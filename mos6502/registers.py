@@ -16,11 +16,11 @@ class Registers:
 
     def __init__(self,
                  endianness=mos6502.memory.ENDIANNESS,
-                 PC=Word(),
-                 SP=Word(),
-                 A=Byte(),
-                 X=Byte(),
-                 Y=Byte()):
+                 PC=Word(0x00),
+                 SP=Word(0x00),
+                 A=Byte(0x00),
+                 X=Byte(0x00),
+                 Y=Byte(0x00)):
         """
         Return a mos6502 register instance.
 

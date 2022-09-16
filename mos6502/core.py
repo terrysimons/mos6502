@@ -17,6 +17,7 @@ from mos6502.memory import Byte, Word, RAM
 INFINITE_CYCLES = 0xFFFFFFFF
 
 
+# https://retro64.altervista.org/blog/an-introduction-to-6502-math-addiction-subtraction-and-more/
 # https://www.pagetable.com/c64ref/6502/
 # http://www.emulator101.com/6502-addressing-modes.html
 # https://www.bigmessowires.com/2010/03/27/8-bit-cpu-comparison/
@@ -117,7 +118,11 @@ class MOS6502CPU(flags.ProcessorStatusFlagsInterface):
         """
         addr: Word = self.PC
         byte: Byte = self.ram[self.PC]
-        self.PC += 1
+
+        if self.PC < 65535:
+            self.PC += 1
+        else:
+            self.PC = 0
         self.spend_cpu_cycles(cost=1)
 
         self.log.debug(

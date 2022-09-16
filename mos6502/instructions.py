@@ -1704,18 +1704,6 @@ InstructionSet.map[InstructionSet.LDA_ABSOLUTE_0xAD] = {
     'flags': lda_absolute_0xad_can_modify_flags
 }
 
-# https://masswerk.at/6502/6502_instruction_set.html#LDA
-#
-# Load Accumulator with Memory
-#
-# M -> A
-# N	Z	C	I	D	V
-# +	+	-	-	-	-
-# addressing	assembler	opc	bytes	cycles
-# absolute,Y	LDA oper,Y	B9	3	4*
-# (indirect,X)	LDA (oper,X)	A1	2	6
-# (indirect),Y	LDA (oper),Y	B1	2	5*
-
 lda_absolute_x_0xbd_can_modify_flags: Byte = lda_immediate_0xa9_can_modify_flags
 InstructionSet.map[InstructionSet.LDA_ABSOLUTE_X_0xBD] = {
     'addressing': 'absolute,X',
@@ -1726,32 +1714,35 @@ InstructionSet.map[InstructionSet.LDA_ABSOLUTE_X_0xBD] = {
     'flags': lda_absolute_x_0xbd_can_modify_flags
 }
 
-# InstructionSet.map[] = {
-#     'addressing': '',
-#     'assembler': '',
-#     'opc': ,
-#     'bytes': '',
-#     'cycles': '',
-#     'flags':
-# }
+lda_absolute_y_0xb9_can_modify_flags: Byte = lda_immediate_0xa9_can_modify_flags
+InstructionSet.map[InstructionSet.LDA_ABSOLUTE_Y_0xB9] = {
+    'addressing': 'absolute,Y',
+    'assembler': 'LDA {oper},Y',
+    'opc': InstructionSet.LDA_ABSOLUTE_Y_0xB9,
+    'bytes': '3',
+    'cycles': '4*',
+    'flags': lda_absolute_y_0xb9_can_modify_flags
+}
 
-# InstructionSet.map[] = {
-#     'addressing': '',
-#     'assembler': '',
-#     'opc': ,
-#     'bytes': '',
-#     'cycles': '',
-#     'flags':
-# }
+lda_indexed_indirect_x_0xa1_can_modify_flags: Byte = lda_immediate_0xa9_can_modify_flags
+InstructionSet.map[InstructionSet.LDA_INDEXED_INDIRECT_X_0xA1] = {
+    'addressing': '(indirect, X)',
+    'assembler': 'LDA ({oper},X)',
+    'opc': InstructionSet.LDA_INDEXED_INDIRECT_X_0xA1,
+    'bytes': '2',
+    'cycles': '6',
+    'flags': lda_indexed_indirect_x_0xa1_can_modify_flags
+}
 
-# InstructionSet.map[] = {
-#     'addressing': '',
-#     'assembler': '',
-#     'opc': ,
-#     'bytes': '',
-#     'cycles': '',
-#     'flags':
-# }
+lda_indirect_indexed_y_0xb1_can_modify_flags: Byte = lda_immediate_0xa9_can_modify_flags
+InstructionSet.map[InstructionSet.LDA_INDIRECT_INDEXED_Y_0xB1] = {
+    'addressing': '({indirect}),Y',
+    'assembler': 'LDA (oper),Y',
+    'opc': LDA_INDIRECT_INDEXED_Y_0xB1,
+    'bytes': '2',
+    'cycles': '5*',
+    'flags': lda_indirect_indexed_y_0xb1_can_modify_flags
+}
 
 '''JSR'''
 # InstructionSet.map[] = {
