@@ -1,28 +1,20 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
+import argparse
 import nox
 
-nox.options.sessions = ['lint', 'test']
-
-@nox.session
-def lint(session):
-    session.run('pip', 'install', 'poetry')
-    session.run('pip', 'install', 'pycodestyle')
-    session.run('pip', 'install', 'pydocstyle')
-
-    session.run('poetry', 'build')
-    session.run('poetry', 'install')
-    session.run('poetry', 'shell')
-
-    session.run('pycodestyle', '--max-line-length=100', '--ignore=E741,E743', 'mos6502')
-    # session.run('pycodestyle', '--max-line-length=100', '--ignore=E741,E743', 'tests')
-    session.run('pydocstyle', 'mos6502')
+nox.options.sessions = ['test']
 
 @nox.session
 def test(session):
-    session.run('poetry', 'install')
-    session.run('poetry', 'shell')
-    session.run('pytest')
+    session.run('pip', 'install', 'pycodestyle')
+    session.run('pip', 'install', 'pydocstyle')
+
+    session.run('poetry', 'build', external=True)
+    session.run('poetry', '-q', 'install', external=True)
+    session.run('pytest', external=True)
+    session.run('pycodestyle', '--max-line-length=100', '--ignore=E741,E743', 'mos6502', external=True)
+    session.run('pydocstyle', 'mos6502', external=True)
 
 @nox.session
 def release(session: nox.Session) -> None:
