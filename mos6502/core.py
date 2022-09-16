@@ -4,8 +4,7 @@
 
 import logging
 
-import bitarray
-from bitarray.util import int2ba, ba2int
+from bitarray.util import ba2int
 
 from mos6502.exceptions import CPUCycleExhaustionException
 import mos6502.flags as flags
@@ -74,8 +73,10 @@ class MOS6502CPU(flags.ProcessorStatusFlagsInterface):
         """
         for i in range(cycles):
             if self.cycles <= 0:
+                self.log.info(self)
                 raise CPUCycleExhaustionException(
-                    f'Exhausted available CPU cycles after {self.cycles_executed} executed cycles.'
+                    f'Exhausted available CPU cycles after {self.cycles_executed} '
+                    f'executed cycles with {self.cycles} remaining.'
                 )
 
             self.cycles_executed += 1
@@ -119,6 +120,7 @@ class MOS6502CPU(flags.ProcessorStatusFlagsInterface):
         addr: Word = self.PC
         byte: Byte = self.ram[self.PC]
 
+        # TODO: This should be handled in the Word class
         if self.PC < 65535:
             self.PC += 1
         else:
@@ -456,13 +458,70 @@ class MOS6502CPU(flags.ProcessorStatusFlagsInterface):
         """
         self.cycles: int = cycles
 
-        while self.cycles > 0:
+        self.log.info(self)
+
+        while True:
+            if self.cycles <= 0:
+                self.log.info(self)
+                raise CPUCycleExhaustionException(
+                    f'Exhausted available CPU cycles after {self.cycles_executed} '
+                    f'executed cycles with {self.cycles} remaining.'
+                )
+
             instruction: Byte = self.fetch_byte()
 
-            self.log.debug(
-                f'Got instruction 0x{instruction:02x} @ {hex(self.PC - 1)}: '
-                f'{instructions.InstructionSet(instruction).name}'
-            )
+            # self.log.debug(
+            #     f'Got instruction 0x{instruction:02x} @ {hex(self.PC - 1)}: '
+            #     f'{instructions.InstructionSet(instruction).name}'
+            # )
+
+            instruction_bytes: int = 0
+
+            machine_code = []
+            operand: memory.MemoryUnit = 0
+            assembly = ''
+            if instruction.value in instructions.InstructionSet.map:
+                instruction_map: int = instructions.InstructionSet.map[instruction.value]
+
+                instruction_bytes: int = int(instruction_map['bytes'])
+
+                # Subtract 1 for the instruction
+                for i in range(instruction_bytes - 1):
+                    machine_code.append(int(self.ram[self.PC + i]))
+
+                # for operand in machine_code:
+                #     operands += str(hex(operand))
+
+                if len(machine_code) > 2:
+                    raise Exception('Unsure how to handle.')
+
+                if len(machine_code) == 0:
+                    assembly: str = instruction_map['assembler']
+                    operand: memory.MemoryUnit = None
+
+                if len(machine_code) == 1:
+                    operand: memory.MemoryUnit = Byte(
+                        value=machine_code[0],
+                        endianness=self.endianness
+                    )
+                    assembly = instruction_map['assembler'].format(oper=f'0x{operand:02X}')
+
+                if len(machine_code) == 2:
+                    low_byte = machine_code[0]
+                    high_byte = machine_code[1]
+
+                    operand: memory.MemoryUnit = Word((high_byte << 8) + low_byte)
+
+                    assembly: str = instruction_map['assembler'].format(oper=f'0x{operand:02X}')
+
+            if operand is not None:
+                self.log.info(
+                    f'0x{self.PC - 1:02X}: 0x{instruction:02X} 0x{operand:02X} ---- {assembly}'
+                )
+            else:
+                self.log.info(
+                    f'0x{self.PC - 1:02X}: 0x{instruction:02X} ---- {assembly}'
+                )
 
             match instruction:
                 # ''' Execute ADC '''
@@ -682,6 +741,8 @@ class MOS6502CPU(flags.ProcessorStatusFlagsInterface):
 
                 # ''' LSR '''
                 # NOP
+                case instructions.NOP_IMPLIED_0xEA:
+                    self.spend_cpu_cycles(1)
                 # ORA
                 # PHA
                 # PHP
@@ -733,10 +794,6 @@ class MOS6502CPU(flags.ProcessorStatusFlagsInterface):
                 # ''' Unhandled Instruction '''
                 case _:
                     self.log.error(f'ILLEGAL INSTRUCTION: {instruction} ({instruction:02X})')
-
-            self.spend_cpu_cycles(cost=1)
-
-        return self.cycles_executed
 
     def reset(self):
         """
@@ -898,15 +955,15 @@ class MOS6502CPU(flags.ProcessorStatusFlagsInterface):
     def __str__(self):
         """Return the CPU status."""
         description = f"{type(self).__name__}\n"
-        description += f"\tPC: {hex(int.from_bytes(self.PC, byteorder=self.endianness))}\n"
-        description += f"\tSP: {hex(int.from_bytes(self.SP, byteorder=self.endianness))}\n"
-        description += f"\tC: {self.C[flags.C]}\n"
-        description += f"\tZ: {self.Z[flags.Z]}\n"
-        description += f"\tI: {self.I[flags.I]}\n"
-        description += f"\tD: {self.D[flags.D]}\n"
-        description += f"\tB: {self.B[flags.B]}\n"
-        description += f"\tV: {self.V[flags.V]}\n"
-        description += f"\tN: {self.N[flags.N]}\n"
+        description += f"\tPC: 0x{self.PC:04X}\n"
+        description += f"\tSP: 0x{self.SP:02X}\n"
+        description += f"\tC: {self.C}\n"
+        description += f"\tZ: {self.Z}\n"
+        description += f"\tI: {self.I}\n"
+        description += f"\tD: {self.D}\n"
+        description += f"\tB: {self.B}\n"
+        description += f"\tV: {self.V}\n"
+        description += f"\tN: {self.N}\n"
 
         return description
 
@@ -921,10 +978,11 @@ def main() -> None:
     then loads 0x23 from 0x4243 using the LDA_IMMEDIATE instruction.
     """
     log: logging.Logger = logging.getLogger('mos6502')
-    logging.basicConfig(format='%(message)s', level=logging.DEBUG)
+    logging.basicConfig(format='%(message)s', level=logging.INFO)
 
     with MOS6502CPU() as cpu:
         cpu.reset()
+        cpu.ram.fill(Byte(instructions.NOP_IMPLIED_0xEA))
         # Supported instructions
         # LDA, LDX, LDY - see tests/test_mos6502_LDA_LDX_LDY_instruction.py
         # JSR - see tests/test_mos6502_JMP_JSR_instruction.py

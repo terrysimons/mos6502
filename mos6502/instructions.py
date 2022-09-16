@@ -1669,8 +1669,8 @@ InstructionSet.map[InstructionSet.LDA_IMMEDIATE_0xA9] = {
     'addressing': 'immediate',
     'assembler': 'LDA #{oper}',
     'opc': InstructionSet.LDA_IMMEDIATE_0xA9,
-    'bytes': 2,
-    'cycles': 2,
+    'bytes': '2',
+    'cycles': '2',
     'flags': lda_immediate_0xa9_can_modify_flags
 }
 
@@ -1679,8 +1679,8 @@ InstructionSet.map[InstructionSet.LDA_ZEROPAGE_0xA5] = {
     'addressing': 'zeropage',
     'assembler': 'LDA {oper}',
     'opc': InstructionSet.LDA_ZEROPAGE_0xA5,
-    'bytes': 2,
-    'cycles': 3,
+    'bytes': '2',
+    'cycles': '3',
     'flags': lda_zeropage_0xa5_can_modify_flags
 }
 
@@ -1745,14 +1745,26 @@ InstructionSet.map[InstructionSet.LDA_INDIRECT_INDEXED_Y_0xB1] = {
 }
 
 '''JSR'''
-# InstructionSet.map[] = {
-#     'addressing': '',
-#     'assembler': '',
-#     'opc': ,
-#     'bytes': '',
-#     'cycles': '',
-#     'flags':
-# }
+jsr_absolute_0x20_can_modify_flags: Byte = Byte()
+InstructionSet.map[InstructionSet.JSR_ABSOLUTE_0x20] = {
+    'addressing': 'absolute',
+    'assembler': 'JSR {oper}',
+    'opc': InstructionSet.JSR_ABSOLUTE_0x20,
+    'bytes': '3',
+    'cycles': '6',
+    'flags': jsr_absolute_0x20_can_modify_flags
+}
+
+'''NOP'''
+nop_implied_0xea_can_modify_flags: Byte = Byte()
+InstructionSet.map[NOP_IMPLIED_0xEA] = {
+    'addressing': 'implied',
+    'assembler': 'NOP',
+    'opc': NOP_IMPLIED_0xEA,
+    'bytes': '1',
+    'cycles': '2',
+    'flags': nop_implied_0xea_can_modify_flags
+}
 
 # Template
 # InstructionSet.map[] = {
