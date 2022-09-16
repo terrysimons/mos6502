@@ -1,8 +1,6 @@
 import mos6502
 from mos6502 import __version__
 
-import bitarray
-
 from mos6502 import flags
 
 def test_version():
@@ -297,29 +295,6 @@ def test_all_flags() -> None:
         flags.ProcessorStatusFlags.V[flags.V] << flags.V |
         flags.ProcessorStatusFlags.N[flags.N] << flags.N
     )
-
-def test_no_cycles():
-    cpu: mos6502.CPU = mos6502.CPU()
-    cpu.reset()
-
-    # given:
-    # This is an illegal instruction
-    cpu.ram[0xFFFC] = 0xFC
-
-    # when:
-    # This shouldn't run any code, so if it does, we'll get
-    # an IllegalCPUInstructionException and the test will fail
-    cpu.execute(cycles=0)
-
-    # Now make sure that the illegal instruction throws an exception
-    test_passed = False
-    try:
-        cpu.execute(cycles=1)
-    except mos6502.exceptions.IllegalCPUInstructionException:
-        test_passed = True
-
-    # then:
-    assert test_passed == True
 
 # def test_cpu_context_manager():
 #     import mos6502
