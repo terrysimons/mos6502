@@ -23,6 +23,7 @@ def check_noop_flags(expected_cpu, actual_cpu):
 def test_cpu_instruction_NOP_IMPLIED_0xEA():
     # given:
     cpu: mos6502.CPU = mos6502.CPU()
+    cpu.reset()
     initial_cpu: mos6502.CPU = copy.deepcopy(cpu)
 
     cpu.ram[0xFFFC] = instructions.NOP_IMPLIED_0xEA
