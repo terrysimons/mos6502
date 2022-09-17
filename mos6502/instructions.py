@@ -1655,13 +1655,98 @@ class InstructionSet(enum.IntEnum):
 # as well as generate the machine code using the enumeration and a little bit of hackery
 InstructionSet.map = {}
 
+'''CLC'''
+# https://masswerk.at/6502/6502_instruction_set.html#CLC
+# Clear Carry Flag
+#
+# 0 -> C
+# N	Z	C	I	D	V
+# -	-	0	-	-	-
+# addressing	assembler	opc	bytes	cycles
+# implied	CLC	18	1	2
+#
+clc_immediate_0x18_can_modify_flags: Byte = Byte()
+clc_immediate_0x18_can_modify_flags[flags.C] = True
+InstructionSet.map[InstructionSet.CLC_IMPLIED_0x18] = {
+    'addressing': 'implied',
+    'assembler': 'CLC',
+    'opc': InstructionSet.CLC_IMPLIED_0x18,
+    'bytes': '1',
+    'cycles': '2',
+    'flags': clc_immediate_0x18_can_modify_flags
+}
+
+
+'''CLD'''
+# https://masswerk.at/6502/6502_instruction_set.html#CLD
+# Clear Decimal Mode
+#
+# 0 -> D
+# N	Z	C	I	D	V
+# -	-	-	-	0	-
+# addressing	assembler	opc	bytes	cycles
+# implied	CLD	D8	1	2
+# CLD_IMPLIED_0xD8: Literal[216] = 0xD8
+cld_immediate_0xd8_can_modify_flags: Byte = Byte()
+cld_immediate_0xd8_can_modify_flags[flags.D] = True
+InstructionSet.map[InstructionSet.CLD_IMPLIED_0xD8] = {
+    'addressing': 'implied',
+    'assembler': 'CLD',
+    'opc': 0xD8,
+    'bytes': '1',
+    'cycles': '2',
+    'flags': cld_immediate_0xd8_can_modify_flags
+}
+
+
+'''CLI'''
+# https://masswerk.at/6502/6502_instruction_set.html#CLI
+# Clear Interrupt Disable Bit
+#
+# 0 -> I
+# N	Z	C	I	D	V
+# -	-	-	0	-	-
+# addressing	assembler	opc	bytes	cycles
+# implied	CLI	58	1	2
+# CLI_IMPLIED_0x58: Literal[88] = 0x58
+cli_immediate_0x58_can_modify_flags: Byte = Byte()
+cli_immediate_0x58_can_modify_flags[flags.I] = True
+InstructionSet.map[InstructionSet.CLI_IMPLIED_0x58] = {
+    'addressing': 'implied',
+    'assembler': 'CLI',
+    'opc': InstructionSet.CLI_IMPLIED_0x58,
+    'bytes': '1',
+    'cycles': '2',
+    'flags': cli_immediate_0x58_can_modify_flags
+}
+
+
+
+'''CLV'''
+# https://masswerk.at/6502/6502_instruction_set.html#CLV
+# Clear Overflow Flag
+#
+# 0 -> V
+# N	Z	C	I	D	V
+# -	-	-	-	-	0
+# addressing	assembler	opc	bytes	cycles
+# implied	CLV	B8	1	2
+# CLV_IMPLIED_0xB8 = 0xB8
+clv_immediate_0xb8_can_modify_flags: Byte = Byte()
+clv_immediate_0xb8_can_modify_flags[flags.V]
+InstructionSet.map[InstructionSet.CLV_IMPLIED_0xB8] = {
+    'addressing': 'implied',
+    'assembler': 'CLV',
+    'opc': InstructionSet.CLV_IMPLIED_0xB8,
+    'bytes': '1',
+    'cycles': '2',
+    'flags': clv_immediate_0xb8_can_modify_flags
+}
+
+
+
 '''LDA'''
 lda_immediate_0xa9_can_modify_flags: Byte = Byte()
-lda_immediate_0xa9_can_modify_flags[flags.C] = False
-lda_immediate_0xa9_can_modify_flags[flags.B] = False
-lda_immediate_0xa9_can_modify_flags[flags.D] = False
-lda_immediate_0xa9_can_modify_flags[flags.I] = False
-lda_immediate_0xa9_can_modify_flags[flags.V] = False
 lda_immediate_0xa9_can_modify_flags[flags.N] = True
 lda_immediate_0xa9_can_modify_flags[flags.Z] = True
 

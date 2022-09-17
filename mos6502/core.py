@@ -6,7 +6,7 @@ import logging
 
 from bitarray.util import ba2int
 
-from mos6502.exceptions import CPUCycleExhaustionException
+import mos6502.exceptions as exceptions
 import mos6502.flags as flags
 import mos6502.instructions as instructions
 import mos6502.registers as registers
@@ -43,7 +43,6 @@ class MOS6502CPU(flags.ProcessorStatusFlagsInterface):
         self.ram = RAM(endianness=self.endianness)
         self.cycles = 0
         self.cycles_executed = 0
-        self.reset()
 
     def __enter__(self):
         """With entrypoint."""
@@ -73,8 +72,7 @@ class MOS6502CPU(flags.ProcessorStatusFlagsInterface):
         """
         for i in range(cycles):
             if self.cycles <= 0:
-                self.log.info(self)
-                raise CPUCycleExhaustionException(
+                raise exceptions.CPUCycleExhaustionException(
                     f'Exhausted available CPU cycles after {self.cycles_executed} '
                     f'executed cycles with {self.cycles} remaining.'
                 )
@@ -104,6 +102,8 @@ class MOS6502CPU(flags.ProcessorStatusFlagsInterface):
         Arguments:
             cost: the number of cycles to consume
         """
+        for i in range(cost):
+            self.log.info('*')
         self.tick(cost)
 
     def fetch_byte(self) -> Byte:
@@ -125,6 +125,7 @@ class MOS6502CPU(flags.ProcessorStatusFlagsInterface):
             self.PC += 1
         else:
             self.PC = 0
+        self.log.info('f')
         self.spend_cpu_cycles(cost=1)
 
         self.log.debug(
@@ -148,11 +149,13 @@ class MOS6502CPU(flags.ProcessorStatusFlagsInterface):
         """
         addr1: Word = self.PC
         lowbyte: Byte = self.ram[self.PC]
+        self.log.info('f')
         self.spend_cpu_cycles(cost=1)
 
         self.PC = self.PC + 1
         addr2: Word = self.PC
         highbyte: Byte = self.ram[self.PC]
+        self.log.info('f')
         self.spend_cpu_cycles(cost=1)
 
         word = (highbyte << 8) + lowbyte
@@ -181,6 +184,7 @@ class MOS6502CPU(flags.ProcessorStatusFlagsInterface):
         """
         memory_section = self.ram.memory_section(address=address)
         data: Byte = self.ram[int(address)]
+        self.log.info('r')
         self.spend_cpu_cycles(cost=1)
         self.log.debug(f'read_byte({memory_section}[0x{address:02x}]): {data}')
         return data
@@ -199,6 +203,7 @@ class MOS6502CPU(flags.ProcessorStatusFlagsInterface):
             None
         """
         self.ram[address] = 0xFF & data
+        self.log.info('w')
         self.spend_cpu_cycles(cost=1)
 
     def read_word(self, address: Word) -> Word:
@@ -215,8 +220,10 @@ class MOS6502CPU(flags.ProcessorStatusFlagsInterface):
         """
         memory_section = self.ram.memory_section(address=address)
         lowbyte: Byte = self.ram[int(address)]
+        self.log.info('r')
         self.spend_cpu_cycles(cost=1)
         highbyte: Byte = self.ram[int(address) + 1]
+        self.log.info('r')
         self.spend_cpu_cycles(cost=1)
         data = (int(highbyte) << 8) + int(lowbyte)
         self.log.debug(f'read_word({memory_section}[0x{address:02x}]): {data}')
@@ -242,8 +249,10 @@ class MOS6502CPU(flags.ProcessorStatusFlagsInterface):
             lowbyte: int = ba2int(data.lowbyte_bits)
             highbyte: int = ba2int(data.highbyte_bits)
         self.ram[address] = lowbyte
+        self.log.info('w')
         self.spend_cpu_cycles(cost=1)
         self.ram[address + 1] = highbyte
+        self.log.info('w')
         self.spend_cpu_cycles(cost=1)
 
     def set_load_status_flags(self, register_name) -> None:
@@ -365,6 +374,7 @@ class MOS6502CPU(flags.ProcessorStatusFlagsInterface):
             address: Word = absolute_address + offset_register_value
 
             if address.overflow:
+                self.log.info('o')
                 self.spend_cpu_cycles(1)
         else:
             address: Word = absolute_address
@@ -438,6 +448,7 @@ class MOS6502CPU(flags.ProcessorStatusFlagsInterface):
         address: Word = Word(absolute_address) + Byte(offset_register_value)
 
         if address.overflow:
+            self.log.info('o')
             self.spend_cpu_cycles(1)
 
         setattr(self, register_name, self.read_byte(address=address))
@@ -458,12 +469,9 @@ class MOS6502CPU(flags.ProcessorStatusFlagsInterface):
         """
         self.cycles: int = cycles
 
-        self.log.info(self)
-
         while True:
             if self.cycles <= 0:
-                self.log.info(self)
-                raise CPUCycleExhaustionException(
+                raise exceptions.CPUCycleExhaustionException(
                     f'Exhausted available CPU cycles after {self.cycles_executed} '
                     f'executed cycles with {self.cycles} remaining.'
                 )
@@ -480,10 +488,17 @@ class MOS6502CPU(flags.ProcessorStatusFlagsInterface):
             machine_code = []
             operand: memory.MemoryUnit = 0
             assembly = ''
+            instruction_cycle_count: int = 0
             if instruction.value in instructions.InstructionSet.map:
                 instruction_map: int = instructions.InstructionSet.map[instruction.value]
 
                 instruction_bytes: int = int(instruction_map['bytes'])
+
+                instruction_cycle_count = instruction_map['cycles']
+                try:
+                    instruction_cycle_count: int = int(instruction_map['cycles'])
+                except ValueError:
+                    pass
 
                 # Subtract 1 for the instruction
                 for i in range(instruction_bytes - 1):
@@ -507,8 +522,8 @@ class MOS6502CPU(flags.ProcessorStatusFlagsInterface):
                     assembly = instruction_map['assembler'].format(oper=f'0x{operand:02X}')
 
                 if len(machine_code) == 2:
-                    low_byte = machine_code[0]
-                    high_byte = machine_code[1]
+                    low_byte: memory.MemoryUnit = machine_code[0]
+                    high_byte: memory.MemoryUnit = machine_code[1]
 
                     operand: memory.MemoryUnit = Word((high_byte << 8) + low_byte)
 
@@ -516,11 +531,11 @@ class MOS6502CPU(flags.ProcessorStatusFlagsInterface):
 
             if operand is not None:
                 self.log.info(
-                    f'0x{self.PC - 1:02X}: 0x{instruction:02X} 0x{operand:02X} ---- {assembly}'
+                    f'0x{self.PC - 1:02X}: 0x{instruction:02X} 0x{operand:02X} \t\t\t {assembly} \t\t\t {instruction_cycle_count}'
                 )
             else:
                 self.log.info(
-                    f'0x{self.PC - 1:02X}: 0x{instruction:02X} ---- {assembly}'
+                    f'0x{self.PC - 1:02X}: 0x{instruction:02X} ---- \t\t\t {assembly} \t\t\t {instruction_cycle_count}'
                 )
 
             match instruction:
@@ -579,9 +594,29 @@ class MOS6502CPU(flags.ProcessorStatusFlagsInterface):
                 # BVC
                 # BVS
                 # CLC
+                case instructions.CLC_IMPLIED_0x18:
+                    self.C = 0
+                    self.log.info('i')
+                    self.spend_cpu_cycles(1)
+
                 # CLD
+                case instructions.CLD_IMPLIED_0xD8:
+                    self.D = 0
+                    self.log.info('i')
+                    self.spend_cpu_cycles(1)
+
                 # CLI
+                case instructions.CLI_IMPLIED_0x58:
+                    self.I = 0
+                    self.log.info('i')
+                    self.spend_cpu_cycles(1)
+
                 # CLV
+                case instructions.CLV_IMPLIED_0xB8:
+                    self.V = 0
+                    self.log.info('i')
+                    self.spend_cpu_cycles(1)
+
                 # CMP
                 # CPX
                 # CPY
@@ -604,6 +639,7 @@ class MOS6502CPU(flags.ProcessorStatusFlagsInterface):
 
                     self.ram[self.SP] = self.PC - 1
                     self.PC = subroutine_address
+                    self.log.info('i')
                     self.spend_cpu_cycles(cost=1)
 
                     self.log.debug(
@@ -742,7 +778,8 @@ class MOS6502CPU(flags.ProcessorStatusFlagsInterface):
                 # ''' LSR '''
                 # NOP
                 case instructions.NOP_IMPLIED_0xEA:
-                    self.spend_cpu_cycles(1)
+                    self.log.info('i')
+                    self.spend_cpu_cycles(cost=1)
                 # ORA
                 # PHA
                 # PHP
@@ -804,7 +841,7 @@ class MOS6502CPU(flags.ProcessorStatusFlagsInterface):
         The PC and SP need to be set up.
         This also clears CPU flags and registers and initializes RAM to 0s.
         """
-        self.log.debug("Reset")
+        self.log.info("Reset")
         self.PC: Word = Word(0xFFFC, endianness=self.endianness)
         self.SP: Word = Word(0x0100, endianness=self.endianness)
 
@@ -836,6 +873,7 @@ class MOS6502CPU(flags.ProcessorStatusFlagsInterface):
         Returns:
             Byte()
         """
+        self.log.debug(f'Flags -> 0x{getattr(self, "_flags"):02X}')
         return getattr(self, '_flags')
 
     @flags.setter
@@ -846,6 +884,7 @@ class MOS6502CPU(flags.ProcessorStatusFlagsInterface):
         Arguments:
             flags: Byte()
         """
+        self.log.debug(f'0x{getattr(self._flags, "_flags"):02X} <- Flags')
         setattr(self._flags, flags)
 
     @property
@@ -856,6 +895,7 @@ class MOS6502CPU(flags.ProcessorStatusFlagsInterface):
         Returns:
             Word()
         """
+        self.log.debug(f'0x{getattr(self._registers, "PC"):04X} <- PC')
         return getattr(self._registers, 'PC')
 
     @PC.setter
@@ -866,6 +906,7 @@ class MOS6502CPU(flags.ProcessorStatusFlagsInterface):
         Arguments:
             PC: Word()
         """
+        self.log.info(f'PC -> 0x{getattr(self._registers, "PC"):04X}')
         setattr(self._registers, 'PC', Word(PC))
 
     @property
@@ -880,6 +921,7 @@ class MOS6502CPU(flags.ProcessorStatusFlagsInterface):
         Returns:
             Word()
         """
+        self.log.debug(f'0x{getattr(self._registers, "SP"):02X} <- SP')
         return getattr(self._registers, 'SP')
 
     @SP.setter
@@ -890,6 +932,7 @@ class MOS6502CPU(flags.ProcessorStatusFlagsInterface):
         Arguments:
             SP: Word()
         """
+        self.log.info(f'SP -> 0x{getattr(self._registers, "SP"):02X}')
         setattr(self._registers, 'SP', Word(SP))
 
     @property
@@ -900,6 +943,7 @@ class MOS6502CPU(flags.ProcessorStatusFlagsInterface):
         Returns:
             Byte()
         """
+        self.log.debug(f'0x{getattr(self._registers, "Y"):02X} <- A')
         return getattr(self._registers, 'A')
 
     @A.setter
@@ -910,6 +954,7 @@ class MOS6502CPU(flags.ProcessorStatusFlagsInterface):
         Arguments:
             A: Byte()
         """
+        self.log.info(f'A -> 0x{getattr(self._registers, "A"):02X}')
         setattr(self._registers, 'A', A)
 
     @property
@@ -920,6 +965,7 @@ class MOS6502CPU(flags.ProcessorStatusFlagsInterface):
         Returns:
             Byte()
         """
+        self.log.debug(f'0x{getattr(self._registers, "Y"):02X} <- X')
         return getattr(self._registers, 'X')
 
     @X.setter
@@ -930,6 +976,7 @@ class MOS6502CPU(flags.ProcessorStatusFlagsInterface):
         Arguments:
             X: Byte()
         """
+        self.log.info(f'X -> 0x{getattr(self._registers, "X"):02X}')
         setattr(self._registers, 'X', X)
 
     @property
@@ -940,6 +987,7 @@ class MOS6502CPU(flags.ProcessorStatusFlagsInterface):
         Returns:
             Byte()
         """
+        self.log.debug(f'0x{getattr(self._registers, "Y"):02X} <- Y')
         return getattr(self._registers, 'Y')
 
     @Y.setter
@@ -950,6 +998,7 @@ class MOS6502CPU(flags.ProcessorStatusFlagsInterface):
         Arguments:
             Y: Byte()
         """
+        self.log.info(f'Y -> 0x{getattr(self._registers, "Y"):02X}')
         setattr(self._registers, 'Y', Y)
 
     def __str__(self):
@@ -982,10 +1031,17 @@ def main() -> None:
 
     with MOS6502CPU() as cpu:
         cpu.reset()
+        log.info(cpu)
+
         cpu.ram.fill(Byte(instructions.NOP_IMPLIED_0xEA))
         # Supported instructions
         # LDA, LDX, LDY - see tests/test_mos6502_LDA_LDX_LDY_instruction.py
         # JSR - see tests/test_mos6502_JMP_JSR_instruction.py
+
+        cpu.C = 1
+        cpu.D = 1
+        cpu.V = 1
+        cpu.I = 1
 
         # Jump to 0x4242
         # Should be 9 cycles
@@ -994,11 +1050,20 @@ def main() -> None:
         cpu.ram[0xFFFE] = 0x42
         cpu.ram[0x4242] = instructions.LDA_IMMEDIATE_0xA9
         cpu.ram[0x4243] = 0x23
+        cpu.ram[0x4244] = instructions.CLC_IMPLIED_0x18
+        cpu.ram[0x4245] = instructions.CLD_IMPLIED_0xD8
+        cpu.ram[0x4246] = instructions.CLV_IMPLIED_0xB8
+        cpu.ram[0x4247] = instructions.CLI_IMPLIED_0x58
+
+        log.info(cpu)
 
         try:
-            cpu.execute(cycles=INFINITE_CYCLES)
-        except instructions.IllegalCPUInstructionException:
-            log.debug(f'Used: {cpu.cycles_executed} cycles')
+            cpu.execute(cycles=20)
+        except exceptions.CPUCycleExhaustionException:
+            log.info(f'Used: {cpu.cycles_executed} cycles')
+
+        log.info(cpu)
+
 
 
 if __name__ == '__main__':
