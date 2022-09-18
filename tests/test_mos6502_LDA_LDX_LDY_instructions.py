@@ -182,6 +182,8 @@ def test_cpu_instruction_LDA_IMMEDIATE_0xA9_with_negative_flag() -> None:
 
     expected_flags[flags.Z] = False
     expected_flags[flags.N] = True
+    cpu.flags[flags.Z] = not expected_flags[flags.Z]
+    cpu.flags[flags.N] = not expected_flags[flags.N]
 
     verify_load_immediate(
         cpu=cpu,
@@ -199,6 +201,8 @@ def test_cpu_instruction_LDA_IMMEDIATE_0xA9_without_negative_flag() -> None:
 
     expected_flags[flags.Z] = False
     expected_flags[flags.N] = False
+    cpu.flags[flags.Z] = not expected_flags[flags.Z]
+    cpu.flags[flags.N] = not expected_flags[flags.N]
 
     verify_load_immediate(
         cpu=cpu,
@@ -216,6 +220,8 @@ def test_cpu_instruction_LDA_IMMEDIATE_0xA9_with_zero_flag() -> None:
 
     expected_flags[flags.Z] = True
     expected_flags[flags.N] = False
+    cpu.flags[flags.Z] = not expected_flags[flags.Z]
+    cpu.flags[flags.N] = not expected_flags[flags.N]
 
     verify_load_immediate(
         cpu=cpu,
@@ -233,6 +239,8 @@ def test_cpu_instruction_LDA_ZEROPAGE_0xA5_with_negative_flag() -> None:
 
     expected_flags[flags.Z] = False
     expected_flags[flags.N] = True
+    cpu.flags[flags.Z] = not expected_flags[flags.Z]
+    cpu.flags[flags.N] = not expected_flags[flags.N]
 
     verify_load_zeropage(
         cpu=cpu,
@@ -251,6 +259,8 @@ def test_cpu_instruction_LDA_ZEROPAGE_0xA5_without_negative_flag() -> None:
 
     expected_flags[flags.Z] = False
     expected_flags[flags.N] = False
+    cpu.flags[flags.Z] = not expected_flags[flags.Z]
+    cpu.flags[flags.N] = not expected_flags[flags.N]
 
     verify_load_zeropage(
         cpu=cpu,
@@ -269,6 +279,8 @@ def test_cpu_instruction_LDA_ZEROPAGE_0xA5_with_zero_flag() -> None:
 
     expected_flags[flags.Z] = True
     expected_flags[flags.N] = False
+    cpu.flags[flags.Z] = not expected_flags[flags.Z]
+    cpu.flags[flags.N] = not expected_flags[flags.N]
 
     verify_load_zeropage(
         cpu=cpu,
@@ -287,6 +299,8 @@ def test_cpu_instruction_LDA_ZEROPAGE_X_0xB5_with_negative_flag() -> None:
 
     expected_flags[flags.Z] = False
     expected_flags[flags.N] = True
+    cpu.flags[flags.Z] = not expected_flags[flags.Z]
+    cpu.flags[flags.N] = not expected_flags[flags.N]
 
     verify_load_zeropage(
         cpu=cpu,
@@ -307,6 +321,8 @@ def test_cpu_instruction_LDA_ZEROPAGE_X_0xB5_without_negative_flag() -> None:
 
     expected_flags[flags.Z] = False
     expected_flags[flags.N] = False
+    cpu.flags[flags.Z] = not expected_flags[flags.Z]
+    cpu.flags[flags.N] = not expected_flags[flags.N]
 
     verify_load_zeropage(
         cpu=cpu,
@@ -327,6 +343,8 @@ def test_cpu_instruction_LDA_ZEROPAGE_X_0xB5_with_zero_flag() -> None:
 
     expected_flags[flags.Z] = True
     expected_flags[flags.N] = False
+    cpu.flags[flags.Z] = not expected_flags[flags.Z]
+    cpu.flags[flags.N] = not expected_flags[flags.N]
 
     verify_load_zeropage(
         cpu=cpu,
@@ -347,6 +365,8 @@ def test_cpu_instruction_LDA_ZEROPAGE_X_0xB5_wrap_with_negative_flag() -> None:
 
     expected_flags[flags.Z] = False
     expected_flags[flags.N] = True
+    cpu.flags[flags.Z] = not expected_flags[flags.Z]
+    cpu.flags[flags.N] = not expected_flags[flags.N]
 
     verify_load_zeropage(
         cpu=cpu,
@@ -367,6 +387,8 @@ def test_cpu_instruction_LDA_ZEROPAGE_X_0xB5_wrap_without_negative_flag() -> Non
 
     expected_flags[flags.Z] = False
     expected_flags[flags.N] = False
+    cpu.flags[flags.Z] = not expected_flags[flags.Z]
+    cpu.flags[flags.N] = not expected_flags[flags.N]
 
     verify_load_zeropage(
         cpu=cpu,
@@ -387,6 +409,8 @@ def test_cpu_instruction_LDA_ZEROPAGE_X_0xB5_wrap_with_zero_flag() -> None:
 
     expected_flags[flags.Z] = True
     expected_flags[flags.N] = False
+    cpu.flags[flags.Z] = not expected_flags[flags.Z]
+    cpu.flags[flags.N] = not expected_flags[flags.N]
 
     verify_load_zeropage(
         cpu=cpu,
@@ -407,6 +431,8 @@ def test_cpu_instruction_LDA_ABSOLUTE_0xAD_with_negative_flag() -> None:
 
     expected_flags[flags.Z] = False
     expected_flags[flags.N] = True
+    cpu.flags[flags.Z] = not expected_flags[flags.Z]
+    cpu.flags[flags.N] = not expected_flags[flags.N]
 
     verify_load_absolute(
         cpu=cpu,
@@ -425,6 +451,8 @@ def test_cpu_instruction_LDA_ABSOLUTE_0xAD_without_negative_flag() -> None:
 
     expected_flags[flags.Z] = False
     expected_flags[flags.N] = False
+    cpu.flags[flags.Z] = not expected_flags[flags.Z]
+    cpu.flags[flags.N] = not expected_flags[flags.N]
 
     verify_load_absolute(
         cpu=cpu,
@@ -443,6 +471,8 @@ def test_cpu_instruction_LDA_ABSOLUTE_0xAD_with_zero_flag() -> None:
 
     expected_flags[flags.Z] = True
     expected_flags[flags.N] = False
+    cpu.flags[flags.Z] = not expected_flags[flags.Z]
+    cpu.flags[flags.N] = not expected_flags[flags.N]
 
     verify_load_absolute(
         cpu=cpu,
@@ -461,6 +491,8 @@ def test_cpu_instruction_LDA_ABSOLUTE_X_0xBD_with_negative_flag() -> None:
 
     expected_flags[flags.Z] = False
     expected_flags[flags.N] = True
+    cpu.flags[flags.Z] = not expected_flags[flags.Z]
+    cpu.flags[flags.N] = not expected_flags[flags.N]
 
     verify_load_absolute(
         cpu=cpu,
@@ -481,6 +513,8 @@ def test_cpu_instruction_LDA_ABSOLUTE_X_0xBD_without_negative_flag() -> None:
 
     expected_flags[flags.Z] = False
     expected_flags[flags.N] = False
+    cpu.flags[flags.Z] = not expected_flags[flags.Z]
+    cpu.flags[flags.N] = not expected_flags[flags.N]
 
     verify_load_absolute(
         cpu=cpu,
@@ -501,6 +535,8 @@ def test_cpu_instruction_LDA_ABSOLUTE_X_0xBD_with_zero_flag() -> None:
 
     expected_flags[flags.Z] = True
     expected_flags[flags.N] = False
+    cpu.flags[flags.Z] = not expected_flags[flags.Z]
+    cpu.flags[flags.N] = not expected_flags[flags.N]
 
     verify_load_absolute(
         cpu=cpu,
@@ -521,6 +557,8 @@ def test_cpu_instruction_LDA_ABSOLUTE_X_0xBD_with_negative_flag_crossing_page_bo
 
     expected_flags[flags.Z] = False
     expected_flags[flags.N] = True
+    cpu.flags[flags.Z] = not expected_flags[flags.Z]
+    cpu.flags[flags.N] = not expected_flags[flags.N]
 
     verify_load_absolute(
         cpu=cpu,
@@ -541,6 +579,8 @@ def test_cpu_instruction_LDA_ABSOLUTE_X_0xBD_without_negative_flag_crossing_page
 
     expected_flags[flags.Z] = False
     expected_flags[flags.N] = False
+    cpu.flags[flags.Z] = not expected_flags[flags.Z]
+    cpu.flags[flags.N] = not expected_flags[flags.N]
 
     verify_load_absolute(
         cpu=cpu,
@@ -561,6 +601,8 @@ def test_cpu_instruction_LDA_ABSOLUTE_X_0xBD_with_zero_flag_crossing_page_bounda
 
     expected_flags[flags.Z] = True
     expected_flags[flags.N] = False
+    cpu.flags[flags.Z] = not expected_flags[flags.Z]
+    cpu.flags[flags.N] = not expected_flags[flags.N]
 
     verify_load_absolute(
         cpu=cpu,
@@ -582,6 +624,8 @@ def test_cpu_instruction_LDA_ABSOLUTE_Y_0xB9_with_negative_flag() -> None:
 
     expected_flags[flags.Z] = False
     expected_flags[flags.N] = True
+    cpu.flags[flags.Z] = not expected_flags[flags.Z]
+    cpu.flags[flags.N] = not expected_flags[flags.N]
 
     verify_load_absolute(
         cpu=cpu,
@@ -602,6 +646,8 @@ def test_cpu_instruction_LDA_ABSOLUTE_Y_0xB9_without_negative_flag() -> None:
 
     expected_flags[flags.Z] = False
     expected_flags[flags.N] = False
+    cpu.flags[flags.Z] = not expected_flags[flags.Z]
+    cpu.flags[flags.N] = not expected_flags[flags.N]
 
     verify_load_absolute(
         cpu=cpu,
@@ -622,6 +668,8 @@ def test_cpu_instruction_LDA_ABSOLUTE_Y_0xB9_with_zero_flag() -> None:
 
     expected_flags[flags.Z] = True
     expected_flags[flags.N] = False
+    cpu.flags[flags.Z] = not expected_flags[flags.Z]
+    cpu.flags[flags.N] = not expected_flags[flags.N]
 
     verify_load_absolute(
         cpu=cpu,
@@ -642,6 +690,8 @@ def test_cpu_instruction_LDA_ABSOLUTE_Y_0xB9_with_negative_flag_crossing_page_bo
 
     expected_flags[flags.Z] = False
     expected_flags[flags.N] = True
+    cpu.flags[flags.Z] = not expected_flags[flags.Z]
+    cpu.flags[flags.N] = not expected_flags[flags.N]
 
     verify_load_absolute(
         cpu=cpu,
@@ -662,6 +712,8 @@ def test_cpu_instruction_LDA_ABSOLUTE_Y_0xB9_without_negative_flag_crossing_page
 
     expected_flags[flags.Z] = False
     expected_flags[flags.N] = False
+    cpu.flags[flags.Z] = not expected_flags[flags.Z]
+    cpu.flags[flags.N] = not expected_flags[flags.N]
 
     verify_load_absolute(
         cpu=cpu,
@@ -682,6 +734,8 @@ def test_cpu_instruction_LDA_ABSOLUTE_Y_0xB9_with_zero_flag_crossing_page_bounda
 
     expected_flags[flags.Z] = True
     expected_flags[flags.N] = False
+    cpu.flags[flags.Z] = not expected_flags[flags.Z]
+    cpu.flags[flags.N] = not expected_flags[flags.N]
 
     verify_load_absolute(
         cpu=cpu,
@@ -702,6 +756,8 @@ def test_cpu_instruction_LDA_INDEXED_INDIRECT_X_0xA1_with_negative_flag() -> Non
 
     expected_flags[flags.Z] = False
     expected_flags[flags.N] = True
+    cpu.flags[flags.Z] = not expected_flags[flags.Z]
+    cpu.flags[flags.N] = not expected_flags[flags.N]
 
     verify_load_indexed_indirect(
         cpu=cpu,
@@ -722,6 +778,8 @@ def test_cpu_instruction_LDA_INDEXED_INDIRECT_X_0xA1_without_negative_flag() -> 
 
     expected_flags[flags.Z] = False
     expected_flags[flags.N] = False
+    cpu.flags[flags.Z] = not expected_flags[flags.Z]
+    cpu.flags[flags.N] = not expected_flags[flags.N]
 
     verify_load_indexed_indirect(
         cpu=cpu,
@@ -742,6 +800,8 @@ def test_cpu_instruction_LDA_INDEXED_INDIRECT_X_0xA1_with_zero_flag() -> None:
 
     expected_flags[flags.Z] = True
     expected_flags[flags.N] = False
+    cpu.flags[flags.Z] = not expected_flags[flags.Z]
+    cpu.flags[flags.N] = not expected_flags[flags.N]
 
     verify_load_indexed_indirect(
         cpu=cpu,
@@ -762,6 +822,8 @@ def test_cpu_instruction_LDA_INDIRECT_INDEXED_Y_0xB1_with_negative_flag() -> Non
 
     expected_flags[flags.Z] = False
     expected_flags[flags.N] = True
+    cpu.flags[flags.Z] = not expected_flags[flags.Z]
+    cpu.flags[flags.N] = not expected_flags[flags.N]
 
     # def verify_load_indirect_indexed(cpu, sp_value, data, instruction, offset, register_name, expected_flags, expected_cycles, offset_value=0x00) -> None:
     verify_load_indirect_indexed(
@@ -783,6 +845,8 @@ def test_cpu_instruction_LDA_INDIRECT_INDEXED_Y_0xB1_without_negative_flag() -> 
 
     expected_flags[flags.Z] = False
     expected_flags[flags.N] = False
+    cpu.flags[flags.Z] = not expected_flags[flags.Z]
+    cpu.flags[flags.N] = not expected_flags[flags.N]
 
     # def verify_load_indirect_indexed(cpu, sp_value, data, instruction, offset, register_name, expected_flags, expected_cycles, offset_value=0x00) -> None:
     verify_load_indirect_indexed(
@@ -804,6 +868,8 @@ def test_cpu_instruction_LDA_INDIRECT_INDEXED_Y_0xB1_with_zero_flag() -> None:
 
     expected_flags[flags.Z] = True
     expected_flags[flags.N] = False
+    cpu.flags[flags.Z] = not expected_flags[flags.Z]
+    cpu.flags[flags.N] = not expected_flags[flags.N]
 
     # def verify_load_indirect_indexed(cpu, sp_value, data, instruction, offset, register_name, expected_flags, expected_cycles, offset_value=0x00) -> None:
     verify_load_indirect_indexed(
@@ -825,6 +891,8 @@ def test_cpu_instruction_LDA_INDIRECT_INDEXED_Y_0xB1_with_negative_flag_crossing
 
     expected_flags[flags.Z] = False
     expected_flags[flags.N] = True
+    cpu.flags[flags.Z] = not expected_flags[flags.Z]
+    cpu.flags[flags.N] = not expected_flags[flags.N]
 
     # def verify_load_indirect_indexed(cpu, sp_value, data, instruction, offset, register_name, expected_flags, expected_cycles, offset_value=0x00) -> None:
     verify_load_indirect_indexed(
@@ -846,6 +914,8 @@ def test_cpu_instruction_LDA_INDIRECT_INDEXED_Y_0xB1_without_negative_flag_cross
 
     expected_flags[flags.Z] = False
     expected_flags[flags.N] = False
+    cpu.flags[flags.Z] = not expected_flags[flags.Z]
+    cpu.flags[flags.N] = not expected_flags[flags.N]
 
     # def verify_load_indirect_indexed(cpu, sp_value, data, instruction, offset, register_name, expected_flags, expected_cycles, offset_value=0x00) -> None:
     verify_load_indirect_indexed(
@@ -867,6 +937,8 @@ def test_cpu_instruction_LDA_INDIRECT_INDEXED_Y_0xB1_with_zero_flag_crossing_pag
 
     expected_flags[flags.Z] = True
     expected_flags[flags.N] = False
+    cpu.flags[flags.Z] = not expected_flags[flags.Z]
+    cpu.flags[flags.N] = not expected_flags[flags.N]
 
     # def verify_load_indirect_indexed(cpu, sp_value, data, instruction, offset, register_name, expected_flags, expected_cycles, offset_value=0x00) -> None:
     verify_load_indirect_indexed(
@@ -889,6 +961,8 @@ def test_cpu_instruction_LDX_IMMEDIATE_0xA2_with_negative_flag():
 
     expected_flags[flags.Z] = False
     expected_flags[flags.N] = True
+    cpu.flags[flags.Z] = not expected_flags[flags.Z]
+    cpu.flags[flags.N] = not expected_flags[flags.N]
 
     verify_load_immediate(
         cpu=cpu,
@@ -906,6 +980,8 @@ def test_cpu_instruction_LDX_IMMEDIATE_0xA2_without_negative_flag():
 
     expected_flags[flags.Z] = False
     expected_flags[flags.N] = False
+    cpu.flags[flags.Z] = not expected_flags[flags.Z]
+    cpu.flags[flags.N] = not expected_flags[flags.N]
 
     verify_load_immediate(
         cpu=cpu,
@@ -923,6 +999,8 @@ def test_cpu_instruction_LDX_IMMEDIATE_0xA2_with_zero_flag():
 
     expected_flags[flags.Z] = True
     expected_flags[flags.N] = False
+    cpu.flags[flags.Z] = not expected_flags[flags.Z]
+    cpu.flags[flags.N] = not expected_flags[flags.N]
 
     verify_load_immediate(
         cpu=cpu,
@@ -940,6 +1018,8 @@ def test_cpu_instruction_LDX_ZEROPAGE_0xA6_with_negative_flag():
 
     expected_flags[flags.Z] = False
     expected_flags[flags.N] = True
+    cpu.flags[flags.Z] = not expected_flags[flags.Z]
+    cpu.flags[flags.N] = not expected_flags[flags.N]
 
     verify_load_zeropage(
         cpu=cpu,
@@ -958,6 +1038,8 @@ def test_cpu_instruction_LDX_ZEROPAGE_0xA6_without_negative_flag():
 
     expected_flags[flags.Z] = False
     expected_flags[flags.N] = False
+    cpu.flags[flags.Z] = not expected_flags[flags.Z]
+    cpu.flags[flags.N] = not expected_flags[flags.N]
 
     verify_load_zeropage(
         cpu=cpu,
@@ -976,6 +1058,8 @@ def test_cpu_instruction_LDX_ZEROPAGE_0xA6_with_zero_flag():
 
     expected_flags[flags.Z] = True
     expected_flags[flags.N] = False
+    cpu.flags[flags.Z] = not expected_flags[flags.Z]
+    cpu.flags[flags.N] = not expected_flags[flags.N]
 
     verify_load_zeropage(
         cpu=cpu,
@@ -994,6 +1078,8 @@ def test_cpu_instruction_LDX_ZEROPAGE_Y_0xB6_with_negative_flag():
 
     expected_flags[flags.Z] = False
     expected_flags[flags.N] = True
+    cpu.flags[flags.Z] = not expected_flags[flags.Z]
+    cpu.flags[flags.N] = not expected_flags[flags.N]
 
     verify_load_zeropage(
         cpu=cpu,
@@ -1014,6 +1100,8 @@ def test_cpu_instruction_LDX_ZEROPAGE_Y_0xB6_without_negative_flag():
 
     expected_flags[flags.Z] = False
     expected_flags[flags.N] = False
+    cpu.flags[flags.Z] = not expected_flags[flags.Z]
+    cpu.flags[flags.N] = not expected_flags[flags.N]
 
     verify_load_zeropage(
         cpu=cpu,
@@ -1034,6 +1122,8 @@ def test_cpu_instruction_LDX_ZEROPAGE_Y_0xB6_with_zero_flag():
 
     expected_flags[flags.Z] = True
     expected_flags[flags.N] = False
+    cpu.flags[flags.Z] = not expected_flags[flags.Z]
+    cpu.flags[flags.N] = not expected_flags[flags.N]
 
     verify_load_zeropage(
         cpu=cpu,
@@ -1054,6 +1144,8 @@ def test_cpu_instruction_LDX_ABSOLUTE_0xAE_with_negative_flag():
 
     expected_flags[flags.Z] = False
     expected_flags[flags.N] = True
+    cpu.flags[flags.Z] = not expected_flags[flags.Z]
+    cpu.flags[flags.N] = not expected_flags[flags.N]
 
     verify_load_absolute(
         cpu=cpu,
@@ -1074,6 +1166,8 @@ def test_cpu_instruction_LDX_ABSOLUTE_0xAE_without_negative_flag():
 
     expected_flags[flags.Z] = False
     expected_flags[flags.N] = False
+    cpu.flags[flags.Z] = not expected_flags[flags.Z]
+    cpu.flags[flags.N] = not expected_flags[flags.N]
 
     verify_load_absolute(
         cpu=cpu,
@@ -1092,6 +1186,8 @@ def test_cpu_instruction_LDX_ABSOLUTE_0xAE_with_zero_flag():
 
     expected_flags[flags.Z] = True
     expected_flags[flags.N] = False
+    cpu.flags[flags.Z] = not expected_flags[flags.Z]
+    cpu.flags[flags.N] = not expected_flags[flags.N]
 
     verify_load_absolute(
         cpu=cpu,
@@ -1110,6 +1206,8 @@ def test_cpu_instruction_LDX_ABSOLUTE_Y_0xBE_with_negative_flag():
 
     expected_flags[flags.Z] = False
     expected_flags[flags.N] = True
+    cpu.flags[flags.Z] = not expected_flags[flags.Z]
+    cpu.flags[flags.N] = not expected_flags[flags.N]
 
     verify_load_absolute(
         cpu=cpu,
@@ -1130,6 +1228,8 @@ def test_cpu_instruction_LDX_ABSOLUTE_Y_0xBE_without_negative_flag():
 
     expected_flags[flags.Z] = False
     expected_flags[flags.N] = False
+    cpu.flags[flags.Z] = not expected_flags[flags.Z]
+    cpu.flags[flags.N] = not expected_flags[flags.N]
 
     verify_load_absolute(
         cpu=cpu,
@@ -1150,6 +1250,8 @@ def test_cpu_instruction_LDX_ABSOLUTE_Y_0xBE_with_zero_flag():
 
     expected_flags[flags.Z] = True
     expected_flags[flags.N] = False
+    cpu.flags[flags.Z] = not expected_flags[flags.Z]
+    cpu.flags[flags.N] = not expected_flags[flags.N]
 
     verify_load_absolute(
         cpu=cpu,
@@ -1170,6 +1272,8 @@ def test_cpu_instruction_LDX_ABSOLUTE_Y_0xBE_with_negative_flag_crossing_page_bo
 
     expected_flags[flags.Z] = False
     expected_flags[flags.N] = True
+    cpu.flags[flags.Z] = not expected_flags[flags.Z]
+    cpu.flags[flags.N] = not expected_flags[flags.N]
 
     verify_load_absolute(
         cpu=cpu,
@@ -1190,6 +1294,8 @@ def test_cpu_instruction_LDX_ABSOLUTE_Y_0xBE_without_negative_flag_flag_crossing
 
     expected_flags[flags.Z] = False
     expected_flags[flags.N] = False
+    cpu.flags[flags.Z] = not expected_flags[flags.Z]
+    cpu.flags[flags.N] = not expected_flags[flags.N]
 
     verify_load_absolute(
         cpu=cpu,
@@ -1210,6 +1316,8 @@ def test_cpu_instruction_LDX_ABSOLUTE_Y_0xBE_with_zero_flag_flag_crossing_page_b
 
     expected_flags[flags.Z] = True
     expected_flags[flags.N] = False
+    cpu.flags[flags.Z] = not expected_flags[flags.Z]
+    cpu.flags[flags.N] = not expected_flags[flags.N]
 
     verify_load_absolute(
         cpu=cpu,
@@ -1232,6 +1340,8 @@ def test_cpu_instruction_LDY_IMMEDIATE_0xA0_with_negative_flag():
 
     expected_flags[flags.Z] = False
     expected_flags[flags.N] = True
+    cpu.flags[flags.Z] = not expected_flags[flags.Z]
+    cpu.flags[flags.N] = not expected_flags[flags.N]
 
     verify_load_immediate(
         cpu=cpu,
@@ -1249,6 +1359,8 @@ def test_cpu_instruction_LDY_IMMEDIATE_0xA0_without_negative_flag():
 
     expected_flags[flags.Z] = False
     expected_flags[flags.N] = False
+    cpu.flags[flags.Z] = not expected_flags[flags.Z]
+    cpu.flags[flags.N] = not expected_flags[flags.N]
 
     verify_load_immediate(
         cpu=cpu,
@@ -1266,6 +1378,8 @@ def test_cpu_instruction_LDY_IMMEDIATE_0xA0_with_zero_flag():
 
     expected_flags[flags.Z] = True
     expected_flags[flags.N] = False
+    cpu.flags[flags.Z] = not expected_flags[flags.Z]
+    cpu.flags[flags.N] = not expected_flags[flags.N]
 
     verify_load_immediate(
         cpu=cpu,
@@ -1283,6 +1397,8 @@ def test_cpu_instruction_LDY_ZEROPAGE_0xA4_with_negative_flag():
 
     expected_flags[flags.Z] = False
     expected_flags[flags.N] = True
+    cpu.flags[flags.Z] = not expected_flags[flags.Z]
+    cpu.flags[flags.N] = not expected_flags[flags.N]
 
     verify_load_zeropage(
         cpu=cpu,
@@ -1301,6 +1417,8 @@ def test_cpu_instruction_LDY_ZEROPAGE_0xA4_without_negative_flag():
 
     expected_flags[flags.Z] = False
     expected_flags[flags.N] = False
+    cpu.flags[flags.Z] = not expected_flags[flags.Z]
+    cpu.flags[flags.N] = not expected_flags[flags.N]
 
     verify_load_zeropage(
         cpu=cpu,
@@ -1319,6 +1437,8 @@ def test_cpu_instruction_LDY_ZEROPAGE_0xA4_with_zero_flag():
 
     expected_flags[flags.Z] = True
     expected_flags[flags.N] = False
+    cpu.flags[flags.Z] = not expected_flags[flags.Z]
+    cpu.flags[flags.N] = not expected_flags[flags.N]
 
     verify_load_zeropage(
         cpu=cpu,
@@ -1337,6 +1457,8 @@ def test_cpu_instruction_LDY_ZEROPAGE_X_0xB4_with_negative_flag():
 
     expected_flags[flags.Z] = False
     expected_flags[flags.N] = True
+    cpu.flags[flags.Z] = not expected_flags[flags.Z]
+    cpu.flags[flags.N] = not expected_flags[flags.N]
 
     verify_load_zeropage(
         cpu=cpu,
@@ -1357,6 +1479,8 @@ def test_cpu_instruction_LDY_ZEROPAGE_X_0xB4_without_negative_flag():
 
     expected_flags[flags.Z] = False
     expected_flags[flags.N] = False
+    cpu.flags[flags.Z] = not expected_flags[flags.Z]
+    cpu.flags[flags.N] = not expected_flags[flags.N]
 
     verify_load_zeropage(
         cpu=cpu,
@@ -1377,6 +1501,8 @@ def test_cpu_instruction_LDY_ZEROPAGE_X_0xB4_with_zero_flag():
 
     expected_flags[flags.Z] = True
     expected_flags[flags.N] = False
+    cpu.flags[flags.Z] = not expected_flags[flags.Z]
+    cpu.flags[flags.N] = not expected_flags[flags.N]
 
     verify_load_zeropage(
         cpu=cpu,
@@ -1397,6 +1523,8 @@ def test_cpu_instruction_LDY_ABSOLUTE_0xAC_with_negative_flag():
 
     expected_flags[flags.Z] = False
     expected_flags[flags.N] = True
+    cpu.flags[flags.Z] = not expected_flags[flags.Z]
+    cpu.flags[flags.N] = not expected_flags[flags.N]
 
     verify_load_absolute(
         cpu=cpu,
@@ -1415,6 +1543,8 @@ def test_cpu_instruction_LDY_ABSOLUTE_0xAC_without_negative_flag():
 
     expected_flags[flags.Z] = False
     expected_flags[flags.N] = False
+    cpu.flags[flags.Z] = not expected_flags[flags.Z]
+    cpu.flags[flags.N] = not expected_flags[flags.N]
 
     verify_load_absolute(
         cpu=cpu,
@@ -1433,6 +1563,8 @@ def test_cpu_instruction_LDY_ABSOLUTE_0xAC_with_zero_flag():
 
     expected_flags[flags.Z] = True
     expected_flags[flags.N] = False
+    cpu.flags[flags.Z] = not expected_flags[flags.Z]
+    cpu.flags[flags.N] = not expected_flags[flags.N]
 
     verify_load_absolute(
         cpu=cpu,
@@ -1451,6 +1583,8 @@ def test_cpu_instruction_LDY_ABSOLUTE_X_0xBC_with_negative_flag():
 
     expected_flags[flags.Z] = False
     expected_flags[flags.N] = True
+    cpu.flags[flags.Z] = not expected_flags[flags.Z]
+    cpu.flags[flags.N] = not expected_flags[flags.N]
 
     verify_load_absolute(
         cpu=cpu,
@@ -1471,6 +1605,8 @@ def test_cpu_instruction_LDY_ABSOLUTE_X_0xBC_without_negative_flag():
 
     expected_flags[flags.Z] = False
     expected_flags[flags.N] = False
+    cpu.flags[flags.Z] = not expected_flags[flags.Z]
+    cpu.flags[flags.N] = not expected_flags[flags.N]
 
     verify_load_absolute(
         cpu=cpu,
@@ -1491,6 +1627,8 @@ def test_cpu_instruction_LDY_ABSOLUTE_X_0xBC_with_zero_flag():
 
     expected_flags[flags.Z] = True
     expected_flags[flags.N] = False
+    cpu.flags[flags.Z] = not expected_flags[flags.Z]
+    cpu.flags[flags.N] = not expected_flags[flags.N]
 
     verify_load_absolute(
         cpu=cpu,
@@ -1511,6 +1649,8 @@ def test_cpu_instruction_LDY_ABSOLUTE_X_0xBC_with_negative_flag_crossing_page_bo
 
     expected_flags[flags.Z] = False
     expected_flags[flags.N] = True
+    cpu.flags[flags.Z] = not expected_flags[flags.Z]
+    cpu.flags[flags.N] = not expected_flags[flags.N]
 
     verify_load_absolute(
         cpu=cpu,
@@ -1531,6 +1671,8 @@ def test_cpu_instruction_LDY_ABSOLUTE_X_0xBC_without_negative_flag_crossing_page
 
     expected_flags[flags.Z] = False
     expected_flags[flags.N] = False
+    cpu.flags[flags.Z] = not expected_flags[flags.Z]
+    cpu.flags[flags.N] = not expected_flags[flags.N]
 
     verify_load_absolute(
         cpu=cpu,
@@ -1551,6 +1693,8 @@ def test_cpu_instruction_LDY_ABSOLUTE_X_0xBC_with_zero_flag_crossing_page_bounda
 
     expected_flags[flags.Z] = True
     expected_flags[flags.N] = False
+    cpu.flags[flags.Z] = not expected_flags[flags.Z]
+    cpu.flags[flags.N] = not expected_flags[flags.N]
 
     verify_load_absolute(
         cpu=cpu,
