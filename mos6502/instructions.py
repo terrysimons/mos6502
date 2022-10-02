@@ -2,6 +2,7 @@
 # -*- coding: utf-8 -*-
 """Instruction set for the mos6502 CPU."""
 import enum
+from typing import Literal
 
 from mos6502.exceptions import IllegalCPUInstructionException
 import mos6502.flags as flags
@@ -50,14 +51,14 @@ from mos6502.memory import Byte, Word
 # absolute,Y	ADC oper,Y	79	3	4*
 # (indirect,X)	ADC (oper,X)	61	2	6
 # (indirect),Y	ADC (oper),Y	71	2	5*
-ADC_IMMEDIATE_0x69 = 0x69
-ADC_ZEROPAGE_0x65 = 0x65
-ADC_ZEROPAGE_X_0x75 = 0x75
-ADC_ABSOLUTE_0x6D = 0x6D
-ADC_ABSOLUTE_X_0x7D = 0x7D
-ADC_ABSOLUTE_Y_0x79 = 0x79
-ADC_INDEXED_INDIRECT_X_0x61 = 0x61
-ADC_INDIRECT_INDEXED_Y_0x71 = 0x71
+ADC_IMMEDIATE_0x69: Literal[105] = 0x69
+ADC_ZEROPAGE_0x65: Literal[101] = 0x65
+ADC_ZEROPAGE_X_0x75: Literal[117] = 0x75
+ADC_ABSOLUTE_0x6D: Literal[109] = 0x6D
+ADC_ABSOLUTE_X_0x7D: Literal[125] = 0x7D
+ADC_ABSOLUTE_Y_0x79: Literal[121] = 0x79
+ADC_INDEXED_INDIRECT_X_0x61: Literal[97] = 0x61
+ADC_INDIRECT_INDEXED_Y_0x71: Literal[113] = 0x71
 
 # https://www.masswerk.at/6502/6502_instruction_set.html#AND
 #
@@ -75,14 +76,14 @@ ADC_INDIRECT_INDEXED_Y_0x71 = 0x71
 # absolute,Y	AND oper,Y	39	3	4*
 # (indirect,X)	AND (oper,X)	21	2	6
 # (indirect),Y	AND (oper),Y	31	2	5*
-AND_IMMEDIATE_0x29 = 0x29
-AND_ZEROPAGE_0x25 = 0x25
-AND_ZEROPAGE_X_0x35 = 0x35
-AND_ABSOLUTE_0x2D = 0x2D
-AND_ABSOLUTE_X_0x3D = 0x3D
-AND_ABSOLUTE_Y_0x39 = 0x39
-AND_INDEXED_INDIRECT_X_0x21 = 0x21
-AND_INDIRECT_INDEXED_Y_0x31 = 0x31
+AND_IMMEDIATE_0x29: Literal[41] = 0x29
+AND_ZEROPAGE_0x25: Literal[37] = 0x25
+AND_ZEROPAGE_X_0x35: Literal[53] = 0x35
+AND_ABSOLUTE_0x2D: Literal[45] = 0x2D
+AND_ABSOLUTE_X_0x3D: Literal[61] = 0x3D
+AND_ABSOLUTE_Y_0x39: Literal[57] = 0x39
+AND_INDEXED_INDIRECT_X_0x21: Literal[33] = 0x21
+AND_INDIRECT_INDEXED_Y_0x31: Literal[49] = 0x31
 
 
 # https://masswerk.at/6502/6502_instruction_set.html#ASL
@@ -98,11 +99,11 @@ AND_INDIRECT_INDEXED_Y_0x31 = 0x31
 # zeropage,X	ASL oper,X	16	2	6
 # absolute	ASL oper	0E	3	6
 # absolute,X	ASL oper,X	1E	3	7
-ASL_ACCUMULATOR_0x0A = 0x0A
-ASL_ZEROPAGE_0x06 = 0x06
-ASL_ZEROPAGE_X_0x16 = 0x16
-ASL_ABSOLUTE_0x0E = 0x0E
-ASL_ABSOLUTE_X_0x1E = 0x1E
+ASL_ACCUMULATOR_0x0A: Literal[10] = 0x0A
+ASL_ZEROPAGE_0x06: Literal[6] = 0x06
+ASL_ZEROPAGE_X_0x16: Literal[22] = 0x16
+ASL_ABSOLUTE_0x0E: Literal[14] = 0x0E
+ASL_ABSOLUTE_X_0x1E: Literal[30] = 0x1E
 
 
 # https://masswerk.at/6502/6502_instruction_set.html#BCC
@@ -113,7 +114,7 @@ ASL_ABSOLUTE_X_0x1E = 0x1E
 # -	-	-	-	-	-
 # addressing	assembler	opc	bytes	cycles
 # relative	BCC oper	90	2	2**
-BBC_RELATIVE_0x90 = 0x90
+BBC_RELATIVE_0x90: Literal[144] = 0x90
 
 
 # https://masswerk.at/6502/6502_instruction_set.html#BCS
@@ -125,7 +126,7 @@ BBC_RELATIVE_0x90 = 0x90
 # -	-	-	-	-	-
 # addressing	assembler	opc	bytes	cycles
 # relative	BCS oper	B0	2	2**
-BCS_RELATIVE_0xB0 = 0xB0
+BCS_RELATIVE_0xB0: Literal[176] = 0xB0
 
 
 # https://masswerk.at/6502/6502_instruction_set.html#BEQ
@@ -136,7 +137,7 @@ BCS_RELATIVE_0xB0 = 0xB0
 # -	-	-	-	-	-
 # addressing	assembler	opc	bytes	cycles
 # relative	BEQ oper	F0	2	2**
-BEQ_RELATIVE_0xF0 = 0xF0
+BEQ_RELATIVE_0xF0: Literal[240] = 0xF0
 
 
 # https://masswerk.at/6502/6502_instruction_set.html#BIT
@@ -152,8 +153,8 @@ BEQ_RELATIVE_0xF0 = 0xF0
 # addressing	assembler	opc	bytes	cycles
 # zeropage	BIT oper	24	2	3
 # absolute	BIT oper	2C	3	4
-BIT_ZEROPAGE_0x24 = 0x24
-BIT_ABSOLUTE_0x2C = 0x2C
+BIT_ZEROPAGE_0x24: Literal[36] = 0x24
+BIT_ABSOLUTE_0x2C: Literal[44] = 0x2C
 
 # https://masswerk.at/6502/6502_instruction_set.html#BMI
 # Branch on Result Minus
@@ -163,7 +164,7 @@ BIT_ABSOLUTE_0x2C = 0x2C
 # -	-	-	-	-	-
 # addressing	assembler	opc	bytes	cycles
 # relative	BMI oper	30	2	2**
-BMI_RELATIVE_0x30 = 0x30
+BMI_RELATIVE_0x30: Literal[48] = 0x30
 
 
 # https://masswerk.at/6502/6502_instruction_set.html#BNE
@@ -174,7 +175,7 @@ BMI_RELATIVE_0x30 = 0x30
 # -	-	-	-	-	-
 # addressing	assembler	opc	bytes	cycles
 # relative	BNE oper	D0	2	2**
-BNE_RELATIVE_0xD0 = 0xD0
+BNE_RELATIVE_0xD0: Literal[208] = 0xD0
 
 # https://masswerk.at/6502/6502_instruction_set.html#BPL
 # Branch on Result Plus
@@ -184,7 +185,7 @@ BNE_RELATIVE_0xD0 = 0xD0
 # -	-	-	-	-	-
 # addressing	assembler	opc	bytes	cycles
 # relative	BPL oper	10	2	2**
-BPL_RELATIVE_0x10 = 0x10
+BPL_RELATIVE_0x10: Literal[16] = 0x10
 
 # https://masswerk.at/6502/6502_instruction_set.html#BRK
 # Force Break
@@ -204,7 +205,7 @@ BPL_RELATIVE_0x10 = 0x10
 # -	-	-	1	-	-
 # addressing	assembler	opc	bytes	cycles
 # implied	BRK	00	1	7
-BRK_IMPLIED_0x00 = 0x00
+BRK_IMPLIED_0x00: Literal[0] = 0x00
 
 # https://masswerk.at/6502/6502_instruction_set.html#BVC
 # Branch on Overflow Clear
@@ -214,7 +215,7 @@ BRK_IMPLIED_0x00 = 0x00
 # -	-	-	-	-	-
 # addressing	assembler	opc	bytes	cycles
 # relative	BVC oper	50	2	2**
-BVC_RELATIVE_0x50 = 0x50
+BVC_RELATIVE_0x50: Literal[80] = 0x50
 
 
 # https://masswerk.at/6502/6502_instruction_set.html#BVS
@@ -225,7 +226,7 @@ BVC_RELATIVE_0x50 = 0x50
 # -	-	-	-	-	-
 # addressing	assembler	opc	bytes	cycles
 # relative	BVS oper	70	2	2**
-BVS_RELATIVE_0x70 = 0x70
+BVS_RELATIVE_0x70: Literal[112] = 0x70
 
 
 # https://masswerk.at/6502/6502_instruction_set.html#CLC
@@ -236,7 +237,7 @@ BVS_RELATIVE_0x70 = 0x70
 # -	-	0	-	-	-
 # addressing	assembler	opc	bytes	cycles
 # implied	CLC	18	1	2
-CLC_IMPLIED_0x18 = 0x18
+CLC_IMPLIED_0x18: Literal[24] = 0x18
 
 # https://masswerk.at/6502/6502_instruction_set.html#CLD
 # Clear Decimal Mode
@@ -246,7 +247,7 @@ CLC_IMPLIED_0x18 = 0x18
 # -	-	-	-	0	-
 # addressing	assembler	opc	bytes	cycles
 # implied	CLD	D8	1	2
-CLD_IMPLIED_0xD8 = 0xD8
+CLD_IMPLIED_0xD8: Literal[216] = 0xD8
 
 # https://masswerk.at/6502/6502_instruction_set.html#CLI
 # Clear Interrupt Disable Bit
@@ -256,7 +257,7 @@ CLD_IMPLIED_0xD8 = 0xD8
 # -	-	-	0	-	-
 # addressing	assembler	opc	bytes	cycles
 # implied	CLI	58	1	2
-CLI_IMPLIED_0x58 = 0x58
+CLI_IMPLIED_0x58: Literal[88] = 0x58
 
 # https://masswerk.at/6502/6502_instruction_set.html#CLV
 # Clear Overflow Flag
@@ -266,7 +267,7 @@ CLI_IMPLIED_0x58 = 0x58
 # -	-	-	-	-	0
 # addressing	assembler	opc	bytes	cycles
 # implied	CLV	B8	1	2
-CLV_IMPLIED_0xB8 = 0xB8
+CLV_IMPLIED_0xB8: Literal[184] = 0xB8
 
 # https://masswerk.at/6502/6502_instruction_set.html#CMP
 # Compare Memory with Accumulator
@@ -283,14 +284,14 @@ CLV_IMPLIED_0xB8 = 0xB8
 # absolute,Y	CMP oper,Y	D9	3	4*
 # (indirect,X)	CMP (oper,X)	C1	2	6
 # (indirect),Y	CMP (oper),Y	D1	2	5*
-CMP_IMMEDIATE_0xC9 = 0xC9
-CMP_ZEROPAGE_0xC5 = 0xC5
-CMP_ZEROPAGE_X_0xD5 = 0xD5
-CMP_ABSOLUTE_0xCD = 0xCD
-CMP_ABSOLUTE_X_0xDD = 0xDD
-CMP_ABSOLUTE_Y_0xD9 = 0xD9
-CMP_INDEXED_INDIRECT_X_0xC1 = 0xC1
-CMP_INDIRECT_INDEXED_Y_0xD1 = 0xD1
+CMP_IMMEDIATE_0xC9: Literal[201] = 0xC9
+CMP_ZEROPAGE_0xC5: Literal[197] = 0xC5
+CMP_ZEROPAGE_X_0xD5: Literal[213] = 0xD5
+CMP_ABSOLUTE_0xCD: Literal[205] = 0xCD
+CMP_ABSOLUTE_X_0xDD: Literal[221] = 0xDD
+CMP_ABSOLUTE_Y_0xD9: Literal[217] = 0xD9
+CMP_INDEXED_INDIRECT_X_0xC1: Literal[193] = 0xC1
+CMP_INDIRECT_INDEXED_Y_0xD1: Literal[209] = 0xD1
 
 # https://masswerk.at/6502/6502_instruction_set.html#CPX
 # Compare Memory and Index X
@@ -302,9 +303,9 @@ CMP_INDIRECT_INDEXED_Y_0xD1 = 0xD1
 # immediate	CPX #oper	E0	2	2
 # zeropage	CPX oper	E4	2	3
 # absolute	CPX oper	EC	3	4
-CPX_IMMEDIATE_0xE0 = 0xE0
-CPX_ZEROPAGE_0xE4 = 0xE4
-CPX_ABSOLUTE_0xEC = 0xEC
+CPX_IMMEDIATE_0xE0: Literal[224] = 0xE0
+CPX_ZEROPAGE_0xE4: Literal[228] = 0xE4
+CPX_ABSOLUTE_0xEC: Literal[236] = 0xEC
 
 # https://masswerk.at/6502/6502_instruction_set.html#CPY
 # Compare Memory and Index Y
@@ -316,9 +317,9 @@ CPX_ABSOLUTE_0xEC = 0xEC
 # immediate	CPY #oper	C0	2	2
 # zeropage	CPY oper	C4	2	3
 # absolute	CPY oper	CC	3	4
-CPY_IMMEDIATE_0xC0 = 0xC0
-CPY_ZEROPAGE_0xC4 = 0xC4
-CPY_ABSOLUTE_0xCC = 0xCC
+CPY_IMMEDIATE_0xC0: Literal[192] = 0xC0
+CPY_ZEROPAGE_0xC4: Literal[196] = 0xC4
+CPY_ABSOLUTE_0xCC: Literal[204] = 0xCC
 
 # https://masswerk.at/6502/6502_instruction_set.html#DEC
 # Decrement Memory by One
@@ -331,10 +332,10 @@ CPY_ABSOLUTE_0xCC = 0xCC
 # zeropage,X	DEC oper,X	D6	2	6
 # absolute	DEC oper	CE	3	6
 # absolute,X	DEC oper,X	DE	3	7
-DEC_ZEROPAGE_0xC6 = 0xC6
-DEC_ZEROPAGE_X_0xD6 = 0xD6
-DEC_ABSOLUTE_0xCE = 0xCE
-DEC_ABSOLUTE_X_0xDE = 0xDE
+DEC_ZEROPAGE_0xC6: Literal[198] = 0xC6
+DEC_ZEROPAGE_X_0xD6: Literal[214] = 0xD6
+DEC_ABSOLUTE_0xCE: Literal[206] = 0xCE
+DEC_ABSOLUTE_X_0xDE: Literal[222] = 0xDE
 
 # https://masswerk.at/6502/6502_instruction_set.html#DEX
 # Decrement Index X by One
@@ -344,7 +345,7 @@ DEC_ABSOLUTE_X_0xDE = 0xDE
 # +	+	-	-	-	-
 # addressing	assembler	opc	bytes	cycles
 # implied	DEX	CA	1	2
-DEX_IMPLIED_0xCA = 0xCA
+DEX_IMPLIED_0xCA: Literal[202] = 0xCA
 
 # https://masswerk.at/6502/6502_instruction_set.html#DEY
 # Decrement Index Y by One
@@ -354,7 +355,7 @@ DEX_IMPLIED_0xCA = 0xCA
 # +	+	-	-	-	-
 # addressing	assembler	opc	bytes	cycles
 # implied	DEY	88	1	2
-DEY_IMPLIED_0x88 = 0x88
+DEY_IMPLIED_0x88: Literal[136] = 0x88
 
 # https://masswerk.at/6502/6502_instruction_set.html#EOR
 # Exclusive-OR Memory with Accumulator
@@ -371,14 +372,14 @@ DEY_IMPLIED_0x88 = 0x88
 # absolute,Y	EOR oper,Y	59	3	4*
 # (indirect,X)	EOR (oper,X)	41	2	6
 # (indirect),Y	EOR (oper),Y	51	2	5*
-EOR_IMMEDIATE_0x49 = 0X49
-EOR_ZEROPAGE_0x45 = 0X45
-EOR_ZEROPAGE_X_0x55 = 0x55
-EOR_ABSOLUTE_0x4D = 0x4D
-EOR_ABSOLUTE_X_0x5D = 0x5D
-EOR_ABSOLUTE_Y_0x59 = 0x59
-EOR_INDEXED_INDIRECT_X_0x41 = 0x41
-EOR_INDIRECT_INDEXED_Y_0x51 = 0x51
+EOR_IMMEDIATE_0x49: Literal[73] = 0X49
+EOR_ZEROPAGE_0x45: Literal[69] = 0X45
+EOR_ZEROPAGE_X_0x55: Literal[85] = 0x55
+EOR_ABSOLUTE_0x4D: Literal[77] = 0x4D
+EOR_ABSOLUTE_X_0x5D: Literal[93] = 0x5D
+EOR_ABSOLUTE_Y_0x59: Literal[89] = 0x59
+EOR_INDEXED_INDIRECT_X_0x41: Literal[65] = 0x41
+EOR_INDIRECT_INDEXED_Y_0x51: Literal[81] = 0x51
 
 # https://masswerk.at/6502/6502_instruction_set.html#INC
 # Increment Memory by One
@@ -391,10 +392,10 @@ EOR_INDIRECT_INDEXED_Y_0x51 = 0x51
 # zeropage,X	INC oper,X	F6	2	6
 # absolute	INC oper	EE	3	6
 # absolute,X	INC oper,X	FE	3	7
-INC_ZEROPAGE_0xE6 = 0xF6
-INC_ZEROPAGE_X_0xF6 = 0xF6
-INC_ABSOLUTE_0xEE = 0xEE
-INC_ABSOLUTE_X_0xFE = 0xFE
+INC_ZEROPAGE_0xE6: Literal[246] = 0xF6
+INC_ZEROPAGE_X_0xF6: Literal[246] = 0xF6
+INC_ABSOLUTE_0xEE: Literal[238] = 0xEE
+INC_ABSOLUTE_X_0xFE: Literal[254] = 0xFE
 
 # https://masswerk.at/6502/6502_instruction_set.html#INX
 # Increment Index X by One
@@ -404,7 +405,7 @@ INC_ABSOLUTE_X_0xFE = 0xFE
 # +	+	-	-	-	-
 # addressing	assembler	opc	bytes	cycles
 # implied	INX	E8	1	2
-INX_IMPLIED_0xE8 = 0xE8
+INX_IMPLIED_0xE8: Literal[232] = 0xE8
 
 
 # https://masswerk.at/6502/6502_instruction_set.html#INY
@@ -415,7 +416,7 @@ INX_IMPLIED_0xE8 = 0xE8
 # +	+	-	-	-	-
 # addressing	assembler	opc	bytes	cycles
 # implied	INY	C8	1	2
-INY_IMPLIED_0xC8 = 0xC8
+INY_IMPLIED_0xC8: Literal[200] = 0xC8
 
 
 # https://masswerk.at/6502/6502_instruction_set.html#JMP
@@ -428,8 +429,8 @@ INY_IMPLIED_0xC8 = 0xC8
 # addressing	assembler	opc	bytes	cycles
 # absolute	JMP oper	4C	3	3
 # indirect	JMP (oper)	6C	3	5
-JMP_ABSOLUTE_0x4C = 0x4C
-JMP_INDIRECT_0x6C = 0x6C
+JMP_ABSOLUTE_0x4C: Literal[76] = 0x4C
+JMP_INDIRECT_0x6C: Literal[108] = 0x6C
 
 # https://masswerk.at/6502/6502_instruction_set.html#JSR
 #
@@ -442,7 +443,7 @@ JMP_INDIRECT_0x6C = 0x6C
 # -	-	-	-	-	-
 # addressing	assembler	opc	bytes	cycles
 # absolute	JSR oper	20	3	6
-JSR_ABSOLUTE_0x20 = 0x20
+JSR_ABSOLUTE_0x20: Literal[32] = 0x20
 
 # https://masswerk.at/6502/6502_instruction_set.html#LDA
 #
@@ -460,14 +461,14 @@ JSR_ABSOLUTE_0x20 = 0x20
 # absolute,Y	LDA oper,Y	B9	3	4*
 # (indirect,X)	LDA (oper,X)	A1	2	6
 # (indirect),Y	LDA (oper),Y	B1	2	5*
-LDA_IMMEDIATE_0xA9 = 0xA9
-LDA_ZEROPAGE_0xA5 = 0xA5
-LDA_ZEROPAGE_X_0xB5 = 0xB5
-LDA_ABSOLUTE_0xAD = 0xAD
-LDA_ABSOLUTE_X_0xBD = 0xBD
-LDA_ABSOLUTE_Y_0xB9 = 0xB9
-LDA_INDEXED_INDIRECT_X_0xA1 = 0xA1
-LDA_INDIRECT_INDEXED_Y_0xB1 = 0xB1
+LDA_IMMEDIATE_0xA9: Literal[169] = 0xA9
+LDA_ZEROPAGE_0xA5: Literal[165] = 0xA5
+LDA_ZEROPAGE_X_0xB5: Literal[181] = 0xB5
+LDA_ABSOLUTE_0xAD: Literal[173] = 0xAD
+LDA_ABSOLUTE_X_0xBD: Literal[189] = 0xBD
+LDA_ABSOLUTE_Y_0xB9: Literal[185] = 0xB9
+LDA_INDEXED_INDIRECT_X_0xA1: Literal[161] = 0xA1
+LDA_INDIRECT_INDEXED_Y_0xB1: Literal[177] = 0xB1
 
 # https://masswerk.at/6502/6502_instruction_set.html#LDX
 #
@@ -482,11 +483,11 @@ LDA_INDIRECT_INDEXED_Y_0xB1 = 0xB1
 # zeropage,Y	LDX oper,Y	B6	2	4
 # absolute	LDX oper	AE	3	4
 # absolute,Y	LDX oper,Y	BE	3	4*
-LDX_IMMEDIATE_0xA2 = 0xA2
-LDX_ZEROPAGE_0xA6 = 0xA6
-LDX_ZEROPAGE_Y_0xB6 = 0xB6
-LDX_ABSOLUTE_0xAE = 0xAE
-LDX_ABSOLUTE_Y_0xBE = 0xBE
+LDX_IMMEDIATE_0xA2: Literal[162] = 0xA2
+LDX_ZEROPAGE_0xA6: Literal[166] = 0xA6
+LDX_ZEROPAGE_Y_0xB6: Literal[182] = 0xB6
+LDX_ABSOLUTE_0xAE: Literal[174] = 0xAE
+LDX_ABSOLUTE_Y_0xBE: Literal[190] = 0xBE
 
 # https://masswerk.at/6502/6502_instruction_set.html#LDY
 #
@@ -501,11 +502,11 @@ LDX_ABSOLUTE_Y_0xBE = 0xBE
 # zeropage,X	LDY oper,X	B4	2	4
 # absolute	LDY oper	AC	3	4
 # absolute,X	LDY oper,X	BC	3	4*
-LDY_IMMEDIATE_0xA0 = 0xA0
-LDY_ZEROPAGE_0xA4 = 0xA4
-LDY_ZEROPAGE_X_0xB4 = 0xB4
-LDY_ABSOLUTE_0xAC = 0xAC
-LDY_ABSOLUTE_X_0xBC = 0xBC
+LDY_IMMEDIATE_0xA0: Literal[160] = 0xA0
+LDY_ZEROPAGE_0xA4: Literal[164] = 0xA4
+LDY_ZEROPAGE_X_0xB4: Literal[180] = 0xB4
+LDY_ABSOLUTE_0xAC: Literal[172] = 0xAC
+LDY_ABSOLUTE_X_0xBC: Literal[188] = 0xBC
 
 # https://masswerk.at/6502/6502_instruction_set.html#LSR
 # Shift One Bit Right (Memory or Accumulator)
@@ -519,11 +520,11 @@ LDY_ABSOLUTE_X_0xBC = 0xBC
 # zeropage,X	LSR oper,X	56	2	6
 # absolute	LSR oper	4E	3	6
 # absolute,X	LSR oper,X	5E	3	7
-LSR_ACCUMULATOR_0x4A = 0x4A
-LSR_ZEROPAGE_0x46 = 0x46
-LSR_ZEROPAGE_X_0x56 = 0x56
-LSR_ABSOLUTE_0x4E = 0x4E
-LSR_ABSOLUTE_X_0x5E = 0x5E
+LSR_ACCUMULATOR_0x4A: Literal[74] = 0x4A
+LSR_ZEROPAGE_0x46: Literal[70] = 0x46
+LSR_ZEROPAGE_X_0x56: Literal[86] = 0x56
+LSR_ABSOLUTE_0x4E: Literal[78] = 0x4E
+LSR_ABSOLUTE_X_0x5E: Literal[94] = 0x5E
 
 
 # https://masswerk.at/6502/6502_instruction_set.html#NOP
@@ -534,7 +535,7 @@ LSR_ABSOLUTE_X_0x5E = 0x5E
 # -	-	-	-	-	-
 # addressing	assembler	opc	bytes	cycles
 # implied	NOP	EA	1	2
-NOP_IMPLIED_0xEA = 0xEA
+NOP_IMPLIED_0xEA: Literal[234] = 0xEA
 
 
 # https://masswerk.at/6502/6502_instruction_set.html#ORA
@@ -552,14 +553,14 @@ NOP_IMPLIED_0xEA = 0xEA
 # absolute,Y	ORA oper,Y	19	3	4*
 # (indirect,X)	ORA (oper,X)	01	2	6
 # (indirect),Y	ORA (oper),Y	11	2	5*
-ORA_IMMEDIATE_0x09 = 0x09
-ORA_ZEROPAGE_0x05 = 0x05
-ORA_ZEROPAGE_X_0x15 = 0x15
-ORA_ABSOLUTE_0x0D = 0x0D
-ORA_ABSOLUTE_X_0x1D = 0x1D
-ORA_ABSOLUTE_Y_0x19 = 0x19
-ORA_INDEXED_INDIRECT_X_0x01 = 0x01
-ORA_INDIRECT_INDEXED_Y_0x11 = 0x11
+ORA_IMMEDIATE_0x09: Literal[9] = 0x09
+ORA_ZEROPAGE_0x05: Literal[5] = 0x05
+ORA_ZEROPAGE_X_0x15: Literal[21] = 0x15
+ORA_ABSOLUTE_0x0D: Literal[13] = 0x0D
+ORA_ABSOLUTE_X_0x1D: Literal[29] = 0x1D
+ORA_ABSOLUTE_Y_0x19: Literal[25] = 0x19
+ORA_INDEXED_INDIRECT_X_0x01: Literal[1] = 0x01
+ORA_INDIRECT_INDEXED_Y_0x11: Literal[17] = 0x11
 
 # https://masswerk.at/6502/6502_instruction_set.html#PHA
 # Push Accumulator on Stack
@@ -569,7 +570,7 @@ ORA_INDIRECT_INDEXED_Y_0x11 = 0x11
 # -	-	-	-	-	-
 # addressing	assembler	opc	bytes	cycles
 # implied	PHA	48	1	3
-PHA_IMPLIED_0x48 = 0x48
+PHA_IMPLIED_0x48: Literal[72] = 0x48
 
 # https://masswerk.at/6502/6502_instruction_set.html#PHP
 # Push Processor Status on Stack
@@ -582,7 +583,7 @@ PHA_IMPLIED_0x48 = 0x48
 # -	-	-	-	-	-
 # addressing	assembler	opc	bytes	cycles
 # implied	PHP	08	1	3
-PHP_IMPLIED_0x08 = 0x08
+PHP_IMPLIED_0x08: Literal[8] = 0x08
 
 
 # https://masswerk.at/6502/6502_instruction_set.html#PLA
@@ -593,7 +594,7 @@ PHP_IMPLIED_0x08 = 0x08
 # +	+	-	-	-	-
 # addressing	assembler	opc	bytes	cycles
 # implied	PLA	68	1	4
-PLA_IMPLIED_0x68 = 0x68
+PLA_IMPLIED_0x68: Literal[104] = 0x68
 
 # https://masswerk.at/6502/6502_instruction_set.html#PLP
 # Pull Processor Status from Stack
@@ -606,7 +607,7 @@ PLA_IMPLIED_0x68 = 0x68
 # from stack
 # addressing	assembler	opc	bytes	cycles
 # implied	PLP	28	1	4
-PLP_IMPLIED_0x28 = 0x28
+PLP_IMPLIED_0x28: Literal[40] = 0x28
 
 # https://masswerk.at/6502/6502_instruction_set.html#ROL
 # Rotate One Bit Left (Memory or Accumulator)
@@ -620,11 +621,11 @@ PLP_IMPLIED_0x28 = 0x28
 # zeropage,X	ROL oper,X	36	2	6
 # absolute	ROL oper	2E	3	6
 # absolute,X	ROL oper,X	3E	3	7
-ROL_ACCUMULATOR_0x2A = 0x2A
-ROL_ZEROPAGE_0x26 = 0x26
-ROL_ZEROPAGE_X_0x36 = 0x36
-ROL_ABSOLUTE_0x2E = 0x2E
-ROL_ABSOLUTE_X_0x3E = 0x3E
+ROL_ACCUMULATOR_0x2A: Literal[42] = 0x2A
+ROL_ZEROPAGE_0x26: Literal[38] = 0x26
+ROL_ZEROPAGE_X_0x36: Literal[54] = 0x36
+ROL_ABSOLUTE_0x2E: Literal[46] = 0x2E
+ROL_ABSOLUTE_X_0x3E: Literal[62] = 0x3E
 
 # https://masswerk.at/6502/6502_instruction_set.html#ROR
 # Rotate One Bit Right (Memory or Accumulator)
@@ -638,11 +639,11 @@ ROL_ABSOLUTE_X_0x3E = 0x3E
 # zeropage,X	ROR oper,X	76	2	6
 # absolute	ROR oper	6E	3	6
 # absolute,X	ROR oper,X	7E	3	7
-ROR_ACCUMULATOR_0x6A = 0x6A
-ROR_ZEROPAGE_0x66 = 0x66
-ROR_ZEROPAGE_X_0x76 = 0x76
-ROR_ABSOLUTE_0x6E = 0x6E
-ROR_ABSOLUTE_X_0x7E = 0x7E
+ROR_ACCUMULATOR_0x6A: Literal[106] = 0x6A
+ROR_ZEROPAGE_0x66: Literal[102] = 0x66
+ROR_ZEROPAGE_X_0x76: Literal[118] = 0x76
+ROR_ABSOLUTE_0x6E: Literal[110] = 0x6E
+ROR_ABSOLUTE_X_0x7E: Literal[126] = 0x7E
 
 
 # https://masswerk.at/6502/6502_instruction_set.html#RTI
@@ -656,7 +657,7 @@ ROR_ABSOLUTE_X_0x7E = 0x7E
 # from stack
 # addressing	assembler	opc	bytes	cycles
 # implied	RTI	40	1	6
-RTI_IMPLIED_0x40 = 0x40
+RTI_IMPLIED_0x40: Literal[64] = 0x40
 
 # https://masswerk.at/6502/6502_instruction_set.html#RTS
 # Return from Subroutine
@@ -666,7 +667,7 @@ RTI_IMPLIED_0x40 = 0x40
 # -	-	-	-	-	-
 # addressing	assembler	opc	bytes	cycles
 # implied	RTS	60	1	6
-RTS_IMPLIED_0x60 = 0x60
+RTS_IMPLIED_0x60: Literal[96] = 0x60
 
 # https://masswerk.at/6502/6502_instruction_set.html#SBC
 # Subtract Memory from Accumulator with Borrow
@@ -683,14 +684,14 @@ RTS_IMPLIED_0x60 = 0x60
 # absolute,Y	SBC oper,Y	F9	3	4*
 # (indirect,X)	SBC (oper,X)	E1	2	6
 # (indirect),Y	SBC (oper),Y	F1	2	5*
-SBC_IMMEDIATE_0xE9 = 0xE9
-SBC_ZEROPAGE_0xE5 = 0xE5
-SBC_ZEROPAGE_X_0xF5 = 0xF5
-SBC_ABSOLUTE_0xED = 0xED
-SBC_ABSOLUTE_X_0xFD = 0xFD
-SBC_ABSOLUTE_Y_0xF9 = 0xF9
-SBC_INDEXED_INDIRECT_X_0xE1 = 0xE1
-SBC_INDIRECT_INDEXED_Y_0xF1 = 0xF1
+SBC_IMMEDIATE_0xE9: Literal[233] = 0xE9
+SBC_ZEROPAGE_0xE5: Literal[229] = 0xE5
+SBC_ZEROPAGE_X_0xF5: Literal[245] = 0xF5
+SBC_ABSOLUTE_0xED: Literal[237] = 0xED
+SBC_ABSOLUTE_X_0xFD: Literal[253] = 0xFD
+SBC_ABSOLUTE_Y_0xF9: Literal[249] = 0xF9
+SBC_INDEXED_INDIRECT_X_0xE1: Literal[225] = 0xE1
+SBC_INDIRECT_INDEXED_Y_0xF1: Literal[241] = 0xF1
 
 # https://masswerk.at/6502/6502_instruction_set.html#SEC
 # Set Carry Flag
@@ -700,7 +701,7 @@ SBC_INDIRECT_INDEXED_Y_0xF1 = 0xF1
 # -	-	1	-	-	-
 # addressing	assembler	opc	bytes	cycles
 # implied	SEC	38	1	2
-SEC_IMPLIED_0x38 = 0x38
+SEC_IMPLIED_0x38: Literal[56] = 0x38
 
 # https://masswerk.at/6502/6502_instruction_set.html#SED
 # Set Decimal Flag
@@ -710,7 +711,7 @@ SEC_IMPLIED_0x38 = 0x38
 # -	-	-	-	1	-
 # addressing	assembler	opc	bytes	cycles
 # implied	SED	F8	1	2
-SED_IMPLIED_0xF8 = 0xF8
+SED_IMPLIED_0xF8: Literal[248] = 0xF8
 
 
 # https://masswerk.at/6502/6502_instruction_set.html#SEI
@@ -721,7 +722,7 @@ SED_IMPLIED_0xF8 = 0xF8
 # -	-	-	1	-	-
 # addressing	assembler	opc	bytes	cycles
 # implied	SEI	78	1	2
-SEI_IMPLIED_0x78 = 0x78
+SEI_IMPLIED_0x78: Literal[120] = 0x78
 
 # https://masswerk.at/6502/6502_instruction_set.html#STA
 # Store Accumulator in Memory
@@ -737,13 +738,13 @@ SEI_IMPLIED_0x78 = 0x78
 # absolute,Y	STA oper,Y	99	3	5
 # (indirect,X)	STA (oper,X)	81	2	6
 # (indirect),Y	STA (oper),Y	91	2	6
-STA_ZEROPAGE_0x85 = 0x85
-STA_ZEROPAGE_X_0x95 = 0x95
-STA_ABSOLUTE_0x8D = 0x8D
-STA_ABSOLUTE_X_0x9D = 0x9D
-STA_ABSOLUTE_Y_0x99 = 0x99
-STA_INDEXED_INDIRECT_X_0x81 = 0x81
-STA_INDIRECT_INDEXED_Y_0x91 = 0x91
+STA_ZEROPAGE_0x85: Literal[133] = 0x85
+STA_ZEROPAGE_X_0x95: Literal[149] = 0x95
+STA_ABSOLUTE_0x8D: Literal[141] = 0x8D
+STA_ABSOLUTE_X_0x9D: Literal[157] = 0x9D
+STA_ABSOLUTE_Y_0x99: Literal[153] = 0x99
+STA_INDEXED_INDIRECT_X_0x81: Literal[129] = 0x81
+STA_INDIRECT_INDEXED_Y_0x91: Literal[145] = 0x91
 
 # https://masswerk.at/6502/6502_instruction_set.html#STX
 # Store Index X in Memory
@@ -755,9 +756,9 @@ STA_INDIRECT_INDEXED_Y_0x91 = 0x91
 # zeropage	STX oper	86	2	3
 # zeropage,Y	STX oper,Y	96	2	4
 # absolute	STX oper	8E	3	4
-STX_ZEROPAGE_0x86 = 0x86
-STX_ZEROPAGE_X_0x96 = 0x96
-STX_ABSOLUTE_0x8E = 0x8E
+STX_ZEROPAGE_0x86: Literal[134] = 0x86
+STX_ZEROPAGE_Y_0x96: Literal[150] = 0x96
+STX_ABSOLUTE_0x8E: Literal[142] = 0x8E
 
 # https://masswerk.at/6502/6502_instruction_set.html#STY
 # Sore Index Y in Memory
@@ -769,9 +770,9 @@ STX_ABSOLUTE_0x8E = 0x8E
 # zeropage	STY oper	84	2	3
 # zeropage,X	STY oper,X	94	2	4
 # absolute	STY oper	8C	3	4
-STY_ZEROPAGE_0x84 = 0x84
-STY_ZEROPAGE_X_0x94 = 0x94
-STY_ABSOLUTE_0x8C = 0x8C
+STY_ZEROPAGE_0x84: Literal[132] = 0x84
+STY_ZEROPAGE_X_0x94: Literal[148] = 0x94
+STY_ABSOLUTE_0x8C: Literal[140] = 0x8C
 
 # https://masswerk.at/6502/6502_instruction_set.html#TAX
 # Transfer Accumulator to Index X
@@ -781,7 +782,7 @@ STY_ABSOLUTE_0x8C = 0x8C
 # +	+	-	-	-	-
 # addressing	assembler	opc	bytes	cycles
 # implied	TAX	AA	1	2
-TAX_IMPLIED_0xAA = 0xAA
+TAX_IMPLIED_0xAA: Literal[170] = 0xAA
 
 # https://masswerk.at/6502/6502_instruction_set.html#TAY
 # Transfer Accumulator to Index Y
@@ -791,7 +792,7 @@ TAX_IMPLIED_0xAA = 0xAA
 # +	+	-	-	-	-
 # addressing	assembler	opc	bytes	cycles
 # implied	TAY	A8	1	2
-TAY_IMPLIED_0xA8 = 0xA8
+TAY_IMPLIED_0xA8: Literal[168] = 0xA8
 
 # https://masswerk.at/6502/6502_instruction_set.html#TSX
 # Transfer Stack Pointer to Index X
@@ -801,7 +802,7 @@ TAY_IMPLIED_0xA8 = 0xA8
 # +	+	-	-	-	-
 # addressing	assembler	opc	bytes	cycles
 # implied	TSX	BA	1	2
-TSX_IMPLIED_0xBA = 0xBA
+TSX_IMPLIED_0xBA: Literal[186] = 0xBA
 
 # https://masswerk.at/6502/6502_instruction_set.html#TXA
 # Transfer Index X to Accumulator
@@ -811,7 +812,7 @@ TSX_IMPLIED_0xBA = 0xBA
 # +	+	-	-	-	-
 # addressing	assembler	opc	bytes	cycles
 # implied	TXA	8A	1	2
-TXA_IMPLIED_0x8A = 0x8A
+TXA_IMPLIED_0x8A: Literal[138] = 0x8A
 
 # https://masswerk.at/6502/6502_instruction_set.html#TXS
 # Transfer Index X to Stack Register
@@ -821,7 +822,7 @@ TXA_IMPLIED_0x8A = 0x8A
 # -	-	-	-	-	-
 # addressing	assembler	opc	bytes	cycles
 # implied	TXS	9A	1	2
-TXS_IMPLIED_0x9A = 0x9A
+TXS_IMPLIED_0x9A: Literal[154] = 0x9A
 
 # https://masswerk.at/6502/6502_instruction_set.html#TYA
 # Transfer Index Y to Accumulator
@@ -831,7 +832,7 @@ TXS_IMPLIED_0x9A = 0x9A
 # +	+	-	-	-	-
 # addressing	assembler	opc	bytes	cycles
 # implied	TYA	98	1	2
-TYA_IMPLIED_0x98 = 0x98
+TYA_IMPLIED_0x98: Literal[152] = 0x98
 
 ''' Illegal Opcodes '''
 # https://masswerk.at/6502/6502_instruction_set.html
@@ -856,7 +857,7 @@ TYA_IMPLIED_0x98 = 0x98
 # +	+	+	-	-	-
 # addressing	assembler	opc	bytes	cycles
 # immediate	ALR #oper	4B	2	2
-ILL_ALR_IMMEDIATE_0x4B = 0x4B
+ILL_ALR_IMMEDIATE_0x4B: Literal[75] = 0x4B
 
 # https://masswerk.at/6502/6502_instruction_set.html#ANC
 # AND oper + set C as ASL
@@ -867,7 +868,7 @@ ILL_ALR_IMMEDIATE_0x4B = 0x4B
 # +	+	+	-	-	-
 # addressing	assembler	opc	bytes	cycles
 # immediate	ANC #oper	0B	2	2
-ILL_ANC_IMMEDIATE_0x0B = 0x0B
+ILL_ANC_IMMEDIATE_0x0B: Literal[11] = 0x0B
 
 # https://masswerk.at/6502/6502_instruction_set.html#ANC2
 # (ANC2)
@@ -881,7 +882,7 @@ ILL_ANC_IMMEDIATE_0x0B = 0x0B
 # +	+	+	-	-	-
 # addressing	assembler	opc	bytes	cycles
 # immediate	ANC #oper	2B	2	2
-ILL_ANC2_IMMEDIATE_0x2B = 0x2B
+ILL_ANC2_IMMEDIATE_0x2B: Literal[43] = 0x2B
 
 # https://masswerk.at/6502/6502_instruction_set.html#ANE
 # (XAA)
@@ -901,7 +902,7 @@ ILL_ANC2_IMMEDIATE_0x2B = 0x2B
 # +	+	-	-	-	-
 # addressing	assembler	opc	bytes	cycles
 # immediate	ANE #oper	8B	2	2  	††
-ILL_ANE_IMMEDIATE_0x8B = 0x8B
+ILL_ANE_IMMEDIATE_0x8B: Literal[139] = 0x8B
 
 # https://masswerk.at/6502/6502_instruction_set.html#ARR
 # AND oper + ROR
@@ -916,7 +917,7 @@ ILL_ANE_IMMEDIATE_0x8B = 0x8B
 # +	+	+	-	-	+
 # addressing	assembler	opc	bytes	cycles
 # immediate	ARR #oper	6B	2	2
-ILL_ARR_IMMEDIATE_0x6B = 0x6B
+ILL_ARR_IMMEDIATE_0x6B: Literal[107] = 0x6B
 
 
 # https://masswerk.at/6502/6502_instruction_set.html#DCP
@@ -935,13 +936,13 @@ ILL_ARR_IMMEDIATE_0x6B = 0x6B
 # absolut,Y	DCP oper,Y	DB	3	7
 # (indirect,X)	DCP (oper,X)	C3	2	8
 # (indirect),Y	DCP (oper),Y	D3	2	8
-ILL_DCP_ZEROPAGE_ZEROPAGE_0xC7 = 0xC7
-ILL_DCP_ZEROPAGE_X_0xD7 = 0xD7
-ILL_DCP_ABSOLUTE_0xCF = 0xCF
-ILL_DCP_ABSOLUTE_X_0xDF = 0xDF
-ILL_DCP_ABSOLUTE_Y_0xDB = 0xDB
-ILL_DCP_INDEXED_INDIRECT_X_0xC3 = 0xC3
-ILL_DCP_INDIRECT_INDEXED_Y_0xD3 = 0xD3
+ILL_DCP_ZEROPAGE_ZEROPAGE_0xC7: Literal[199] = 0xC7
+ILL_DCP_ZEROPAGE_X_0xD7: Literal[215] = 0xD7
+ILL_DCP_ABSOLUTE_0xCF: Literal[207] = 0xCF
+ILL_DCP_ABSOLUTE_X_0xDF: Literal[223] = 0xDF
+ILL_DCP_ABSOLUTE_Y_0xDB: Literal[219] = 0xDB
+ILL_DCP_INDEXED_INDIRECT_X_0xC3: Literal[195] = 0xC3
+ILL_DCP_INDIRECT_INDEXED_Y_0xD3: Literal[211] = 0xD3
 
 # https://masswerk.at/6502/6502_instruction_set.html#ISC
 # (ISB, INS)
@@ -959,13 +960,13 @@ ILL_DCP_INDIRECT_INDEXED_Y_0xD3 = 0xD3
 # absolut,Y	ISC oper,Y	FB	3	7
 # (indirect,X)	ISC (oper,X)	E3	2	8
 # (indirect),Y	ISC (oper),Y	F3	2	8
-ILL_ISC_ZEROPAGE_0xE7 = 0xE7
-ILL_ISC_ZEROPAGE_X_0xF7 = 0xF7
-ILL_ISC_ABSOLUTE_0xEF = 0xEF
-ILL_ISC_ABSOLUTE_X_0xFF = 0xFF
-ILL_ISC_ABSOLUTE_Y_0xFB = 0xFB
-ILL_ISC_INDEXED_INDIRECT_X_0xE3 = 0xE3
-ILL_ISC_INDIRECT_INDEXED_Y_0xF3 = 0xF3
+ILL_ISC_ZEROPAGE_0xE7: Literal[231] = 0xE7
+ILL_ISC_ZEROPAGE_X_0xF7: Literal[247] = 0xF7
+ILL_ISC_ABSOLUTE_0xEF: Literal[239] = 0xEF
+ILL_ISC_ABSOLUTE_X_0xFF: Literal[255] = 0xFF
+ILL_ISC_ABSOLUTE_Y_0xFB: Literal[251] = 0xFB
+ILL_ISC_INDEXED_INDIRECT_X_0xE3: Literal[227] = 0xE3
+ILL_ISC_INDIRECT_INDEXED_Y_0xF3: Literal[243] = 0xF3
 
 # https://masswerk.at/6502/6502_instruction_set.html#LAS
 # (LAR)
@@ -977,7 +978,7 @@ ILL_ISC_INDIRECT_INDEXED_Y_0xF3 = 0xF3
 # +	+	-	-	-	-
 # addressing	assembler	opc	bytes	cycles
 # absolut,Y	LAS oper,Y	BB	3	4*
-ILL_LAS_ABSOLUTE_0xBB = 0xBB
+ILL_LAS_ABSOLUTE_0xBB: Literal[187] = 0xBB
 
 # https://masswerk.at/6502/6502_instruction_set.html#LAX
 # LDA oper + LDX oper
@@ -993,12 +994,12 @@ ILL_LAS_ABSOLUTE_0xBB = 0xBB
 # absolut,Y	LAX oper,Y	BF	3	4*
 # (indirect,X)	LAX (oper,X)	A3	2	6
 # (indirect),Y	LAX (oper),Y	B3	2	5*
-ILL_LAX_ZEROPAGE_0xA7 = 0xA7
-ILL_LAX_ZEROPAGE_X_0xB7 = 0xB7
-ILL_LAX_ABSOLUTE_0xAF = 0xAF
-ILL_LAX_ABSOLUTE_Y_0xBF = 0xBF
-ILL_LAX_INDEXED_INDIRECT_X_0xA3 = 0xA3
-ILL_LAX_INDIRECT_INDEXED_Y_0xB3 = 0xB3
+ILL_LAX_ZEROPAGE_0xA7: Literal[167] = 0xA7
+ILL_LAX_ZEROPAGE_X_0xB7: Literal[183] = 0xB7
+ILL_LAX_ABSOLUTE_0xAF: Literal[175] = 0xAF
+ILL_LAX_ABSOLUTE_Y_0xBF: Literal[191] = 0xBF
+ILL_LAX_INDEXED_INDIRECT_X_0xA3: Literal[163] = 0xA3
+ILL_LAX_INDIRECT_INDEXED_Y_0xB3: Literal[179] = 0xB3
 
 # https://masswerk.at/6502/6502_instruction_set.html#LXA
 # (LAX immediate)
@@ -1012,7 +1013,7 @@ ILL_LAX_INDIRECT_INDEXED_Y_0xB3 = 0xB3
 # +	+	-	-	-	-
 # addressing	assembler	opc	bytes	cycles
 # immediate	LXA #oper	AB	2	2  	††
-ILL_LXA_IMMEDIATE_0xAB = 0xAB
+ILL_LXA_IMMEDIATE_0xAB: Literal[171] = 0xAB
 
 # https://masswerk.at/6502/6502_instruction_set.html#RLA
 # ROL oper + AND oper
@@ -1029,13 +1030,13 @@ ILL_LXA_IMMEDIATE_0xAB = 0xAB
 # absolut,Y	RLA oper,Y	3B	3	7
 # (indirect,X)	RLA (oper,X)	23	2	8
 # (indirect),Y	RLA (oper),Y	33	2	8
-ILL_RLA_ZEROPAGE_0x27 = 0x27
-ILL_RLA_ZEROPAGE_X_0x37 = 0x37
-ILL_RLA_ABSOLUTE_0x2F = 0x2F
-ILL_RLA_ABSOLUTE_X_0x3F = 0x3F
-ILL_RLA_ABSOLUTE_Y_0x3B = 0x3B
-ILL_RLA_INDEXED_INDIRECT_X_0x23 = 0x23
-ILL_RLA_INDIRECT_INDEXED_Y_0x33 = 0x33
+ILL_RLA_ZEROPAGE_0x27: Literal[39] = 0x27
+ILL_RLA_ZEROPAGE_X_0x37: Literal[55] = 0x37
+ILL_RLA_ABSOLUTE_0x2F: Literal[47] = 0x2F
+ILL_RLA_ABSOLUTE_X_0x3F: Literal[63] = 0x3F
+ILL_RLA_ABSOLUTE_Y_0x3B: Literal[59] = 0x3B
+ILL_RLA_INDEXED_INDIRECT_X_0x23: Literal[35] = 0x23
+ILL_RLA_INDIRECT_INDEXED_Y_0x33: Literal[51] = 0x33
 
 # https://masswerk.at/6502/6502_instruction_set.html#RRA
 # ROR oper + ADC oper
@@ -1052,13 +1053,13 @@ ILL_RLA_INDIRECT_INDEXED_Y_0x33 = 0x33
 # absolut,Y	RRA oper,Y	7B	3	7
 # (indirect,X)	RRA (oper,X)	63	2	8
 # (indirect),Y	RRA (oper),Y	73	2	8
-ILL_RRA_ZEROPAGE_0x67 = 0x67
-ILL_RRA_ZEROPAGE_X_0x77 = 0x77
-ILL_RRA_ABSOLUTE_0x6F = 0x6F
-ILL_RRA_ABSOLUTE_X_0x7F = 0x7F
-ILL_RRA_ABSOLUTE_Y_0x7B = 0x7B
-ILL_RRA_INDEXED_INDIRECT_X_0x63 = 0x63
-ILL_RRA_INDIRECT_INDEXED_Y_0x73 = 0x73
+ILL_RRA_ZEROPAGE_0x67: Literal[103] = 0x67
+ILL_RRA_ZEROPAGE_X_0x77: Literal[119] = 0x77
+ILL_RRA_ABSOLUTE_0x6F: Literal[111] = 0x6F
+ILL_RRA_ABSOLUTE_X_0x7F: Literal[127] = 0x7F
+ILL_RRA_ABSOLUTE_Y_0x7B: Literal[123] = 0x7B
+ILL_RRA_INDEXED_INDIRECT_X_0x63: Literal[99] = 0x63
+ILL_RRA_INDIRECT_INDEXED_Y_0x73: Literal[115] = 0x73
 
 # https://masswerk.at/6502/6502_instruction_set.html#SAX
 # (AXS, AAX)
@@ -1074,10 +1075,10 @@ ILL_RRA_INDIRECT_INDEXED_Y_0x73 = 0x73
 # zeropage,Y	SAX oper,Y	97	2	4
 # absolute	SAX oper	8F	3	4
 # (indirect,X)	SAX (oper,X)	83	2	6
-ILL_SAX_ZEROPAGE_0x87 = 0x87
-ILL_SAX_ZEROPAGE_Y_0x97 = 0x97
-ILL_SAX_ABSOLUTE_0x8F = 0x8F
-ILL_SAX_INDEXED_INDIRECT_X_0x83 = 0x83
+ILL_SAX_ZEROPAGE_0x87: Literal[135] = 0x87
+ILL_SAX_ZEROPAGE_Y_0x97: Literal[151] = 0x97
+ILL_SAX_ABSOLUTE_0x8F: Literal[143] = 0x8F
+ILL_SAX_INDEXED_INDIRECT_X_0x83: Literal[131] = 0x83
 
 
 # https://masswerk.at/6502/6502_instruction_set.html#SBX
@@ -1090,7 +1091,7 @@ ILL_SAX_INDEXED_INDIRECT_X_0x83 = 0x83
 # +	+	+	-	-	-
 # addressing	assembler	opc	bytes	cycles
 # immediate	SBX #oper	CB	2	2
-ILL_SBX_IMMEDIATE_0xCB = 0xCB
+ILL_SBX_IMMEDIATE_0xCB: Literal[203] = 0xCB
 
 # https://masswerk.at/6502/6502_instruction_set.html#SHA
 # (AHX, AXA)
@@ -1106,8 +1107,8 @@ ILL_SBX_IMMEDIATE_0xCB = 0xCB
 # addressing	assembler	opc	bytes	cycles
 # absolut,Y	SHA oper,Y	9F	3	5  	†
 # (indirect),Y	SHA (oper),Y	93	2	6  	†
-ILL_SHA_ABSOLUTE_Y_0x9F = 0x9F
-ILL_SHA_INDIRECT_INDEXED_Y_0x93 = 0x93
+ILL_SHA_ABSOLUTE_Y_0x9F: Literal[159] = 0x9F
+ILL_SHA_INDIRECT_INDEXED_Y_0x93: Literal[147] = 0x93
 
 # https://masswerk.at/6502/6502_instruction_set.html#SHX
 # (A11, SXA, XAS)
@@ -1122,7 +1123,7 @@ ILL_SHA_INDIRECT_INDEXED_Y_0x93 = 0x93
 # -	-	-	-	-	-
 # addressing	assembler	opc	bytes	cycles
 # absolut,Y	SHX oper,Y	9E	3	5  	†
-ILL_SHX_ABSOLUTE_Y_0x9E = 0x9E
+ILL_SHX_ABSOLUTE_Y_0x9E: Literal[158] = 0x9E
 
 # https://masswerk.at/6502/6502_instruction_set.html#SHY
 # SHY (A11, SYA, SAY)
@@ -1137,7 +1138,7 @@ ILL_SHX_ABSOLUTE_Y_0x9E = 0x9E
 # -	-	-	-	-	-
 # addressing	assembler	opc	bytes	cycles
 # absolut,X	SHY oper,X	9C	3	5  	†
-ILL_SHY_ABSOLUTE_X_0x9C = 0x9C
+ILL_SHY_ABSOLUTE_X_0x9C: Literal[156] = 0x9C
 
 
 # https://masswerk.at/6502/6502_instruction_set.html#SLO
@@ -1156,13 +1157,13 @@ ILL_SHY_ABSOLUTE_X_0x9C = 0x9C
 # absolut,Y	SLO oper,Y	1B	3	7
 # (indirect,X)	SLO (oper,X)	03	2	8
 # (indirect),Y	SLO (oper),Y	13	2	8
-ILL_SLO_ZEROPAGE_0x07 = 0x07
-ILL_SLO_ZEROPAGE_X_0x17 = 0x17
-ILL_SLO_ABSOLUTE_0x0F = 0x0F
-ILL_SLO_ABSOLUTE_X_0x1F = 0x1F
-ILL_SLO_ABSOLUTE_Y_0x1B = 0x1B
-ILL_SLO_INDEXED_INDIRECT_X_0x03 = 0x03
-ILL_SLO_INDIRECT_INDEXED_Y_0x13 = 0x13
+ILL_SLO_ZEROPAGE_0x07: Literal[7] = 0x07
+ILL_SLO_ZEROPAGE_X_0x17: Literal[23] = 0x17
+ILL_SLO_ABSOLUTE_0x0F: Literal[15] = 0x0F
+ILL_SLO_ABSOLUTE_X_0x1F: Literal[31] = 0x1F
+ILL_SLO_ABSOLUTE_Y_0x1B: Literal[27] = 0x1B
+ILL_SLO_INDEXED_INDIRECT_X_0x03: Literal[3] = 0x03
+ILL_SLO_INDIRECT_INDEXED_Y_0x13: Literal[19] = 0x13
 
 # https://masswerk.at/6502/6502_instruction_set.html#SRE
 # (LSE)
@@ -1180,13 +1181,13 @@ ILL_SLO_INDIRECT_INDEXED_Y_0x13 = 0x13
 # absolut,Y	SRE oper,Y	5B	3	7
 # (indirect,X)	SRE (oper,X)	43	2	8
 # (indirect),Y	SRE (oper),Y	53	2	8
-ILL_SRE_ZEROPAGE_0x47 = 0x47
-ILL_SRE_ZEROPAGE_X_0x57 = 0x57
-ILL_SRE_ABSOLUTE_0x4F = 0x4F
-ILL_SRE_ABSOLUTE_X_0x4F = 0x5F
-ILL_SRE_ABSOLUTE_Y_0x5B = 0x5B
-ILL_SRE_INDEXED_INDIRECT_X_0x43 = 0x43
-ILL_SRE_INDIRECT_INDEXED_Y_0x53 = 0x53
+ILL_SRE_ZEROPAGE_0x47: Literal[71] = 0x47
+ILL_SRE_ZEROPAGE_X_0x57: Literal[87] = 0x57
+ILL_SRE_ABSOLUTE_0x4F: Literal[79] = 0x4F
+ILL_SRE_ABSOLUTE_X_0x4F: Literal[95] = 0x5F
+ILL_SRE_ABSOLUTE_Y_0x5B: Literal[91] = 0x5B
+ILL_SRE_INDEXED_INDIRECT_X_0x43: Literal[67] = 0x43
+ILL_SRE_INDIRECT_INDEXED_Y_0x53: Literal[83] = 0x53
 
 
 # https://masswerk.at/6502/6502_instruction_set.html#TAS
@@ -1202,7 +1203,7 @@ ILL_SRE_INDIRECT_INDEXED_Y_0x53 = 0x53
 # -	-	-	-	-	-
 # addressing	assembler	opc	bytes	cycles
 # absolut,Y	TAS oper,Y	9B	3	5  	†
-ILL_TAS_ABSOLUTE_0x9B = 0x9B
+ILL_TAS_ABSOLUTE_0x9B: Literal[155] = 0x9B
 
 # https://masswerk.at/6502/6502_instruction_set.html#USBC
 # (SBC)
@@ -1510,7 +1511,7 @@ class InstructionSet(enum.IntEnum):
 
     '''STX'''
     STX_ZEROPAGE_0x86 = STX_ZEROPAGE_0x86
-    STX_ZEROPAGE_X_0x96 = STX_ZEROPAGE_X_0x96
+    STX_ZEROPAGE_Y_0x96 = STX_ZEROPAGE_Y_0x96
     STX_ABSOLUTE_0x8E = STX_ABSOLUTE_0x8E
 
     '''STY'''
@@ -1721,7 +1722,6 @@ InstructionSet.map[InstructionSet.CLI_IMPLIED_0x58] = {
 }
 
 
-
 '''CLV'''
 # https://masswerk.at/6502/6502_instruction_set.html#CLV
 # Clear Overflow Flag
@@ -1742,7 +1742,6 @@ InstructionSet.map[InstructionSet.CLV_IMPLIED_0xB8] = {
     'cycles': '2',
     'flags': clv_immediate_0xb8_can_modify_flags
 }
-
 
 
 '''LDA'''
@@ -1849,6 +1848,139 @@ InstructionSet.map[NOP_IMPLIED_0xEA] = {
     'bytes': '1',
     'cycles': '2',
     'flags': nop_implied_0xea_can_modify_flags
+}
+
+'''STA'''
+sta_zeropage_0x85_can_modify_flags: Byte = Byte()
+InstructionSet.map[InstructionSet.STA_ZEROPAGE_0x85] = {
+    'addressing': 'zeropage',
+    'assembler': 'STA {oper}',
+    'opc': InstructionSet.STA_ZEROPAGE_0x85,
+    'bytes': '2',
+    'cycles': '3',
+    'flags': sta_zeropage_0x85_can_modify_flags
+}
+
+sta_zeropage_x_0x95_can_modify_flags: Byte = sta_zeropage_0x85_can_modify_flags
+InstructionSet.map[InstructionSet.STA_ZEROPAGE_X_0x95] = {
+    'addressing': 'zeropage,X',
+    'assembler': 'STA {oper},X',
+    'opc': InstructionSet.STA_ZEROPAGE_X_0x95,
+    'bytes': '2',
+    'cycles': '4',
+    'flags': sta_zeropage_x_0x95_can_modify_flags
+}
+
+sta_absolute_0x8d_can_modify_flags: Byte = sta_zeropage_0x85_can_modify_flags
+InstructionSet.map[InstructionSet.STA_ABSOLUTE_0x8D] = {
+    'addressing': 'absolute',
+    'assembler': 'STA {oper}',
+    'opc': InstructionSet.STA_ABSOLUTE_0x8D,
+    'bytes': '3',
+    'cycles': '4',
+    'flags': sta_absolute_0x8d_can_modify_flags
+}
+
+sta_absolute_x_0x9d_can_modify_flags: Byte = sta_zeropage_0x85_can_modify_flags
+InstructionSet.map[InstructionSet.STA_ABSOLUTE_X_0x9D] = {
+    'addressing': 'absolute,X',
+    'assembler': 'STA {oper},X',
+    'opc': InstructionSet.STA_ABSOLUTE_X_0x9D,
+    'bytes': '3',
+    'cycles': '5',
+    'flags': sta_absolute_x_0x9d_can_modify_flags
+}
+
+sta_absolute_y_0x99_can_modify_flags: Byte = sta_zeropage_0x85_can_modify_flags
+InstructionSet.map[InstructionSet.STA_ABSOLUTE_Y_0x99] = {
+    'addressing': 'absolute,Y',
+    'assembler': 'STA {oper},Y',
+    'opc': InstructionSet.STA_ABSOLUTE_Y_0x99,
+    'bytes': '3',
+    'cycles': '5',
+    'flags': sta_absolute_y_0x99_can_modify_flags
+}
+
+sta_indexed_indirect_x_0x81_can_modify_flags: Byte = sta_zeropage_0x85_can_modify_flags
+InstructionSet.map[InstructionSet.STA_INDEXED_INDIRECT_X_0x81] = {
+    'addressing': '(indirect, X)',
+    'assembler': 'STA ({oper},X)',
+    'opc': InstructionSet.STA_INDEXED_INDIRECT_X_0x81,
+    'bytes': '2',
+    'cycles': '6',
+    'flags': sta_indexed_indirect_x_0x81_can_modify_flags
+}
+
+sta_indirect_indexed_y_0x91_can_modify_flags: Byte = sta_zeropage_0x85_can_modify_flags
+InstructionSet.map[InstructionSet.STA_INDIRECT_INDEXED_Y_0x91] = {
+    'addressing': '(indirect), Y',
+    'assembler': 'STA ({oper}),Y',
+    'opc': InstructionSet.STA_INDIRECT_INDEXED_Y_0x91,
+    'bytes': '2',
+    'cycles': '6',
+    'flags': sta_indirect_indexed_y_0x91_can_modify_flags
+}
+
+'''STX'''
+stx_zeropage_0x86_can_modify_flags: Byte = Byte()
+InstructionSet.map[InstructionSet.STX_ZEROPAGE_0x86] = {
+    'addressing': 'zeropage',
+    'assembler': 'STX {oper}',
+    'opc': InstructionSet.STX_ZEROPAGE_0x86,
+    'bytes': '2',
+    'cycles': '3',
+    'flags': stx_zeropage_0x86_can_modify_flags
+}
+
+stx_zeropage_y_0x96_can_modify_flags: Byte = stx_zeropage_0x86_can_modify_flags
+InstructionSet.map[InstructionSet.STX_ZEROPAGE_Y_0x96] = {
+    'addressing': 'zeropage,Y',
+    'assembler': 'STX {oper},Y',
+    'opc': InstructionSet.STX_ZEROPAGE_Y_0x96,
+    'bytes': '2',
+    'cycles': '4',
+    'flags': stx_zeropage_y_0x96_can_modify_flags
+}
+
+stx_absolute_0x8e_can_modify_flags: Byte = stx_zeropage_0x86_can_modify_flags
+InstructionSet.map[InstructionSet.STX_ABSOLUTE_0x8E] = {
+    'addressing': 'absolute',
+    'assembler': 'STX {oper}',
+    'opc': InstructionSet.STX_ABSOLUTE_0x8E,
+    'bytes': '3',
+    'cycles': '4',
+    'flags': stx_absolute_0x8e_can_modify_flags
+}
+
+'''STY'''
+sty_zeropage_0x84_can_modify_flags: Byte = Byte()
+InstructionSet.map[InstructionSet.STY_ZEROPAGE_0x84] = {
+    'addressing': 'zeropage',
+    'assembler': 'STY {oper}',
+    'opc': InstructionSet.STY_ZEROPAGE_0x84,
+    'bytes': '2',
+    'cycles': '3',
+    'flags': sty_zeropage_0x84_can_modify_flags
+}
+
+sty_zeropage_x_0x94_can_modify_flags: Byte = sty_zeropage_0x84_can_modify_flags
+InstructionSet.map[InstructionSet.STY_ZEROPAGE_X_0x94] = {
+    'addressing': 'zeropage,X',
+    'assembler': 'STY {oper},X',
+    'opc': InstructionSet.STY_ZEROPAGE_X_0x94,
+    'bytes': '2',
+    'cycles': '4',
+    'flags': sty_zeropage_x_0x94_can_modify_flags
+}
+
+sty_absolute_0x8c_can_modify_flags: Byte = sty_zeropage_0x84_can_modify_flags
+InstructionSet.map[InstructionSet.STY_ABSOLUTE_0x8C] = {
+    'addressing': 'absolute',
+    'assembler': 'STY {oper}',
+    'opc': InstructionSet.STY_ABSOLUTE_0x8C,
+    'bytes': '3',
+    'cycles': '4',
+    'flags': sty_absolute_0x8c_can_modify_flags
 }
 
 # Template

@@ -3,6 +3,7 @@
 """CPU core for the mos6502."""
 
 import logging
+from typing import Literal
 
 from bitarray.util import ba2int
 
@@ -13,9 +14,11 @@ import mos6502.registers as registers
 import mos6502.memory as memory
 from mos6502.memory import Byte, Word, RAM
 
-INFINITE_CYCLES = 0xFFFFFFFF
+INFINITE_CYCLES: Literal[4294967295] = 0xFFFFFFFF
 
 
+# https://skilldrick.github.io/easy6502/
+# https://masswerk.at/6502/6502_instruction_set.html
 # https://retro64.altervista.org/blog/an-introduction-to-6502-math-addiction-subtraction-and-more/
 # https://www.pagetable.com/c64ref/6502/
 # http://www.emulator101.com/6502-addressing-modes.html
@@ -61,7 +64,7 @@ class MOS6502CPU(flags.ProcessorStatusFlagsInterface):
 
         Infinite cycles can be used by setting this to mos6502.core.INFINITE_CYCLES
 
-        self.executed_cycles will have the # of executed cycles added to it.
+        self.cycles_executed will have the # of executed cycles added to it.
         self.cycles will have {cycles} subtracted from it.
 
         Arguments:
@@ -189,6 +192,21 @@ class MOS6502CPU(flags.ProcessorStatusFlagsInterface):
         self.log.debug(f'read_byte({memory_section}[0x{address:02x}]): {data}')
         return data
 
+    def peek_byte(self, address: Word) -> Byte:
+        """
+        Read a Byte() from RAM at location RAM[address].
+
+        Doesn't use CPU cycles.
+
+        Arguments:
+            address: the address to read from
+
+        Returns:
+            a Byte() set to the value located in memory at RAM[address]
+        """
+        data: Byte = self.ram[int(address)]
+        return data
+
     def write_byte(self, address: Word, data: Byte) -> Byte:
         """
         Write a Byte() to RAM at location RAM[address].
@@ -229,6 +247,23 @@ class MOS6502CPU(flags.ProcessorStatusFlagsInterface):
         self.log.debug(f'read_word({memory_section}[0x{address:02x}]): {data}')
         return Word(data, endianness=self.endianness)
 
+    def peek_word(self, address: Word) -> Word:
+        """
+        Read a Word() from RAM at location RAM[address].
+
+        Doesn't use CPU cycles.
+
+        Arguments:
+            address: the address to read from
+
+        Returns:
+            a Byte() set to the value located in memory at RAM[address]
+        """
+        lowbyte: Byte = self.ram[int(address)]
+        highbyte: Byte = self.ram[int(address) + 1]
+        data = (int(highbyte) << 8) + int(lowbyte)
+        return Word(data, endianness=self.endianness)
+
     def write_word(self, address: Word, data: Word) -> None:
         """
         Write a Word() to RAM at location RAM[address].
@@ -254,6 +289,99 @@ class MOS6502CPU(flags.ProcessorStatusFlagsInterface):
         self.ram[address + 1] = highbyte
         self.log.info('w')
         self.spend_cpu_cycles(cost=1)
+
+    def read_register(self, register_name):
+        """
+        Read the value of a register.
+
+        Costs 1 CPU cycle.
+
+        Arguments:
+            register_name: the name of the register to read
+
+        Returns:
+            a MemoryUnit (either Byte() or Word() depending on the register read)
+        """
+        if register_name == 'PC':
+            return getattr(self, register_name) & 0xFFFF
+
+        return getattr(self, register_name) & 0xFF
+
+    def write_register(self, register_name, data):
+        """
+        Write a value to a register.
+
+        Costs 1 CPU cycle.
+
+        Arguments:
+            register_name: the name of the register to write to
+            data: the data to write to the register
+
+        Returns:
+            a MemoryUnit (either Byte() or Word() depending on the register read)
+        """
+        if register_name == 'PC':
+            setattr(self, register_name, data & 0xFFFF)
+
+        setattr(self, register_name, data & 0xFF)
+
+    def write_register_to_ram(self, register_name, address) -> None:
+        """
+        Write a register value to ram.
+
+        Costs 1 CPU cycle for 8-bit registers, 2 cycles for 16-bit registers.
+
+        Arguments:
+            register_name: the name of the register to write to
+            data: the data to write to the register
+
+        Returns:
+            a MemoryUnit (either Byte() or Word() depending on the register read)
+        """
+        if register_name == 'PC':
+            self.write_byte(
+                address=address,
+                data=Byte(getattr(self, register_name)).lowbyte & 0xFF
+            )
+            self.write_byte(
+                address=address,
+                data=Byte(getattr(self, register_name)).highbyte & 0xFF
+            )
+
+        self.write_byte(address=address, data=getattr(self, register_name) & 0xFF)
+
+    def write_ram_to_register(self, address, register_name) -> None:
+        """
+        Write a ram value to a register.
+
+        Costs 1 CPU cycle for 8-bit registers, 2 cycles for 16-bit registers.
+
+        Arguments:
+            register_name: the name of the register to write to
+            data: the data to write to the register
+
+        Returns:
+            a MemoryUnit (either Byte() or Word() depending on the register read)
+        """
+        if register_name == 'PC':
+            setattr(
+                self,
+                register_name,
+                data=Word(
+                    self.read_byte(address + 1) << 8 + self.read_byte(address)
+                )
+            )
+
+        setattr(self, register_name, self.fetch_byte(address=address) & 0xFF)
+
+    def set_store_status_flags(self, register_name) -> None:
+        """Set the status flags for store operations.
+
+        Arguments:
+            register_name: the name of th register to read to determine status
+        """
+        # No flag modifications for store instructions
+        pass
 
     def set_load_status_flags(self, register_name) -> None:
         """Set the status flags for load operations.
@@ -299,6 +427,49 @@ class MOS6502CPU(flags.ProcessorStatusFlagsInterface):
             f'{Byte(value=getattr(self, register_name))}'
         )
 
+    def execute_store_zeropage(self, instruction, register_name, offset_register_name) -> None:
+        """
+        Instruction execution for store zeropage.
+
+        "zeropage ST[A, X, Y] oper" and "zeropage ST[A, X, Y],[X, Y] oper".
+
+        Executes Store Zeropage on {register_name} for {instruction} using {offset_register_name}.
+
+        Arguments:
+            instruction: the store zeropage instruction to execute
+            register_name: the register to load to
+            offset_register_name: the offset register to use for any offset operations.
+
+        Returns:
+            None
+        """
+        # Note: Due to how we handle Byte and Word object, we have to look up the registers by
+        # name, otherwise passing them through functions results in the register dereferencing
+        # to an integer value.
+        #
+        # This helps us keep the code super readable by allowing heavy code reuse across instruction
+        # types.
+        #
+        # Just remember to pass register names and dereference in methods if necessary.
+        data: Byte = getattr(self, register_name)
+        zeropage_address: Byte | None = self.fetch_byte()
+
+        offset_register_value: Literal[0] = 0
+        address: Byte = zeropage_address + offset_register_value
+
+        if offset_register_name is not None:
+            offset_register_value: Literal[0] = getattr(self, offset_register_name)
+
+            # This needs to wrap, so mask by 0xFF
+            address: Byte = zeropage_address + offset_register_value
+
+        self.write_byte(address=address, data=data)
+        setattr(self, register_name, self.read_byte(address=address))
+
+        self.set_store_status_flags(register_name=register_name)
+
+        self.log.debug(f'{instructions.InstructionSet(instruction).name}: {Byte(value=data)}')
+
     def execute_load_zeropage(self, instruction, register_name, offset_register_name) -> None:
         """
         Instruction execution for load zeropage.
@@ -308,7 +479,7 @@ class MOS6502CPU(flags.ProcessorStatusFlagsInterface):
         Executes Load Zeropage on {register_name} for {instruction} using {offset_register_name}.
 
         Arguments:
-            instruction: the load immediate instruction to execute
+            instruction: the load zeropage instruction to execute
             register_name: the register to load to
             offset_register_name: the offset register to use for any offset operations.
 
@@ -326,11 +497,11 @@ class MOS6502CPU(flags.ProcessorStatusFlagsInterface):
         register: Byte = getattr(self, register_name)
         zeropage_address: Byte | None = self.fetch_byte()
 
-        offset_register_value = 0
+        offset_register_value: Literal[0] = 0
         address: Byte = zeropage_address + offset_register_value
 
         if offset_register_name is not None:
-            offset_register_value = getattr(self, offset_register_name)
+            offset_register_value: Literal[0] = getattr(self, offset_register_name)
 
             # This needs to wrap, so mask by 0xFF
             address: Byte = zeropage_address + offset_register_value
@@ -338,6 +509,41 @@ class MOS6502CPU(flags.ProcessorStatusFlagsInterface):
         setattr(self, register_name, self.read_byte(address=address))
 
         self.set_load_status_flags(register_name=register_name)
+
+        self.log.debug(f'{instructions.InstructionSet(instruction).name}: {Byte(value=register)}')
+
+    def execute_store_absolute(self, instruction, register_name, offset_register_name) -> None:
+        """
+        Instruction execution for store absolute.
+
+        "absolute ST[A, X, Y] oper" and "absolute,[X, Y] ST[A, X, Y] oper,[X, Y]".
+
+        Executes Load Absolute on {register_name} for {instruction} using {offset_register_name}
+
+        Arguments:
+            instruction: the load absolute instruction to execute
+            register_name: the register to load to
+            offset_register_name: the offset register to use for any offset operations
+
+        Returns:
+            None
+        """
+        register: Byte = getattr(self, register_name)
+        absolute_address: Word | None = self.fetch_word()
+
+        address: Word = absolute_address
+        if offset_register_name is not None:
+            offset_register_value = getattr(self, offset_register_name)
+            address: Word = absolute_address + offset_register_value
+
+            if address.overflow:
+                self.log.info('o')
+                self.spend_cpu_cycles(1)
+        else:
+            address: Word = absolute_address
+
+        self.write_byte(address=address & 0xFFFF, data=getattr(self, register_name))
+        self.set_store_status_flags(register_name=register_name)
 
         self.log.debug(f'{instructions.InstructionSet(instruction).name}: {Byte(value=register)}')
 
@@ -384,6 +590,83 @@ class MOS6502CPU(flags.ProcessorStatusFlagsInterface):
 
         self.log.debug(f'{instructions.InstructionSet(instruction).name}: {Byte(value=register)}')
 
+    def read_indexed_indirect_address(self) -> Word:
+        """
+        Read from RAM @ RAM[(PC:PC + 1) + X].
+
+        Costs 3 CPU cycles.
+
+        Arguments:
+            register_name: the name of the register to read
+
+        Returns:
+            a Byte()
+        """
+        indirect_address: Byte = self.read_byte(self.SP)
+        offset_register_value: Byte = getattr(self, 'X')
+
+        address: Word = self.read_word(indirect_address + offset_register_value)
+
+        return address
+
+    def fetch_indexed_indirect_address(self) -> Word:
+        """
+        Read from RAM @ RAM[(PC:PC + 1) + X].
+
+        Increases PC by 1.
+
+        Costs 3 CPU cycles.
+
+        Arguments:
+            register_name: the name of the register to fetch
+
+        Returns:
+            a Byte()
+        """
+        indirect_address: Byte = self.fetch_byte()
+        offset_register_value: Byte = getattr(self, 'X')
+
+        address: Word = self.read_word(indirect_address + offset_register_value)
+
+        return address
+
+    def execute_store_indexed_indirect(self, instruction, register_name) -> None:
+        """
+        Instruction execution for "(indirect,X) ST[A, X, Y] (oper,X)".
+
+        Executes Store Indexed Indirect on {register_name} for {instruction}.
+
+        Arguments:
+            instruction: the load indexed indirect instruction to execute
+            register_name: the name of the register to load to
+
+        Returns:
+            None
+        """
+        # Note: Due to how we handle Byte and Word object, we have to look up the registers by
+        # name, otherwise passing them through functions results in the register dereferencing
+        # to an integer value.
+        #
+        # This helps us keep the code super readable by allowing heavy code reuse across instruction
+        # types.
+        #
+        # Just remember to pass register names and dereference in methods if necessary.
+        # indirect_address: Byte = self.fetch_byte()
+        # offset_register_value: Byte = getattr(self, 'X')
+
+        # address: Word = self.read_word(indirect_address + offset_register_value) & 0xFFFF
+        address: int = self.fetch_indexed_indirect_address() & 0xFFFF
+
+        data: Byte = self.read_byte(address=address)
+
+        setattr(self, register_name, data)
+        self.set_store_status_flags(register_name=register_name)
+
+        self.log.debug(
+            f'{instructions.InstructionSet(instruction).name}: '
+            f'{Byte(value=self.ram[address])}'
+        )
+
     def execute_load_indexed_indirect(self, instruction, register_name) -> None:
         """
         Instruction execution for "(indirect,X) LD[A, X, Y] (oper,X)".
@@ -407,14 +690,60 @@ class MOS6502CPU(flags.ProcessorStatusFlagsInterface):
         # Just remember to pass register names and dereference in methods if necessary.
         register: Byte = getattr(self, register_name)
         indirect_address: Byte = self.fetch_byte()
-        offset_register_value = getattr(self, 'X')
+        offset_register_value: Byte = getattr(self, 'X')
 
         address = self.read_word(indirect_address + offset_register_value)
 
         setattr(self, register_name, self.read_byte(address=address))
         self.set_load_status_flags(register_name=register_name)
 
-        self.log.debug(f'{instructions.InstructionSet(instruction).name}: {Byte(value=register)}')
+        self.log.debug(
+            f'{instructions.InstructionSet(instruction).name}: '
+            f'{Byte(value=register)}'
+        )
+
+    def execute_store_indirect_indexed(self, instruction, register_name) -> None:
+        """
+        Instruction execution for "(indirect),Y LD[A, X, Y] (oper),Y".
+
+        Executes Store Indirect Indexed on {register_name} for {instruction}.
+
+        Arguments:
+            instruction: the load indexed indirect instruction to esxecute
+            register_name: the name of the register to load to
+
+        Returns:
+            None
+        """
+        # Note: Due to how we handle Byte and Word object, we have to look up the registers by
+        # name, otherwise passing them through functions results in the register dereferencing
+        # to an integer value.
+        #
+        # This helps us keep the code super readable by allowing heavy code reuse across instruction
+        # types.
+        #
+        # Just remember to pass register names and dereference in methods if necessary.
+        # register: Byte = getattr(self, register_name)
+        indirect_address: Byte = self.fetch_byte()
+        offset_register_value = getattr(self, 'Y')
+
+        absolute_address = self.read_word(indirect_address)
+
+        # Note: We add these together this way to ensure
+        # an overflow condition
+        address: Word = Word(absolute_address) + Byte(offset_register_value)
+
+        if address.overflow:
+            self.log.info('o')
+            self.spend_cpu_cycles(1)
+
+        setattr(self, register_name, self.read_byte(address=address))
+        self.set_store_status_flags(register_name=register_name)
+
+        self.log.debug(
+            f'{instructions.InstructionSet(instruction).name}: '
+            f'{Byte(value=self.ram[address & 0xFFFF])}'
+        )
 
     def execute_load_indirect_indexed(self, instruction, register_name) -> None:
         """
@@ -531,11 +860,13 @@ class MOS6502CPU(flags.ProcessorStatusFlagsInterface):
 
             if operand is not None:
                 self.log.info(
-                    f'0x{self.PC - 1:02X}: 0x{instruction:02X} 0x{operand:02X} \t\t\t {assembly} \t\t\t {instruction_cycle_count}'
+                    f'0x{self.PC - 1:02X}: 0x{instruction:02X} '
+                    f'0x{operand:02X} \t\t\t {assembly} \t\t\t {instruction_cycle_count}'
                 )
             else:
                 self.log.info(
-                    f'0x{self.PC - 1:02X}: 0x{instruction:02X} ---- \t\t\t {assembly} \t\t\t {instruction_cycle_count}'
+                    f'0x{self.PC - 1:02X}: 0x{instruction:02X} ---- '
+                    f'\t\t\t {assembly} \t\t\t {instruction_cycle_count}'
                 )
 
             match instruction:
@@ -793,9 +1124,98 @@ class MOS6502CPU(flags.ProcessorStatusFlagsInterface):
                 # SEC
                 # SED
                 # SEI
-                # STA
-                # STX
-                # STY
+                # ''' STA '''
+                case instructions.STA_ZEROPAGE_0x85:
+                    self.execute_store_zeropage(
+                        instruction=instruction,
+                        register_name='A',
+                        offset_register_name=None
+                    )
+
+                case instructions.STA_ZEROPAGE_X_0x95:
+                    self.execute_store_zeropage(
+                        instruction=instruction,
+                        register_name='A',
+                        offset_register_name='X'
+                    )
+
+                case instructions.STA_ABSOLUTE_0x8D:
+                    self.execute_store_absolute(
+                        instruction=instruction,
+                        register_name='A',
+                        offset_register_name=None
+                    )
+
+                case instructions.STA_ABSOLUTE_X_0x9D:
+                    self.execute_store_absolute(
+                        instruction=instruction,
+                        register_name='A',
+                        offset_register_name='X'
+                    )
+
+                case instructions.STA_ABSOLUTE_Y_0x99:
+                    self.execute_store_absolute(
+                        instruction=instruction,
+                        register_name='A',
+                        offset_register_name='Y'
+                    )
+
+                case instructions.STA_INDEXED_INDIRECT_X_0x81:
+                    self.execute_store_indexed_indirect(
+                        instruction=instruction,
+                        register_name='A'
+                    )
+
+                case instructions.STA_INDIRECT_INDEXED_Y_0x91:
+                    self.execute_store_indirect_indexed(
+                        instruction=instruction,
+                        register_name='A'
+                    )
+
+                # ''' STX '''
+                case instructions.STX_ABSOLUTE_0x8E:
+                    self.execute_store_absolute(
+                        instruction=instruction,
+                        register_name='X',
+                        offset_register_name=None
+                    )
+
+                case instructions.STX_ZEROPAGE_0x86:
+                    self.execute_store_zeropage(
+                        instruction=instruction,
+                        register_name='X',
+                        offset_register_name=None
+                    )
+
+                case instructions.STX_ZEROPAGE_Y_0x96:
+                    self.execute_store_zeropage(
+                        instruction=instruction,
+                        register_name='X',
+                        offset_register_name='Y'
+                    )
+
+                # ''' STY '''
+                case instructions.STY_ABSOLUTE_0x8C:
+                    self.execute_store_absolute(
+                        instruction=instruction,
+                        register_name='Y',
+                        offset_register_name=None
+                    )
+
+                case instructions.STY_ZEROPAGE_0x84:
+                    self.execute_store_zeropage(
+                        instruction=instruction,
+                        register_name='Y',
+                        offset_register_name=None
+                    )
+
+                case instructions.STY_ZEROPAGE_X_0x94:
+                    self.execute_store_zeropage(
+                        instruction=instruction,
+                        register_name='Y',
+                        offset_register_name='X'
+                    )
+
                 # TAX
                 # TAY
                 # TSX
@@ -884,7 +1304,7 @@ class MOS6502CPU(flags.ProcessorStatusFlagsInterface):
         Arguments:
             flags: Byte()
         """
-        self.log.debug(f'0x{getattr(self._flags, "_flags"):02X} <- Flags')
+        self.log.debug(f'Flags <- 0x{getattr(self._flags, "_flags"):02X}')
         setattr(self._flags, flags)
 
     @property
@@ -895,7 +1315,7 @@ class MOS6502CPU(flags.ProcessorStatusFlagsInterface):
         Returns:
             Word()
         """
-        self.log.debug(f'0x{getattr(self._registers, "PC"):04X} <- PC')
+        self.log.debug(f'PC <- 0x{getattr(self._registers, "PC"):04X}')
         return getattr(self._registers, 'PC')
 
     @PC.setter
@@ -921,7 +1341,7 @@ class MOS6502CPU(flags.ProcessorStatusFlagsInterface):
         Returns:
             Word()
         """
-        self.log.debug(f'0x{getattr(self._registers, "SP"):02X} <- SP')
+        self.log.debug(f'SP <- 0x{getattr(self._registers, "SP"):02X} ')
         return getattr(self._registers, 'SP')
 
     @SP.setter
@@ -943,7 +1363,7 @@ class MOS6502CPU(flags.ProcessorStatusFlagsInterface):
         Returns:
             Byte()
         """
-        self.log.debug(f'0x{getattr(self._registers, "Y"):02X} <- A')
+        self.log.debug(f'A <- 0x{getattr(self._registers, "Y"):02X}')
         return getattr(self._registers, 'A')
 
     @A.setter
@@ -965,7 +1385,7 @@ class MOS6502CPU(flags.ProcessorStatusFlagsInterface):
         Returns:
             Byte()
         """
-        self.log.debug(f'0x{getattr(self._registers, "Y"):02X} <- X')
+        self.log.debug(f'X <- 0x{getattr(self._registers, "Y"):02X}')
         return getattr(self._registers, 'X')
 
     @X.setter
@@ -987,7 +1407,7 @@ class MOS6502CPU(flags.ProcessorStatusFlagsInterface):
         Returns:
             Byte()
         """
-        self.log.debug(f'0x{getattr(self._registers, "Y"):02X} <- Y')
+        self.log.debug(f'Y <- 0x{getattr(self._registers, "Y"):02X}')
         return getattr(self._registers, 'Y')
 
     @Y.setter
@@ -1013,6 +1433,8 @@ class MOS6502CPU(flags.ProcessorStatusFlagsInterface):
         description += f"\tB: {self.B}\n"
         description += f"\tV: {self.V}\n"
         description += f"\tN: {self.N}\n"
+        description += f"Executed Cycles: {self.cycles_executed}"
+        description += "\n"
 
         return description
 
@@ -1063,7 +1485,6 @@ def main() -> None:
             log.info(f'Used: {cpu.cycles_executed} cycles')
 
         log.info(cpu)
-
 
 
 if __name__ == '__main__':
