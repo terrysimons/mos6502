@@ -53,3 +53,11 @@ def test_cpu_instruction_JSR_ABSOLUTE_0x20():
     assert cpu.A == 0x23
     assert cpu.PC == 0x4244
     check_noop_flags(expected_cpu=initial_cpu, actual_cpu=cpu)
+
+# def test_cpu_insruction_JMP_ABSOLUTE_0x4C():
+#     instructions.JMP_ABSOLUTE_0x4C
+#     assert False
+
+# def test_cpu_instructions_JMP_0x6C():
+#     instructions.JMP_INDIRECT_0x6C
+#     assert False
