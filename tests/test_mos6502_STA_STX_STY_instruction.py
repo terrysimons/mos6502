@@ -74,7 +74,7 @@ def verify_store_absolute(cpu, data, instruction, offset, register_name, expecte
     assert cpu.flags == expected_flags
     check_noop_flags(expected_cpu=initial_cpu, actual_cpu=cpu)
 
-def verify_store_indexed_indirect(cpu, sp_value, data, instruction, offset, register_name, expected_flags, expected_cycles, offset_value=0x00) -> None:
+def verify_store_indexed_indirect(cpu, pc_value, data, instruction, offset, register_name, expected_flags, expected_cycles, offset_value=0x00) -> None:
     # given:
     initial_cpu: mos6502.MOS6502CPU = copy.deepcopy(cpu)
 
@@ -84,11 +84,11 @@ def verify_store_indexed_indirect(cpu, sp_value, data, instruction, offset, regi
     # Store with indirect x offset
     # @PC
     cpu.ram[0xFFFC] = instruction
-    cpu.ram[0xFFFD] = sp_value
+    cpu.ram[0xFFFD] = pc_value
 
     # @ZP offset
-    cpu.ram[(sp_value + offset_value) & 0xFF] = (offset) & 0xFF # zeropage addr
-    cpu.ram[(sp_value + offset_value + 1) & 0xFF] = (offset >> 8) & 0xFF # zerpage addr + 1
+    cpu.ram[(pc_value + offset_value) & 0xFF] = (offset) & 0xFF # zeropage addr
+    cpu.ram[(pc_value + offset_value + 1) & 0xFF] = (offset >> 8) & 0xFF # zerpage addr + 1
 
     address: Word = Word(offset)
 
@@ -108,7 +108,7 @@ def verify_store_indexed_indirect(cpu, sp_value, data, instruction, offset, regi
     assert cpu.flags == expected_flags
     check_noop_flags(expected_cpu=initial_cpu, actual_cpu=cpu)
 
-def verify_store_indirect_indexed(cpu, sp_value, data, instruction, offset, register_name, expected_flags, expected_cycles, offset_value=0x00) -> None:
+def verify_store_indirect_indexed(cpu, pc_value, data, instruction, offset, register_name, expected_flags, expected_cycles, offset_value=0x00) -> None:
     # given:
     initial_cpu: mos6502.MOS6502CPU = copy.deepcopy(cpu)
 
@@ -116,25 +116,13 @@ def verify_store_indirect_indexed(cpu, sp_value, data, instruction, offset, regi
     setattr(cpu, register_name, 0x00)
     setattr(cpu, 'Y', offset_value)
 
-    # verify_store_indirect_indexed(
-    #     cpu=cpu,
-    #     sp_value=0x80,
-    #     data=0xFF,
-    #     instruction=instructions.STA_INDIRECT_INDEXED_Y_0x91,
-    #     offset=0x8000,
-    #     register_name='A',
-    #     expected_flags=expected_flags,
-    #     expected_cycles=6,
-    #     offset_value=0x04
-    # )
-
     # Load with indirect x offset
     cpu.ram[0xFFFC] = instruction
-    cpu.ram[0xFFFD] = sp_value
+    cpu.ram[0xFFFD] = pc_value
 
     # @ZP offset
-    cpu.ram[(sp_value) & 0xFF] = (offset) & 0xFF # zeropage addr
-    cpu.ram[(sp_value + 1) & 0xFF] = (offset >> 8) & 0xFF # zerpage addr + 1
+    cpu.ram[(pc_value) & 0xFF] = (offset) & 0xFF # zeropage addr
+    cpu.ram[(pc_value + 1) & 0xFF] = (offset >> 8) & 0xFF # zerpage addr + 1
 
     # @Address
     cpu.ram[(offset + offset_value) & 0xFFFF] = data
@@ -214,7 +202,7 @@ def test_cpu_instruction_STA_INDEXED_INDIRECT_X_0x81() -> None:
 
     verify_store_indexed_indirect(
         cpu=cpu,
-        sp_value=0x02,
+        pc_value=0x02,
         data=0xFF,
         instruction=instructions.STA_INDEXED_INDIRECT_X_0x81,
         offset=0x8000,
@@ -232,7 +220,7 @@ def test_cpu_instruction_STA_INDIRECT_INDEXED_Y_0x91() -> None:
 
     verify_store_indirect_indexed(
         cpu=cpu,
-        sp_value=0x80,
+        pc_value=0x80,
         data=0xFF,
         instruction=instructions.STA_INDIRECT_INDEXED_Y_0x91,
         offset=0x8000,

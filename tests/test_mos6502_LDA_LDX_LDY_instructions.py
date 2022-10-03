@@ -109,7 +109,7 @@ def verify_load_absolute(cpu, data, instruction, offset, register_name, expected
     assert cpu.flags[flags.N] == expected_flags[flags.N]
     check_noop_flags(expected_cpu=initial_cpu, actual_cpu=cpu)
 
-def verify_load_indexed_indirect(cpu, sp_value, data, instruction, offset, register_name, expected_flags, expected_cycles, offset_value=0x00) -> None:
+def verify_load_indexed_indirect(cpu, pc_value, data, instruction, offset, register_name, expected_flags, expected_cycles, offset_value=0x00) -> None:
     # given:
     initial_cpu: mos6502.MOS6502CPU = copy.deepcopy(cpu)
 
@@ -122,9 +122,9 @@ def verify_load_indexed_indirect(cpu, sp_value, data, instruction, offset, regis
     offset_address: Word = Word(offset, endianness=cpu.endianness)
 
     cpu.ram[0xFFFC] = instruction
-    cpu.ram[0xFFFD] = sp_value # fetch_byte() -> 0x02
-    cpu.ram[sp_value + offset_value] = 0xFF & offset_address.lowbyte # 0x02 + cpu.X(value))
-    cpu.ram[sp_value + offset_value + 1] = 0x80 & offset_address.highbyte # read_byte(0x06) == 0x00, read_byte(0x07) == 0x80 -> Word(0x8000)
+    cpu.ram[0xFFFD] = pc_value # fetch_byte() -> 0x02
+    cpu.ram[pc_value + offset_value] = 0xFF & offset_address.lowbyte # 0x02 + cpu.X(value))
+    cpu.ram[pc_value + offset_value + 1] = 0x80 & offset_address.highbyte # read_byte(0x06) == 0x00, read_byte(0x07) == 0x80 -> Word(0x8000)
     cpu.ram[offset_address & 0xFFFF] = data # read_byte(0x8000) -> cpu.A
 
     # when:
@@ -141,7 +141,7 @@ def verify_load_indexed_indirect(cpu, sp_value, data, instruction, offset, regis
     assert cpu.flags[flags.N] == expected_flags[flags.N]
     check_noop_flags(expected_cpu=initial_cpu, actual_cpu=cpu)
 
-def verify_load_indirect_indexed(cpu, sp_value, data, instruction, offset, register_name, expected_flags, expected_cycles, offset_value=0x00) -> None:
+def verify_load_indirect_indexed(cpu, pc_value, data, instruction, offset, register_name, expected_flags, expected_cycles, offset_value=0x00) -> None:
     # given:
     initial_cpu: mos6502.MOS6502CPU = copy.deepcopy(cpu)
 
@@ -154,9 +154,9 @@ def verify_load_indirect_indexed(cpu, sp_value, data, instruction, offset, regis
     offset_address: Word = Word(offset, endianness=cpu.endianness)
 
     cpu.ram[0xFFFC] = instruction
-    cpu.ram[0xFFFD] = sp_value # SP
-    cpu.ram[sp_value] = 0xFF & offset_address.lowbyte # 0x02@0xFFFD is the start of our address vector in the zero page (LSB)
-    cpu.ram[sp_value + 1] = 0xFF & offset_address.highbyte # 0x03 is the msb of our address (0x8000)
+    cpu.ram[0xFFFD] = pc_value # SP
+    cpu.ram[pc_value] = 0xFF & offset_address.lowbyte # 0x02@0xFFFD is the start of our address vector in the zero page (LSB)
+    cpu.ram[pc_value + 1] = 0xFF & offset_address.highbyte # 0x03 is the msb of our address (0x8000)
     cpu.ram[(offset_address + offset_value) & 0xFFFF] = data # 0x8000 + cpu.Y(0x80) [0x8080] -> cpu.A
 
     # when:
@@ -761,7 +761,7 @@ def test_cpu_instruction_LDA_INDEXED_INDIRECT_X_0xA1_with_negative_flag() -> Non
 
     verify_load_indexed_indirect(
         cpu=cpu,
-        sp_value=0x02,
+        pc_value=0x02,
         data=0xFF,
         instruction=instructions.LDA_INDEXED_INDIRECT_X_0xA1,
         offset=0x8000,
@@ -783,7 +783,7 @@ def test_cpu_instruction_LDA_INDEXED_INDIRECT_X_0xA1_without_negative_flag() -> 
 
     verify_load_indexed_indirect(
         cpu=cpu,
-        sp_value=0x02,
+        pc_value=0x02,
         data=0x01,
         instruction=instructions.LDA_INDEXED_INDIRECT_X_0xA1,
         offset=0x8000,
@@ -805,7 +805,7 @@ def test_cpu_instruction_LDA_INDEXED_INDIRECT_X_0xA1_with_zero_flag() -> None:
 
     verify_load_indexed_indirect(
         cpu=cpu,
-        sp_value=0x02,
+        pc_value=0x02,
         data=0x00,
         instruction=instructions.LDA_INDEXED_INDIRECT_X_0xA1,
         offset=0x8000,
@@ -825,10 +825,10 @@ def test_cpu_instruction_LDA_INDIRECT_INDEXED_Y_0xB1_with_negative_flag() -> Non
     cpu.flags[flags.Z] = not expected_flags[flags.Z]
     cpu.flags[flags.N] = not expected_flags[flags.N]
 
-    # def verify_load_indirect_indexed(cpu, sp_value, data, instruction, offset, register_name, expected_flags, expected_cycles, offset_value=0x00) -> None:
+    # def verify_load_indirect_indexed(cpu, pc_value, data, instruction, offset, register_name, expected_flags, expected_cycles, offset_value=0x00) -> None:
     verify_load_indirect_indexed(
         cpu=cpu,
-        sp_value=0x80,
+        pc_value=0x80,
         data=0xFF,
         instruction=instructions.LDA_INDIRECT_INDEXED_Y_0xB1,
         offset=0x8000,
@@ -848,10 +848,10 @@ def test_cpu_instruction_LDA_INDIRECT_INDEXED_Y_0xB1_without_negative_flag() -> 
     cpu.flags[flags.Z] = not expected_flags[flags.Z]
     cpu.flags[flags.N] = not expected_flags[flags.N]
 
-    # def verify_load_indirect_indexed(cpu, sp_value, data, instruction, offset, register_name, expected_flags, expected_cycles, offset_value=0x00) -> None:
+    # def verify_load_indirect_indexed(cpu, pc_value, data, instruction, offset, register_name, expected_flags, expected_cycles, offset_value=0x00) -> None:
     verify_load_indirect_indexed(
         cpu=cpu,
-        sp_value=0x80,
+        pc_value=0x80,
         data=0x01,
         instruction=instructions.LDA_INDIRECT_INDEXED_Y_0xB1,
         offset=0x8000,
@@ -871,10 +871,10 @@ def test_cpu_instruction_LDA_INDIRECT_INDEXED_Y_0xB1_with_zero_flag() -> None:
     cpu.flags[flags.Z] = not expected_flags[flags.Z]
     cpu.flags[flags.N] = not expected_flags[flags.N]
 
-    # def verify_load_indirect_indexed(cpu, sp_value, data, instruction, offset, register_name, expected_flags, expected_cycles, offset_value=0x00) -> None:
+    # def verify_load_indirect_indexed(cpu, pc_value, data, instruction, offset, register_name, expected_flags, expected_cycles, offset_value=0x00) -> None:
     verify_load_indirect_indexed(
         cpu=cpu,
-        sp_value=0x80,
+        pc_value=0x80,
         data=0x00,
         instruction=instructions.LDA_INDIRECT_INDEXED_Y_0xB1,
         offset=0x8000,
@@ -894,10 +894,10 @@ def test_cpu_instruction_LDA_INDIRECT_INDEXED_Y_0xB1_with_negative_flag_crossing
     cpu.flags[flags.Z] = not expected_flags[flags.Z]
     cpu.flags[flags.N] = not expected_flags[flags.N]
 
-    # def verify_load_indirect_indexed(cpu, sp_value, data, instruction, offset, register_name, expected_flags, expected_cycles, offset_value=0x00) -> None:
+    # def verify_load_indirect_indexed(cpu, pc_value, data, instruction, offset, register_name, expected_flags, expected_cycles, offset_value=0x00) -> None:
     verify_load_indirect_indexed(
         cpu=cpu,
-        sp_value=0xFF,
+        pc_value=0xFF,
         data=0xFF,
         instruction=instructions.LDA_INDIRECT_INDEXED_Y_0xB1,
         offset=0x80FF,
@@ -917,10 +917,10 @@ def test_cpu_instruction_LDA_INDIRECT_INDEXED_Y_0xB1_without_negative_flag_cross
     cpu.flags[flags.Z] = not expected_flags[flags.Z]
     cpu.flags[flags.N] = not expected_flags[flags.N]
 
-    # def verify_load_indirect_indexed(cpu, sp_value, data, instruction, offset, register_name, expected_flags, expected_cycles, offset_value=0x00) -> None:
+    # def verify_load_indirect_indexed(cpu, pc_value, data, instruction, offset, register_name, expected_flags, expected_cycles, offset_value=0x00) -> None:
     verify_load_indirect_indexed(
         cpu=cpu,
-        sp_value=0xFF,
+        pc_value=0xFF,
         data=0x01,
         instruction=instructions.LDA_INDIRECT_INDEXED_Y_0xB1,
         offset=0x80FF,
@@ -940,10 +940,10 @@ def test_cpu_instruction_LDA_INDIRECT_INDEXED_Y_0xB1_with_zero_flag_crossing_pag
     cpu.flags[flags.Z] = not expected_flags[flags.Z]
     cpu.flags[flags.N] = not expected_flags[flags.N]
 
-    # def verify_load_indirect_indexed(cpu, sp_value, data, instruction, offset, register_name, expected_flags, expected_cycles, offset_value=0x00) -> None:
+    # def verify_load_indirect_indexed(cpu, pc_value, data, instruction, offset, register_name, expected_flags, expected_cycles, offset_value=0x00) -> None:
     verify_load_indirect_indexed(
         cpu=cpu,
-        sp_value=0xFF,
+        pc_value=0xFF,
         data=0x00,
         instruction=instructions.LDA_INDIRECT_INDEXED_Y_0xB1,
         offset=0x80FF,
