@@ -154,7 +154,7 @@ def verify_load_indirect_indexed(cpu, pc_value, data, instruction, offset, regis
     offset_address: Word = Word(offset, endianness=cpu.endianness)
 
     cpu.ram[0xFFFC] = instruction
-    cpu.ram[0xFFFD] = pc_value # SP
+    cpu.ram[0xFFFD] = pc_value
     cpu.ram[pc_value] = 0xFF & offset_address.lowbyte # 0x02@0xFFFD is the start of our address vector in the zero page (LSB)
     cpu.ram[pc_value + 1] = 0xFF & offset_address.highbyte # 0x03 is the msb of our address (0x8000)
     cpu.ram[(offset_address + offset_value) & 0xFFFF] = data # 0x8000 + cpu.Y(0x80) [0x8080] -> cpu.A

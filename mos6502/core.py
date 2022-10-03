@@ -977,11 +977,11 @@ class MOS6502CPU(flags.ProcessorStatusFlagsInterface):
                 case instructions.JSR_ABSOLUTE_0x20:
                     subroutine_address: Word = self.fetch_word()
 
-                    self.write_word(address=self.SP, data=self.PC - 1)
+                    self.write_word(address=self.S, data=self.PC - 1)
 
                     # TODO: Need to increment the stack pointer some where here??
 
-                    self.ram[self.SP] = self.PC - 1
+                    self.ram[self.S] = self.PC - 1
                     self.PC = subroutine_address
                     self.log.info('i')
                     self.spend_cpu_cycles(cost=1)
@@ -1271,12 +1271,12 @@ class MOS6502CPU(flags.ProcessorStatusFlagsInterface):
 
         It is necessary to call this method before executing instructions.
 
-        The PC and SP need to be set up.
+        The PC and S need to be set up.
         This also clears CPU flags and registers and initializes RAM to 0s.
         """
         self.log.info("Reset")
         self.PC: Word = Word(0xFFFC, endianness=self.endianness)
-        self.SP: Word = Word(0x0100, endianness=self.endianness)
+        self.S: Word = Word(0x0100, endianness=self.endianness)
 
         # CPU Status Flags
         #
@@ -1343,9 +1343,9 @@ class MOS6502CPU(flags.ProcessorStatusFlagsInterface):
         setattr(self._registers, 'PC', Word(PC))
 
     @property
-    def SP(self) -> Byte:
+    def S(self) -> Byte:
         """
-        Return the CPU SP register.
+        Return the CPU S register.
 
         This register is an 8-bit register, but we store it as 16-bits for convenience.
 
@@ -1354,19 +1354,19 @@ class MOS6502CPU(flags.ProcessorStatusFlagsInterface):
         Returns:
             Word()
         """
-        self.log.debug(f'SP <- 0x{getattr(self._registers, "SP"):02X} ')
-        return getattr(self._registers, 'SP')
+        self.log.debug(f'S <- 0x{getattr(self._registers, "S"):02X} ')
+        return getattr(self._registers, 'S')
 
-    @SP.setter
-    def SP(self, SP) -> None:
+    @S.setter
+    def S(self, S) -> None:
         """
-        Set the CPU SP register.
+        Set the CPU S register.
 
         Arguments:
-            SP: Word()
+            S: Byte() or Word() (masked with 0xFF)
         """
-        self.log.info(f'SP -> 0x{getattr(self._registers, "SP"):02X}')
-        setattr(self._registers, 'SP', Word(SP))
+        self.log.info(f'S -> 0x{getattr(self._registers, "S"):02X}')
+        setattr(self._registers, 'S', Word(S & 0xFF))
 
     @property
     def A(self) -> Byte:
@@ -1438,7 +1438,7 @@ class MOS6502CPU(flags.ProcessorStatusFlagsInterface):
         """Return the CPU status."""
         description = f"{type(self).__name__}\n"
         description += f"\tPC: 0x{self.PC:04X}\n"
-        description += f"\tSP: 0x{self.SP:02X}\n"
+        description += f"\tS: 0x{self.S:02X}\n"
         description += f"\tC: {self.C}\n"
         description += f"\tZ: {self.Z}\n"
         description += f"\tI: {self.I}\n"

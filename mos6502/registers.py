@@ -17,7 +17,7 @@ class Registers:
     def __init__(self,
                  endianness=mos6502.memory.ENDIANNESS,
                  PC=Word(0x00),
-                 SP=Word(0x00),
+                 S=Word(0x00),
                  A=Byte(0x00),
                  X=Byte(0x00),
                  Y=Byte(0x00)):
@@ -27,7 +27,7 @@ class Registers:
         Parameters:
             endianness: the endianness of the architecture - "big" or "little" (default=little)
             PC: the mos6502 program counter
-            SP: the mos6502 stack pointer
+            S: the mos6502 stack pointer
             A: the mos6502 accumulator
             X: the mos6502 X index register
             Y: the mos6502 Y index register
@@ -39,11 +39,11 @@ class Registers:
         # endianness
         self._PC: Word = Word(value=PC.value, endianness=self.endianness)
 
-        # SP is 8-bit in hardware, but it is convenient to be 16-bit here.
+        # S is 8-bit in hardware, but it is convenient to be 16-bit here.
         #
         # Only holds an offset of 255 values starting at 0x100 - 0x1FF
         # We mask the value with 0xFF as a @property.
-        self._SP: Word = Word(SP.value, endianness=self.endianness)
+        self._S: Word = Word(S.value, endianness=self.endianness)
         self._A: Byte = Byte(A.value, endianness=self.endianness)
         self._X: Byte = Byte(X.value, endianness=self.endianness)
         self._Y: Byte = Byte(Y.value, endianness=self.endianness)
@@ -63,24 +63,24 @@ class Registers:
         self._PC = value
 
     @property
-    def SP(self) -> int:
+    def S(self) -> int:
         """Return the PC register as an int."""
-        # SP is 8-bits, so mask off.
+        # S is 8-bits, so mask off.
         #
         # This simplifies handling overflow with bitarrays.
-        return self._SP.value & 0xFF
+        return self._S.value & 0xFF
 
-    @SP.setter
-    def SP(self, SP) -> None:
-        """Set the SP register."""
-        # SP is 8-bits, so mask off.
+    @S.setter
+    def S(self, S) -> None:
+        """Set the S register."""
+        # S is 8-bits, so mask off.
         #
         # This simplifies handling overflow with bitarrays.
-        value: int = SP & 0xFF
+        value: int = S & 0xFF
 
         value: Word = Word(value=value, endianness=self.endianness)
 
-        self._SP = value
+        self._S: Word = value
 
     @property
     def A(self) -> int:

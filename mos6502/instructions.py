@@ -797,7 +797,7 @@ TAY_IMPLIED_0xA8: Literal[168] = 0xA8
 # https://masswerk.at/6502/6502_instruction_set.html#TSX
 # Transfer Stack Pointer to Index X
 #
-# SP -> X
+# S -> X
 # N	Z	C	I	D	V
 # +	+	-	-	-	-
 # addressing	assembler	opc	bytes	cycles
@@ -817,7 +817,7 @@ TXA_IMPLIED_0x8A: Literal[138] = 0x8A
 # https://masswerk.at/6502/6502_instruction_set.html#TXS
 # Transfer Index X to Stack Register
 #
-# X -> SP
+# X -> S
 # N	Z	C	I	D	V
 # -	-	-	-	-	-
 # addressing	assembler	opc	bytes	cycles
@@ -972,7 +972,7 @@ ILL_ISC_INDIRECT_INDEXED_Y_0xF3: Literal[243] = 0xF3
 # (LAR)
 # LDA/TSX oper
 #
-# M AND SP -> A, X, SP
+# M AND S -> A, X, S
 #
 # N	Z	C	I	D	V
 # +	+	-	-	-	-
@@ -1192,12 +1192,12 @@ ILL_SRE_INDIRECT_INDEXED_Y_0x53: Literal[83] = 0x53
 
 # https://masswerk.at/6502/6502_instruction_set.html#TAS
 # TAS (XAS, SHS)
-# Puts A AND X in SP and stores A AND X AND (high-byte of addr. + 1) at addr.
+# Puts A AND X in S and stores A AND X AND (high-byte of addr. + 1) at addr.
 #
 # unstable: sometimes 'AND (H+1)' is dropped, page boundary crossings may not work
 # (with the high-byte of the value used as the high-byte of the address)
 #
-# A AND X -> SP, A AND X AND (H+1) -> M
+# A AND X -> S, A AND X AND (H+1) -> M
 #
 # N	Z	C	I	D	V
 # -	-	-	-	-	-

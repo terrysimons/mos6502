@@ -301,3 +301,4 @@ def test_all_flags() -> None:
 
 #     with mos6502.CPU() as cpu:
 #         assert False
+
