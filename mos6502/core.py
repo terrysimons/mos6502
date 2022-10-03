@@ -397,6 +397,127 @@ class MOS6502CPU(flags.ProcessorStatusFlagsInterface):
         self.N = flags.ProcessorStatusFlags.N[flags.N] \
             if (register & 128) else not flags.ProcessorStatusFlags.N[flags.N]
 
+    def fetch_zeropage_mode_address(self, offset_register_name) -> Byte:
+        """
+        Read from RAM @ RAM:ZEROPAGE[PC].
+
+        Increases PC by 2.
+
+        Costs 2 CPU cycles.
+
+        Arguments:
+            register_name: the name of the register to fetch
+
+        Returns:
+            a Word()
+        """
+        zeropage_address: Byte = self.fetch_byte()
+
+        offset_register_value: Literal[0] = 0
+        address: Byte = zeropage_address + offset_register_value
+
+        if offset_register_name is not None:
+            offset_register_value: Literal[0] = getattr(self, offset_register_name)
+
+            # This needs to wrap, so mask by 0xFF
+            address: Byte = zeropage_address + offset_register_value
+
+        return address
+
+    def fetch_immediate_mode_address(self) -> Byte:
+        """
+        Read from RAM @ RAM[PC].
+
+        Increases PC by 1.
+
+        Costs 1 CPU cycles.
+
+        Arguments:
+            register_name: the name of the register to fetch
+
+        Returns:
+            a Word()
+        """
+        data: Byte = self.fetch_byte()
+
+        return data
+
+    def fetch_absolute_mode_address(self, offset_register_name) -> Word:
+        """
+        Read from RAM @ RAM[(PC:PC + 1)].
+
+        Increases PC by 2.
+
+        Costs 2 CPU cycles.
+
+        Arguments:
+            register_name: the name of the register to fetch
+
+        Returns:
+            a Word()
+        """
+        address: Word = self.fetch_word()
+
+        if offset_register_name is not None:
+            offset_register_value: Byte = getattr(self, offset_register_name)
+            address: Word = address + offset_register_value
+
+            if address.overflow:
+                self.log.info('o')
+                self.spend_cpu_cycles(1)
+
+        return address
+
+    def fetch_indexed_indirect_mode_address(self) -> Word:
+        """
+        Read from RAM @ RAM[(PC:PC + 1) + X].
+
+        Increases PC by 1.
+
+        Costs 3 CPU cycles.
+
+        Arguments:
+            register_name: the name of the register to fetch
+
+        Returns:
+            a Word()
+        """
+        indirect_address: Byte = self.fetch_byte()
+        offset_register_value: Byte = getattr(self, 'X')
+
+        address: Word = self.read_word(indirect_address + offset_register_value)
+
+        return address
+
+    def fetch_indirect_indexed_mode_address(self) -> Word:
+        """
+        Read from RAM @ RAM:[ZEROPAGE[PC] << 8 + ZEROPAGE[PC + 1] + Y.
+
+        Increases PC by 1.
+
+        Costs 3 CPU cycles.
+
+        Arguments:
+            register_name: the name of the register to fetch
+
+        Returns:
+            a Word()
+        """
+        indirect_address: Byte = self.fetch_byte()
+        offset_register_value: Byte = getattr(self, 'Y')
+
+        absolute_address: Word = self.read_word(indirect_address)
+
+        # Note: We add these together this way to ensure
+        # an overflow condition
+        address: Word = Word(absolute_address) + Byte(offset_register_value)
+
+        if address.overflow:
+            self.log.info('o')
+            self.spend_cpu_cycles(1)
+
+        return address
+
     def execute_load_immediate(self, instruction, register_name) -> None:
         """
         Instruction execution for "immediate LD[A, X, Y] #oper".
@@ -418,8 +539,9 @@ class MOS6502CPU(flags.ProcessorStatusFlagsInterface):
         # types.
         #
         # Just remember to pass register names and dereference in methods if necessary.
+        data: Byte = self.fetch_immediate_mode_address()
 
-        setattr(self, register_name, self.fetch_byte())
+        setattr(self, register_name, data)
         self.set_load_status_flags(register_name=register_name)
 
         self.log.debug(
@@ -451,17 +573,8 @@ class MOS6502CPU(flags.ProcessorStatusFlagsInterface):
         # types.
         #
         # Just remember to pass register names and dereference in methods if necessary.
+        address: Byte = self.fetch_zeropage_mode_address(offset_register_name=offset_register_name)
         data: Byte = getattr(self, register_name)
-        zeropage_address: Byte | None = self.fetch_byte()
-
-        offset_register_value: Literal[0] = 0
-        address: Byte = zeropage_address + offset_register_value
-
-        if offset_register_name is not None:
-            offset_register_value: Literal[0] = getattr(self, offset_register_name)
-
-            # This needs to wrap, so mask by 0xFF
-            address: Byte = zeropage_address + offset_register_value
 
         self.write_byte(address=address, data=data)
         setattr(self, register_name, self.read_byte(address=address))
@@ -494,17 +607,8 @@ class MOS6502CPU(flags.ProcessorStatusFlagsInterface):
         # types.
         #
         # Just remember to pass register names and dereference in methods if necessary.
+        address: Byte = self.fetch_zeropage_mode_address(offset_register_name=offset_register_name)
         register: Byte = getattr(self, register_name)
-        zeropage_address: Byte | None = self.fetch_byte()
-
-        offset_register_value: Literal[0] = 0
-        address: Byte = zeropage_address + offset_register_value
-
-        if offset_register_name is not None:
-            offset_register_value: Literal[0] = getattr(self, offset_register_name)
-
-            # This needs to wrap, so mask by 0xFF
-            address: Byte = zeropage_address + offset_register_value
 
         setattr(self, register_name, self.read_byte(address=address))
 
@@ -528,21 +632,10 @@ class MOS6502CPU(flags.ProcessorStatusFlagsInterface):
         Returns:
             None
         """
+        address: Word = self.fetch_absolute_mode_address(offset_register_name=offset_register_name)
         register: Byte = getattr(self, register_name)
-        absolute_address: Word | None = self.fetch_word()
 
-        address: Word = absolute_address
-        if offset_register_name is not None:
-            offset_register_value = getattr(self, offset_register_name)
-            address: Word = absolute_address + offset_register_value
-
-            if address.overflow:
-                self.log.info('o')
-                self.spend_cpu_cycles(1)
-        else:
-            address: Word = absolute_address
-
-        self.write_byte(address=address & 0xFFFF, data=getattr(self, register_name))
+        self.write_byte(address=address & 0xFFFF, data=register)
         self.set_store_status_flags(register_name=register_name)
 
         self.log.debug(f'{instructions.InstructionSet(instruction).name}: {Byte(value=register)}')
@@ -571,64 +664,13 @@ class MOS6502CPU(flags.ProcessorStatusFlagsInterface):
         # types.
         #
         # Just remember to pass register names and dereference in methods if necessary.
+        address: Word = self.fetch_absolute_mode_address(offset_register_name=offset_register_name)
         register: Byte = getattr(self, register_name)
-        absolute_address: Word | None = self.fetch_word()
-
-        address: Word = absolute_address
-        if offset_register_name is not None:
-            offset_register_value = getattr(self, offset_register_name)
-            address: Word = absolute_address + offset_register_value
-
-            if address.overflow:
-                self.log.info('o')
-                self.spend_cpu_cycles(1)
-        else:
-            address: Word = absolute_address
 
         setattr(self, register_name, self.read_byte(address=address))
         self.set_load_status_flags(register_name=register_name)
 
         self.log.debug(f'{instructions.InstructionSet(instruction).name}: {Byte(value=register)}')
-
-    def read_indexed_indirect_address(self) -> Word:
-        """
-        Read from RAM @ RAM[(PC:PC + 1) + X].
-
-        Costs 3 CPU cycles.
-
-        Arguments:
-            register_name: the name of the register to read
-
-        Returns:
-            a Byte()
-        """
-        indirect_address: Byte = self.read_byte(self.SP)
-        offset_register_value: Byte = getattr(self, 'X')
-
-        address: Word = self.read_word(indirect_address + offset_register_value)
-
-        return address
-
-    def fetch_indexed_indirect_address(self) -> Word:
-        """
-        Read from RAM @ RAM[(PC:PC + 1) + X].
-
-        Increases PC by 1.
-
-        Costs 3 CPU cycles.
-
-        Arguments:
-            register_name: the name of the register to fetch
-
-        Returns:
-            a Byte()
-        """
-        indirect_address: Byte = self.fetch_byte()
-        offset_register_value: Byte = getattr(self, 'X')
-
-        address: Word = self.read_word(indirect_address + offset_register_value)
-
-        return address
 
     def execute_store_indexed_indirect(self, instruction, register_name) -> None:
         """
@@ -651,12 +693,7 @@ class MOS6502CPU(flags.ProcessorStatusFlagsInterface):
         # types.
         #
         # Just remember to pass register names and dereference in methods if necessary.
-        # indirect_address: Byte = self.fetch_byte()
-        # offset_register_value: Byte = getattr(self, 'X')
-
-        # address: Word = self.read_word(indirect_address + offset_register_value) & 0xFFFF
-        address: int = self.fetch_indexed_indirect_address() & 0xFFFF
-
+        address: Word = self.fetch_indexed_indirect_mode_address() & 0xFFFF
         data: Byte = self.read_byte(address=address)
 
         setattr(self, register_name, data)
@@ -688,11 +725,8 @@ class MOS6502CPU(flags.ProcessorStatusFlagsInterface):
         # types.
         #
         # Just remember to pass register names and dereference in methods if necessary.
+        address: Word = self.fetch_indexed_indirect_mode_address() & 0xFFFF
         register: Byte = getattr(self, register_name)
-        indirect_address: Byte = self.fetch_byte()
-        offset_register_value: Byte = getattr(self, 'X')
-
-        address = self.read_word(indirect_address + offset_register_value)
 
         setattr(self, register_name, self.read_byte(address=address))
         self.set_load_status_flags(register_name=register_name)
@@ -724,18 +758,7 @@ class MOS6502CPU(flags.ProcessorStatusFlagsInterface):
         #
         # Just remember to pass register names and dereference in methods if necessary.
         # register: Byte = getattr(self, register_name)
-        indirect_address: Byte = self.fetch_byte()
-        offset_register_value = getattr(self, 'Y')
-
-        absolute_address = self.read_word(indirect_address)
-
-        # Note: We add these together this way to ensure
-        # an overflow condition
-        address: Word = Word(absolute_address) + Byte(offset_register_value)
-
-        if address.overflow:
-            self.log.info('o')
-            self.spend_cpu_cycles(1)
+        address: Word = self.fetch_indirect_indexed_mode_address()
 
         setattr(self, register_name, self.read_byte(address=address))
         self.set_store_status_flags(register_name=register_name)
@@ -766,22 +789,12 @@ class MOS6502CPU(flags.ProcessorStatusFlagsInterface):
         # types.
         #
         # Just remember to pass register names and dereference in methods if necessary.
-        register: Byte = getattr(self, register_name)
-        indirect_address: Byte = self.fetch_byte()
-        offset_register_value = getattr(self, 'Y')
-
-        absolute_address = self.read_word(indirect_address)
-
-        # Note: We add these together this way to ensure
-        # an overflow condition
-        address: Word = Word(absolute_address) + Byte(offset_register_value)
-
-        if address.overflow:
-            self.log.info('o')
-            self.spend_cpu_cycles(1)
+        address: Word = self.fetch_indirect_indexed_mode_address()
 
         setattr(self, register_name, self.read_byte(address=address))
         self.set_load_status_flags(register_name=register_name)
+
+        register: Byte = getattr(self, register_name)
 
         self.log.debug(f'{instructions.InstructionSet(instruction).name}: {Byte(value=register)}')
 
