@@ -1,12 +1,12 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 """Instruction set for the mos6502 CPU."""
 import enum
 from typing import Literal
 
-from mos6502.exceptions import IllegalCPUInstructionException
-import mos6502.flags as flags
-from mos6502.memory import Byte, Word
+from mos6502 import flags
+from mos6502.exceptions import IllegalCPUInstructionError
+from mos6502.memory import Byte
+
 # https://www.masswerk.at/6502/6502_instruction_set.html
 #
 # Legend
@@ -90,7 +90,6 @@ AND_INDIRECT_INDEXED_Y_0x31: Literal[49] = 0x31
 #
 # Shift Left One Bit (Memory or Accumulator)
 #
-# C <- [76543210] <- 0
 # N	Z	C	I	D	V
 # +	+	+	-	-	-
 # addressing	assembler	opc	bytes	cycles
@@ -436,7 +435,6 @@ JMP_INDIRECT_0x6C: Literal[108] = 0x6C
 #
 # Jump to New Location Saving Return Address
 #
-# push (PC+2),
 # (PC+1) -> PCL
 # (PC+2) -> PCH
 # N	Z	C	I	D	V
@@ -612,7 +610,6 @@ PLP_IMPLIED_0x28: Literal[40] = 0x28
 # https://masswerk.at/6502/6502_instruction_set.html#ROL
 # Rotate One Bit Left (Memory or Accumulator)
 #
-# C <- [76543210] <- C
 # N	Z	C	I	D	V
 # +	+	+	-	-	-
 # addressing	assembler	opc	bytes	cycles
@@ -834,7 +831,7 @@ TXS_IMPLIED_0x9A: Literal[154] = 0x9A
 # implied	TYA	98	1	2
 TYA_IMPLIED_0x98: Literal[152] = 0x98
 
-''' Illegal Opcodes '''
+""" Illegal Opcodes """
 # https://masswerk.at/6502/6502_instruction_set.html
 # Legend
 # "Illegal" Opcodes in Details
@@ -848,7 +845,6 @@ TYA_IMPLIED_0x98: Literal[152] = 0x98
 # highly unstable
 
 # https://masswerk.at/6502/6502_instruction_set.html#ALR
-# (ASR)
 # AND oper + LSR
 #
 # A AND oper, 0 -> [76543210] -> C
@@ -871,7 +867,6 @@ ILL_ALR_IMMEDIATE_0x4B: Literal[75] = 0x4B
 ILL_ANC_IMMEDIATE_0x0B: Literal[11] = 0x0B
 
 # https://masswerk.at/6502/6502_instruction_set.html#ANC2
-# (ANC2)
 # AND oper + set C as ROL
 #
 # effectively the same as instr. 0B
@@ -885,7 +880,6 @@ ILL_ANC_IMMEDIATE_0x0B: Literal[11] = 0x0B
 ILL_ANC2_IMMEDIATE_0x2B: Literal[43] = 0x2B
 
 # https://masswerk.at/6502/6502_instruction_set.html#ANE
-# (XAA)
 # * AND X + AND oper
 #
 # Highly unstable, do not use.
@@ -921,7 +915,6 @@ ILL_ARR_IMMEDIATE_0x6B: Literal[107] = 0x6B
 
 
 # https://masswerk.at/6502/6502_instruction_set.html#DCP
-# (DCM)
 # DEC oper + CMP oper
 #
 # M - 1 -> M, A - M
@@ -945,7 +938,6 @@ ILL_DCP_INDEXED_INDIRECT_X_0xC3: Literal[195] = 0xC3
 ILL_DCP_INDIRECT_INDEXED_Y_0xD3: Literal[211] = 0xD3
 
 # https://masswerk.at/6502/6502_instruction_set.html#ISC
-# (ISB, INS)
 # INC oper + SBC oper
 #
 # M + 1 -> M, A - M - C -> A
@@ -969,7 +961,6 @@ ILL_ISC_INDEXED_INDIRECT_X_0xE3: Literal[227] = 0xE3
 ILL_ISC_INDIRECT_INDEXED_Y_0xF3: Literal[243] = 0xF3
 
 # https://masswerk.at/6502/6502_instruction_set.html#LAS
-# (LAR)
 # LDA/TSX oper
 #
 # M AND S -> A, X, S
@@ -1062,7 +1053,6 @@ ILL_RRA_INDEXED_INDIRECT_X_0x63: Literal[99] = 0x63
 ILL_RRA_INDIRECT_INDEXED_Y_0x73: Literal[115] = 0x73
 
 # https://masswerk.at/6502/6502_instruction_set.html#SAX
-# (AXS, AAX)
 # A and X are put on the bus at the same time (resulting effectively in an AND operation)
 # and stored in M
 #
@@ -1082,7 +1072,6 @@ ILL_SAX_INDEXED_INDIRECT_X_0x83: Literal[131] = 0x83
 
 
 # https://masswerk.at/6502/6502_instruction_set.html#SBX
-# (AXS, SAX)
 # CMP and DEX at once, sets flags like CMP
 #
 # (A AND X) - oper -> X
@@ -1094,7 +1083,6 @@ ILL_SAX_INDEXED_INDIRECT_X_0x83: Literal[131] = 0x83
 ILL_SBX_IMMEDIATE_0xCB: Literal[203] = 0xCB
 
 # https://masswerk.at/6502/6502_instruction_set.html#SHA
-# (AHX, AXA)
 # Stores A AND X AND (high-byte of addr. + 1) at addr.
 #
 # unstable: sometimes 'AND (H+1)' is dropped, page boundary crossings may not work
@@ -1111,7 +1099,6 @@ ILL_SHA_ABSOLUTE_Y_0x9F: Literal[159] = 0x9F
 ILL_SHA_INDIRECT_INDEXED_Y_0x93: Literal[147] = 0x93
 
 # https://masswerk.at/6502/6502_instruction_set.html#SHX
-# (A11, SXA, XAS)
 # Stores X AND (high-byte of addr. + 1) at addr.
 #
 # unstable: sometimes 'AND (H+1)' is dropped, page boundary crossings may not work
@@ -1126,7 +1113,6 @@ ILL_SHA_INDIRECT_INDEXED_Y_0x93: Literal[147] = 0x93
 ILL_SHX_ABSOLUTE_Y_0x9E: Literal[158] = 0x9E
 
 # https://masswerk.at/6502/6502_instruction_set.html#SHY
-# SHY (A11, SYA, SAY)
 # Stores Y AND (high-byte of addr. + 1) at addr.
 #
 # unstable: sometimes 'AND (H+1)' is dropped, page boundary crossings may not work
@@ -1142,7 +1128,6 @@ ILL_SHY_ABSOLUTE_X_0x9C: Literal[156] = 0x9C
 
 
 # https://masswerk.at/6502/6502_instruction_set.html#SLO
-# (ASO)
 # ASL oper + ORA oper
 #
 # M = C <- [76543210] <- 0, A OR M -> A
@@ -1166,7 +1151,6 @@ ILL_SLO_INDEXED_INDIRECT_X_0x03: Literal[3] = 0x03
 ILL_SLO_INDIRECT_INDEXED_Y_0x13: Literal[19] = 0x13
 
 # https://masswerk.at/6502/6502_instruction_set.html#SRE
-# (LSE)
 # LSR oper + EOR oper
 #
 # M = 0 -> [76543210] -> C, A EOR M -> A
@@ -1191,7 +1175,6 @@ ILL_SRE_INDIRECT_INDEXED_Y_0x53: Literal[83] = 0x53
 
 
 # https://masswerk.at/6502/6502_instruction_set.html#TAS
-# TAS (XAS, SHS)
 # Puts A AND X in S and stores A AND X AND (high-byte of addr. + 1) at addr.
 #
 # unstable: sometimes 'AND (H+1)' is dropped, page boundary crossings may not work
@@ -1206,7 +1189,6 @@ ILL_SRE_INDIRECT_INDEXED_Y_0x53: Literal[83] = 0x53
 ILL_TAS_ABSOLUTE_0x9B: Literal[155] = 0x9B
 
 # https://masswerk.at/6502/6502_instruction_set.html#USBC
-# (SBC)
 # SBC oper + NOP
 #
 # effectively same as normal SBC immediate, instr. E9.
@@ -1263,7 +1245,6 @@ ILL_TAS_ABSOLUTE_0x9B: Literal[155] = 0x9B
 # _INDIRECT_INDEXED_Y_
 
 # https://masswerk.at/6502/6502_instruction_set.html#JAM (various)
-# (KIL, HLT)
 # These instructions freeze the CPU.
 #
 # The processor will be trapped infinitely in T1 phase with $FF on the data bus. — Reset required.
@@ -1274,7 +1255,7 @@ ILL_TAS_ABSOLUTE_0x9B: Literal[155] = 0x9B
 class InstructionSet(enum.IntEnum):
     """Instruction set for the mos6502 CPU."""
 
-    '''ADC'''
+    """ADC"""
     ADC_IMMEDIATE_0x69 = ADC_IMMEDIATE_0x69
     ADC_ZEROPAGE_0x65 = ADC_ZEROPAGE_0x65
     ADC_ZEROPAGE_X_0x75 = ADC_ZEROPAGE_X_0x75
@@ -1284,7 +1265,7 @@ class InstructionSet(enum.IntEnum):
     ADC_INDEXED_INDIRECT_X_0x61 = ADC_INDEXED_INDIRECT_X_0x61
     ADC_INDIRECT_INDEXED_Y_0x71 = ADC_INDIRECT_INDEXED_Y_0x71
 
-    '''AND'''
+    """AND"""
     AND_IMMEDIATE_0x29 = AND_IMMEDIATE_0x29
     AND_ZEROPAGE_0x25 = AND_ZEROPAGE_0x25
     AND_ZEROPAGE_X_0x35 = AND_ZEROPAGE_X_0x35
@@ -1294,57 +1275,57 @@ class InstructionSet(enum.IntEnum):
     AND_INDEXED_INDIRECT_X_0x21 = AND_INDEXED_INDIRECT_X_0x21
     AND_INDIRECT_INDEXED_Y_0x31 = AND_INDIRECT_INDEXED_Y_0x31
 
-    '''ASL'''
+    """ASL"""
     ASL_ACCUMULATOR_0x0A = ASL_ACCUMULATOR_0x0A
     ASL_ZEROPAGE_0x06 = ASL_ZEROPAGE_0x06
     ASL_ZEROPAGE_X_0x16 = ASL_ZEROPAGE_X_0x16
     ASL_ABSOLUTE_0x0E = ASL_ABSOLUTE_0x0E
     ASL_ABSOLUTE_X_0x1E = ASL_ABSOLUTE_X_0x1E
 
-    '''BCC'''
+    """BCC"""
     BBC_RELATIVE_0x90 = BBC_RELATIVE_0x90
 
-    '''BCS'''
+    """BCS"""
     BCS_RELATIVE_0xB0 = BCS_RELATIVE_0xB0
 
-    '''BEQ'''
+    """BEQ"""
     BEQ_RELATIVE_0xF0 = BEQ_RELATIVE_0xF0
 
-    '''BIT'''
+    """BIT"""
     BIT_ZEROPAGE_0x24 = BIT_ZEROPAGE_0x24
     BIT_ABSOLUTE_0x2C = BIT_ABSOLUTE_0x2C
 
-    '''BMI'''
+    """BMI"""
     BMI_RELATIVE_0x30 = BMI_RELATIVE_0x30
 
-    '''BNE'''
+    """BNE"""
     BNE_RELATIVE_0xD0 = BNE_RELATIVE_0xD0
 
-    '''BPL'''
+    """BPL"""
     BPL_RELATIVE_0x10 = BPL_RELATIVE_0x10
 
-    '''BRK'''
+    """BRK"""
     BRK_IMPLIED_0x00 = BRK_IMPLIED_0x00
 
-    '''BVC'''
+    """BVC"""
     BVC_RELATIVE_0x50 = BVC_RELATIVE_0x50
 
-    '''BVS'''
+    """BVS"""
     BVS_RELATIVE_0x70 = BVS_RELATIVE_0x70
 
-    '''CLC'''
+    """CLC"""
     CLC_IMPLIED_0x18 = CLC_IMPLIED_0x18
 
-    '''CLD'''
+    """CLD"""
     CLD_IMPLIED_0xD8 = CLD_IMPLIED_0xD8
 
-    '''CLI'''
+    """CLI"""
     CLI_IMPLIED_0x58 = CLI_IMPLIED_0x58
 
-    '''CLV'''
+    """CLV"""
     CLV_IMPLIED_0xB8 = CLV_IMPLIED_0xB8
 
-    '''CMP'''
+    """CMP"""
     CMP_IMMEDIATE_0xC9 = CMP_IMMEDIATE_0xC9
     CMP_ZEROPAGE_0xC5 = CMP_ZEROPAGE_0xC5
     CMP_ZEROPAGE_X_0xD5 = CMP_ZEROPAGE_X_0xD5
@@ -1354,29 +1335,29 @@ class InstructionSet(enum.IntEnum):
     CMP_INDEXED_INDIRECT_X_0xC1 = CMP_INDEXED_INDIRECT_X_0xC1
     CMP_INDIRECT_INDEXED_Y_0xD1 = CMP_INDIRECT_INDEXED_Y_0xD1
 
-    '''CPX'''
+    """CPX"""
     CPX_IMMEDIATE_0xE0 = CPX_IMMEDIATE_0xE0
     CPX_ZEROPAGE_0xE4 = CPX_ZEROPAGE_0xE4
     CPX_ABSOLUTE_0xEC = CPX_ABSOLUTE_0xEC
 
-    '''CPY'''
+    """CPY"""
     CPY_IMMEDIATE_0xC0 = CPY_IMMEDIATE_0xC0
     CPY_ZEROPAGE_0xC4 = CPY_ZEROPAGE_0xC4
     CPY_ABSOLUTE_0xCC = CPY_ABSOLUTE_0xCC
 
-    '''DEC'''
+    """DEC"""
     DEC_ZEROPAGE_0xC6 = DEC_ZEROPAGE_0xC6
     DEC_ZEROPAGE_X_0xD6 = DEC_ZEROPAGE_X_0xD6
     DEC_ABSOLUTE_0xCE = DEC_ABSOLUTE_0xCE
     DEC_ABSOLUTE_X_0xDE = DEC_ABSOLUTE_X_0xDE
 
-    '''DEX'''
+    """DEX"""
     DEX_IMPLIED_0xCA = DEX_IMPLIED_0xCA
 
-    '''DEY'''
+    """DEY"""
     DEY_IMPLIED_0x88 = DEY_IMPLIED_0x88
 
-    '''EOR'''
+    """EOR"""
     EOR_IMMEDIATE_0x49 = EOR_IMMEDIATE_0x49
     EOR_ZEROPAGE_0x45 = EOR_ZEROPAGE_0x45
     EOR_ZEROPAGE_X_0x55 = EOR_ZEROPAGE_X_0x55
@@ -1386,26 +1367,26 @@ class InstructionSet(enum.IntEnum):
     EOR_INDEXED_INDIRECT_X_0x41 = EOR_INDEXED_INDIRECT_X_0x41
     EOR_INDIRECT_INDEXED_Y_0x51 = EOR_INDIRECT_INDEXED_Y_0x51
 
-    '''INC'''
+    """INC"""
     INC_ZEROPAGE_0xE6 = INC_ZEROPAGE_0xE6
     INC_ZEROPAGE_X_0xF6 = INC_ZEROPAGE_X_0xF6
     INC_ABSOLUTE_0xEE = INC_ABSOLUTE_0xEE
     INC_ABSOLUTE_X_0xFE = INC_ABSOLUTE_X_0xFE
 
-    '''INX'''
+    """INX"""
     INX_IMPLIED_0xE8 = INX_IMPLIED_0xE8
 
-    '''INY'''
+    """INY"""
     INY_IMPLIED_0xC8 = INY_IMPLIED_0xC8
 
-    '''JMP'''
+    """JMP"""
     JMP_ABSOLUTE_0x4C = JMP_ABSOLUTE_0x4C
     JMP_INDIRECT_0x6C = JMP_INDIRECT_0x6C
 
-    '''JSR'''
+    """JSR"""
     JSR_ABSOLUTE_0x20 = JSR_ABSOLUTE_0x20
 
-    '''LDA'''
+    """LDA"""
     LDA_IMMEDIATE_0xA9 = LDA_IMMEDIATE_0xA9
     LDA_ZEROPAGE_0xA5 = LDA_ZEROPAGE_0xA5
     LDA_ZEROPAGE_X_0xB5 = LDA_ZEROPAGE_X_0xB5
@@ -1415,31 +1396,31 @@ class InstructionSet(enum.IntEnum):
     LDA_INDEXED_INDIRECT_X_0xA1 = LDA_INDEXED_INDIRECT_X_0xA1
     LDA_INDIRECT_INDEXED_Y_0xB1 = LDA_INDIRECT_INDEXED_Y_0xB1
 
-    '''LDX'''
+    """LDX"""
     LDX_IMMEDIATE_0xA2 = LDX_IMMEDIATE_0xA2
     LDX_ZEROPAGE_0xA6 = LDX_ZEROPAGE_0xA6
     LDX_ZEROPAGE_Y_0xB6 = LDX_ZEROPAGE_Y_0xB6
     LDX_ABSOLUTE_0xAE = LDX_ABSOLUTE_0xAE
     LDX_ABSOLUTE_Y_0xBE = LDX_ABSOLUTE_Y_0xBE
 
-    '''LDY'''
+    """LDY"""
     LDY_IMMEDIATE_0xA0 = LDY_IMMEDIATE_0xA0
     LDY_ZEROPAGE_0xA4 = LDY_ZEROPAGE_0xA4
     LDY_ZEROPAGE_X_0xB4 = LDY_ZEROPAGE_X_0xB4
     LDY_ABSOLUTE_0xAC = LDY_ABSOLUTE_0xAC
     LDY_ABSOLUTE_X_0xBC = LDY_ABSOLUTE_X_0xBC
 
-    '''LSR'''
+    """LSR"""
     LSR_ACCUMULATOR_0x4A = LSR_ACCUMULATOR_0x4A
     LSR_ZEROPAGE_0x46 = LSR_ZEROPAGE_0x46
     LSR_ZEROPAGE_X_0x56 = LSR_ZEROPAGE_X_0x56
     LSR_ABSOLUTE_0x4E = LSR_ABSOLUTE_0x4E
     LSR_ABSOLUTE_X_0x5E = LSR_ABSOLUTE_X_0x5E
 
-    '''NOP'''
+    """NOP"""
     NOP_IMPLIED_0xEA = NOP_IMPLIED_0xEA
 
-    '''ORA'''
+    """ORA"""
     ORA_IMMEDIATE_0x09 = ORA_IMMEDIATE_0x09
     ORA_ZEROPAGE_0x05 = ORA_ZEROPAGE_0x05
     ORA_ZEROPAGE_X_0x15 = ORA_ZEROPAGE_X_0x15
@@ -1449,39 +1430,39 @@ class InstructionSet(enum.IntEnum):
     ORA_INDEXED_INDIRECT_X_0x01 = ORA_INDEXED_INDIRECT_X_0x01
     ORA_INDIRECT_INDEXED_Y_0x11 = ORA_INDIRECT_INDEXED_Y_0x11
 
-    '''PHA'''
+    """PHA"""
     PHA_IMPLIED_0x48 = PHA_IMPLIED_0x48
 
-    '''PHP'''
+    """PHP"""
     PHP_IMPLIED_0x08 = PHP_IMPLIED_0x08
 
-    '''PLA'''
+    """PLA"""
     PLA_IMPLIED_0x68 = PLA_IMPLIED_0x68
 
-    '''PLP'''
+    """PLP"""
     PLP_IMPLIED_0x28 = PLP_IMPLIED_0x28
 
-    '''ROL'''
+    """ROL"""
     ROL_ACCUMULATOR_0x2A = ROL_ACCUMULATOR_0x2A
     ROL_ZEROPAGE_0x26 = ROL_ZEROPAGE_0x26
     ROL_ZEROPAGE_X_0x36 = ROL_ZEROPAGE_X_0x36
     ROL_ABSOLUTE_0x2E = ROL_ABSOLUTE_0x2E
     ROL_ABSOLUTE_X_0x3E = ROL_ABSOLUTE_X_0x3E
 
-    '''ROR'''
+    """ROR"""
     ROR_ACCUMULATOR_0x6A = ROR_ACCUMULATOR_0x6A
     ROR_ZEROPAGE_0x66 = ROR_ZEROPAGE_0x66
     ROR_ZEROPAGE_X_0x76 = ROR_ZEROPAGE_X_0x76
     ROR_ABSOLUTE_0x6E = ROR_ABSOLUTE_0x6E
     ROR_ABSOLUTE_X_0x7E = ROR_ABSOLUTE_X_0x7E
 
-    '''RTI'''
+    """RTI"""
     RTI_IMPLIED_0x40 = RTI_IMPLIED_0x40
 
-    '''RTS'''
+    """RTS"""
     RTS_IMPLIED_0x60 = RTS_IMPLIED_0x60
 
-    '''SBC'''
+    """SBC"""
     SBC_IMMEDIATE_0xE9 = SBC_IMMEDIATE_0xE9
     SBC_ZEROPAGE_0xE5 = SBC_ZEROPAGE_0xE5
     SBC_ZEROPAGE_X_0xF5 = SBC_ZEROPAGE_X_0xF5
@@ -1491,16 +1472,16 @@ class InstructionSet(enum.IntEnum):
     SBC_INDEXED_INDIRECT_X_0xE1 = SBC_INDEXED_INDIRECT_X_0xE1
     SBC_INDIRECT_INDEXED_Y_0xF1 = SBC_INDIRECT_INDEXED_Y_0xF1
 
-    '''SEC'''
+    """SEC"""
     SEC_IMPLIED_0x38 = 0x38
 
-    '''SED'''
+    """SED"""
     SED_IMPLIED_0xF8 = SED_IMPLIED_0xF8
 
-    '''SEI'''
+    """SEI"""
     SEI_IMPLIED_0x78 = SEI_IMPLIED_0x78
 
-    '''STA'''
+    """STA"""
     STA_ZEROPAGE_0x85 = STA_ZEROPAGE_0x85
     STA_ZEROPAGE_X_0x95 = STA_ZEROPAGE_X_0x95
     STA_ABSOLUTE_0x8D = STA_ABSOLUTE_0x8D
@@ -1509,51 +1490,51 @@ class InstructionSet(enum.IntEnum):
     STA_INDEXED_INDIRECT_X_0x81 = STA_INDEXED_INDIRECT_X_0x81
     STA_INDIRECT_INDEXED_Y_0x91 = STA_INDIRECT_INDEXED_Y_0x91
 
-    '''STX'''
+    """STX"""
     STX_ZEROPAGE_0x86 = STX_ZEROPAGE_0x86
     STX_ZEROPAGE_Y_0x96 = STX_ZEROPAGE_Y_0x96
     STX_ABSOLUTE_0x8E = STX_ABSOLUTE_0x8E
 
-    '''STY'''
+    """STY"""
     STY_ZEROPAGE_0x84 = STY_ZEROPAGE_0x84
     STY_ZEROPAGE_X_0x94 = STY_ZEROPAGE_X_0x94
     STY_ABSOLUTE_0x8C = STY_ABSOLUTE_0x8C
 
-    '''TAX'''
+    """TAX"""
     TAX_IMPLIED_0xAA = TAX_IMPLIED_0xAA
 
-    '''TAY'''
+    """TAY"""
     TAY_IMPLIED_0xA8 = TAY_IMPLIED_0xA8
 
-    '''TSX'''
+    """TSX"""
     TSX_IMPLIED_0xBA = TSX_IMPLIED_0xBA
 
-    '''TXA'''
+    """TXA"""
     TXA_IMPLIED_0x8A = TXA_IMPLIED_0x8A
 
-    '''TXS'''
+    """TXS"""
     TXS_IMPLIED_0x9A = TXS_IMPLIED_0x9A
 
-    '''TYA'''
+    """TYA"""
     TYA_IMPLIED_0x98 = TYA_IMPLIED_0x98
 
-    '''Illegal Opcodes'''
-    '''ALR'''
+    """Illegal Opcodes"""
+    """ALR"""
     ILL_ALR_IMMEDIATE_0x4B = ILL_ALR_IMMEDIATE_0x4B
 
-    '''ANC'''
+    """ANC"""
     ILL_ANC_IMMEDIATE_0x0B = ILL_ANC_IMMEDIATE_0x0B
 
-    '''ANC2'''
+    """ANC2"""
     ILL_ANC2_IMMEDIATE_0x2B = ILL_ANC2_IMMEDIATE_0x2B
 
-    '''ANE'''
+    """ANE"""
     ILL_ANE_IMMEDIATE_0x8B = ILL_ANE_IMMEDIATE_0x8B
 
-    '''ARR'''
+    """ARR"""
     ILL_ARR_IMMEDIATE_0x6B = ILL_ARR_IMMEDIATE_0x6B
 
-    '''DCP'''
+    """DCP"""
     ILL_DCP_ZEROPAGE_ZEROPAGE_0xC7 = ILL_DCP_ZEROPAGE_ZEROPAGE_0xC7
     ILL_DCP_ZEROPAGE_X_0xD7 = ILL_DCP_ZEROPAGE_X_0xD7
     ILL_DCP_ABSOLUTE_0xCF = ILL_DCP_ABSOLUTE_0xCF
@@ -1562,7 +1543,7 @@ class InstructionSet(enum.IntEnum):
     ILL_DCP_INDEXED_INDIRECT_X_0xC3 = ILL_DCP_INDEXED_INDIRECT_X_0xC3
     ILL_DCP_INDIRECT_INDEXED_Y_0xD3 = ILL_DCP_INDIRECT_INDEXED_Y_0xD3
 
-    '''ISC'''
+    """ISC"""
     ILL_ISC_ZEROPAGE_0xE7 = ILL_ISC_ZEROPAGE_0xE7
     ILL_ISC_ZEROPAGE_X_0xF7 = ILL_ISC_ZEROPAGE_X_0xF7
     ILL_ISC_ABSOLUTE_0xEF = ILL_ISC_ABSOLUTE_0xEF
@@ -1571,10 +1552,10 @@ class InstructionSet(enum.IntEnum):
     ILL_ISC_INDEXED_INDIRECT_X_0xE3 = ILL_ISC_INDEXED_INDIRECT_X_0xE3
     ILL_ISC_INDIRECT_INDEXED_Y_0xF3 = ILL_ISC_INDIRECT_INDEXED_Y_0xF3
 
-    '''LAS'''
+    """LAS"""
     ILL_LAS_ABSOLUTE_0xBB = ILL_LAS_ABSOLUTE_0xBB
 
-    '''LAX'''
+    """LAX"""
     ILL_LAX_ZEROPAGE_0xA7 = ILL_LAX_ZEROPAGE_0xA7
     ILL_LAX_ZEROPAGE_X_0xB7 = ILL_LAX_ZEROPAGE_X_0xB7
     ILL_LAX_ABSOLUTE_0xAF = ILL_LAX_ABSOLUTE_0xAF
@@ -1582,10 +1563,10 @@ class InstructionSet(enum.IntEnum):
     ILL_LAX_INDEXED_INDIRECT_X_0xA3 = ILL_LAX_INDEXED_INDIRECT_X_0xA3
     ILL_LAX_INDIRECT_INDEXED_Y_0xB3 = ILL_LAX_INDIRECT_INDEXED_Y_0xB3
 
-    '''LXA'''
+    """LXA"""
     ILL_LXA_IMMEDIATE_0xAB = ILL_LXA_IMMEDIATE_0xAB
 
-    '''RLA'''
+    """RLA"""
     ILL_RLA_ZEROPAGE_0x27 = ILL_RLA_ZEROPAGE_0x27
     ILL_RLA_ZEROPAGE_X_0x37 = ILL_RLA_ZEROPAGE_X_0x37
     ILL_RLA_ABSOLUTE_0x2F = ILL_RLA_ABSOLUTE_0x2F
@@ -1594,7 +1575,7 @@ class InstructionSet(enum.IntEnum):
     ILL_RLA_INDEXED_INDIRECT_X_0x23 = ILL_RLA_INDEXED_INDIRECT_X_0x23
     ILL_RLA_INDIRECT_INDEXED_Y_0x33 = ILL_RLA_INDIRECT_INDEXED_Y_0x33
 
-    '''RRA'''
+    """RRA"""
     ILL_RRA_ZEROPAGE_0x67 = ILL_RRA_ZEROPAGE_0x67
     ILL_RRA_ZEROPAGE_X_0x77 = ILL_RRA_ZEROPAGE_X_0x77
     ILL_RRA_ABSOLUTE_0x6F = ILL_RRA_ABSOLUTE_0x6F
@@ -1603,26 +1584,26 @@ class InstructionSet(enum.IntEnum):
     ILL_RRA_INDEXED_INDIRECT_X_0x63 = ILL_RRA_INDEXED_INDIRECT_X_0x63
     ILL_RRA_INDIRECT_INDEXED_Y_0x73 = ILL_RRA_INDIRECT_INDEXED_Y_0x73
 
-    '''SAX'''
+    """SAX"""
     ILL_SAX_ZEROPAGE_0x87 = ILL_SAX_ZEROPAGE_0x87
     ILL_SAX_ZEROPAGE_Y_0x97 = ILL_SAX_ZEROPAGE_Y_0x97
     ILL_SAX_ABSOLUTE_0x8F = ILL_SAX_ABSOLUTE_0x8F
     ILL_SAX_INDEXED_INDIRECT_X_0x83 = ILL_SAX_INDEXED_INDIRECT_X_0x83
 
-    '''SBX'''
+    """SBX"""
     ILL_SBX_IMMEDIATE_0xCB = ILL_SBX_IMMEDIATE_0xCB
 
-    '''SHA'''
+    """SHA"""
     ILL_SHA_ABSOLUTE_Y_0x9F = ILL_SHA_ABSOLUTE_Y_0x9F
     ILL_SHA_INDIRECT_INDEXED_Y_0x93 = ILL_SHA_INDIRECT_INDEXED_Y_0x93
 
-    '''SHX'''
+    """SHX"""
     ILL_SHX_ABSOLUTE_Y_0x9E = ILL_SHX_ABSOLUTE_Y_0x9E
 
-    '''SHY'''
+    """SHY"""
     ILL_SHY_ABSOLUTE_X_0x9C = ILL_SHY_ABSOLUTE_X_0x9C
 
-    '''SLO'''
+    """SLO"""
     ILL_SLO_ZEROPAGE_0x07 = ILL_SLO_ZEROPAGE_0x07
     ILL_SLO_ZEROPAGE_X_0x17 = ILL_SLO_ZEROPAGE_X_0x17
     ILL_SLO_ABSOLUTE_0x0F = ILL_SLO_ABSOLUTE_0x0F
@@ -1631,7 +1612,7 @@ class InstructionSet(enum.IntEnum):
     ILL_SLO_INDEXED_INDIRECT_X_0x03 = ILL_SLO_INDEXED_INDIRECT_X_0x03
     ILL_SLO_INDIRECT_INDEXED_Y_0x13 = ILL_SLO_INDIRECT_INDEXED_Y_0x13
 
-    '''SRE'''
+    """SRE"""
     ILL_SRE_ZEROPAGE_0x47 = ILL_SRE_ZEROPAGE_0x47
     ILL_SRE_ZEROPAGE_X_0x57 = ILL_SRE_ZEROPAGE_X_0x57
     ILL_SRE_ABSOLUTE_0x4F = ILL_SRE_ABSOLUTE_0x4F
@@ -1640,23 +1621,23 @@ class InstructionSet(enum.IntEnum):
     ILL_SRE_INDEXED_INDIRECT_X_0x43 = ILL_SRE_INDEXED_INDIRECT_X_0x43
     ILL_SRE_INDIRECT_INDEXED_Y_0x53 = ILL_SRE_INDIRECT_INDEXED_Y_0x53
 
-    '''TAS'''
+    """TAS"""
     ILL_TAS_ABSOLUTE_0x9B = ILL_TAS_ABSOLUTE_0x9B
 
-    '''USBC'''
-    '''NOPS'''
-    '''JAM'''
+    """USBC"""
+    """NOPS"""
+    """JAM"""
 
     @classmethod
     def _missing_(cls, value):
-        raise IllegalCPUInstructionException(fr'{value}' + f' ({value:02X}) is not a valid {cls}.')
+        raise IllegalCPUInstructionError(f"{value} ({value:02X}) is not a valid {cls}.")
 
 
 # It would be possible to store the assembly instructions mnemonics as format specifiers
 # as well as generate the machine code using the enumeration and a little bit of hackery
 InstructionSet.map = {}
 
-'''CLC'''
+"""CLC"""
 # https://masswerk.at/6502/6502_instruction_set.html#CLC
 # Clear Carry Flag
 #
@@ -1669,16 +1650,16 @@ InstructionSet.map = {}
 clc_immediate_0x18_can_modify_flags: Byte = Byte()
 clc_immediate_0x18_can_modify_flags[flags.C] = True
 InstructionSet.map[InstructionSet.CLC_IMPLIED_0x18] = {
-    'addressing': 'implied',
-    'assembler': 'CLC',
-    'opc': InstructionSet.CLC_IMPLIED_0x18,
-    'bytes': '1',
-    'cycles': '2',
-    'flags': clc_immediate_0x18_can_modify_flags
+    "addressing": "implied",
+    "assembler": "CLC",
+    "opc": InstructionSet.CLC_IMPLIED_0x18,
+    "bytes": "1",
+    "cycles": "2",
+    "flags": clc_immediate_0x18_can_modify_flags,
 }
 
 
-'''CLD'''
+"""CLD"""
 # https://masswerk.at/6502/6502_instruction_set.html#CLD
 # Clear Decimal Mode
 #
@@ -1687,20 +1668,19 @@ InstructionSet.map[InstructionSet.CLC_IMPLIED_0x18] = {
 # -	-	-	-	0	-
 # addressing	assembler	opc	bytes	cycles
 # implied	CLD	D8	1	2
-# CLD_IMPLIED_0xD8: Literal[216] = 0xD8
 cld_immediate_0xd8_can_modify_flags: Byte = Byte()
 cld_immediate_0xd8_can_modify_flags[flags.D] = True
 InstructionSet.map[InstructionSet.CLD_IMPLIED_0xD8] = {
-    'addressing': 'implied',
-    'assembler': 'CLD',
-    'opc': 0xD8,
-    'bytes': '1',
-    'cycles': '2',
-    'flags': cld_immediate_0xd8_can_modify_flags
+    "addressing": "implied",
+    "assembler": "CLD",
+    "opc": 0xD8,
+    "bytes": "1",
+    "cycles": "2",
+    "flags": cld_immediate_0xd8_can_modify_flags,
 }
 
 
-'''CLI'''
+"""CLI"""
 # https://masswerk.at/6502/6502_instruction_set.html#CLI
 # Clear Interrupt Disable Bit
 #
@@ -1709,20 +1689,19 @@ InstructionSet.map[InstructionSet.CLD_IMPLIED_0xD8] = {
 # -	-	-	0	-	-
 # addressing	assembler	opc	bytes	cycles
 # implied	CLI	58	1	2
-# CLI_IMPLIED_0x58: Literal[88] = 0x58
 cli_immediate_0x58_can_modify_flags: Byte = Byte()
 cli_immediate_0x58_can_modify_flags[flags.I] = True
 InstructionSet.map[InstructionSet.CLI_IMPLIED_0x58] = {
-    'addressing': 'implied',
-    'assembler': 'CLI',
-    'opc': InstructionSet.CLI_IMPLIED_0x58,
-    'bytes': '1',
-    'cycles': '2',
-    'flags': cli_immediate_0x58_can_modify_flags
+    "addressing": "implied",
+    "assembler": "CLI",
+    "opc": InstructionSet.CLI_IMPLIED_0x58,
+    "bytes": "1",
+    "cycles": "2",
+    "flags": cli_immediate_0x58_can_modify_flags,
 }
 
 
-'''CLV'''
+"""CLV"""
 # https://masswerk.at/6502/6502_instruction_set.html#CLV
 # Clear Overflow Flag
 #
@@ -1731,264 +1710,257 @@ InstructionSet.map[InstructionSet.CLI_IMPLIED_0x58] = {
 # -	-	-	-	-	0
 # addressing	assembler	opc	bytes	cycles
 # implied	CLV	B8	1	2
-# CLV_IMPLIED_0xB8 = 0xB8
 clv_immediate_0xb8_can_modify_flags: Byte = Byte()
 clv_immediate_0xb8_can_modify_flags[flags.V]
 InstructionSet.map[InstructionSet.CLV_IMPLIED_0xB8] = {
-    'addressing': 'implied',
-    'assembler': 'CLV',
-    'opc': InstructionSet.CLV_IMPLIED_0xB8,
-    'bytes': '1',
-    'cycles': '2',
-    'flags': clv_immediate_0xb8_can_modify_flags
+    "addressing": "implied",
+    "assembler": "CLV",
+    "opc": InstructionSet.CLV_IMPLIED_0xB8,
+    "bytes": "1",
+    "cycles": "2",
+    "flags": clv_immediate_0xb8_can_modify_flags,
 }
 
 
-'''LDA'''
+"""LDA"""
 lda_immediate_0xa9_can_modify_flags: Byte = Byte()
 lda_immediate_0xa9_can_modify_flags[flags.N] = True
 lda_immediate_0xa9_can_modify_flags[flags.Z] = True
 
 InstructionSet.map[InstructionSet.LDA_IMMEDIATE_0xA9] = {
-    'addressing': 'immediate',
-    'assembler': 'LDA #{oper}',
-    'opc': InstructionSet.LDA_IMMEDIATE_0xA9,
-    'bytes': '2',
-    'cycles': '2',
-    'flags': lda_immediate_0xa9_can_modify_flags
+    "addressing": "immediate",
+    "assembler": "LDA #{oper}",
+    "opc": InstructionSet.LDA_IMMEDIATE_0xA9,
+    "bytes": "2",
+    "cycles": "2",
+    "flags": lda_immediate_0xa9_can_modify_flags,
 }
 
 lda_zeropage_0xa5_can_modify_flags: Byte = lda_immediate_0xa9_can_modify_flags
 InstructionSet.map[InstructionSet.LDA_ZEROPAGE_0xA5] = {
-    'addressing': 'zeropage',
-    'assembler': 'LDA {oper}',
-    'opc': InstructionSet.LDA_ZEROPAGE_0xA5,
-    'bytes': '2',
-    'cycles': '3',
-    'flags': lda_zeropage_0xa5_can_modify_flags
+    "addressing": "zeropage",
+    "assembler": "LDA {oper}",
+    "opc": InstructionSet.LDA_ZEROPAGE_0xA5,
+    "bytes": "2",
+    "cycles": "3",
+    "flags": lda_zeropage_0xa5_can_modify_flags,
 }
 
 lda_zeropage_x_0xb5_can_modify_flags: Byte = lda_immediate_0xa9_can_modify_flags
 InstructionSet.map[InstructionSet.LDA_ZEROPAGE_X_0xB5] = {
-    'addressing': 'zeropage,X',
-    'assembler': 'LDA {oper},X',
-    'opc': InstructionSet.LDA_ZEROPAGE_X_0xB5,
-    'bytes': '2',
-    'cycles': '4',
-    'flags': lda_zeropage_x_0xb5_can_modify_flags
+    "addressing": "zeropage,X",
+    "assembler": "LDA {oper},X",
+    "opc": InstructionSet.LDA_ZEROPAGE_X_0xB5,
+    "bytes": "2",
+    "cycles": "4",
+    "flags": lda_zeropage_x_0xb5_can_modify_flags,
 }
 
 lda_absolute_0xad_can_modify_flags: Byte = lda_immediate_0xa9_can_modify_flags
 InstructionSet.map[InstructionSet.LDA_ABSOLUTE_0xAD] = {
-    'addressing': 'absolute',
-    'assembler': 'LDA {oper}',
-    'opc': InstructionSet.LDA_ABSOLUTE_0xAD,
-    'bytes': '3',
-    'cycles': '4',
-    'flags': lda_absolute_0xad_can_modify_flags
+    "addressing": "absolute",
+    "assembler": "LDA {oper}",
+    "opc": InstructionSet.LDA_ABSOLUTE_0xAD,
+    "bytes": "3",
+    "cycles": "4",
+    "flags": lda_absolute_0xad_can_modify_flags,
 }
 
 lda_absolute_x_0xbd_can_modify_flags: Byte = lda_immediate_0xa9_can_modify_flags
 InstructionSet.map[InstructionSet.LDA_ABSOLUTE_X_0xBD] = {
-    'addressing': 'absolute,X',
-    'assembler': 'LDA {oper},X',
-    'opc': InstructionSet.LDA_ABSOLUTE_X_0xBD,
-    'bytes': '3',
-    'cycles': '4*',
-    'flags': lda_absolute_x_0xbd_can_modify_flags
+    "addressing": "absolute,X",
+    "assembler": "LDA {oper},X",
+    "opc": InstructionSet.LDA_ABSOLUTE_X_0xBD,
+    "bytes": "3",
+    "cycles": "4*",
+    "flags": lda_absolute_x_0xbd_can_modify_flags,
 }
 
 lda_absolute_y_0xb9_can_modify_flags: Byte = lda_immediate_0xa9_can_modify_flags
 InstructionSet.map[InstructionSet.LDA_ABSOLUTE_Y_0xB9] = {
-    'addressing': 'absolute,Y',
-    'assembler': 'LDA {oper},Y',
-    'opc': InstructionSet.LDA_ABSOLUTE_Y_0xB9,
-    'bytes': '3',
-    'cycles': '4*',
-    'flags': lda_absolute_y_0xb9_can_modify_flags
+    "addressing": "absolute,Y",
+    "assembler": "LDA {oper},Y",
+    "opc": InstructionSet.LDA_ABSOLUTE_Y_0xB9,
+    "bytes": "3",
+    "cycles": "4*",
+    "flags": lda_absolute_y_0xb9_can_modify_flags,
 }
 
 lda_indexed_indirect_x_0xa1_can_modify_flags: Byte = lda_immediate_0xa9_can_modify_flags
 InstructionSet.map[InstructionSet.LDA_INDEXED_INDIRECT_X_0xA1] = {
-    'addressing': '(indirect, X)',
-    'assembler': 'LDA ({oper},X)',
-    'opc': InstructionSet.LDA_INDEXED_INDIRECT_X_0xA1,
-    'bytes': '2',
-    'cycles': '6',
-    'flags': lda_indexed_indirect_x_0xa1_can_modify_flags
+    "addressing": "(indirect, X)",
+    "assembler": "LDA ({oper},X)",
+    "opc": InstructionSet.LDA_INDEXED_INDIRECT_X_0xA1,
+    "bytes": "2",
+    "cycles": "6",
+    "flags": lda_indexed_indirect_x_0xa1_can_modify_flags,
 }
 
 lda_indirect_indexed_y_0xb1_can_modify_flags: Byte = lda_immediate_0xa9_can_modify_flags
 InstructionSet.map[InstructionSet.LDA_INDIRECT_INDEXED_Y_0xB1] = {
-    'addressing': '({indirect}),Y',
-    'assembler': 'LDA (oper),Y',
-    'opc': LDA_INDIRECT_INDEXED_Y_0xB1,
-    'bytes': '2',
-    'cycles': '5*',
-    'flags': lda_indirect_indexed_y_0xb1_can_modify_flags
+    "addressing": "({indirect}),Y",
+    "assembler": "LDA (oper),Y",
+    "opc": LDA_INDIRECT_INDEXED_Y_0xB1,
+    "bytes": "2",
+    "cycles": "5*",
+    "flags": lda_indirect_indexed_y_0xb1_can_modify_flags,
 }
 
-'''JSR'''
+"""JSR"""
 jsr_absolute_0x20_can_modify_flags: Byte = Byte()
 InstructionSet.map[InstructionSet.JSR_ABSOLUTE_0x20] = {
-    'addressing': 'absolute',
-    'assembler': 'JSR {oper}',
-    'opc': InstructionSet.JSR_ABSOLUTE_0x20,
-    'bytes': '3',
-    'cycles': '6',
-    'flags': jsr_absolute_0x20_can_modify_flags
+    "addressing": "absolute",
+    "assembler": "JSR {oper}",
+    "opc": InstructionSet.JSR_ABSOLUTE_0x20,
+    "bytes": "3",
+    "cycles": "6",
+    "flags": jsr_absolute_0x20_can_modify_flags,
 }
 
-'''NOP'''
+"""NOP"""
 nop_implied_0xea_can_modify_flags: Byte = Byte()
 InstructionSet.map[NOP_IMPLIED_0xEA] = {
-    'addressing': 'implied',
-    'assembler': 'NOP',
-    'opc': NOP_IMPLIED_0xEA,
-    'bytes': '1',
-    'cycles': '2',
-    'flags': nop_implied_0xea_can_modify_flags
+    "addressing": "implied",
+    "assembler": "NOP",
+    "opc": NOP_IMPLIED_0xEA,
+    "bytes": "1",
+    "cycles": "2",
+    "flags": nop_implied_0xea_can_modify_flags,
 }
 
-'''STA'''
+"""STA"""
 sta_zeropage_0x85_can_modify_flags: Byte = Byte()
 InstructionSet.map[InstructionSet.STA_ZEROPAGE_0x85] = {
-    'addressing': 'zeropage',
-    'assembler': 'STA {oper}',
-    'opc': InstructionSet.STA_ZEROPAGE_0x85,
-    'bytes': '2',
-    'cycles': '3',
-    'flags': sta_zeropage_0x85_can_modify_flags
+    "addressing": "zeropage",
+    "assembler": "STA {oper}",
+    "opc": InstructionSet.STA_ZEROPAGE_0x85,
+    "bytes": "2",
+    "cycles": "3",
+    "flags": sta_zeropage_0x85_can_modify_flags,
 }
 
 sta_zeropage_x_0x95_can_modify_flags: Byte = sta_zeropage_0x85_can_modify_flags
 InstructionSet.map[InstructionSet.STA_ZEROPAGE_X_0x95] = {
-    'addressing': 'zeropage,X',
-    'assembler': 'STA {oper},X',
-    'opc': InstructionSet.STA_ZEROPAGE_X_0x95,
-    'bytes': '2',
-    'cycles': '4',
-    'flags': sta_zeropage_x_0x95_can_modify_flags
+    "addressing": "zeropage,X",
+    "assembler": "STA {oper},X",
+    "opc": InstructionSet.STA_ZEROPAGE_X_0x95,
+    "bytes": "2",
+    "cycles": "4",
+    "flags": sta_zeropage_x_0x95_can_modify_flags,
 }
 
 sta_absolute_0x8d_can_modify_flags: Byte = sta_zeropage_0x85_can_modify_flags
 InstructionSet.map[InstructionSet.STA_ABSOLUTE_0x8D] = {
-    'addressing': 'absolute',
-    'assembler': 'STA {oper}',
-    'opc': InstructionSet.STA_ABSOLUTE_0x8D,
-    'bytes': '3',
-    'cycles': '4',
-    'flags': sta_absolute_0x8d_can_modify_flags
+    "addressing": "absolute",
+    "assembler": "STA {oper}",
+    "opc": InstructionSet.STA_ABSOLUTE_0x8D,
+    "bytes": "3",
+    "cycles": "4",
+    "flags": sta_absolute_0x8d_can_modify_flags,
 }
 
 sta_absolute_x_0x9d_can_modify_flags: Byte = sta_zeropage_0x85_can_modify_flags
 InstructionSet.map[InstructionSet.STA_ABSOLUTE_X_0x9D] = {
-    'addressing': 'absolute,X',
-    'assembler': 'STA {oper},X',
-    'opc': InstructionSet.STA_ABSOLUTE_X_0x9D,
-    'bytes': '3',
-    'cycles': '5',
-    'flags': sta_absolute_x_0x9d_can_modify_flags
+    "addressing": "absolute,X",
+    "assembler": "STA {oper},X",
+    "opc": InstructionSet.STA_ABSOLUTE_X_0x9D,
+    "bytes": "3",
+    "cycles": "5",
+    "flags": sta_absolute_x_0x9d_can_modify_flags,
 }
 
 sta_absolute_y_0x99_can_modify_flags: Byte = sta_zeropage_0x85_can_modify_flags
 InstructionSet.map[InstructionSet.STA_ABSOLUTE_Y_0x99] = {
-    'addressing': 'absolute,Y',
-    'assembler': 'STA {oper},Y',
-    'opc': InstructionSet.STA_ABSOLUTE_Y_0x99,
-    'bytes': '3',
-    'cycles': '5',
-    'flags': sta_absolute_y_0x99_can_modify_flags
+    "addressing": "absolute,Y",
+    "assembler": "STA {oper},Y",
+    "opc": InstructionSet.STA_ABSOLUTE_Y_0x99,
+    "bytes": "3",
+    "cycles": "5",
+    "flags": sta_absolute_y_0x99_can_modify_flags,
 }
 
 sta_indexed_indirect_x_0x81_can_modify_flags: Byte = sta_zeropage_0x85_can_modify_flags
 InstructionSet.map[InstructionSet.STA_INDEXED_INDIRECT_X_0x81] = {
-    'addressing': '(indirect, X)',
-    'assembler': 'STA ({oper},X)',
-    'opc': InstructionSet.STA_INDEXED_INDIRECT_X_0x81,
-    'bytes': '2',
-    'cycles': '6',
-    'flags': sta_indexed_indirect_x_0x81_can_modify_flags
+    "addressing": "(indirect, X)",
+    "assembler": "STA ({oper},X)",
+    "opc": InstructionSet.STA_INDEXED_INDIRECT_X_0x81,
+    "bytes": "2",
+    "cycles": "6",
+    "flags": sta_indexed_indirect_x_0x81_can_modify_flags,
 }
 
 sta_indirect_indexed_y_0x91_can_modify_flags: Byte = sta_zeropage_0x85_can_modify_flags
 InstructionSet.map[InstructionSet.STA_INDIRECT_INDEXED_Y_0x91] = {
-    'addressing': '(indirect), Y',
-    'assembler': 'STA ({oper}),Y',
-    'opc': InstructionSet.STA_INDIRECT_INDEXED_Y_0x91,
-    'bytes': '2',
-    'cycles': '6',
-    'flags': sta_indirect_indexed_y_0x91_can_modify_flags
+    "addressing": "(indirect), Y",
+    "assembler": "STA ({oper}),Y",
+    "opc": InstructionSet.STA_INDIRECT_INDEXED_Y_0x91,
+    "bytes": "2",
+    "cycles": "6",
+    "flags": sta_indirect_indexed_y_0x91_can_modify_flags,
 }
 
-'''STX'''
+"""STX"""
 stx_zeropage_0x86_can_modify_flags: Byte = Byte()
 InstructionSet.map[InstructionSet.STX_ZEROPAGE_0x86] = {
-    'addressing': 'zeropage',
-    'assembler': 'STX {oper}',
-    'opc': InstructionSet.STX_ZEROPAGE_0x86,
-    'bytes': '2',
-    'cycles': '3',
-    'flags': stx_zeropage_0x86_can_modify_flags
+    "addressing": "zeropage",
+    "assembler": "STX {oper}",
+    "opc": InstructionSet.STX_ZEROPAGE_0x86,
+    "bytes": "2",
+    "cycles": "3",
+    "flags": stx_zeropage_0x86_can_modify_flags,
 }
 
 stx_zeropage_y_0x96_can_modify_flags: Byte = stx_zeropage_0x86_can_modify_flags
 InstructionSet.map[InstructionSet.STX_ZEROPAGE_Y_0x96] = {
-    'addressing': 'zeropage,Y',
-    'assembler': 'STX {oper},Y',
-    'opc': InstructionSet.STX_ZEROPAGE_Y_0x96,
-    'bytes': '2',
-    'cycles': '4',
-    'flags': stx_zeropage_y_0x96_can_modify_flags
+    "addressing": "zeropage,Y",
+    "assembler": "STX {oper},Y",
+    "opc": InstructionSet.STX_ZEROPAGE_Y_0x96,
+    "bytes": "2",
+    "cycles": "4",
+    "flags": stx_zeropage_y_0x96_can_modify_flags,
 }
 
 stx_absolute_0x8e_can_modify_flags: Byte = stx_zeropage_0x86_can_modify_flags
 InstructionSet.map[InstructionSet.STX_ABSOLUTE_0x8E] = {
-    'addressing': 'absolute',
-    'assembler': 'STX {oper}',
-    'opc': InstructionSet.STX_ABSOLUTE_0x8E,
-    'bytes': '3',
-    'cycles': '4',
-    'flags': stx_absolute_0x8e_can_modify_flags
+    "addressing": "absolute",
+    "assembler": "STX {oper}",
+    "opc": InstructionSet.STX_ABSOLUTE_0x8E,
+    "bytes": "3",
+    "cycles": "4",
+    "flags": stx_absolute_0x8e_can_modify_flags,
 }
 
-'''STY'''
+"""STY"""
 sty_zeropage_0x84_can_modify_flags: Byte = Byte()
 InstructionSet.map[InstructionSet.STY_ZEROPAGE_0x84] = {
-    'addressing': 'zeropage',
-    'assembler': 'STY {oper}',
-    'opc': InstructionSet.STY_ZEROPAGE_0x84,
-    'bytes': '2',
-    'cycles': '3',
-    'flags': sty_zeropage_0x84_can_modify_flags
+    "addressing": "zeropage",
+    "assembler": "STY {oper}",
+    "opc": InstructionSet.STY_ZEROPAGE_0x84,
+    "bytes": "2",
+    "cycles": "3",
+    "flags": sty_zeropage_0x84_can_modify_flags,
 }
 
 sty_zeropage_x_0x94_can_modify_flags: Byte = sty_zeropage_0x84_can_modify_flags
 InstructionSet.map[InstructionSet.STY_ZEROPAGE_X_0x94] = {
-    'addressing': 'zeropage,X',
-    'assembler': 'STY {oper},X',
-    'opc': InstructionSet.STY_ZEROPAGE_X_0x94,
-    'bytes': '2',
-    'cycles': '4',
-    'flags': sty_zeropage_x_0x94_can_modify_flags
+    "addressing": "zeropage,X",
+    "assembler": "STY {oper},X",
+    "opc": InstructionSet.STY_ZEROPAGE_X_0x94,
+    "bytes": "2",
+    "cycles": "4",
+    "flags": sty_zeropage_x_0x94_can_modify_flags,
 }
 
 sty_absolute_0x8c_can_modify_flags: Byte = sty_zeropage_0x84_can_modify_flags
 InstructionSet.map[InstructionSet.STY_ABSOLUTE_0x8C] = {
-    'addressing': 'absolute',
-    'assembler': 'STY {oper}',
-    'opc': InstructionSet.STY_ABSOLUTE_0x8C,
-    'bytes': '3',
-    'cycles': '4',
-    'flags': sty_absolute_0x8c_can_modify_flags
+    "addressing": "absolute",
+    "assembler": "STY {oper}",
+    "opc": InstructionSet.STY_ABSOLUTE_0x8C,
+    "bytes": "3",
+    "cycles": "4",
+    "flags": sty_absolute_0x8c_can_modify_flags,
 }
 
 # Template
 # InstructionSet.map[] = {
-#     'addressing': '',
-#     'assembler': '',
-#     'opc': ,
-#     'bytes': '',
-#     'cycles': '',
 #     'flags':
-# }

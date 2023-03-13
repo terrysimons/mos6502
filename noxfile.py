@@ -12,9 +12,10 @@ def test(session):
 
     session.run('poetry', 'build', external=True)
     session.run('poetry', '-q', 'install', external=True)
-    session.run('pytest', external=True)
+    session.run('ruff', 'mos6502', 'tests', external=True)
     session.run('pycodestyle', '--max-line-length=100', '--ignore=E741,E743', 'mos6502', external=True)
     session.run('pydocstyle', 'mos6502', external=True)
+    session.run('pytest', external=True)
 
 @nox.session
 def release(session: nox.Session) -> None:

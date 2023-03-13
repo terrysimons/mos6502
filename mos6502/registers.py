@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 """
 mos6502 Registers.
 
@@ -20,11 +19,12 @@ class Registers:
                  S=Word(0x00),
                  A=Byte(0x00),
                  X=Byte(0x00),
-                 Y=Byte(0x00)):
+                 Y=Byte(0x00)) -> None:
         """
         Return a mos6502 register instance.
 
-        Parameters:
+        Parameters
+        ----------
             endianness: the endianness of the architecture - "big" or "little" (default=little)
             PC: the mos6502 program counter
             S: the mos6502 stack pointer
@@ -68,7 +68,7 @@ class Registers:
         # S is 8-bits, so mask off.
         #
         # This simplifies handling overflow with bitarrays.
-        return self._S.value & 0xFF
+        return self._S.value & 0x1FF
 
     @S.setter
     def S(self, S) -> None:
@@ -76,7 +76,7 @@ class Registers:
         # S is 8-bits, so mask off.
         #
         # This simplifies handling overflow with bitarrays.
-        value: int = S & 0xFF
+        value: int = S & 0x1FF
 
         value: Word = Word(value=value, endianness=self.endianness)
 

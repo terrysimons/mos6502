@@ -1,27 +1,22 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 """mos6502 Exceptions."""
 
 
-class IllegalCPUInstructionException(Exception):
+class MachineCodeExecutionError(Exception):
+    """Raise when something unexpected happens trying to execute a machine code op."""
+
+
+class IllegalCPUInstructionError(Exception):
     """Raise when an illegal CPU instruction is encountered."""
 
-    pass
 
-
-class CPUCycleExhaustionException(Exception):
+class CPUCycleExhaustionError(Exception):
     """Raise when the expected number of CPU cycles is exhausted."""
 
-    pass
 
-
-class InvalidMemoryLocationException(Exception):
+class InvalidMemoryLocationError(Exception):
     """Raise when an invalid memory location is accessed."""
 
-    pass
 
-
-class InvalidMemoryAssignmentException(Exception):
+class InvalidMemoryAssignmentError(Exception):
     """Raise when an invalid memory location is assigned to."""
-
-    pass

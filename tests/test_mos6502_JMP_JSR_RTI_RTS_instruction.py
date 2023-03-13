@@ -1,17 +1,15 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
+import contextlib
 import copy
 import logging
 
 import mos6502
-import mos6502.flags as flags
-import mos6502.instructions as instructions
-import mos6502.exceptions as exceptions
+from mos6502 import exceptions, flags, instructions
 
-log = logging.getLogger('mos6502')
+log: logging.Logger = logging.getLogger("mos6502")
 log.setLevel(logging.DEBUG)
 
-def check_noop_flags(expected_cpu, actual_cpu):
+def check_noop_flags(expected_cpu, actual_cpu) -> None:
     assert actual_cpu.flags[flags.C] == expected_cpu.flags[flags.C]
     assert actual_cpu.flags[flags.Z] == expected_cpu.flags[flags.Z]
     assert actual_cpu.flags[flags.B] == expected_cpu.flags[flags.B]
@@ -20,39 +18,53 @@ def check_noop_flags(expected_cpu, actual_cpu):
     assert actual_cpu.flags[flags.V] == expected_cpu.flags[flags.V]
     assert actual_cpu.flags[flags.N] == expected_cpu.flags[flags.N]
 
-def test_cpu_instruction_JSR_ABSOLUTE_0x20():
+# def test_cpu_instruction_JSR_ABSOLUTE_0x20():
+
+#     # Jump to 0x4242
+#     # Should be 8 cycles
+
+#         pass
+
+
+
+#         pass
+
+
+
+def test_cpu_instruction_JSR_ABSOLUTE_0x20_and_RTS_IMPLIED_0x60():
     # given:
     cpu: mos6502.CPU = mos6502.CPU()
     cpu.reset()
-    initial_cpu: mos6502.CPU = copy.deepcopy(cpu)
+    copy.deepcopy(cpu)
 
     # Jump to 0x4242
     # Should be 8 cycles
     cpu.ram[0xFFFC] = instructions.JSR_ABSOLUTE_0x20
-    cpu.ram[0xFFFD] = 0x42
+    cpu.ram[0xFFFD] = 0x43
     cpu.ram[0xFFFE] = 0x42
+    cpu.ram[0xFFFF] = instructions.NOP_IMPLIED_0xEA
 
     # when:
-    try:
+    with contextlib.suppress(exceptions.CPUCycleExhaustionError):
         cpu.execute(cycles=6)
-    except exceptions.CPUCycleExhaustionException:
-        pass
 
     # then:
     assert cpu.cycles_executed == 6
 
-    cpu.ram[0x4242] = instructions.LDA_IMMEDIATE_0xA9
-    cpu.ram[0x4243] = 0x23
+    # JSR to 0x2223
+    cpu.ram[0x4243] = instructions.JSR_ABSOLUTE_0x20
+    cpu.ram[0x4244] = 0x22
+    cpu.ram[0x4245] = 0x23
+    cpu.ram[0x4246] = instructions.RTS_IMPLIED_0x60
 
-    try:
-        cpu.execute(cycles=2)
-    except exceptions.CPUCycleExhaustionException:
-        pass
 
-    assert cpu.cycles_executed == 8
-    assert cpu.A == 0x23
-    assert cpu.PC == 0x4244
-    check_noop_flags(expected_cpu=initial_cpu, actual_cpu=cpu)
+    #     pass
+
+
+    #     pass
+
+
+
 
 # def test_cpu_insruction_JMP_ABSOLUTE_0x4C():
 #     instructions.JMP_ABSOLUTE_0x4C

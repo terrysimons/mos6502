@@ -1,14 +1,12 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
+import contextlib
 import copy
 import logging
 
 import mos6502
-import mos6502.flags as flags
-import mos6502.instructions as instructions
-import mos6502.exceptions as exceptions
+from mos6502 import exceptions, flags, instructions
 
-log = logging.getLogger('mos6502')
+log = logging.getLogger("mos6502")
 log.setLevel(logging.DEBUG)
 
 def check_noop_flags(expected_cpu, actual_cpu):
@@ -29,10 +27,8 @@ def test_cpu_instruction_NOP_IMPLIED_0xEA():
     cpu.ram[0xFFFC] = instructions.NOP_IMPLIED_0xEA
 
     # when:
-    try:
+    with contextlib.suppress(exceptions.CPUCycleExhaustionError):
         cpu.execute(cycles=2)
-    except exceptions.CPUCycleExhaustionException:
-        pass
 
     # then:
     assert cpu.PC == 0xFFFD

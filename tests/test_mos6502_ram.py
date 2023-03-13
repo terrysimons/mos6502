@@ -1,8 +1,11 @@
+#!/usr/bin/env python3
+
 from bitarray.util import int2ba
 
 import mos6502
-from  mos6502.core import INFINITE_CYCLES
 import mos6502.memory as ram
+from mos6502 import exceptions
+from mos6502.core import INFINITE_CYCLES
 from mos6502.memory import Byte, Word
 
 
@@ -12,20 +15,16 @@ def test_ram_byte() -> None:
 
     c: Byte = a + b
 
-    # Byte == bitarray
     assert(c == int2ba(3, length=8, endian=ram.ENDIANNESS))
 
-    # Byte == int
     assert(c == 3)
 
     d: Byte = Byte(value=3)
 
-    # Byte == Byte
     assert(c == d)
 
     d: Word = Word(value=3)
 
-    # Byte == Word
     assert(c == d)
 
 def test_ram_word() -> None:
@@ -34,18 +33,14 @@ def test_ram_word() -> None:
 
     c: Word = a + b
 
-    # Word == bitarray
     assert(c == int2ba(3, length=16, endian=ram.ENDIANNESS))
 
-    # Word == int
     assert(c == 3)
 
-    # Word == Word
     d: Word = Word(value=3)
 
     assert(c == d)
 
-    # Word == Byte
     d: Word = Byte(value=3)
 
     assert(c == d)
@@ -70,21 +65,21 @@ def test_ram_zeropage() -> None:
     cpu.reset()
 
     for address in range(256):
-        assert cpu.ram.memory_section(address=address) == 'zeropage'
+        assert cpu.ram.memory_section(address=address) == "zeropage"
 
 def test_ram_stack() -> None:
     cpu: mos6502.CPU = mos6502.CPU()
     cpu.reset()
 
     for address in range(256):
-        assert cpu.ram.memory_section(address=address + 256) == 'stack'
+        assert cpu.ram.memory_section(address=address + 256) == "stack"
 
 def test_ram_heap() -> None:
     cpu: mos6502.CPU = mos6502.CPU()
     cpu.reset()
 
     for address in range(65536 - 512):
-        assert cpu.ram.memory_section(address=address + 512) == 'heap'
+        assert cpu.ram.memory_section(address=address + 512) == "heap"
 
 def test_ram_out_of_bounds() -> None:
     cpu: mos6502.CPU = mos6502.CPU()
@@ -95,27 +90,27 @@ def test_ram_out_of_bounds() -> None:
     got_exception = False
     try:
         section: None = cpu.ram.memory_section(address=len(cpu.ram) + 1)
-    except ram.InvalidMemoryLocationException:
+    except exceptions.InvalidMemoryLocationError:
         got_exception = True
 
     assert section == expected_section
-    assert got_exception == True
+    assert got_exception is True
 
     got_exception = False
     try:
         section: None = cpu.ram.memory_section(-1)
-    except ram.InvalidMemoryLocationException:
+    except exceptions.InvalidMemoryLocationError:
         got_exception = True
 
-    assert got_exception == True
+    assert got_exception is True
 
     got_exception = False
     try:
         section: None = cpu.ram.memory_section(len(cpu.ram) + 1)
-    except ram.InvalidMemoryLocationException:
+    except exceptions.InvalidMemoryLocationError:
         got_exception = True
 
-    assert got_exception == True
+    assert got_exception is True
 
 def test_ram_read_byte() -> None:
     cpu: mos6502.CPU = mos6502.CPU()
@@ -208,7 +203,7 @@ def test_ram_write_word() -> None:
     cpu.ram[0x4243] = 0x00
 
     # when:
-    cpu.write_word(address=0x4242, data=Word(0xBEEF, endianness='little'))
+    cpu.write_word(address=0x4242, data=Word(0xBEEF, endianness="little"))
 
     # then:
     assert cpu.ram[0x4242] == 0xEF
