@@ -288,7 +288,7 @@ class MemoryUnit:
             ")",
         )
 
-    def __str__(self):
+    def __str__(self) -> str:
         """Describe this MemoryUnit as a hexadecimal value."""
         if isinstance(self.value, bitarray.bitarray):
             return str(hex(ba2int(self.value)))

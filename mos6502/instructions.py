@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Instruction set for the mos6502 CPU."""
 import enum
-from typing import Literal
+from typing import Literal, NoReturn
 
 from mos6502 import flags
 from mos6502.exceptions import IllegalCPUInstructionError
@@ -1629,7 +1629,7 @@ class InstructionSet(enum.IntEnum):
     """JAM"""
 
     @classmethod
-    def _missing_(cls, value):
+    def _missing_(cls, value) -> NoReturn:
         raise IllegalCPUInstructionError(f"{value} ({value:02X}) is not a valid {cls}.")
 
 

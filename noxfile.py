@@ -2,22 +2,18 @@
 # -*- coding: utf-8 -*-
 import argparse
 import nox
+from nox_poetry import session
 
 nox.options.sessions = ['test']
 
-@nox.session
+@session
 def test(session):
-    session.run('pip', 'install', 'pycodestyle')
-    session.run('pip', 'install', 'pydocstyle')
-
-    session.run('poetry', 'build', external=True)
-    session.run('poetry', '-q', 'install', external=True)
     session.run('ruff', 'mos6502', 'tests', external=True)
     session.run('pycodestyle', '--max-line-length=100', '--ignore=E741,E743', 'mos6502', external=True)
     session.run('pydocstyle', 'mos6502', external=True)
     session.run('pytest', external=True)
 
-@nox.session
+@session
 def release(session: nox.Session) -> None:
     """
     Kicks off an automated release process by creating and pushing a new tag.

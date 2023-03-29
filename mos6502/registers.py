@@ -4,6 +4,7 @@ mos6502 Registers.
 
 This module implements the mos6502 register set.
 """
+from typing import Self
 
 import mos6502
 import mos6502.memory
@@ -13,13 +14,13 @@ from mos6502.memory import Byte, Word
 class Registers:
     """The mos6502 register set."""
 
-    def __init__(self,
+    def __init__(self: Self,
                  endianness=mos6502.memory.ENDIANNESS,
                  PC=Word(0x00),
                  S=Word(0x00),
                  A=Byte(0x00),
                  X=Byte(0x00),
-                 Y=Byte(0x00)) -> None:
+                 Y=Byte(0x00)) -> None:  # noqa: B008
         """
         Return a mos6502 register instance.
 
@@ -49,12 +50,12 @@ class Registers:
         self._Y: Byte = Byte(Y.value, endianness=self.endianness)
 
     @property
-    def PC(self) -> int:
+    def PC(self: Self) -> int:  # noqa: N802
         """Return the PC register as an int."""
         return self._PC.value & 0xFFFF
 
     @PC.setter
-    def PC(self, PC) -> None:
+    def PC(self: Self, PC) -> None:  # noqa: ANN001 N802 N803
         """Set the PC register as an int with the correct endianness."""
         value: int = PC & 0xFFFF
 
@@ -63,7 +64,7 @@ class Registers:
         self._PC = value
 
     @property
-    def S(self) -> int:
+    def S(self: Self) -> int:  # noqa: N802
         """Return the PC register as an int."""
         # S is 8-bits, so mask off.
         #
@@ -71,7 +72,7 @@ class Registers:
         return self._S.value & 0x1FF
 
     @S.setter
-    def S(self, S) -> None:
+    def S(self: Self, S: int) -> None:  # noqa: N802, N803
         """Set the S register."""
         # S is 8-bits, so mask off.
         #
@@ -83,12 +84,12 @@ class Registers:
         self._S: Word = value
 
     @property
-    def A(self) -> int:
+    def A(self: Self) -> int:  # noqa: N802
         """Return the A register."""
         return self._A.value & 0xFF
 
     @A.setter
-    def A(self, A) -> None:
+    def A(self: Self, A: int) -> None:  # noqa: N802, N803
         """Set the A register."""
         value: int = A & 0xFF
 
@@ -97,12 +98,12 @@ class Registers:
         self._A = value
 
     @property
-    def X(self) -> int:
+    def X(self: Self) -> int:  # noqa: N802
         """Return the X register."""
         return self._X.value & 0xFF
 
     @X.setter
-    def X(self, X) -> None:
+    def X(self: Self, X: int) -> None:  # noqa: N802, N803
         """Set the X register."""
         value: int = X & 0xFF
 
@@ -111,12 +112,12 @@ class Registers:
         self._X = value
 
     @property
-    def Y(self) -> int:
+    def Y(self: Self) -> int:  # noqa: N802
         """Return the Y register."""
         return self._Y.value & 0xFF
 
     @Y.setter
-    def Y(self, Y) -> None:
+    def Y(self: Self, Y: int) -> None:  # noqa: N802, N803
         """Set the Y register."""
         value: int = Y & 0xFF
 
