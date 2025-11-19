@@ -495,65 +495,6 @@ SED_IMPLIED_0xF8: Literal[248] = 0xF8
 # implied	SEI	78	1	2
 SEI_IMPLIED_0x78: Literal[120] = 0x78
 
-# https://masswerk.at/6502/6502_instruction_set.html#TAX
-# Transfer Accumulator to Index X
-#
-# A -> X
-# N	Z	C	I	D	V
-# +	+	-	-	-	-
-# addressing	assembler	opc	bytes	cycles
-# implied	TAX	AA	1	2
-TAX_IMPLIED_0xAA: Literal[170] = 0xAA
-
-# https://masswerk.at/6502/6502_instruction_set.html#TAY
-# Transfer Accumulator to Index Y
-#
-# A -> Y
-# N	Z	C	I	D	V
-# +	+	-	-	-	-
-# addressing	assembler	opc	bytes	cycles
-# implied	TAY	A8	1	2
-TAY_IMPLIED_0xA8: Literal[168] = 0xA8
-
-# https://masswerk.at/6502/6502_instruction_set.html#TSX
-# Transfer Stack Pointer to Index X
-#
-# S -> X
-# N	Z	C	I	D	V
-# +	+	-	-	-	-
-# addressing	assembler	opc	bytes	cycles
-# implied	TSX	BA	1	2
-TSX_IMPLIED_0xBA: Literal[186] = 0xBA
-
-# https://masswerk.at/6502/6502_instruction_set.html#TXA
-# Transfer Index X to Accumulator
-#
-# X -> A
-# N	Z	C	I	D	V
-# +	+	-	-	-	-
-# addressing	assembler	opc	bytes	cycles
-# implied	TXA	8A	1	2
-TXA_IMPLIED_0x8A: Literal[138] = 0x8A
-
-# https://masswerk.at/6502/6502_instruction_set.html#TXS
-# Transfer Index X to Stack Register
-#
-# X -> S
-# N	Z	C	I	D	V
-# -	-	-	-	-	-
-# addressing	assembler	opc	bytes	cycles
-# implied	TXS	9A	1	2
-TXS_IMPLIED_0x9A: Literal[154] = 0x9A
-
-# https://masswerk.at/6502/6502_instruction_set.html#TYA
-# Transfer Index Y to Accumulator
-#
-# Y -> A
-# N	Z	C	I	D	V
-# +	+	-	-	-	-
-# addressing	assembler	opc	bytes	cycles
-# implied	TYA	98	1	2
-TYA_IMPLIED_0x98: Literal[152] = 0x98
 
 """ Illegal Opcodes """
 # https://masswerk.at/6502/6502_instruction_set.html
@@ -1167,22 +1108,16 @@ class InstructionSet(enum.IntEnum):
     """STY"""
 
     """TAX"""
-    TAX_IMPLIED_0xAA = TAX_IMPLIED_0xAA
 
     """TAY"""
-    TAY_IMPLIED_0xA8 = TAY_IMPLIED_0xA8
 
     """TSX"""
-    TSX_IMPLIED_0xBA = TSX_IMPLIED_0xBA
 
     """TXA"""
-    TXA_IMPLIED_0x8A = TXA_IMPLIED_0x8A
 
     """TXS"""
-    TXS_IMPLIED_0x9A = TXS_IMPLIED_0x9A
 
     """TYA"""
-    TYA_IMPLIED_0x98 = TYA_IMPLIED_0x98
 
     """Illegal Opcodes"""
     """ALR"""

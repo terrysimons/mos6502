@@ -18,6 +18,8 @@ from mos6502.instructions.stack import register_all_stack_instructions  # noqa: 
 from mos6502.instructions.stack import *  # noqa: F401, F403
 from mos6502.instructions.store import register_all_store_instructions  # noqa: F401
 from mos6502.instructions.store import *  # noqa: F401, F403
+from mos6502.instructions.transfer import register_all_transfer_instructions  # noqa: F401
+from mos6502.instructions.transfer import *  # noqa: F401, F403
 
 # Re-export everything else from _instructions module
 from mos6502.instructions._instructions import *  # noqa: F401, F403
@@ -231,3 +233,4 @@ register_all_flag_instructions(InstructionSet, InstructionSet.map)
 register_all_load_instructions(InstructionSet, InstructionSet.map)
 register_all_stack_instructions(InstructionSet, InstructionSet.map)
 register_all_store_instructions(InstructionSet, InstructionSet.map)
+register_all_transfer_instructions(InstructionSet, InstructionSet.map)
