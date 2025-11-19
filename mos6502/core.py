@@ -1113,12 +1113,38 @@ class MOS6502CPU(flags.ProcessorStatusFlagsInterface):
                 # CPX
                 # CPY
                 # DEC
+
                 # DEX
+                case instructions.DEX_IMPLIED_0xCA:
+                    self.X = (self.X - 1) & 0xFF
+                    self.set_load_status_flags(register_name="X")
+                    self.log.info("i")
+                    self.spend_cpu_cycles(1)
+
                 # DEY
+                case instructions.DEY_IMPLIED_0x88:
+                    self.Y = (self.Y - 1) & 0xFF
+                    self.set_load_status_flags(register_name="Y")
+                    self.log.info("i")
+                    self.spend_cpu_cycles(1)
+
                 # EOR
                 # INC
+
                 # INX
+                case instructions.INX_IMPLIED_0xE8:
+                    self.X = (self.X + 1) & 0xFF
+                    self.set_load_status_flags(register_name="X")
+                    self.log.info("i")
+                    self.spend_cpu_cycles(1)
+
                 # INY
+                case instructions.INY_IMPLIED_0xC8:
+                    self.Y = (self.Y + 1) & 0xFF
+                    self.set_load_status_flags(register_name="Y")
+                    self.log.info("i")
+                    self.spend_cpu_cycles(1)
+
                 # JMP
 
                 # ''' Execute JSR '''

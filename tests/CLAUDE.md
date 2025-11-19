@@ -1,0 +1,1 @@
+- When creating or refactoring tests, try to layout as close to the way the code in the CPU core is as possible.
