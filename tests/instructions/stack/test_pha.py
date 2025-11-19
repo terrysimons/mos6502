@@ -1,0 +1,74 @@
+#!/usr/bin/env python3
+import contextlib
+import copy
+import logging
+
+import mos6502
+from mos6502 import exceptions, flags, instructions
+
+log = logging.getLogger("mos6502")
+log.setLevel(logging.DEBUG)
+
+
+def check_noop_flags(expected_cpu: mos6502.CPU, actual_cpu: mos6502.CPU) -> None:
+    """PHA does not affect any flags."""
+    assert actual_cpu.flags[flags.C] == expected_cpu.flags[flags.C]
+    assert actual_cpu.flags[flags.Z] == expected_cpu.flags[flags.Z]
+    assert actual_cpu.flags[flags.B] == expected_cpu.flags[flags.B]
+    assert actual_cpu.flags[flags.D] == expected_cpu.flags[flags.D]
+    assert actual_cpu.flags[flags.I] == expected_cpu.flags[flags.I]
+    assert actual_cpu.flags[flags.V] == expected_cpu.flags[flags.V]
+    assert actual_cpu.flags[flags.N] == expected_cpu.flags[flags.N]
+
+
+def test_cpu_instruction_PHA_IMPLIED_0x48() -> None:  # noqa: N802
+    # given:
+    cpu: mos6502.CPU = mos6502.CPU()
+    cpu.reset()
+    initial_cpu: mos6502.CPU = copy.deepcopy(cpu)
+
+    cpu.A = 0x42
+    initial_sp: int = cpu.S
+
+    cpu.ram[0xFFFC] = instructions.PHA_IMPLIED_0x48
+
+    # when:
+    with contextlib.suppress(exceptions.CPUCycleExhaustionError):
+        cpu.execute(cycles=3)
+
+    # then:
+    assert cpu.PC == 0xFFFD
+    assert cpu.cycles_executed == 3  # 1 opcode + 2 for push
+    assert cpu.A == 0x42  # A unchanged
+    assert cpu.S == initial_sp - 1  # Stack pointer decremented
+    assert cpu.ram[initial_sp] == 0x42  # Value pushed to stack
+    check_noop_flags(expected_cpu=initial_cpu, actual_cpu=cpu)
+
+
+def test_cpu_instruction_PHA_IMPLIED_0x48_stack_grows_down() -> None:  # noqa: N802
+    """Test that stack grows downward with multiple pushes."""
+    # given:
+    cpu: mos6502.CPU = mos6502.CPU()
+    cpu.reset()
+    initial_cpu: mos6502.CPU = copy.deepcopy(cpu)
+    initial_sp: int = cpu.S
+
+    # Set A to different value and push three times
+    cpu.A = 0x33
+    cpu.ram[0xFFFC] = instructions.PHA_IMPLIED_0x48
+    cpu.ram[0xFFFD] = instructions.PHA_IMPLIED_0x48
+    cpu.ram[0xFFFE] = instructions.PHA_IMPLIED_0x48
+
+    # when:
+    with contextlib.suppress(exceptions.CPUCycleExhaustionError):
+        cpu.execute(cycles=9)
+
+    # then:
+    assert cpu.PC == 0xFFFF
+    assert cpu.cycles_executed == 9  # 3 * 3 cycles
+    assert cpu.S == initial_sp - 3  # Stack pointer decremented by 3
+    # All three pushes should have the same value (0x33) since A doesn't change
+    assert cpu.ram[initial_sp] == 0x33  # First push
+    assert cpu.ram[initial_sp - 1] == 0x33  # Second push
+    assert cpu.ram[initial_sp - 2] == 0x33  # Third push
+    check_noop_flags(expected_cpu=initial_cpu, actual_cpu=cpu)

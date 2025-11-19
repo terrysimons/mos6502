@@ -1330,10 +1330,40 @@ class MOS6502CPU(flags.ProcessorStatusFlagsInterface):
                     self.log.info("i")
                     self.spend_cpu_cycles(cost=1)
                 # ORA
+
                 # PHA
+                case instructions.PHA_IMPLIED_0x48:
+                    self.write_byte(address=self.S, data=self.A)
+                    self.S -= 1
+                    self.log.info("i")
+                    self.spend_cpu_cycles(1)
+
                 # PHP
+                case instructions.PHP_IMPLIED_0x08:
+                    # Push processor status with B flag set
+                    status_with_b: Byte = Byte(self.flags.value | 0b00110000)
+                    self.write_byte(address=self.S, data=status_with_b)
+                    self.S -= 1
+                    self.log.info("i")
+                    self.spend_cpu_cycles(1)
+
                 # PLA
+                case instructions.PLA_IMPLIED_0x68:
+                    self.S += 1
+                    self.A = self.read_byte(address=self.S)
+                    self.set_load_status_flags(register_name="A")
+                    self.log.info("i")
+                    self.spend_cpu_cycles(2)
+
                 # PLP
+                case instructions.PLP_IMPLIED_0x28:
+                    self.S += 1
+                    status_byte: int = self.read_byte(address=self.S)
+                    # Restore all flags from stack by replacing the entire Byte
+                    self._flags = Byte(status_byte)
+                    self.log.info("i")
+                    self.spend_cpu_cycles(2)
+
                 # ROL
                 # ROR
                 # RTI
