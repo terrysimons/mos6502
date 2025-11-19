@@ -360,68 +360,6 @@ INY_IMPLIED_0xC8: Literal[200] = 0xC8
 
 
 
-# https://masswerk.at/6502/6502_instruction_set.html#LDA
-#
-# Load Accumulator with Memory
-#
-# M -> A
-# N	Z	C	I	D	V
-# +	+	-	-	-	-
-# addressing	assembler	opc	bytes	cycles
-# immediate	LDA #oper	A9	2	2
-# zeropage	LDA oper	A5	2	3
-# zeropage,X	LDA oper,X	B5	2	4
-# absolute	LDA oper	AD	3	4
-# absolute,X	LDA oper,X	BD	3	4*
-# absolute,Y	LDA oper,Y	B9	3	4*
-# (indirect,X)	LDA (oper,X)	A1	2	6
-# (indirect),Y	LDA (oper),Y	B1	2	5*
-LDA_IMMEDIATE_0xA9: Literal[169] = 0xA9
-LDA_ZEROPAGE_0xA5: Literal[165] = 0xA5
-LDA_ZEROPAGE_X_0xB5: Literal[181] = 0xB5
-LDA_ABSOLUTE_0xAD: Literal[173] = 0xAD
-LDA_ABSOLUTE_X_0xBD: Literal[189] = 0xBD
-LDA_ABSOLUTE_Y_0xB9: Literal[185] = 0xB9
-LDA_INDEXED_INDIRECT_X_0xA1: Literal[161] = 0xA1
-LDA_INDIRECT_INDEXED_Y_0xB1: Literal[177] = 0xB1
-
-# https://masswerk.at/6502/6502_instruction_set.html#LDX
-#
-# Load Index X with Memory
-#
-# M -> X
-# N	Z	C	I	D	V
-# +	+	-	-	-	-
-# addressing	assembler	opc	bytes	cycles
-# immediate	LDX #oper	A2	2	2
-# zeropage	LDX oper	A6	2	3
-# zeropage,Y	LDX oper,Y	B6	2	4
-# absolute	LDX oper	AE	3	4
-# absolute,Y	LDX oper,Y	BE	3	4*
-LDX_IMMEDIATE_0xA2: Literal[162] = 0xA2
-LDX_ZEROPAGE_0xA6: Literal[166] = 0xA6
-LDX_ZEROPAGE_Y_0xB6: Literal[182] = 0xB6
-LDX_ABSOLUTE_0xAE: Literal[174] = 0xAE
-LDX_ABSOLUTE_Y_0xBE: Literal[190] = 0xBE
-
-# https://masswerk.at/6502/6502_instruction_set.html#LDY
-#
-# Load Index Y with Memory
-#
-# M -> Y
-# N	Z	C	I	D	V
-# +	+	-	-	-	-
-# addressing	assembler	opc	bytes	cycles
-# immediate	LDY #oper	A0	2	2
-# zeropage	LDY oper	A4	2	3
-# zeropage,X	LDY oper,X	B4	2	4
-# absolute	LDY oper	AC	3	4
-# absolute,X	LDY oper,X	BC	3	4*
-LDY_IMMEDIATE_0xA0: Literal[160] = 0xA0
-LDY_ZEROPAGE_0xA4: Literal[164] = 0xA4
-LDY_ZEROPAGE_X_0xB4: Literal[180] = 0xB4
-LDY_ABSOLUTE_0xAC: Literal[172] = 0xAC
-LDY_ABSOLUTE_X_0xBC: Literal[188] = 0xBC
 
 # https://masswerk.at/6502/6502_instruction_set.html#LSR
 # Shift One Bit Right (Memory or Accumulator)
@@ -1155,28 +1093,10 @@ class InstructionSet(enum.IntEnum):
     """JSR"""
 
     """LDA"""
-    LDA_IMMEDIATE_0xA9 = LDA_IMMEDIATE_0xA9
-    LDA_ZEROPAGE_0xA5 = LDA_ZEROPAGE_0xA5
-    LDA_ZEROPAGE_X_0xB5 = LDA_ZEROPAGE_X_0xB5
-    LDA_ABSOLUTE_0xAD = LDA_ABSOLUTE_0xAD
-    LDA_ABSOLUTE_X_0xBD = LDA_ABSOLUTE_X_0xBD
-    LDA_ABSOLUTE_Y_0xB9 = LDA_ABSOLUTE_Y_0xB9
-    LDA_INDEXED_INDIRECT_X_0xA1 = LDA_INDEXED_INDIRECT_X_0xA1
-    LDA_INDIRECT_INDEXED_Y_0xB1 = LDA_INDIRECT_INDEXED_Y_0xB1
 
     """LDX"""
-    LDX_IMMEDIATE_0xA2 = LDX_IMMEDIATE_0xA2
-    LDX_ZEROPAGE_0xA6 = LDX_ZEROPAGE_0xA6
-    LDX_ZEROPAGE_Y_0xB6 = LDX_ZEROPAGE_Y_0xB6
-    LDX_ABSOLUTE_0xAE = LDX_ABSOLUTE_0xAE
-    LDX_ABSOLUTE_Y_0xBE = LDX_ABSOLUTE_Y_0xBE
 
     """LDY"""
-    LDY_IMMEDIATE_0xA0 = LDY_IMMEDIATE_0xA0
-    LDY_ZEROPAGE_0xA4 = LDY_ZEROPAGE_0xA4
-    LDY_ZEROPAGE_X_0xB4 = LDY_ZEROPAGE_X_0xB4
-    LDY_ABSOLUTE_0xAC = LDY_ABSOLUTE_0xAC
-    LDY_ABSOLUTE_X_0xBC = LDY_ABSOLUTE_X_0xBC
 
     """LSR"""
     LSR_ACCUMULATOR_0x4A = LSR_ACCUMULATOR_0x4A
@@ -1384,88 +1304,6 @@ class InstructionSet(enum.IntEnum):
 InstructionSet.map = {}
 
 """LDA"""
-lda_immediate_0xa9_can_modify_flags: Byte = Byte()
-lda_immediate_0xa9_can_modify_flags[flags.N] = True
-lda_immediate_0xa9_can_modify_flags[flags.Z] = True
-
-InstructionSet.map[InstructionSet.LDA_IMMEDIATE_0xA9] = {
-    "addressing": "immediate",
-    "assembler": "LDA #{oper}",
-    "opc": InstructionSet.LDA_IMMEDIATE_0xA9,
-    "bytes": "2",
-    "cycles": "2",
-    "flags": lda_immediate_0xa9_can_modify_flags,
-}
-
-lda_zeropage_0xa5_can_modify_flags: Byte = lda_immediate_0xa9_can_modify_flags
-InstructionSet.map[InstructionSet.LDA_ZEROPAGE_0xA5] = {
-    "addressing": "zeropage",
-    "assembler": "LDA {oper}",
-    "opc": InstructionSet.LDA_ZEROPAGE_0xA5,
-    "bytes": "2",
-    "cycles": "3",
-    "flags": lda_zeropage_0xa5_can_modify_flags,
-}
-
-lda_zeropage_x_0xb5_can_modify_flags: Byte = lda_immediate_0xa9_can_modify_flags
-InstructionSet.map[InstructionSet.LDA_ZEROPAGE_X_0xB5] = {
-    "addressing": "zeropage,X",
-    "assembler": "LDA {oper},X",
-    "opc": InstructionSet.LDA_ZEROPAGE_X_0xB5,
-    "bytes": "2",
-    "cycles": "4",
-    "flags": lda_zeropage_x_0xb5_can_modify_flags,
-}
-
-lda_absolute_0xad_can_modify_flags: Byte = lda_immediate_0xa9_can_modify_flags
-InstructionSet.map[InstructionSet.LDA_ABSOLUTE_0xAD] = {
-    "addressing": "absolute",
-    "assembler": "LDA {oper}",
-    "opc": InstructionSet.LDA_ABSOLUTE_0xAD,
-    "bytes": "3",
-    "cycles": "4",
-    "flags": lda_absolute_0xad_can_modify_flags,
-}
-
-lda_absolute_x_0xbd_can_modify_flags: Byte = lda_immediate_0xa9_can_modify_flags
-InstructionSet.map[InstructionSet.LDA_ABSOLUTE_X_0xBD] = {
-    "addressing": "absolute,X",
-    "assembler": "LDA {oper},X",
-    "opc": InstructionSet.LDA_ABSOLUTE_X_0xBD,
-    "bytes": "3",
-    "cycles": "4*",
-    "flags": lda_absolute_x_0xbd_can_modify_flags,
-}
-
-lda_absolute_y_0xb9_can_modify_flags: Byte = lda_immediate_0xa9_can_modify_flags
-InstructionSet.map[InstructionSet.LDA_ABSOLUTE_Y_0xB9] = {
-    "addressing": "absolute,Y",
-    "assembler": "LDA {oper},Y",
-    "opc": InstructionSet.LDA_ABSOLUTE_Y_0xB9,
-    "bytes": "3",
-    "cycles": "4*",
-    "flags": lda_absolute_y_0xb9_can_modify_flags,
-}
-
-lda_indexed_indirect_x_0xa1_can_modify_flags: Byte = lda_immediate_0xa9_can_modify_flags
-InstructionSet.map[InstructionSet.LDA_INDEXED_INDIRECT_X_0xA1] = {
-    "addressing": "(indirect, X)",
-    "assembler": "LDA ({oper},X)",
-    "opc": InstructionSet.LDA_INDEXED_INDIRECT_X_0xA1,
-    "bytes": "2",
-    "cycles": "6",
-    "flags": lda_indexed_indirect_x_0xa1_can_modify_flags,
-}
-
-lda_indirect_indexed_y_0xb1_can_modify_flags: Byte = lda_immediate_0xa9_can_modify_flags
-InstructionSet.map[InstructionSet.LDA_INDIRECT_INDEXED_Y_0xB1] = {
-    "addressing": "({indirect}),Y",
-    "assembler": "LDA (oper),Y",
-    "opc": LDA_INDIRECT_INDEXED_Y_0xB1,
-    "bytes": "2",
-    "cycles": "5*",
-    "flags": lda_indirect_indexed_y_0xb1_can_modify_flags,
-}
 
 """JSR"""
 
