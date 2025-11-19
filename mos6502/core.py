@@ -1088,7 +1088,28 @@ class MOS6502CPU(flags.ProcessorStatusFlagsInterface):
 
                     self.log.info("i")
 
-                # BPL
+                # ''' Execute BPL '''
+                case instructions.BPL_RELATIVE_0x10:
+                    # Branch on Plus/Positive (N = 0)
+                    offset: int = int(self.fetch_byte())  # Signed byte offset
+
+                    # Convert to signed byte (-128 to +127)
+                    if offset > 127:
+                        offset = offset - 256
+
+                    if self.flags[flags.N] == 0:
+                        # Branch taken
+                        old_pc: int = self.PC
+                        self.PC = (self.PC + offset) & 0xFFFF
+
+                        # Check for page boundary crossing (adds 1 cycle)
+                        if (old_pc & 0xFF00) != (self.PC & 0xFF00):
+                            self.spend_cpu_cycles(1)
+
+                        self.spend_cpu_cycles(1)  # Branch taken costs 1 extra cycle
+
+                    self.log.info("i")
+
                 # ''' Execute BRK '''
                 case instructions.BRK_IMPLIED_0x00:
                     # VARIANT: 6502 - D (decimal) flag is NOT cleared by BRK or any interrupt (IRQ, NMI, RESET)
