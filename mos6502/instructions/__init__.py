@@ -2,6 +2,7 @@
 """Instruction set for the mos6502 CPU."""
 
 # Import from individual instruction modules
+from mos6502.instructions.bit import BIT_ZEROPAGE_0x24, BIT_ABSOLUTE_0x2C, register_bit_instructions  # noqa: F401
 from mos6502.instructions.brk import BRK_IMPLIED_0x00, register_brk_instructions  # noqa: F401
 from mos6502.instructions.jmp import JMP_ABSOLUTE_0x4C, JMP_INDIRECT_0x6C, register_jmp_instructions  # noqa: F401
 from mos6502.instructions.jsr import JSR_ABSOLUTE_0x20, register_jsr_instructions  # noqa: F401
@@ -12,6 +13,8 @@ from mos6502.instructions.rts import RTS_IMPLIED_0x60, register_rts_instructions
 # Import from instruction family modules
 from mos6502.instructions.arithmetic import register_all_arithmetic_instructions  # noqa: F401
 from mos6502.instructions.arithmetic import *  # noqa: F401, F403
+from mos6502.instructions.branch import register_all_branch_instructions  # noqa: F401
+from mos6502.instructions.branch import *  # noqa: F401, F403
 from mos6502.instructions.compare import register_all_compare_instructions  # noqa: F401
 from mos6502.instructions.compare import *  # noqa: F401, F403
 from mos6502.instructions.flags import register_all_flag_instructions  # noqa: F401
@@ -231,6 +234,7 @@ __all__ = [
 ]
 
 # Register instruction modules
+register_bit_instructions(InstructionSet, InstructionSet.map)
 register_brk_instructions(InstructionSet, InstructionSet.map)
 register_jmp_instructions(InstructionSet, InstructionSet.map)
 register_jsr_instructions(InstructionSet, InstructionSet.map)
@@ -238,6 +242,7 @@ register_nop_instructions(InstructionSet, InstructionSet.map)
 register_rti_instructions(InstructionSet, InstructionSet.map)
 register_rts_instructions(InstructionSet, InstructionSet.map)
 register_all_arithmetic_instructions(InstructionSet, InstructionSet.map)
+register_all_branch_instructions(InstructionSet, InstructionSet.map)
 register_all_compare_instructions(InstructionSet, InstructionSet.map)
 register_all_flag_instructions(InstructionSet, InstructionSet.map)
 register_all_load_instructions(InstructionSet, InstructionSet.map)
