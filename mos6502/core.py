@@ -999,6 +999,26 @@ class MOS6502CPU(flags.ProcessorStatusFlagsInterface):
                     self.log.info("i")
 
                 # ''' Execute BCS '''
+                case instructions.BCS_RELATIVE_0xB0:
+                    # Branch on Carry Set (C = 1)
+                    offset: int = int(self.fetch_byte())  # Signed byte offset
+
+                    # Convert to signed byte (-128 to +127)
+                    if offset > 127:
+                        offset = offset - 256
+
+                    if self.flags[flags.C] == 1:
+                        # Branch taken
+                        old_pc: int = self.PC
+                        self.PC = (self.PC + offset) & 0xFFFF
+
+                        # Check for page boundary crossing (adds 1 cycle)
+                        if (old_pc & 0xFF00) != (self.PC & 0xFF00):
+                            self.spend_cpu_cycles(1)
+
+                        self.spend_cpu_cycles(1)  # Branch taken costs 1 extra cycle
+
+                    self.log.info("i")
 
                 # ''' Excecute BEQ '''
 
