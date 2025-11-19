@@ -1276,7 +1276,19 @@ class MOS6502CPU(flags.ProcessorStatusFlagsInterface):
                     self.log.info("i")
                     self.spend_cpu_cycles(1)
 
-                # CMP
+                # ''' Execute CMP '''
+                case instructions.CMP_IMMEDIATE_0xC9:
+                    # Compare Accumulator with Memory (A - M)
+                    value: int = int(self.fetch_byte())
+                    result: int = (self.A - value) & 0xFF
+
+                    # Set flags based on comparison
+                    self.flags[flags.Z] = 1 if result == 0 else 0
+                    self.flags[flags.N] = 1 if (result & 0x80) else 0
+                    self.flags[flags.C] = 1 if self.A >= value else 0  # C=1 if A >= M (no borrow)
+
+                    self.log.info("i")
+
                 # CPX
                 # CPY
                 # DEC

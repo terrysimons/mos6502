@@ -1,0 +1,105 @@
+#!/usr/bin/env python3
+import contextlib
+import logging
+
+import mos6502
+from mos6502 import exceptions, flags, instructions
+
+log = logging.getLogger("mos6502")
+log.setLevel(logging.DEBUG)
+
+
+def test_cpu_instruction_CMP_IMMEDIATE_0xC9_equal() -> None:  # noqa: N802
+    """Test CMP when A == M (sets Z=1, C=1, N=0)."""
+    # given:
+    cpu: mos6502.CPU = mos6502.CPU()
+    cpu.reset()
+
+    cpu.A = 0x42
+
+    # CMP #$42
+    cpu.ram[0xFFFC] = instructions.CMP_IMMEDIATE_0xC9
+    cpu.ram[0xFFFD] = 0x42
+
+    # when:
+    with contextlib.suppress(exceptions.CPUCycleExhaustionError):
+        cpu.execute(cycles=2)
+
+    # then:
+    assert cpu.A == 0x42  # A unchanged
+    assert cpu.flags[flags.Z] == 1  # Equal
+    assert cpu.flags[flags.C] == 1  # A >= M (no borrow)
+    assert cpu.flags[flags.N] == 0  # Result is 0
+    assert cpu.cycles_executed == 2
+
+
+def test_cpu_instruction_CMP_IMMEDIATE_0xC9_greater() -> None:  # noqa: N802
+    """Test CMP when A > M (sets Z=0, C=1, N varies)."""
+    # given:
+    cpu: mos6502.CPU = mos6502.CPU()
+    cpu.reset()
+
+    cpu.A = 0x50
+
+    # CMP #$30
+    cpu.ram[0xFFFC] = instructions.CMP_IMMEDIATE_0xC9
+    cpu.ram[0xFFFD] = 0x30
+
+    # when:
+    with contextlib.suppress(exceptions.CPUCycleExhaustionError):
+        cpu.execute(cycles=2)
+
+    # then:
+    assert cpu.A == 0x50  # A unchanged
+    assert cpu.flags[flags.Z] == 0  # Not equal
+    assert cpu.flags[flags.C] == 1  # A >= M (no borrow)
+    assert cpu.flags[flags.N] == 0  # Result = 0x20 (positive)
+    assert cpu.cycles_executed == 2
+
+
+def test_cpu_instruction_CMP_IMMEDIATE_0xC9_less() -> None:  # noqa: N802
+    """Test CMP when A < M (sets Z=0, C=0, N=1)."""
+    # given:
+    cpu: mos6502.CPU = mos6502.CPU()
+    cpu.reset()
+
+    cpu.A = 0x30
+
+    # CMP #$50
+    cpu.ram[0xFFFC] = instructions.CMP_IMMEDIATE_0xC9
+    cpu.ram[0xFFFD] = 0x50
+
+    # when:
+    with contextlib.suppress(exceptions.CPUCycleExhaustionError):
+        cpu.execute(cycles=2)
+
+    # then:
+    assert cpu.A == 0x30  # A unchanged
+    assert cpu.flags[flags.Z] == 0  # Not equal
+    assert cpu.flags[flags.C] == 0  # A < M (borrow needed)
+    assert cpu.flags[flags.N] == 1  # Result = 0xE0 (negative, bit 7 set)
+    assert cpu.cycles_executed == 2
+
+
+def test_cpu_instruction_CMP_IMMEDIATE_0xC9_zero() -> None:  # noqa: N802
+    """Test CMP when A = 0 and M = 0."""
+    # given:
+    cpu: mos6502.CPU = mos6502.CPU()
+    cpu.reset()
+
+    cpu.A = 0x00
+
+    # CMP #$00
+    cpu.ram[0xFFFC] = instructions.CMP_IMMEDIATE_0xC9
+    cpu.ram[0xFFFD] = 0x00
+
+    # when:
+    with contextlib.suppress(exceptions.CPUCycleExhaustionError):
+        cpu.execute(cycles=2)
+
+    # then:
+    assert cpu.A == 0x00
+    assert cpu.flags[flags.Z] == 1  # Equal
+    assert cpu.flags[flags.C] == 1  # A >= M
+    assert cpu.flags[flags.N] == 0  # Result = 0
+    assert cpu.cycles_executed == 2
