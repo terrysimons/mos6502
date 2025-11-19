@@ -1507,7 +1507,63 @@ class MOS6502CPU(flags.ProcessorStatusFlagsInterface):
                     self.log.info("i")
                     self.spend_cpu_cycles(1)
 
-                # EOR
+                # ''' Execute EOR '''
+                case instructions.EOR_IMMEDIATE_0x49:
+                    # Bitwise Exclusive OR with Accumulator
+                    value: int = int(self.fetch_byte())
+                    self.A = self.A ^ value
+                    self.set_load_status_flags(register_name="A")
+                    self.log.info("i")
+
+                case instructions.EOR_ZEROPAGE_0x45:
+                    address: int = self.fetch_zeropage_mode_address(offset_register_name=None)
+                    value: int = int(self.read_byte(address=address))
+                    self.A = self.A ^ value
+                    self.set_load_status_flags(register_name="A")
+                    self.log.info("i")
+
+                case instructions.EOR_ZEROPAGE_X_0x55:
+                    address: int = self.fetch_zeropage_mode_address(offset_register_name="X")
+                    value: int = int(self.read_byte(address=address))
+                    self.A = self.A ^ value
+                    self.set_load_status_flags(register_name="A")
+                    self.log.info("i")
+
+                case instructions.EOR_ABSOLUTE_0x4D:
+                    address: int = self.fetch_absolute_mode_address(offset_register_name=None)
+                    value: int = int(self.read_byte(address=address))
+                    self.A = self.A ^ value
+                    self.set_load_status_flags(register_name="A")
+                    self.log.info("i")
+
+                case instructions.EOR_ABSOLUTE_X_0x5D:
+                    address: int = self.fetch_absolute_mode_address(offset_register_name="X")
+                    value: int = int(self.read_byte(address=address))
+                    self.A = self.A ^ value
+                    self.set_load_status_flags(register_name="A")
+                    self.log.info("i")
+
+                case instructions.EOR_ABSOLUTE_Y_0x59:
+                    address: int = self.fetch_absolute_mode_address(offset_register_name="Y")
+                    value: int = int(self.read_byte(address=address))
+                    self.A = self.A ^ value
+                    self.set_load_status_flags(register_name="A")
+                    self.log.info("i")
+
+                case instructions.EOR_INDEXED_INDIRECT_X_0x41:
+                    address: int = self.fetch_indexed_indirect_mode_address()
+                    value: int = int(self.read_byte(address=address))
+                    self.A = self.A ^ value
+                    self.set_load_status_flags(register_name="A")
+                    self.log.info("i")
+
+                case instructions.EOR_INDIRECT_INDEXED_Y_0x51:
+                    address: int = self.fetch_indirect_indexed_mode_address()
+                    value: int = int(self.read_byte(address=address))
+                    self.A = self.A ^ value
+                    self.set_load_status_flags(register_name="A")
+                    self.log.info("i")
+
                 # INC
 
                 # INX
