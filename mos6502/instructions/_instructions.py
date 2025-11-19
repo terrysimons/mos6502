@@ -36,30 +36,6 @@ from mos6502.memory import Byte
 # to the mneomonic for forced zeropage addressing.
 
 
-# https://www.masswerk.at/6502/6502_instruction_set.html#AND
-#
-# AND Memory with Accumulator
-#
-# A AND M -> A
-# N	Z	C	I	D	V
-# +	+	-	-	-	-
-# addressing	assembler	opc	bytes	cycles
-# immediate	AND #oper	29	2	2
-# zeropage	AND oper	25	2	3
-# zeropage,X	AND oper,X	35	2	4
-# absolute	AND oper	2D	3	4
-# absolute,X	AND oper,X	3D	3	4*
-# absolute,Y	AND oper,Y	39	3	4*
-# (indirect,X)	AND (oper,X)	21	2	6
-# (indirect),Y	AND (oper),Y	31	2	5*
-AND_IMMEDIATE_0x29: Literal[41] = 0x29
-AND_ZEROPAGE_0x25: Literal[37] = 0x25
-AND_ZEROPAGE_X_0x35: Literal[53] = 0x35
-AND_ABSOLUTE_0x2D: Literal[45] = 0x2D
-AND_ABSOLUTE_X_0x3D: Literal[61] = 0x3D
-AND_ABSOLUTE_Y_0x39: Literal[57] = 0x39
-AND_INDEXED_INDIRECT_X_0x21: Literal[33] = 0x21
-AND_INDIRECT_INDEXED_Y_0x31: Literal[49] = 0x31
 
 
 # https://masswerk.at/6502/6502_instruction_set.html#ASL
@@ -237,29 +213,6 @@ CPY_ZEROPAGE_0xC4: Literal[196] = 0xC4
 CPY_ABSOLUTE_0xCC: Literal[204] = 0xCC
 
 
-# https://masswerk.at/6502/6502_instruction_set.html#EOR
-# Exclusive-OR Memory with Accumulator
-#
-# A EOR M -> A
-# N	Z	C	I	D	V
-# +	+	-	-	-	-
-# addressing	assembler	opc	bytes	cycles
-# immediate	EOR #oper	49	2	2
-# zeropage	EOR oper	45	2	3
-# zeropage,X	EOR oper,X	55	2	4
-# absolute	EOR oper	4D	3	4
-# absolute,X	EOR oper,X	5D	3	4*
-# absolute,Y	EOR oper,Y	59	3	4*
-# (indirect,X)	EOR (oper,X)	41	2	6
-# (indirect),Y	EOR (oper),Y	51	2	5*
-EOR_IMMEDIATE_0x49: Literal[73] = 0X49
-EOR_ZEROPAGE_0x45: Literal[69] = 0X45
-EOR_ZEROPAGE_X_0x55: Literal[85] = 0x55
-EOR_ABSOLUTE_0x4D: Literal[77] = 0x4D
-EOR_ABSOLUTE_X_0x5D: Literal[93] = 0x5D
-EOR_ABSOLUTE_Y_0x59: Literal[89] = 0x59
-EOR_INDEXED_INDIRECT_X_0x41: Literal[65] = 0x41
-EOR_INDIRECT_INDEXED_Y_0x51: Literal[81] = 0x51
 
 
 
@@ -285,29 +238,6 @@ LSR_ABSOLUTE_0x4E: Literal[78] = 0x4E
 LSR_ABSOLUTE_X_0x5E: Literal[94] = 0x5E
 
 
-# https://masswerk.at/6502/6502_instruction_set.html#ORA
-# OR Memory with Accumulator
-#
-# A OR M -> A
-# N	Z	C	I	D	V
-# +	+	-	-	-	-
-# addressing	assembler	opc	bytes	cycles
-# immediate	ORA #oper	09	2	2
-# zeropage	ORA oper	05	2	3
-# zeropage,X	ORA oper,X	15	2	4
-# absolute	ORA oper	0D	3	4
-# absolute,X	ORA oper,X	1D	3	4*
-# absolute,Y	ORA oper,Y	19	3	4*
-# (indirect,X)	ORA (oper,X)	01	2	6
-# (indirect),Y	ORA (oper),Y	11	2	5*
-ORA_IMMEDIATE_0x09: Literal[9] = 0x09
-ORA_ZEROPAGE_0x05: Literal[5] = 0x05
-ORA_ZEROPAGE_X_0x15: Literal[21] = 0x15
-ORA_ABSOLUTE_0x0D: Literal[13] = 0x0D
-ORA_ABSOLUTE_X_0x1D: Literal[29] = 0x1D
-ORA_ABSOLUTE_Y_0x19: Literal[25] = 0x19
-ORA_INDEXED_INDIRECT_X_0x01: Literal[1] = 0x01
-ORA_INDIRECT_INDEXED_Y_0x11: Literal[17] = 0x11
 
 # https://masswerk.at/6502/6502_instruction_set.html#ROL
 # Rotate One Bit Left (Memory or Accumulator)
@@ -805,14 +735,6 @@ class InstructionSet(enum.IntEnum):
     """ADC"""
 
     """AND"""
-    AND_IMMEDIATE_0x29 = AND_IMMEDIATE_0x29
-    AND_ZEROPAGE_0x25 = AND_ZEROPAGE_0x25
-    AND_ZEROPAGE_X_0x35 = AND_ZEROPAGE_X_0x35
-    AND_ABSOLUTE_0x2D = AND_ABSOLUTE_0x2D
-    AND_ABSOLUTE_X_0x3D = AND_ABSOLUTE_X_0x3D
-    AND_ABSOLUTE_Y_0x39 = AND_ABSOLUTE_Y_0x39
-    AND_INDEXED_INDIRECT_X_0x21 = AND_INDEXED_INDIRECT_X_0x21
-    AND_INDIRECT_INDEXED_Y_0x31 = AND_INDIRECT_INDEXED_Y_0x31
 
     """ASL"""
     ASL_ACCUMULATOR_0x0A = ASL_ACCUMULATOR_0x0A
@@ -876,14 +798,6 @@ class InstructionSet(enum.IntEnum):
     """DEY"""
 
     """EOR"""
-    EOR_IMMEDIATE_0x49 = EOR_IMMEDIATE_0x49
-    EOR_ZEROPAGE_0x45 = EOR_ZEROPAGE_0x45
-    EOR_ZEROPAGE_X_0x55 = EOR_ZEROPAGE_X_0x55
-    EOR_ABSOLUTE_0x4D = EOR_ABSOLUTE_0x4D
-    EOR_ABSOLUTE_X_0x5D = EOR_ABSOLUTE_X_0x5D
-    EOR_ABSOLUTE_Y_0x59 = EOR_ABSOLUTE_Y_0x59
-    EOR_INDEXED_INDIRECT_X_0x41 = EOR_INDEXED_INDIRECT_X_0x41
-    EOR_INDIRECT_INDEXED_Y_0x51 = EOR_INDIRECT_INDEXED_Y_0x51
 
     """INC"""
 
@@ -909,14 +823,6 @@ class InstructionSet(enum.IntEnum):
     LSR_ABSOLUTE_X_0x5E = LSR_ABSOLUTE_X_0x5E
 
     """ORA"""
-    ORA_IMMEDIATE_0x09 = ORA_IMMEDIATE_0x09
-    ORA_ZEROPAGE_0x05 = ORA_ZEROPAGE_0x05
-    ORA_ZEROPAGE_X_0x15 = ORA_ZEROPAGE_X_0x15
-    ORA_ABSOLUTE_0x0D = ORA_ABSOLUTE_0x0D
-    ORA_ABSOLUTE_X_0x1D = ORA_ABSOLUTE_X_0x1D
-    ORA_ABSOLUTE_Y_0x19 = ORA_ABSOLUTE_Y_0x19
-    ORA_INDEXED_INDIRECT_X_0x01 = ORA_INDEXED_INDIRECT_X_0x01
-    ORA_INDIRECT_INDEXED_Y_0x11 = ORA_INDIRECT_INDEXED_Y_0x11
 
     """PHA"""
 
