@@ -35,30 +35,6 @@ from mos6502.memory import Byte
 # Some assemblers employ "OPC *oper" or a ".b" extension
 # to the mneomonic for forced zeropage addressing.
 
-# https://www.masswerk.at/6502/6502_instruction_set.html#ADC
-#
-# Add Memory to Accumulator with Carry
-#
-# A + M + C -> A, C
-# N	Z	C	I	D	V
-# +	+	+	-	-	+
-# addressing	assembler	opc	bytes	cycles
-# immediate	ADC #oper	69	2	2
-# zeropage	ADC oper	65	2	3
-# zeropage,X	ADC oper,X	75	2	4
-# absolute	ADC oper	6D	3	4
-# absolute,X	ADC oper,X	7D	3	4*
-# absolute,Y	ADC oper,Y	79	3	4*
-# (indirect,X)	ADC (oper,X)	61	2	6
-# (indirect),Y	ADC (oper),Y	71	2	5*
-ADC_IMMEDIATE_0x69: Literal[105] = 0x69
-ADC_ZEROPAGE_0x65: Literal[101] = 0x65
-ADC_ZEROPAGE_X_0x75: Literal[117] = 0x75
-ADC_ABSOLUTE_0x6D: Literal[109] = 0x6D
-ADC_ABSOLUTE_X_0x7D: Literal[125] = 0x7D
-ADC_ABSOLUTE_Y_0x79: Literal[121] = 0x79
-ADC_INDEXED_INDIRECT_X_0x61: Literal[97] = 0x61
-ADC_INDIRECT_INDEXED_Y_0x71: Literal[113] = 0x71
 
 # https://www.masswerk.at/6502/6502_instruction_set.html#AND
 #
@@ -260,41 +236,6 @@ CPY_IMMEDIATE_0xC0: Literal[192] = 0xC0
 CPY_ZEROPAGE_0xC4: Literal[196] = 0xC4
 CPY_ABSOLUTE_0xCC: Literal[204] = 0xCC
 
-# https://masswerk.at/6502/6502_instruction_set.html#DEC
-# Decrement Memory by One
-#
-# M - 1 -> M
-# N	Z	C	I	D	V
-# +	+	-	-	-	-
-# addressing	assembler	opc	bytes	cycles
-# zeropage	DEC oper	C6	2	5
-# zeropage,X	DEC oper,X	D6	2	6
-# absolute	DEC oper	CE	3	6
-# absolute,X	DEC oper,X	DE	3	7
-DEC_ZEROPAGE_0xC6: Literal[198] = 0xC6
-DEC_ZEROPAGE_X_0xD6: Literal[214] = 0xD6
-DEC_ABSOLUTE_0xCE: Literal[206] = 0xCE
-DEC_ABSOLUTE_X_0xDE: Literal[222] = 0xDE
-
-# https://masswerk.at/6502/6502_instruction_set.html#DEX
-# Decrement Index X by One
-#
-# X - 1 -> X
-# N	Z	C	I	D	V
-# +	+	-	-	-	-
-# addressing	assembler	opc	bytes	cycles
-# implied	DEX	CA	1	2
-DEX_IMPLIED_0xCA: Literal[202] = 0xCA
-
-# https://masswerk.at/6502/6502_instruction_set.html#DEY
-# Decrement Index Y by One
-#
-# Y - 1 -> Y
-# N	Z	C	I	D	V
-# +	+	-	-	-	-
-# addressing	assembler	opc	bytes	cycles
-# implied	DEY	88	1	2
-DEY_IMPLIED_0x88: Literal[136] = 0x88
 
 # https://masswerk.at/6502/6502_instruction_set.html#EOR
 # Exclusive-OR Memory with Accumulator
@@ -320,42 +261,6 @@ EOR_ABSOLUTE_Y_0x59: Literal[89] = 0x59
 EOR_INDEXED_INDIRECT_X_0x41: Literal[65] = 0x41
 EOR_INDIRECT_INDEXED_Y_0x51: Literal[81] = 0x51
 
-# https://masswerk.at/6502/6502_instruction_set.html#INC
-# Increment Memory by One
-#
-# M + 1 -> M
-# N	Z	C	I	D	V
-# +	+	-	-	-	-
-# addressing	assembler	opc	bytes	cycles
-# zeropage	INC oper	E6	2	5
-# zeropage,X	INC oper,X	F6	2	6
-# absolute	INC oper	EE	3	6
-# absolute,X	INC oper,X	FE	3	7
-INC_ZEROPAGE_0xE6: Literal[246] = 0xF6
-INC_ZEROPAGE_X_0xF6: Literal[246] = 0xF6
-INC_ABSOLUTE_0xEE: Literal[238] = 0xEE
-INC_ABSOLUTE_X_0xFE: Literal[254] = 0xFE
-
-# https://masswerk.at/6502/6502_instruction_set.html#INX
-# Increment Index X by One
-#
-# X + 1 -> X
-# N	Z	C	I	D	V
-# +	+	-	-	-	-
-# addressing	assembler	opc	bytes	cycles
-# implied	INX	E8	1	2
-INX_IMPLIED_0xE8: Literal[232] = 0xE8
-
-
-# https://masswerk.at/6502/6502_instruction_set.html#INY
-# Increment Index Y by One
-#
-# Y + 1 -> Y
-# N	Z	C	I	D	V
-# +	+	-	-	-	-
-# addressing	assembler	opc	bytes	cycles
-# implied	INY	C8	1	2
-INY_IMPLIED_0xC8: Literal[200] = 0xC8
 
 
 
@@ -440,29 +345,6 @@ ROR_ABSOLUTE_0x6E: Literal[110] = 0x6E
 ROR_ABSOLUTE_X_0x7E: Literal[126] = 0x7E
 
 
-# https://masswerk.at/6502/6502_instruction_set.html#SBC
-# Subtract Memory from Accumulator with Borrow
-#
-# A - M - C -> A
-# N	Z	C	I	D	V
-# +	+	+	-	-	+
-# addressing	assembler	opc	bytes	cycles
-# immediate	SBC #oper	E9	2	2
-# zeropage	SBC oper	E5	2	3
-# zeropage,X	SBC oper,X	F5	2	4
-# absolute	SBC oper	ED	3	4
-# absolute,X	SBC oper,X	FD	3	4*
-# absolute,Y	SBC oper,Y	F9	3	4*
-# (indirect,X)	SBC (oper,X)	E1	2	6
-# (indirect),Y	SBC (oper),Y	F1	2	5*
-SBC_IMMEDIATE_0xE9: Literal[233] = 0xE9
-SBC_ZEROPAGE_0xE5: Literal[229] = 0xE5
-SBC_ZEROPAGE_X_0xF5: Literal[245] = 0xF5
-SBC_ABSOLUTE_0xED: Literal[237] = 0xED
-SBC_ABSOLUTE_X_0xFD: Literal[253] = 0xFD
-SBC_ABSOLUTE_Y_0xF9: Literal[249] = 0xF9
-SBC_INDEXED_INDIRECT_X_0xE1: Literal[225] = 0xE1
-SBC_INDIRECT_INDEXED_Y_0xF1: Literal[241] = 0xF1
 
 # https://masswerk.at/6502/6502_instruction_set.html#SEC
 # Set Carry Flag
@@ -921,14 +803,6 @@ class InstructionSet(enum.IntEnum):
     """Instruction set for the mos6502 CPU."""
 
     """ADC"""
-    ADC_IMMEDIATE_0x69 = ADC_IMMEDIATE_0x69
-    ADC_ZEROPAGE_0x65 = ADC_ZEROPAGE_0x65
-    ADC_ZEROPAGE_X_0x75 = ADC_ZEROPAGE_X_0x75
-    ADC_ABSOLUTE_0x6D = ADC_ABSOLUTE_0x6D
-    ADC_ABSOLUTE_X_0x7D = ADC_ABSOLUTE_X_0x7D
-    ADC_ABSOLUTE_Y_0x79 = ADC_ABSOLUTE_Y_0x79
-    ADC_INDEXED_INDIRECT_X_0x61 = ADC_INDEXED_INDIRECT_X_0x61
-    ADC_INDIRECT_INDEXED_Y_0x71 = ADC_INDIRECT_INDEXED_Y_0x71
 
     """AND"""
     AND_IMMEDIATE_0x29 = AND_IMMEDIATE_0x29
@@ -996,16 +870,10 @@ class InstructionSet(enum.IntEnum):
     CPY_ABSOLUTE_0xCC = CPY_ABSOLUTE_0xCC
 
     """DEC"""
-    DEC_ZEROPAGE_0xC6 = DEC_ZEROPAGE_0xC6
-    DEC_ZEROPAGE_X_0xD6 = DEC_ZEROPAGE_X_0xD6
-    DEC_ABSOLUTE_0xCE = DEC_ABSOLUTE_0xCE
-    DEC_ABSOLUTE_X_0xDE = DEC_ABSOLUTE_X_0xDE
 
     """DEX"""
-    DEX_IMPLIED_0xCA = DEX_IMPLIED_0xCA
 
     """DEY"""
-    DEY_IMPLIED_0x88 = DEY_IMPLIED_0x88
 
     """EOR"""
     EOR_IMMEDIATE_0x49 = EOR_IMMEDIATE_0x49
@@ -1018,16 +886,10 @@ class InstructionSet(enum.IntEnum):
     EOR_INDIRECT_INDEXED_Y_0x51 = EOR_INDIRECT_INDEXED_Y_0x51
 
     """INC"""
-    INC_ZEROPAGE_0xE6 = INC_ZEROPAGE_0xE6
-    INC_ZEROPAGE_X_0xF6 = INC_ZEROPAGE_X_0xF6
-    INC_ABSOLUTE_0xEE = INC_ABSOLUTE_0xEE
-    INC_ABSOLUTE_X_0xFE = INC_ABSOLUTE_X_0xFE
 
     """INX"""
-    INX_IMPLIED_0xE8 = INX_IMPLIED_0xE8
 
     """INY"""
-    INY_IMPLIED_0xC8 = INY_IMPLIED_0xC8
 
     """JMP"""
 
@@ -1083,14 +945,6 @@ class InstructionSet(enum.IntEnum):
     """RTS"""
 
     """SBC"""
-    SBC_IMMEDIATE_0xE9 = SBC_IMMEDIATE_0xE9
-    SBC_ZEROPAGE_0xE5 = SBC_ZEROPAGE_0xE5
-    SBC_ZEROPAGE_X_0xF5 = SBC_ZEROPAGE_X_0xF5
-    SBC_ABSOLUTE_0xED = SBC_ABSOLUTE_0xED
-    SBC_ABSOLUTE_X_0xFD = SBC_ABSOLUTE_X_0xFD
-    SBC_ABSOLUTE_Y_0xF9 = SBC_ABSOLUTE_Y_0xF9
-    SBC_INDEXED_INDIRECT_X_0xE1 = SBC_INDEXED_INDIRECT_X_0xE1
-    SBC_INDIRECT_INDEXED_Y_0xF1 = SBC_INDIRECT_INDEXED_Y_0xF1
 
     """SEC"""
     SEC_IMPLIED_0x38 = 0x38
