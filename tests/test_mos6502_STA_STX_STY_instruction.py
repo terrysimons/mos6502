@@ -207,7 +207,7 @@ def test_cpu_instruction_STA_INDEXED_INDIRECT_X_0x81() -> None:  # noqa: N802
         offset=0x8000,
         register_name="A",
         expected_flags=expected_flags,
-        expected_cycles=22,
+        expected_cycles=6,
         offset_value=0x04,
     )
 
