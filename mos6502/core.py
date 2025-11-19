@@ -1367,6 +1367,19 @@ class MOS6502CPU(flags.ProcessorStatusFlagsInterface):
                 # ROL
                 # ROR
                 # RTI
+                case instructions.RTI_IMPLIED_0x40:
+                    # Pull status register from stack
+                    self.S += 1
+                    self._flags = Byte(self.read_byte(address=self.S))
+
+                    # Pull PC from stack
+                    self.S += 1
+                    self.PC = self.read_word(address=self.S)
+                    self.S += 1
+
+                    self.log.info("i")
+                    self.spend_cpu_cycles(4)
+
                 # '''RTS'''
                 case instructions.RTS_IMPLIED_0x60:
                     self.log.info("i")
