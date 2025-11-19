@@ -1068,6 +1068,47 @@ class MOS6502CPU(flags.ProcessorStatusFlagsInterface):
                     self.log.info("i")
                     self.spend_cpu_cycles(1)
 
+                # TAX
+                case instructions.TAX_IMPLIED_0xAA:
+                    self.X = self.A
+                    self.set_load_status_flags(register_name="X")
+                    self.log.info("i")
+                    self.spend_cpu_cycles(1)
+
+                # TAY
+                case instructions.TAY_IMPLIED_0xA8:
+                    self.Y = self.A
+                    self.set_load_status_flags(register_name="Y")
+                    self.log.info("i")
+                    self.spend_cpu_cycles(1)
+
+                # TSX
+                case instructions.TSX_IMPLIED_0xBA:
+                    self.X = self.S & 0xFF
+                    self.set_load_status_flags(register_name="X")
+                    self.log.info("i")
+                    self.spend_cpu_cycles(1)
+
+                # TXA
+                case instructions.TXA_IMPLIED_0x8A:
+                    self.A = self.X
+                    self.set_load_status_flags(register_name="A")
+                    self.log.info("i")
+                    self.spend_cpu_cycles(1)
+
+                # TXS
+                case instructions.TXS_IMPLIED_0x9A:
+                    self.S = 0x100 | self.X
+                    self.log.info("i")
+                    self.spend_cpu_cycles(1)
+
+                # TYA
+                case instructions.TYA_IMPLIED_0x98:
+                    self.A = self.Y
+                    self.set_load_status_flags(register_name="A")
+                    self.log.info("i")
+                    self.spend_cpu_cycles(1)
+
                 # CMP
                 # CPX
                 # CPY

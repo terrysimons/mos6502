@@ -20,3 +20,4 @@
 - When you notice that we are implementing 6502 code that is chip-dependent, put # VARIANT: 6502c <a description of how the 6502c is different>
 - Any time you document a variant, make sure that you document *ALL* variants - for instance, be explicit, not implicit... if 6502A is the same as 6502, but 6502C differs - be sure to describe the expected behavior of all 3, every time.
 - pytest.mocking
+- Make sure to use the code style already present in the project.
