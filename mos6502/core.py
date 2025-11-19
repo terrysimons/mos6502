@@ -1044,7 +1044,28 @@ class MOS6502CPU(flags.ProcessorStatusFlagsInterface):
 
                 # ''' Execute BIT '''
 
-                # BMI
+                # ''' Execute BMI '''
+                case instructions.BMI_RELATIVE_0x30:
+                    # Branch on Minus/Negative (N = 1)
+                    offset: int = int(self.fetch_byte())  # Signed byte offset
+
+                    # Convert to signed byte (-128 to +127)
+                    if offset > 127:
+                        offset = offset - 256
+
+                    if self.flags[flags.N] == 1:
+                        # Branch taken
+                        old_pc: int = self.PC
+                        self.PC = (self.PC + offset) & 0xFFFF
+
+                        # Check for page boundary crossing (adds 1 cycle)
+                        if (old_pc & 0xFF00) != (self.PC & 0xFF00):
+                            self.spend_cpu_cycles(1)
+
+                        self.spend_cpu_cycles(1)  # Branch taken costs 1 extra cycle
+
+                    self.log.info("i")
+
                 # BNE
                 # BPL
                 # ''' Execute BRK '''
