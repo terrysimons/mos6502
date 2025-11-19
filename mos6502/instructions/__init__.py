@@ -12,6 +12,8 @@ from mos6502.instructions.rts import RTS_IMPLIED_0x60, register_rts_instructions
 # Import from instruction family modules
 from mos6502.instructions.flags import register_all_flag_instructions  # noqa: F401
 from mos6502.instructions.flags import *  # noqa: F401, F403
+from mos6502.instructions.stack import register_all_stack_instructions  # noqa: F401
+from mos6502.instructions.stack import *  # noqa: F401, F403
 
 # Re-export everything else from _instructions module
 from mos6502.instructions._instructions import *  # noqa: F401, F403
@@ -222,3 +224,4 @@ register_nop_instructions(InstructionSet, InstructionSet.map)
 register_rti_instructions(InstructionSet, InstructionSet.map)
 register_rts_instructions(InstructionSet, InstructionSet.map)
 register_all_flag_instructions(InstructionSet, InstructionSet.map)
+register_all_stack_instructions(InstructionSet, InstructionSet.map)

@@ -466,53 +466,6 @@ ORA_ABSOLUTE_Y_0x19: Literal[25] = 0x19
 ORA_INDEXED_INDIRECT_X_0x01: Literal[1] = 0x01
 ORA_INDIRECT_INDEXED_Y_0x11: Literal[17] = 0x11
 
-# https://masswerk.at/6502/6502_instruction_set.html#PHA
-# Push Accumulator on Stack
-#
-# push A
-# N	Z	C	I	D	V
-# -	-	-	-	-	-
-# addressing	assembler	opc	bytes	cycles
-# implied	PHA	48	1	3
-PHA_IMPLIED_0x48: Literal[72] = 0x48
-
-# https://masswerk.at/6502/6502_instruction_set.html#PHP
-# Push Processor Status on Stack
-#
-# The status register will be pushed with the break
-# flag and bit 5 set to 1.
-#
-# push SR
-# N	Z	C	I	D	V
-# -	-	-	-	-	-
-# addressing	assembler	opc	bytes	cycles
-# implied	PHP	08	1	3
-PHP_IMPLIED_0x08: Literal[8] = 0x08
-
-
-# https://masswerk.at/6502/6502_instruction_set.html#PLA
-# Pull Accumulator from Stack
-#
-# pull A
-# N	Z	C	I	D	V
-# +	+	-	-	-	-
-# addressing	assembler	opc	bytes	cycles
-# implied	PLA	68	1	4
-PLA_IMPLIED_0x68: Literal[104] = 0x68
-
-# https://masswerk.at/6502/6502_instruction_set.html#PLP
-# Pull Processor Status from Stack
-#
-# The status register will be pulled with the break
-# flag and bit 5 ignored.
-#
-# pull SR
-# N	Z	C	I	D	V
-# from stack
-# addressing	assembler	opc	bytes	cycles
-# implied	PLP	28	1	4
-PLP_IMPLIED_0x28: Literal[40] = 0x28
-
 # https://masswerk.at/6502/6502_instruction_set.html#ROL
 # Rotate One Bit Left (Memory or Accumulator)
 #
@@ -1293,16 +1246,12 @@ class InstructionSet(enum.IntEnum):
     ORA_INDIRECT_INDEXED_Y_0x11 = ORA_INDIRECT_INDEXED_Y_0x11
 
     """PHA"""
-    PHA_IMPLIED_0x48 = PHA_IMPLIED_0x48
 
     """PHP"""
-    PHP_IMPLIED_0x08 = PHP_IMPLIED_0x08
 
     """PLA"""
-    PLA_IMPLIED_0x68 = PLA_IMPLIED_0x68
 
     """PLP"""
-    PLP_IMPLIED_0x28 = PLP_IMPLIED_0x28
 
     """ROL"""
     ROL_ACCUMULATOR_0x2A = ROL_ACCUMULATOR_0x2A
