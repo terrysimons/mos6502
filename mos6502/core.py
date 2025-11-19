@@ -1050,6 +1050,24 @@ class MOS6502CPU(flags.ProcessorStatusFlagsInterface):
                     self.log.info("i")
                     self.spend_cpu_cycles(1)
 
+                # SEC
+                case instructions.SEC_IMPLIED_0x38:
+                    self.C = 1
+                    self.log.info("i")
+                    self.spend_cpu_cycles(1)
+
+                # SED
+                case instructions.SED_IMPLIED_0xF8:
+                    self.D = 1
+                    self.log.info("i")
+                    self.spend_cpu_cycles(1)
+
+                # SEI
+                case instructions.SEI_IMPLIED_0x78:
+                    self.I = 1
+                    self.log.info("i")
+                    self.spend_cpu_cycles(1)
+
                 # CMP
                 # CPX
                 # CPY
