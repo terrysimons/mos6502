@@ -208,16 +208,6 @@ BVC_RELATIVE_0x50: Literal[80] = 0x50
 BVS_RELATIVE_0x70: Literal[112] = 0x70
 
 
-# https://masswerk.at/6502/6502_instruction_set.html#CLD
-# Clear Decimal Mode
-#
-# 0 -> D
-# N	Z	C	I	D	V
-# -	-	-	-	0	-
-# addressing	assembler	opc	bytes	cycles
-# implied	CLD	D8	1	2
-CLD_IMPLIED_0xD8: Literal[216] = 0xD8
-
 # https://masswerk.at/6502/6502_instruction_set.html#CLI
 # Clear Interrupt Disable Bit
 #
@@ -1269,9 +1259,6 @@ class InstructionSet(enum.IntEnum):
     """BVS"""
     BVS_RELATIVE_0x70 = BVS_RELATIVE_0x70
 
-    """CLD"""
-    CLD_IMPLIED_0xD8 = CLD_IMPLIED_0xD8
-
     """CLI"""
     CLI_IMPLIED_0x58 = CLI_IMPLIED_0x58
 
@@ -1586,27 +1573,6 @@ class InstructionSet(enum.IntEnum):
 # It would be possible to store the assembly instructions mnemonics as format specifiers
 # as well as generate the machine code using the enumeration and a little bit of hackery
 InstructionSet.map = {}
-
-"""CLD"""
-# https://masswerk.at/6502/6502_instruction_set.html#CLD
-# Clear Decimal Mode
-#
-# 0 -> D
-# N	Z	C	I	D	V
-# -	-	-	-	0	-
-# addressing	assembler	opc	bytes	cycles
-# implied	CLD	D8	1	2
-cld_immediate_0xd8_can_modify_flags: Byte = Byte()
-cld_immediate_0xd8_can_modify_flags[flags.D] = True
-InstructionSet.map[InstructionSet.CLD_IMPLIED_0xD8] = {
-    "addressing": "implied",
-    "assembler": "CLD",
-    "opc": 0xD8,
-    "bytes": "1",
-    "cycles": "2",
-    "flags": cld_immediate_0xd8_can_modify_flags,
-}
-
 
 """CLI"""
 # https://masswerk.at/6502/6502_instruction_set.html#CLI
