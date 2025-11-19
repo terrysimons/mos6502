@@ -596,7 +596,7 @@ class MOS6502CPU(flags.ProcessorStatusFlagsInterface):
         self.set_load_status_flags(register_name=register_name)
 
         self.log.debug(
-            f"{instructions.InstructionSet(instruction).name}: "
+            f"{instructions.InstructionSet(int(instruction)).name}: "
             f"{Byte(value=getattr(self, register_name))}",
         )
 
@@ -635,7 +635,7 @@ class MOS6502CPU(flags.ProcessorStatusFlagsInterface):
 
         self.set_store_status_flags(register_name=register_name)
 
-        self.log.debug(f"{instructions.InstructionSet(instruction).name}: {Byte(value=data)}")
+        self.log.debug(f"{instructions.InstructionSet(int(instruction)).name}: {Byte(value=data)}")
 
     def execute_load_zeropage(self: Self, instruction: instructions.InstructionSet,
                               register_name: str, offset_register_name: str) -> None:
@@ -671,7 +671,7 @@ class MOS6502CPU(flags.ProcessorStatusFlagsInterface):
 
         self.set_load_status_flags(register_name=register_name)
 
-        self.log.debug(f"{instructions.InstructionSet(instruction).name}: {Byte(value=register)}")
+        self.log.debug(f"{instructions.InstructionSet(int(instruction)).name}: {Byte(value=register)}")
 
     def execute_store_absolute(self: Self, instruction: instructions.InstructionSet,
                                register_name: str, offset_register_name: str) -> None:
@@ -698,7 +698,7 @@ class MOS6502CPU(flags.ProcessorStatusFlagsInterface):
         self.write_byte(address=address & 0xFFFF, data=register)
         self.set_store_status_flags(register_name=register_name)
 
-        self.log.debug(f"{instructions.InstructionSet(instruction).name}: {Byte(value=register)}")
+        self.log.debug(f"{instructions.InstructionSet(int(instruction)).name}: {Byte(value=register)}")
 
     def execute_load_absolute(self: Self, instruction: instructions.InstructionSet,
                               register_name: str, offset_register_name: str) -> None:
@@ -733,7 +733,7 @@ class MOS6502CPU(flags.ProcessorStatusFlagsInterface):
         setattr(self, register_name, self.read_byte(address=address))
         self.set_load_status_flags(register_name=register_name)
 
-        self.log.debug(f"{instructions.InstructionSet(instruction).name}: {Byte(value=register)}")
+        self.log.debug(f"{instructions.InstructionSet(int(instruction)).name}: {Byte(value=register)}")
 
     def execute_store_indexed_indirect(self: Self, instruction: instructions.InstructionSet,
                                        register_name: str) -> None:
@@ -766,7 +766,7 @@ class MOS6502CPU(flags.ProcessorStatusFlagsInterface):
         self.set_store_status_flags(register_name=register_name)
 
         self.log.debug(
-            f"{instructions.InstructionSet(instruction).name}: "
+            f"{instructions.InstructionSet(int(instruction)).name}: "
             f"{Byte(value=self.ram[address])}",
         )
 
@@ -801,7 +801,7 @@ class MOS6502CPU(flags.ProcessorStatusFlagsInterface):
         self.set_load_status_flags(register_name=register_name)
 
         self.log.debug(
-            f"{instructions.InstructionSet(instruction).name}: "
+            f"{instructions.InstructionSet(int(instruction)).name}: "
             f"{Byte(value=register)}",
         )
 
@@ -835,7 +835,7 @@ class MOS6502CPU(flags.ProcessorStatusFlagsInterface):
         self.set_store_status_flags(register_name=register_name)
 
         self.log.debug(
-            f"{instructions.InstructionSet(instruction).name}: "
+            f"{instructions.InstructionSet(int(instruction)).name}: "
             f"{Byte(value=self.ram[address & 0xFFFF])}",
         )
 
@@ -870,7 +870,7 @@ class MOS6502CPU(flags.ProcessorStatusFlagsInterface):
 
         register: Byte = getattr(self, register_name)
 
-        self.log.debug(f"{instructions.InstructionSet(instruction).name}: {Byte(value=register)}")
+        self.log.debug(f"{instructions.InstructionSet(int(instruction)).name}: {Byte(value=register)}")
 
     def execute(self: Self, cycles: int = 1) -> int:  # noqa: C901, PLR0915
         """

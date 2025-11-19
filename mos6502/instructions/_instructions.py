@@ -557,56 +557,6 @@ SED_IMPLIED_0xF8: Literal[248] = 0xF8
 # implied	SEI	78	1	2
 SEI_IMPLIED_0x78: Literal[120] = 0x78
 
-# https://masswerk.at/6502/6502_instruction_set.html#STA
-# Store Accumulator in Memory
-#
-# A -> M
-# N	Z	C	I	D	V
-# -	-	-	-	-	-
-# addressing	assembler	opc	bytes	cycles
-# zeropage	STA oper	85	2	3
-# zeropage,X	STA oper,X	95	2	4
-# absolute	STA oper	8D	3	4
-# absolute,X	STA oper,X	9D	3	5
-# absolute,Y	STA oper,Y	99	3	5
-# (indirect,X)	STA (oper,X)	81	2	6
-# (indirect),Y	STA (oper),Y	91	2	6
-STA_ZEROPAGE_0x85: Literal[133] = 0x85
-STA_ZEROPAGE_X_0x95: Literal[149] = 0x95
-STA_ABSOLUTE_0x8D: Literal[141] = 0x8D
-STA_ABSOLUTE_X_0x9D: Literal[157] = 0x9D
-STA_ABSOLUTE_Y_0x99: Literal[153] = 0x99
-STA_INDEXED_INDIRECT_X_0x81: Literal[129] = 0x81
-STA_INDIRECT_INDEXED_Y_0x91: Literal[145] = 0x91
-
-# https://masswerk.at/6502/6502_instruction_set.html#STX
-# Store Index X in Memory
-#
-# X -> M
-# N	Z	C	I	D	V
-# -	-	-	-	-	-
-# addressing	assembler	opc	bytes	cycles
-# zeropage	STX oper	86	2	3
-# zeropage,Y	STX oper,Y	96	2	4
-# absolute	STX oper	8E	3	4
-STX_ZEROPAGE_0x86: Literal[134] = 0x86
-STX_ZEROPAGE_Y_0x96: Literal[150] = 0x96
-STX_ABSOLUTE_0x8E: Literal[142] = 0x8E
-
-# https://masswerk.at/6502/6502_instruction_set.html#STY
-# Sore Index Y in Memory
-#
-# Y -> M
-# N	Z	C	I	D	V
-# -	-	-	-	-	-
-# addressing	assembler	opc	bytes	cycles
-# zeropage	STY oper	84	2	3
-# zeropage,X	STY oper,X	94	2	4
-# absolute	STY oper	8C	3	4
-STY_ZEROPAGE_0x84: Literal[132] = 0x84
-STY_ZEROPAGE_X_0x94: Literal[148] = 0x94
-STY_ABSOLUTE_0x8C: Literal[140] = 0x8C
-
 # https://masswerk.at/6502/6502_instruction_set.html#TAX
 # Transfer Accumulator to Index X
 #
@@ -1291,23 +1241,10 @@ class InstructionSet(enum.IntEnum):
     SEI_IMPLIED_0x78 = SEI_IMPLIED_0x78
 
     """STA"""
-    STA_ZEROPAGE_0x85 = STA_ZEROPAGE_0x85
-    STA_ZEROPAGE_X_0x95 = STA_ZEROPAGE_X_0x95
-    STA_ABSOLUTE_0x8D = STA_ABSOLUTE_0x8D
-    STA_ABSOLUTE_X_0x9D = STA_ABSOLUTE_X_0x9D
-    STA_ABSOLUTE_Y_0x99 = STA_ABSOLUTE_Y_0x99
-    STA_INDEXED_INDIRECT_X_0x81 = STA_INDEXED_INDIRECT_X_0x81
-    STA_INDIRECT_INDEXED_Y_0x91 = STA_INDIRECT_INDEXED_Y_0x91
 
     """STX"""
-    STX_ZEROPAGE_0x86 = STX_ZEROPAGE_0x86
-    STX_ZEROPAGE_Y_0x96 = STX_ZEROPAGE_Y_0x96
-    STX_ABSOLUTE_0x8E = STX_ABSOLUTE_0x8E
 
     """STY"""
-    STY_ZEROPAGE_0x84 = STY_ZEROPAGE_0x84
-    STY_ZEROPAGE_X_0x94 = STY_ZEROPAGE_X_0x94
-    STY_ABSOLUTE_0x8C = STY_ABSOLUTE_0x8C
 
     """TAX"""
     TAX_IMPLIED_0xAA = TAX_IMPLIED_0xAA
@@ -1533,137 +1470,10 @@ InstructionSet.map[InstructionSet.LDA_INDIRECT_INDEXED_Y_0xB1] = {
 """JSR"""
 
 """STA"""
-sta_zeropage_0x85_can_modify_flags: Byte = Byte()
-InstructionSet.map[InstructionSet.STA_ZEROPAGE_0x85] = {
-    "addressing": "zeropage",
-    "assembler": "STA {oper}",
-    "opc": InstructionSet.STA_ZEROPAGE_0x85,
-    "bytes": "2",
-    "cycles": "3",
-    "flags": sta_zeropage_0x85_can_modify_flags,
-}
-
-sta_zeropage_x_0x95_can_modify_flags: Byte = sta_zeropage_0x85_can_modify_flags
-InstructionSet.map[InstructionSet.STA_ZEROPAGE_X_0x95] = {
-    "addressing": "zeropage,X",
-    "assembler": "STA {oper},X",
-    "opc": InstructionSet.STA_ZEROPAGE_X_0x95,
-    "bytes": "2",
-    "cycles": "4",
-    "flags": sta_zeropage_x_0x95_can_modify_flags,
-}
-
-sta_absolute_0x8d_can_modify_flags: Byte = sta_zeropage_0x85_can_modify_flags
-InstructionSet.map[InstructionSet.STA_ABSOLUTE_0x8D] = {
-    "addressing": "absolute",
-    "assembler": "STA {oper}",
-    "opc": InstructionSet.STA_ABSOLUTE_0x8D,
-    "bytes": "3",
-    "cycles": "4",
-    "flags": sta_absolute_0x8d_can_modify_flags,
-}
-
-sta_absolute_x_0x9d_can_modify_flags: Byte = sta_zeropage_0x85_can_modify_flags
-InstructionSet.map[InstructionSet.STA_ABSOLUTE_X_0x9D] = {
-    "addressing": "absolute,X",
-    "assembler": "STA {oper},X",
-    "opc": InstructionSet.STA_ABSOLUTE_X_0x9D,
-    "bytes": "3",
-    "cycles": "5",
-    "flags": sta_absolute_x_0x9d_can_modify_flags,
-}
-
-sta_absolute_y_0x99_can_modify_flags: Byte = sta_zeropage_0x85_can_modify_flags
-InstructionSet.map[InstructionSet.STA_ABSOLUTE_Y_0x99] = {
-    "addressing": "absolute,Y",
-    "assembler": "STA {oper},Y",
-    "opc": InstructionSet.STA_ABSOLUTE_Y_0x99,
-    "bytes": "3",
-    "cycles": "5",
-    "flags": sta_absolute_y_0x99_can_modify_flags,
-}
-
-sta_indexed_indirect_x_0x81_can_modify_flags: Byte = sta_zeropage_0x85_can_modify_flags
-InstructionSet.map[InstructionSet.STA_INDEXED_INDIRECT_X_0x81] = {
-    "addressing": "(indirect, X)",
-    "assembler": "STA ({oper},X)",
-    "opc": InstructionSet.STA_INDEXED_INDIRECT_X_0x81,
-    "bytes": "2",
-    "cycles": "6",
-    "flags": sta_indexed_indirect_x_0x81_can_modify_flags,
-}
-
-sta_indirect_indexed_y_0x91_can_modify_flags: Byte = sta_zeropage_0x85_can_modify_flags
-InstructionSet.map[InstructionSet.STA_INDIRECT_INDEXED_Y_0x91] = {
-    "addressing": "(indirect), Y",
-    "assembler": "STA ({oper}),Y",
-    "opc": InstructionSet.STA_INDIRECT_INDEXED_Y_0x91,
-    "bytes": "2",
-    "cycles": "6",
-    "flags": sta_indirect_indexed_y_0x91_can_modify_flags,
-}
 
 """STX"""
-stx_zeropage_0x86_can_modify_flags: Byte = Byte()
-InstructionSet.map[InstructionSet.STX_ZEROPAGE_0x86] = {
-    "addressing": "zeropage",
-    "assembler": "STX {oper}",
-    "opc": InstructionSet.STX_ZEROPAGE_0x86,
-    "bytes": "2",
-    "cycles": "3",
-    "flags": stx_zeropage_0x86_can_modify_flags,
-}
-
-stx_zeropage_y_0x96_can_modify_flags: Byte = stx_zeropage_0x86_can_modify_flags
-InstructionSet.map[InstructionSet.STX_ZEROPAGE_Y_0x96] = {
-    "addressing": "zeropage,Y",
-    "assembler": "STX {oper},Y",
-    "opc": InstructionSet.STX_ZEROPAGE_Y_0x96,
-    "bytes": "2",
-    "cycles": "4",
-    "flags": stx_zeropage_y_0x96_can_modify_flags,
-}
-
-stx_absolute_0x8e_can_modify_flags: Byte = stx_zeropage_0x86_can_modify_flags
-InstructionSet.map[InstructionSet.STX_ABSOLUTE_0x8E] = {
-    "addressing": "absolute",
-    "assembler": "STX {oper}",
-    "opc": InstructionSet.STX_ABSOLUTE_0x8E,
-    "bytes": "3",
-    "cycles": "4",
-    "flags": stx_absolute_0x8e_can_modify_flags,
-}
 
 """STY"""
-sty_zeropage_0x84_can_modify_flags: Byte = Byte()
-InstructionSet.map[InstructionSet.STY_ZEROPAGE_0x84] = {
-    "addressing": "zeropage",
-    "assembler": "STY {oper}",
-    "opc": InstructionSet.STY_ZEROPAGE_0x84,
-    "bytes": "2",
-    "cycles": "3",
-    "flags": sty_zeropage_0x84_can_modify_flags,
-}
-
-sty_zeropage_x_0x94_can_modify_flags: Byte = sty_zeropage_0x84_can_modify_flags
-InstructionSet.map[InstructionSet.STY_ZEROPAGE_X_0x94] = {
-    "addressing": "zeropage,X",
-    "assembler": "STY {oper},X",
-    "opc": InstructionSet.STY_ZEROPAGE_X_0x94,
-    "bytes": "2",
-    "cycles": "4",
-    "flags": sty_zeropage_x_0x94_can_modify_flags,
-}
-
-sty_absolute_0x8c_can_modify_flags: Byte = sty_zeropage_0x84_can_modify_flags
-InstructionSet.map[InstructionSet.STY_ABSOLUTE_0x8C] = {
-    "addressing": "absolute",
-    "assembler": "STY {oper}",
-    "opc": InstructionSet.STY_ABSOLUTE_0x8C,
-    "bytes": "3",
-    "cycles": "4",
-    "flags": sty_absolute_0x8c_can_modify_flags,
-}
 
 # Template
 # InstructionSet.map[] = {
