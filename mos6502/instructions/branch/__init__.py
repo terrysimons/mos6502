@@ -3,7 +3,7 @@
 
 # Import from individual branch instruction modules
 from mos6502.instructions.branch.bcc import (  # noqa: F401
-    BBC_RELATIVE_0x90,
+    BCC_RELATIVE_0x90,
     register_bcc_instructions,
 )
 from mos6502.instructions.branch.bcs import (  # noqa: F401
@@ -37,7 +37,7 @@ from mos6502.instructions.branch.bvs import (  # noqa: F401
 
 __all__ = [
     # BCC
-    'BBC_RELATIVE_0x90',
+    'BCC_RELATIVE_0x90',
     'register_bcc_instructions',
     # BCS
     'BCS_RELATIVE_0xB0',
