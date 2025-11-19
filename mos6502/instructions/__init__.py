@@ -1,5 +1,9 @@
 #!/usr/bin/env python3
 """Instruction set for the mos6502 CPU."""
+import enum
+from typing import NoReturn
+
+from mos6502.exceptions import IllegalCPUInstructionError
 
 # Import from individual instruction modules
 from mos6502.instructions.bit import BIT_ZEROPAGE_0x24, BIT_ABSOLUTE_0x2C, register_bit_instructions  # noqa: F401
@@ -31,9 +35,6 @@ from mos6502.instructions.store import register_all_store_instructions  # noqa: 
 from mos6502.instructions.store import *  # noqa: F401, F403
 from mos6502.instructions.transfer import register_all_transfer_instructions  # noqa: F401
 from mos6502.instructions.transfer import *  # noqa: F401, F403
-
-# Re-export everything else from _instructions module
-from mos6502.instructions._instructions import *  # noqa: F401, F403
 
 __all__ = [
     # Instruction Set
@@ -232,6 +233,28 @@ __all__ = [
     'TXS_IMPLIED_0x9A',
     'TYA_IMPLIED_0x98',
 ]
+
+
+# InstructionSet enum class
+class InstructionSet(enum.IntEnum):
+    """Instruction set for the mos6502 CPU.
+
+    Note: This enum is populated dynamically by the registration functions below.
+    Members are added via the PseudoEnumMember pattern in each instruction module.
+
+    The _UNINITIALIZED member exists solely to satisfy Python's requirement that
+    IntEnum classes have at least one member at definition time.
+    """
+
+    _UNINITIALIZED = -1  # Placeholder to allow dynamic member addition
+
+    @classmethod
+    def _missing_(cls: type["InstructionSet"], value: int) -> NoReturn:
+        raise IllegalCPUInstructionError(f"{value} ({value:02X}) is not a valid {cls}.")
+
+
+# Initialize instruction map
+InstructionSet.map = {}
 
 # Register instruction modules
 register_bit_instructions(InstructionSet, InstructionSet.map)
