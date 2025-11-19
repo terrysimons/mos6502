@@ -1289,6 +1289,83 @@ class MOS6502CPU(flags.ProcessorStatusFlagsInterface):
 
                     self.log.info("i")
 
+                case instructions.CMP_ZEROPAGE_0xC5:
+                    address: int = self.fetch_zeropage_mode_address(offset_register_name=None)
+                    value: int = int(self.read_byte(address=address))
+                    result: int = (self.A - value) & 0xFF
+
+                    self.flags[flags.Z] = 1 if result == 0 else 0
+                    self.flags[flags.N] = 1 if (result & 0x80) else 0
+                    self.flags[flags.C] = 1 if self.A >= value else 0
+
+                    self.log.info("i")
+
+                case instructions.CMP_ZEROPAGE_X_0xD5:
+                    address: int = self.fetch_zeropage_mode_address(offset_register_name="X")
+                    value: int = int(self.read_byte(address=address))
+                    result: int = (self.A - value) & 0xFF
+
+                    self.flags[flags.Z] = 1 if result == 0 else 0
+                    self.flags[flags.N] = 1 if (result & 0x80) else 0
+                    self.flags[flags.C] = 1 if self.A >= value else 0
+
+                    self.log.info("i")
+
+                case instructions.CMP_ABSOLUTE_0xCD:
+                    address: int = self.fetch_absolute_mode_address(offset_register_name=None)
+                    value: int = int(self.read_byte(address=address))
+                    result: int = (self.A - value) & 0xFF
+
+                    self.flags[flags.Z] = 1 if result == 0 else 0
+                    self.flags[flags.N] = 1 if (result & 0x80) else 0
+                    self.flags[flags.C] = 1 if self.A >= value else 0
+
+                    self.log.info("i")
+
+                case instructions.CMP_ABSOLUTE_X_0xDD:
+                    address: int = self.fetch_absolute_mode_address(offset_register_name="X")
+                    value: int = int(self.read_byte(address=address))
+                    result: int = (self.A - value) & 0xFF
+
+                    self.flags[flags.Z] = 1 if result == 0 else 0
+                    self.flags[flags.N] = 1 if (result & 0x80) else 0
+                    self.flags[flags.C] = 1 if self.A >= value else 0
+
+                    self.log.info("i")
+
+                case instructions.CMP_ABSOLUTE_Y_0xD9:
+                    address: int = self.fetch_absolute_mode_address(offset_register_name="Y")
+                    value: int = int(self.read_byte(address=address))
+                    result: int = (self.A - value) & 0xFF
+
+                    self.flags[flags.Z] = 1 if result == 0 else 0
+                    self.flags[flags.N] = 1 if (result & 0x80) else 0
+                    self.flags[flags.C] = 1 if self.A >= value else 0
+
+                    self.log.info("i")
+
+                case instructions.CMP_INDEXED_INDIRECT_X_0xC1:
+                    address: int = self.fetch_indexed_indirect_mode_address()
+                    value: int = int(self.read_byte(address=address))
+                    result: int = (self.A - value) & 0xFF
+
+                    self.flags[flags.Z] = 1 if result == 0 else 0
+                    self.flags[flags.N] = 1 if (result & 0x80) else 0
+                    self.flags[flags.C] = 1 if self.A >= value else 0
+
+                    self.log.info("i")
+
+                case instructions.CMP_INDIRECT_INDEXED_Y_0xD1:
+                    address: int = self.fetch_indirect_indexed_mode_address()
+                    value: int = int(self.read_byte(address=address))
+                    result: int = (self.A - value) & 0xFF
+
+                    self.flags[flags.Z] = 1 if result == 0 else 0
+                    self.flags[flags.N] = 1 if (result & 0x80) else 0
+                    self.flags[flags.C] = 1 if self.A >= value else 0
+
+                    self.log.info("i")
+
                 # CPX
                 # CPY
                 # DEC

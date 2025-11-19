@@ -103,3 +103,54 @@ def test_cpu_instruction_CMP_IMMEDIATE_0xC9_zero() -> None:  # noqa: N802
     assert cpu.flags[flags.C] == 1  # A >= M
     assert cpu.flags[flags.N] == 0  # Result = 0
     assert cpu.cycles_executed == 2
+
+
+def test_cpu_instruction_CMP_ZEROPAGE_0xC5() -> None:  # noqa: N802
+    """Test CMP Zero Page addressing mode."""
+    # given:
+    cpu: mos6502.CPU = mos6502.CPU()
+    cpu.reset()
+
+    cpu.A = 0x50
+    cpu.ram[0x0042] = 0x30  # Value at zero page address
+
+    # CMP $42
+    cpu.ram[0xFFFC] = instructions.CMP_ZEROPAGE_0xC5
+    cpu.ram[0xFFFD] = 0x42
+
+    # when:
+    with contextlib.suppress(exceptions.CPUCycleExhaustionError):
+        cpu.execute(cycles=3)
+
+    # then:
+    assert cpu.A == 0x50  # A unchanged
+    assert cpu.flags[flags.Z] == 0
+    assert cpu.flags[flags.C] == 1  # A > M
+    assert cpu.flags[flags.N] == 0
+    assert cpu.cycles_executed == 3
+
+
+def test_cpu_instruction_CMP_ABSOLUTE_0xCD() -> None:  # noqa: N802
+    """Test CMP Absolute addressing mode."""
+    # given:
+    cpu: mos6502.CPU = mos6502.CPU()
+    cpu.reset()
+
+    cpu.A = 0x20
+    cpu.ram[0x1234] = 0x30  # Value at absolute address
+
+    # CMP $1234
+    cpu.ram[0xFFFC] = instructions.CMP_ABSOLUTE_0xCD
+    cpu.ram[0xFFFD] = 0x34
+    cpu.ram[0xFFFE] = 0x12
+
+    # when:
+    with contextlib.suppress(exceptions.CPUCycleExhaustionError):
+        cpu.execute(cycles=4)
+
+    # then:
+    assert cpu.A == 0x20  # A unchanged
+    assert cpu.flags[flags.Z] == 0
+    assert cpu.flags[flags.C] == 0  # A < M
+    assert cpu.flags[flags.N] == 1  # Negative result
+    assert cpu.cycles_executed == 4
