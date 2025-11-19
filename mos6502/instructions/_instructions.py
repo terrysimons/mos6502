@@ -208,16 +208,6 @@ BVC_RELATIVE_0x50: Literal[80] = 0x50
 BVS_RELATIVE_0x70: Literal[112] = 0x70
 
 
-# https://masswerk.at/6502/6502_instruction_set.html#CLV
-# Clear Overflow Flag
-#
-# 0 -> V
-# N	Z	C	I	D	V
-# -	-	-	-	-	0
-# addressing	assembler	opc	bytes	cycles
-# implied	CLV	B8	1	2
-CLV_IMPLIED_0xB8: Literal[184] = 0xB8
-
 # https://masswerk.at/6502/6502_instruction_set.html#CMP
 # Compare Memory with Accumulator
 #
@@ -1249,9 +1239,6 @@ class InstructionSet(enum.IntEnum):
     """BVS"""
     BVS_RELATIVE_0x70 = BVS_RELATIVE_0x70
 
-    """CLV"""
-    CLV_IMPLIED_0xB8 = CLV_IMPLIED_0xB8
-
     """CMP"""
     CMP_IMMEDIATE_0xC9 = CMP_IMMEDIATE_0xC9
     CMP_ZEROPAGE_0xC5 = CMP_ZEROPAGE_0xC5
@@ -1560,27 +1547,6 @@ class InstructionSet(enum.IntEnum):
 # It would be possible to store the assembly instructions mnemonics as format specifiers
 # as well as generate the machine code using the enumeration and a little bit of hackery
 InstructionSet.map = {}
-
-"""CLV"""
-# https://masswerk.at/6502/6502_instruction_set.html#CLV
-# Clear Overflow Flag
-#
-# 0 -> V
-# N	Z	C	I	D	V
-# -	-	-	-	-	0
-# addressing	assembler	opc	bytes	cycles
-# implied	CLV	B8	1	2
-clv_immediate_0xb8_can_modify_flags: Byte = Byte()
-clv_immediate_0xb8_can_modify_flags[flags.V]
-InstructionSet.map[InstructionSet.CLV_IMPLIED_0xB8] = {
-    "addressing": "implied",
-    "assembler": "CLV",
-    "opc": InstructionSet.CLV_IMPLIED_0xB8,
-    "bytes": "1",
-    "cycles": "2",
-    "flags": clv_immediate_0xb8_can_modify_flags,
-}
-
 
 """LDA"""
 lda_immediate_0xa9_can_modify_flags: Byte = Byte()
