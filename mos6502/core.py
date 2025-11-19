@@ -973,6 +973,61 @@ class MOS6502CPU(flags.ProcessorStatusFlagsInterface):
                     pass
 
                 # ''' Execute AND '''
+                case instructions.AND_IMMEDIATE_0x29:
+                    # Bitwise AND with Accumulator
+                    value: int = int(self.fetch_byte())
+                    self.A = self.A & value
+                    self.set_load_status_flags(register_name="A")
+                    self.log.info("i")
+
+                case instructions.AND_ZEROPAGE_0x25:
+                    address: int = self.fetch_zeropage_mode_address(offset_register_name=None)
+                    value: int = int(self.read_byte(address=address))
+                    self.A = self.A & value
+                    self.set_load_status_flags(register_name="A")
+                    self.log.info("i")
+
+                case instructions.AND_ZEROPAGE_X_0x35:
+                    address: int = self.fetch_zeropage_mode_address(offset_register_name="X")
+                    value: int = int(self.read_byte(address=address))
+                    self.A = self.A & value
+                    self.set_load_status_flags(register_name="A")
+                    self.log.info("i")
+
+                case instructions.AND_ABSOLUTE_0x2D:
+                    address: int = self.fetch_absolute_mode_address(offset_register_name=None)
+                    value: int = int(self.read_byte(address=address))
+                    self.A = self.A & value
+                    self.set_load_status_flags(register_name="A")
+                    self.log.info("i")
+
+                case instructions.AND_ABSOLUTE_X_0x3D:
+                    address: int = self.fetch_absolute_mode_address(offset_register_name="X")
+                    value: int = int(self.read_byte(address=address))
+                    self.A = self.A & value
+                    self.set_load_status_flags(register_name="A")
+                    self.log.info("i")
+
+                case instructions.AND_ABSOLUTE_Y_0x39:
+                    address: int = self.fetch_absolute_mode_address(offset_register_name="Y")
+                    value: int = int(self.read_byte(address=address))
+                    self.A = self.A & value
+                    self.set_load_status_flags(register_name="A")
+                    self.log.info("i")
+
+                case instructions.AND_INDEXED_INDIRECT_X_0x21:
+                    address: int = self.fetch_indexed_indirect_mode_address()
+                    value: int = int(self.read_byte(address=address))
+                    self.A = self.A & value
+                    self.set_load_status_flags(register_name="A")
+                    self.log.info("i")
+
+                case instructions.AND_INDIRECT_INDEXED_Y_0x31:
+                    address: int = self.fetch_indirect_indexed_mode_address()
+                    value: int = int(self.read_byte(address=address))
+                    self.A = self.A & value
+                    self.set_load_status_flags(register_name="A")
+                    self.log.info("i")
 
                 # ''' Execute ASL '''
 
