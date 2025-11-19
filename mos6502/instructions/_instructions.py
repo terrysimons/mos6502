@@ -186,26 +186,6 @@ BNE_RELATIVE_0xD0: Literal[208] = 0xD0
 # relative	BPL oper	10	2	2**
 BPL_RELATIVE_0x10: Literal[16] = 0x10
 
-# https://masswerk.at/6502/6502_instruction_set.html#BRK
-# Force Break
-#
-# BRK initiates a software interrupt similar to a hardware
-# interrupt (IRQ). The return address pushed to the stack is
-# PC+2, providing an extra byte of spacing for a break mark
-# (identifying a reason for the break.)
-# The status register will be pushed to the stack with the break
-# flag set to 1. However, when retrieved during RTI or by a PLP
-# instruction, the break flag will be ignored.
-# The interrupt disable flag is not set automatically.
-#
-# interrupt,
-# push PC+2, push SR
-# N	Z	C	I	D	V
-# -	-	-	1	-	-
-# addressing	assembler	opc	bytes	cycles
-# implied	BRK	00	1	7
-BRK_IMPLIED_0x00: Literal[0] = 0x00
-
 # https://masswerk.at/6502/6502_instruction_set.html#BVC
 # Branch on Overflow Clear
 #
@@ -1292,9 +1272,6 @@ class InstructionSet(enum.IntEnum):
 
     """BPL"""
     BPL_RELATIVE_0x10 = BPL_RELATIVE_0x10
-
-    """BRK"""
-    BRK_IMPLIED_0x00 = BRK_IMPLIED_0x00
 
     """BVC"""
     BVC_RELATIVE_0x50 = BVC_RELATIVE_0x50

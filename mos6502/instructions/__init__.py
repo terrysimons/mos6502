@@ -2,6 +2,7 @@
 """Instruction set for the mos6502 CPU."""
 
 # Import from individual instruction modules
+from mos6502.instructions.brk import BRK_IMPLIED_0x00, register_brk_instructions  # noqa: F401
 from mos6502.instructions.nop import NOP_IMPLIED_0xEA, register_nop_instructions  # noqa: F401
 
 # Re-export everything else from _instructions module
@@ -206,4 +207,5 @@ __all__ = [
 ]
 
 # Register instruction modules
+register_brk_instructions(InstructionSet, InstructionSet.map)
 register_nop_instructions(InstructionSet, InstructionSet.map)

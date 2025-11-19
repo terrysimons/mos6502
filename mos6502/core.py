@@ -1018,7 +1018,7 @@ class MOS6502CPU(flags.ProcessorStatusFlagsInterface):
                     self.spend_cpu_cycles(cost=3)
 
                     self.log.info("i")
-                    self.log.debug(f"{instructions.InstructionSet(instruction).name}")
+                    self.log.debug(f"{instructions.InstructionSet(int(instruction)).name}")
 
                     raise exceptions.CPUBreakError(
                         f"BRK instruction executed at PC=0x{self.PC - 1:04X}",
