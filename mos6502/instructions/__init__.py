@@ -3,6 +3,7 @@
 
 # Import from individual instruction modules
 from mos6502.instructions.brk import BRK_IMPLIED_0x00, register_brk_instructions  # noqa: F401
+from mos6502.instructions.jmp import JMP_ABSOLUTE_0x4C, JMP_INDIRECT_0x6C, register_jmp_instructions  # noqa: F401
 from mos6502.instructions.jsr import JSR_ABSOLUTE_0x20, register_jsr_instructions  # noqa: F401
 from mos6502.instructions.nop import NOP_IMPLIED_0xEA, register_nop_instructions  # noqa: F401
 from mos6502.instructions.rti import RTI_IMPLIED_0x40, register_rti_instructions  # noqa: F401
@@ -215,6 +216,7 @@ __all__ = [
 
 # Register instruction modules
 register_brk_instructions(InstructionSet, InstructionSet.map)
+register_jmp_instructions(InstructionSet, InstructionSet.map)
 register_jsr_instructions(InstructionSet, InstructionSet.map)
 register_nop_instructions(InstructionSet, InstructionSet.map)
 register_rti_instructions(InstructionSet, InstructionSet.map)

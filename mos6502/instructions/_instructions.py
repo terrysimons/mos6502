@@ -358,18 +358,6 @@ INX_IMPLIED_0xE8: Literal[232] = 0xE8
 INY_IMPLIED_0xC8: Literal[200] = 0xC8
 
 
-# https://masswerk.at/6502/6502_instruction_set.html#JMP
-# Jump to New Location
-#
-# (PC+1) -> PCL
-# (PC+2) -> PCH
-# N	Z	C	I	D	V
-# -	-	-	-	-	-
-# addressing	assembler	opc	bytes	cycles
-# absolute	JMP oper	4C	3	3
-# indirect	JMP (oper)	6C	3	5
-JMP_ABSOLUTE_0x4C: Literal[76] = 0x4C
-JMP_INDIRECT_0x6C: Literal[108] = 0x6C
 
 
 # https://masswerk.at/6502/6502_instruction_set.html#LDA
@@ -1260,8 +1248,6 @@ class InstructionSet(enum.IntEnum):
     INY_IMPLIED_0xC8 = INY_IMPLIED_0xC8
 
     """JMP"""
-    JMP_ABSOLUTE_0x4C = JMP_ABSOLUTE_0x4C
-    JMP_INDIRECT_0x6C = JMP_INDIRECT_0x6C
 
     """JSR"""
 
