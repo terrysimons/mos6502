@@ -1146,6 +1146,34 @@ class MOS6502CPU(flags.ProcessorStatusFlagsInterface):
                     self.spend_cpu_cycles(1)
 
                 # JMP
+                case instructions.JMP_ABSOLUTE_0x4C:
+                    jump_address: Word = self.fetch_word()
+                    self.PC = jump_address
+                    self.log.info("i")
+                    # No additional cycles - fetch_word already spent 2
+
+                case instructions.JMP_INDIRECT_0x6C:
+                    indirect_address: Word = self.fetch_word()
+
+                    # VARIANT: 6502/6502A - Page boundary bug
+                    # If indirect_address is 0xXXFF, the 6502 wraps within the page
+                    # instead of crossing to the next page for the high byte.
+                    # Example: JMP ($10FF) reads low byte from $10FF and high byte
+                    # from $1000 (not $1100 as expected).
+                    # VARIANT: 65C02 - Bug fixed, correctly reads across page boundary
+
+                    if (indirect_address & 0xFF) == 0xFF:
+                        # Page boundary bug: wrap within same page
+                        low_byte: Byte = self.read_byte(address=indirect_address)
+                        high_byte: Byte = self.read_byte(address=indirect_address & 0xFF00)
+                        jump_address: Word = Word((high_byte << 8) | low_byte)
+                    else:
+                        # Normal case: read word normally
+                        jump_address: Word = self.read_word(address=indirect_address)
+
+                    self.PC = jump_address
+                    self.log.info("i")
+                    # No additional cycles - fetch_word already spent 2, read operations spent 2
 
                 # ''' Execute JSR '''
                 case instructions.JSR_ABSOLUTE_0x20:
