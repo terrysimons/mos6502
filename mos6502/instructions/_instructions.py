@@ -371,17 +371,6 @@ INY_IMPLIED_0xC8: Literal[200] = 0xC8
 JMP_ABSOLUTE_0x4C: Literal[76] = 0x4C
 JMP_INDIRECT_0x6C: Literal[108] = 0x6C
 
-# https://masswerk.at/6502/6502_instruction_set.html#JSR
-#
-# Jump to New Location Saving Return Address
-#
-# (PC+1) -> PCL
-# (PC+2) -> PCH
-# N	Z	C	I	D	V
-# -	-	-	-	-	-
-# addressing	assembler	opc	bytes	cycles
-# absolute	JSR oper	20	3	6
-JSR_ABSOLUTE_0x20: Literal[32] = 0x20
 
 # https://masswerk.at/6502/6502_instruction_set.html#LDA
 #
@@ -571,29 +560,6 @@ ROR_ZEROPAGE_X_0x76: Literal[118] = 0x76
 ROR_ABSOLUTE_0x6E: Literal[110] = 0x6E
 ROR_ABSOLUTE_X_0x7E: Literal[126] = 0x7E
 
-
-# https://masswerk.at/6502/6502_instruction_set.html#RTI
-# Return from Interrupt
-#
-# The status register is pulled with the break flag
-# and bit 5 ignored. Then PC is pulled from the stack.
-#
-# pull SR, pull PC
-# N	Z	C	I	D	V
-# from stack
-# addressing	assembler	opc	bytes	cycles
-# implied	RTI	40	1	6
-RTI_IMPLIED_0x40: Literal[64] = 0x40
-
-# https://masswerk.at/6502/6502_instruction_set.html#RTS
-# Return from Subroutine
-#
-# pull PC, PC+1 -> PC
-# N	Z	C	I	D	V
-# -	-	-	-	-	-
-# addressing	assembler	opc	bytes	cycles
-# implied	RTS	60	1	6
-RTS_IMPLIED_0x60: Literal[96] = 0x60
 
 # https://masswerk.at/6502/6502_instruction_set.html#SBC
 # Subtract Memory from Accumulator with Borrow
@@ -1298,7 +1264,6 @@ class InstructionSet(enum.IntEnum):
     JMP_INDIRECT_0x6C = JMP_INDIRECT_0x6C
 
     """JSR"""
-    JSR_ABSOLUTE_0x20 = JSR_ABSOLUTE_0x20
 
     """LDA"""
     LDA_IMMEDIATE_0xA9 = LDA_IMMEDIATE_0xA9
@@ -1368,10 +1333,8 @@ class InstructionSet(enum.IntEnum):
     ROR_ABSOLUTE_X_0x7E = ROR_ABSOLUTE_X_0x7E
 
     """RTI"""
-    RTI_IMPLIED_0x40 = RTI_IMPLIED_0x40
 
     """RTS"""
-    RTS_IMPLIED_0x60 = RTS_IMPLIED_0x60
 
     """SBC"""
     SBC_IMMEDIATE_0xE9 = SBC_IMMEDIATE_0xE9
@@ -1633,15 +1596,6 @@ InstructionSet.map[InstructionSet.LDA_INDIRECT_INDEXED_Y_0xB1] = {
 }
 
 """JSR"""
-jsr_absolute_0x20_can_modify_flags: Byte = Byte()
-InstructionSet.map[InstructionSet.JSR_ABSOLUTE_0x20] = {
-    "addressing": "absolute",
-    "assembler": "JSR {oper}",
-    "opc": InstructionSet.JSR_ABSOLUTE_0x20,
-    "bytes": "3",
-    "cycles": "6",
-    "flags": jsr_absolute_0x20_can_modify_flags,
-}
 
 """STA"""
 sta_zeropage_0x85_can_modify_flags: Byte = Byte()

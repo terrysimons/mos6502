@@ -1079,7 +1079,7 @@ class MOS6502CPU(flags.ProcessorStatusFlagsInterface):
                     self.log.info("i")
 
                     self.log.debug(
-                        f"{instructions.InstructionSet(instruction).name}: "
+                        f"{instructions.InstructionSet(int(instruction)).name}: "
                         f"{hex(subroutine_address)}",
                     )
 
