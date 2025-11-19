@@ -20,3 +20,7 @@ class InvalidMemoryLocationError(Exception):
 
 class InvalidMemoryAssignmentError(Exception):
     """Raise when an invalid memory location is assigned to."""
+
+
+class CPUBreakError(Exception):
+    """Raise when BRK instruction is executed."""

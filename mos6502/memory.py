@@ -61,7 +61,7 @@ class MemoryUnit:
     @property
     def endianness(self: Self) -> str:
         """Return endianness of the architecture - "big" or "little" (default=little)."""
-        return self._value.endian()
+        return self._value.endian
 
     @property
     def value(self: Self) -> int:
@@ -74,7 +74,7 @@ class MemoryUnit:
         return self._overflow
 
     @overflow.setter
-    def overflow(self: Self, *, overflow: bool = False) -> None:
+    def overflow(self: Self, overflow: bool) -> None:
         """Set overflow status."""
         self._overflow = overflow
 
@@ -84,7 +84,7 @@ class MemoryUnit:
         return self._underflow
 
     @underflow.setter
-    def underflow(self: Self, *, underflow: bool = False) -> None:
+    def underflow(self: Self, underflow: bool) -> None:
         """Set underflow status."""
         self._underflow = underflow
 

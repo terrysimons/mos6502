@@ -241,7 +241,7 @@ class MOS6502CPU(flags.ProcessorStatusFlagsInterface):
         -------
             None
         """
-        self.ram[address] = 0xFF & data
+        self.ram[address] = data & 0xFF
         self.log.info("w")
         self.spend_cpu_cycles(cost=1)
 
@@ -987,7 +987,43 @@ class MOS6502CPU(flags.ProcessorStatusFlagsInterface):
                 # BMI
                 # BNE
                 # BPL
-                # BRK
+                # ''' Execute BRK '''
+                case instructions.BRK_IMPLIED_0x00:
+                    # VARIANT: 6502 - D (decimal) flag is NOT cleared by BRK or any interrupt (IRQ, NMI, RESET)
+                    # VARIANT: 6502A - D (decimal) flag is NOT cleared by BRK or any interrupt (IRQ, NMI, RESET)
+                    # VARIANT: 65C02 - D (decimal) flag IS cleared by BRK and all interrupts (IRQ, NMI, RESET)
+                    # This implementation follows the NMOS 6502/6502A behavior (does not clear D flag)
+
+                    # BRK pushes PC+2, then SR (with B flag set), then sets I flag
+                    # Total: 7 cycles (1 for fetch + 2 for write_word + 1 for write_byte + 3 for overhead)
+                    # BRK is documented as pushing PC+2, but after fetch_byte(), PC is already +1
+                    # So we push PC (current value, which is already original PC+1)
+                    self.write_word(address=self.S - 1, data=self.PC)
+                    self.S -= 2
+
+                    # Push status register with B flag set
+                    # Create a copy of flags with B flag set
+                    status_with_break: Byte = Byte(self._flags.value | (1 << flags.B))
+                    self.write_byte(address=self.S, data=status_with_break)
+                    self.S -= 1
+
+                    # Set interrupt disable flag
+                    self.I = flags.ProcessorStatusFlags.I[flags.I]
+
+                    # Load PC from IRQ vector at 0xFFFE/0xFFFF
+                    # (In a real system, this would jump to the interrupt handler)
+                    # For our emulator, we'll raise an exception instead
+                    # We've spent 4 cycles so far (1 fetch + 2 write_word + 1 write_byte)
+                    # Need 3 more to total 7
+                    self.spend_cpu_cycles(cost=3)
+
+                    self.log.info("i")
+                    self.log.debug(f"{instructions.InstructionSet(instruction).name}")
+
+                    raise exceptions.CPUBreakError(
+                        f"BRK instruction executed at PC=0x{self.PC - 1:04X}",
+                    )
+
                 # BVC
                 # BVS
                 # CLC

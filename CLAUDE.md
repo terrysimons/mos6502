@@ -1,0 +1,22 @@
+- We are emulating a CPU, so using classes like Byte and Word is appropriate and necessary.
+- Always use proper operand order with Byte/Word: byte_obj & 0xFF, not 0xFF & byte_obj
+- Register properties return int, not Word/Byte objects
+- Stack pointer's 0x1FF mask is clever design to avoid constant 0x0100 offset calculations
+- Existing codebase pattern: pass ints to write_word/write_byte, let them handle conversion
+- Byte() wrapping needed when creating new Byte values, not when passing existing registers
+- Important: The codebase has pragmatic type handling:
+- Type annotations say Word or Byte for parameters
+- Implementations check isinstance(data, int) and handle both
+- Properties return int (via .value) even though annotations say Word/Byte
+- Arithmetic on registers (self.S - 1, self.PC + 1) returns int, passed directly
+- Stack Pointer (S) Special Case:
+- Hardware: 8-bit register (0x00-0xFF)
+- Implementation: Stored as Word, masked with 0x1FF (9 bits)
+- Reason: Stack lives at 0x0100-0x01FF, so S directly represents full address
+- Allows self.S - 1 to work directly as stack address without adding 0x0100
+- Consistent Pattern:
+- self.write_word(address=self.S - 1, data=self.PC + 1)  # JSR pattern
+- self.write_word(address=self.S - 1, data=self.PC)      # BRK pattern
+- When you notice that we are implementing 6502 code that is chip-dependent, put # VARIANT: 6502c <a description of how the 6502c is different>
+- Any time you document a variant, make sure that you document *ALL* variants - for instance, be explicit, not implicit... if 6502A is the same as 6502, but 6502C differs - be sure to describe the expected behavior of all 3, every time.
+- pytest.mocking
