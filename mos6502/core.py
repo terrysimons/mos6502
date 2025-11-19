@@ -1764,7 +1764,62 @@ class MOS6502CPU(flags.ProcessorStatusFlagsInterface):
                 case instructions.NOP_IMPLIED_0xEA:
                     self.log.info("i")
                     self.spend_cpu_cycles(cost=1)
-                # ORA
+                # ''' Execute ORA '''
+                case instructions.ORA_IMMEDIATE_0x09:
+                    # Bitwise OR with Accumulator
+                    value: int = int(self.fetch_byte())
+                    self.A = self.A | value
+                    self.set_load_status_flags(register_name="A")
+                    self.log.info("i")
+
+                case instructions.ORA_ZEROPAGE_0x05:
+                    address: int = self.fetch_zeropage_mode_address(offset_register_name=None)
+                    value: int = int(self.read_byte(address=address))
+                    self.A = self.A | value
+                    self.set_load_status_flags(register_name="A")
+                    self.log.info("i")
+
+                case instructions.ORA_ZEROPAGE_X_0x15:
+                    address: int = self.fetch_zeropage_mode_address(offset_register_name="X")
+                    value: int = int(self.read_byte(address=address))
+                    self.A = self.A | value
+                    self.set_load_status_flags(register_name="A")
+                    self.log.info("i")
+
+                case instructions.ORA_ABSOLUTE_0x0D:
+                    address: int = self.fetch_absolute_mode_address(offset_register_name=None)
+                    value: int = int(self.read_byte(address=address))
+                    self.A = self.A | value
+                    self.set_load_status_flags(register_name="A")
+                    self.log.info("i")
+
+                case instructions.ORA_ABSOLUTE_X_0x1D:
+                    address: int = self.fetch_absolute_mode_address(offset_register_name="X")
+                    value: int = int(self.read_byte(address=address))
+                    self.A = self.A | value
+                    self.set_load_status_flags(register_name="A")
+                    self.log.info("i")
+
+                case instructions.ORA_ABSOLUTE_Y_0x19:
+                    address: int = self.fetch_absolute_mode_address(offset_register_name="Y")
+                    value: int = int(self.read_byte(address=address))
+                    self.A = self.A | value
+                    self.set_load_status_flags(register_name="A")
+                    self.log.info("i")
+
+                case instructions.ORA_INDEXED_INDIRECT_X_0x01:
+                    address: int = self.fetch_indexed_indirect_mode_address()
+                    value: int = int(self.read_byte(address=address))
+                    self.A = self.A | value
+                    self.set_load_status_flags(register_name="A")
+                    self.log.info("i")
+
+                case instructions.ORA_INDIRECT_INDEXED_Y_0x11:
+                    address: int = self.fetch_indirect_indexed_mode_address()
+                    value: int = int(self.read_byte(address=address))
+                    self.A = self.A | value
+                    self.set_load_status_flags(register_name="A")
+                    self.log.info("i")
 
                 # PHA
                 case instructions.PHA_IMPLIED_0x48:
