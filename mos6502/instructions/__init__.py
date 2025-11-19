@@ -1,7 +1,10 @@
 #!/usr/bin/env python3
 """Instruction set for the mos6502 CPU."""
 
-# Re-export everything from _instructions module
+# Import from individual instruction modules
+from mos6502.instructions.nop import NOP_IMPLIED_0xEA, register_nop_instructions  # noqa: F401
+
+# Re-export everything else from _instructions module
 from mos6502.instructions._instructions import *  # noqa: F401, F403
 
 __all__ = [
@@ -201,3 +204,6 @@ __all__ = [
     'TXS_IMPLIED_0x9A',
     'TYA_IMPLIED_0x98',
 ]
+
+# Register instruction modules
+register_nop_instructions(InstructionSet, InstructionSet.map)

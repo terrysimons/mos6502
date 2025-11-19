@@ -525,17 +525,6 @@ LSR_ABSOLUTE_0x4E: Literal[78] = 0x4E
 LSR_ABSOLUTE_X_0x5E: Literal[94] = 0x5E
 
 
-# https://masswerk.at/6502/6502_instruction_set.html#NOP
-# No Operation
-#
-# ---
-# N	Z	C	I	D	V
-# -	-	-	-	-	-
-# addressing	assembler	opc	bytes	cycles
-# implied	NOP	EA	1	2
-NOP_IMPLIED_0xEA: Literal[234] = 0xEA
-
-
 # https://masswerk.at/6502/6502_instruction_set.html#ORA
 # OR Memory with Accumulator
 #
@@ -1417,9 +1406,6 @@ class InstructionSet(enum.IntEnum):
     LSR_ABSOLUTE_0x4E = LSR_ABSOLUTE_0x4E
     LSR_ABSOLUTE_X_0x5E = LSR_ABSOLUTE_X_0x5E
 
-    """NOP"""
-    NOP_IMPLIED_0xEA = NOP_IMPLIED_0xEA
-
     """ORA"""
     ORA_IMMEDIATE_0x09 = ORA_IMMEDIATE_0x09
     ORA_ZEROPAGE_0x05 = ORA_ZEROPAGE_0x05
@@ -1815,17 +1801,6 @@ InstructionSet.map[InstructionSet.JSR_ABSOLUTE_0x20] = {
     "bytes": "3",
     "cycles": "6",
     "flags": jsr_absolute_0x20_can_modify_flags,
-}
-
-"""NOP"""
-nop_implied_0xea_can_modify_flags: Byte = Byte()
-InstructionSet.map[NOP_IMPLIED_0xEA] = {
-    "addressing": "implied",
-    "assembler": "NOP",
-    "opc": NOP_IMPLIED_0xEA,
-    "bytes": "1",
-    "cycles": "2",
-    "flags": nop_implied_0xea_can_modify_flags,
 }
 
 """STA"""
