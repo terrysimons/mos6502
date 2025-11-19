@@ -12,6 +12,8 @@ from mos6502.instructions.rts import RTS_IMPLIED_0x60, register_rts_instructions
 # Import from instruction family modules
 from mos6502.instructions.arithmetic import register_all_arithmetic_instructions  # noqa: F401
 from mos6502.instructions.arithmetic import *  # noqa: F401, F403
+from mos6502.instructions.compare import register_all_compare_instructions  # noqa: F401
+from mos6502.instructions.compare import *  # noqa: F401, F403
 from mos6502.instructions.flags import register_all_flag_instructions  # noqa: F401
 from mos6502.instructions.flags import *  # noqa: F401, F403
 from mos6502.instructions.load import register_all_load_instructions  # noqa: F401
@@ -236,6 +238,7 @@ register_nop_instructions(InstructionSet, InstructionSet.map)
 register_rti_instructions(InstructionSet, InstructionSet.map)
 register_rts_instructions(InstructionSet, InstructionSet.map)
 register_all_arithmetic_instructions(InstructionSet, InstructionSet.map)
+register_all_compare_instructions(InstructionSet, InstructionSet.map)
 register_all_flag_instructions(InstructionSet, InstructionSet.map)
 register_all_load_instructions(InstructionSet, InstructionSet.map)
 register_all_logic_instructions(InstructionSet, InstructionSet.map)

@@ -143,57 +143,6 @@ BVC_RELATIVE_0x50: Literal[80] = 0x50
 BVS_RELATIVE_0x70: Literal[112] = 0x70
 
 
-# https://masswerk.at/6502/6502_instruction_set.html#CMP
-# Compare Memory with Accumulator
-#
-# A - M
-# N	Z	C	I	D	V
-# +	+	+	-	-	-
-# addressing	assembler	opc	bytes	cycles
-# immediate	CMP #oper	C9	2	2
-# zeropage	CMP oper	C5	2	3
-# zeropage,X	CMP oper,X	D5	2	4
-# absolute	CMP oper	CD	3	4
-# absolute,X	CMP oper,X	DD	3	4*
-# absolute,Y	CMP oper,Y	D9	3	4*
-# (indirect,X)	CMP (oper,X)	C1	2	6
-# (indirect),Y	CMP (oper),Y	D1	2	5*
-CMP_IMMEDIATE_0xC9: Literal[201] = 0xC9
-CMP_ZEROPAGE_0xC5: Literal[197] = 0xC5
-CMP_ZEROPAGE_X_0xD5: Literal[213] = 0xD5
-CMP_ABSOLUTE_0xCD: Literal[205] = 0xCD
-CMP_ABSOLUTE_X_0xDD: Literal[221] = 0xDD
-CMP_ABSOLUTE_Y_0xD9: Literal[217] = 0xD9
-CMP_INDEXED_INDIRECT_X_0xC1: Literal[193] = 0xC1
-CMP_INDIRECT_INDEXED_Y_0xD1: Literal[209] = 0xD1
-
-# https://masswerk.at/6502/6502_instruction_set.html#CPX
-# Compare Memory and Index X
-#
-# X - M
-# N	Z	C	I	D	V
-# +	+	+	-	-	-
-# addressing	assembler	opc	bytes	cycles
-# immediate	CPX #oper	E0	2	2
-# zeropage	CPX oper	E4	2	3
-# absolute	CPX oper	EC	3	4
-CPX_IMMEDIATE_0xE0: Literal[224] = 0xE0
-CPX_ZEROPAGE_0xE4: Literal[228] = 0xE4
-CPX_ABSOLUTE_0xEC: Literal[236] = 0xEC
-
-# https://masswerk.at/6502/6502_instruction_set.html#CPY
-# Compare Memory and Index Y
-#
-# Y - M
-# N	Z	C	I	D	V
-# +	+	+	-	-	-
-# addressing	assembler	opc	bytes	cycles
-# immediate	CPY #oper	C0	2	2
-# zeropage	CPY oper	C4	2	3
-# absolute	CPY oper	CC	3	4
-CPY_IMMEDIATE_0xC0: Literal[192] = 0xC0
-CPY_ZEROPAGE_0xC4: Literal[196] = 0xC4
-CPY_ABSOLUTE_0xCC: Literal[204] = 0xCC
 
 
 
@@ -697,25 +646,6 @@ class InstructionSet(enum.IntEnum):
     """BVS"""
     BVS_RELATIVE_0x70 = BVS_RELATIVE_0x70
 
-    """CMP"""
-    CMP_IMMEDIATE_0xC9 = CMP_IMMEDIATE_0xC9
-    CMP_ZEROPAGE_0xC5 = CMP_ZEROPAGE_0xC5
-    CMP_ZEROPAGE_X_0xD5 = CMP_ZEROPAGE_X_0xD5
-    CMP_ABSOLUTE_0xCD = CMP_ABSOLUTE_0xCD
-    CMP_ABSOLUTE_X_0xDD = CMP_ABSOLUTE_X_0xDD
-    CMP_ABSOLUTE_Y_0xD9 = CMP_ABSOLUTE_Y_0xD9
-    CMP_INDEXED_INDIRECT_X_0xC1 = CMP_INDEXED_INDIRECT_X_0xC1
-    CMP_INDIRECT_INDEXED_Y_0xD1 = CMP_INDIRECT_INDEXED_Y_0xD1
-
-    """CPX"""
-    CPX_IMMEDIATE_0xE0 = CPX_IMMEDIATE_0xE0
-    CPX_ZEROPAGE_0xE4 = CPX_ZEROPAGE_0xE4
-    CPX_ABSOLUTE_0xEC = CPX_ABSOLUTE_0xEC
-
-    """CPY"""
-    CPY_IMMEDIATE_0xC0 = CPY_IMMEDIATE_0xC0
-    CPY_ZEROPAGE_0xC4 = CPY_ZEROPAGE_0xC4
-    CPY_ABSOLUTE_0xCC = CPY_ABSOLUTE_0xCC
 
     """DEC"""
 
