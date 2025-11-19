@@ -38,23 +38,6 @@ from mos6502.memory import Byte
 
 
 
-# https://masswerk.at/6502/6502_instruction_set.html#ASL
-#
-# Shift Left One Bit (Memory or Accumulator)
-#
-# N	Z	C	I	D	V
-# +	+	+	-	-	-
-# addressing	assembler	opc	bytes	cycles
-# accumulator	ASL A	0A	1	2
-# zeropage	ASL oper	06	2	5
-# zeropage,X	ASL oper,X	16	2	6
-# absolute	ASL oper	0E	3	6
-# absolute,X	ASL oper,X	1E	3	7
-ASL_ACCUMULATOR_0x0A: Literal[10] = 0x0A
-ASL_ZEROPAGE_0x06: Literal[6] = 0x06
-ASL_ZEROPAGE_X_0x16: Literal[22] = 0x16
-ASL_ABSOLUTE_0x0E: Literal[14] = 0x0E
-ASL_ABSOLUTE_X_0x1E: Literal[30] = 0x1E
 
 
 # https://masswerk.at/6502/6502_instruction_set.html#BCC
@@ -219,60 +202,9 @@ CPY_ABSOLUTE_0xCC: Literal[204] = 0xCC
 
 
 
-# https://masswerk.at/6502/6502_instruction_set.html#LSR
-# Shift One Bit Right (Memory or Accumulator)
-#
-# 0 -> [76543210] -> C
-# N	Z	C	I	D	V
-# 0	+	+	-	-	-
-# addressing	assembler	opc	bytes	cycles
-# accumulator	LSR A	4A	1	2
-# zeropage	LSR oper	46	2	5
-# zeropage,X	LSR oper,X	56	2	6
-# absolute	LSR oper	4E	3	6
-# absolute,X	LSR oper,X	5E	3	7
-LSR_ACCUMULATOR_0x4A: Literal[74] = 0x4A
-LSR_ZEROPAGE_0x46: Literal[70] = 0x46
-LSR_ZEROPAGE_X_0x56: Literal[86] = 0x56
-LSR_ABSOLUTE_0x4E: Literal[78] = 0x4E
-LSR_ABSOLUTE_X_0x5E: Literal[94] = 0x5E
 
 
 
-# https://masswerk.at/6502/6502_instruction_set.html#ROL
-# Rotate One Bit Left (Memory or Accumulator)
-#
-# N	Z	C	I	D	V
-# +	+	+	-	-	-
-# addressing	assembler	opc	bytes	cycles
-# accumulator	ROL A	2A	1	2
-# zeropage	ROL oper	26	2	5
-# zeropage,X	ROL oper,X	36	2	6
-# absolute	ROL oper	2E	3	6
-# absolute,X	ROL oper,X	3E	3	7
-ROL_ACCUMULATOR_0x2A: Literal[42] = 0x2A
-ROL_ZEROPAGE_0x26: Literal[38] = 0x26
-ROL_ZEROPAGE_X_0x36: Literal[54] = 0x36
-ROL_ABSOLUTE_0x2E: Literal[46] = 0x2E
-ROL_ABSOLUTE_X_0x3E: Literal[62] = 0x3E
-
-# https://masswerk.at/6502/6502_instruction_set.html#ROR
-# Rotate One Bit Right (Memory or Accumulator)
-#
-# C -> [76543210] -> C
-# N	Z	C	I	D	V
-# +	+	+	-	-	-
-# addressing	assembler	opc	bytes	cycles
-# accumulator	ROR A	6A	1	2
-# zeropage	ROR oper	66	2	5
-# zeropage,X	ROR oper,X	76	2	6
-# absolute	ROR oper	6E	3	6
-# absolute,X	ROR oper,X	7E	3	7
-ROR_ACCUMULATOR_0x6A: Literal[106] = 0x6A
-ROR_ZEROPAGE_0x66: Literal[102] = 0x66
-ROR_ZEROPAGE_X_0x76: Literal[118] = 0x76
-ROR_ABSOLUTE_0x6E: Literal[110] = 0x6E
-ROR_ABSOLUTE_X_0x7E: Literal[126] = 0x7E
 
 
 
@@ -736,12 +668,6 @@ class InstructionSet(enum.IntEnum):
 
     """AND"""
 
-    """ASL"""
-    ASL_ACCUMULATOR_0x0A = ASL_ACCUMULATOR_0x0A
-    ASL_ZEROPAGE_0x06 = ASL_ZEROPAGE_0x06
-    ASL_ZEROPAGE_X_0x16 = ASL_ZEROPAGE_X_0x16
-    ASL_ABSOLUTE_0x0E = ASL_ABSOLUTE_0x0E
-    ASL_ABSOLUTE_X_0x1E = ASL_ABSOLUTE_X_0x1E
 
     """BCC"""
     BBC_RELATIVE_0x90 = BBC_RELATIVE_0x90
@@ -815,12 +741,6 @@ class InstructionSet(enum.IntEnum):
 
     """LDY"""
 
-    """LSR"""
-    LSR_ACCUMULATOR_0x4A = LSR_ACCUMULATOR_0x4A
-    LSR_ZEROPAGE_0x46 = LSR_ZEROPAGE_0x46
-    LSR_ZEROPAGE_X_0x56 = LSR_ZEROPAGE_X_0x56
-    LSR_ABSOLUTE_0x4E = LSR_ABSOLUTE_0x4E
-    LSR_ABSOLUTE_X_0x5E = LSR_ABSOLUTE_X_0x5E
 
     """ORA"""
 
@@ -832,19 +752,7 @@ class InstructionSet(enum.IntEnum):
 
     """PLP"""
 
-    """ROL"""
-    ROL_ACCUMULATOR_0x2A = ROL_ACCUMULATOR_0x2A
-    ROL_ZEROPAGE_0x26 = ROL_ZEROPAGE_0x26
-    ROL_ZEROPAGE_X_0x36 = ROL_ZEROPAGE_X_0x36
-    ROL_ABSOLUTE_0x2E = ROL_ABSOLUTE_0x2E
-    ROL_ABSOLUTE_X_0x3E = ROL_ABSOLUTE_X_0x3E
 
-    """ROR"""
-    ROR_ACCUMULATOR_0x6A = ROR_ACCUMULATOR_0x6A
-    ROR_ZEROPAGE_0x66 = ROR_ZEROPAGE_0x66
-    ROR_ZEROPAGE_X_0x76 = ROR_ZEROPAGE_X_0x76
-    ROR_ABSOLUTE_0x6E = ROR_ABSOLUTE_0x6E
-    ROR_ABSOLUTE_X_0x7E = ROR_ABSOLUTE_X_0x7E
 
     """RTI"""
 
