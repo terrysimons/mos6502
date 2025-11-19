@@ -5,40 +5,38 @@ description = ""
 authors = ["Terry Simons <terry.simons@gmail.com>"]
 
 [tool.poetry.dependencies]
-bitarray = "^2.6.0"
-python = ">=3.8,<4.0"
-textual = "^0.1.18"
+python = ">=3.14,<4.0"
+textual = "*"
+bitarray = "*"
+
 
 [tool.poetry.group.test.dependencies]
-bandit = "^1.7.4"
-coverage = "^6.4.4"
-nox = "^2022.8.7"
-nox-poetry = "^1.0.1"
-pycodestyle = "^2.10.0"
-pydocstyle = "^6.3.0"
-pytest = "^7.1.3"
-pytest-mock = "^3.10.0"
-ruff = "^0.0.254"
-pyupgrade = "^3.3.1"
+bandit = "*"
+coverage = "*"
+nox = "*"
+nox-poetry = "*"
+pytest = "*"
+pytest-mock = "*"
+ruff = "*"
+pyupgrade = "*"
 
 [tool.poetry.group.dev.dependencies]
-bump2version = "^1.0.1"
-toml = "^0.10.2"
+bump2version = "*"
+toml = "*"
 
 [tool.ruff]
 line-length = 100
 select = [
-    "F401",
-    "F403"
+    "D",
+    "E",
+    "F",
+    "W"
 ]
 extend-select = [
-    "F",
-    "E",
     "W",
     "C90",
     "I",
     "N",
-    "D",
     "UP",
     "YTT",
     "ANN",
@@ -80,7 +78,6 @@ extend-select = [
 
     "G",
     "S101",
-    "PLR2004",
     "N999",
     "TRY003", # Avoid specifying long messages outside the exception class
     "EM102", # Exception must not use an f-string literal, assign to variable first
@@ -94,57 +91,40 @@ extend-select = [
     "ANN102", # Missing type annotation for `cls` in classmethod
     "ANN101", # Missing type annotation for `self` in method
     "ANN204", # Missing return type annotation for special method
-    "B008", # Do not perform function call `Word` in argument defaults
-    "D104", # Missing docstring in public package
-    "D100", # Missing docstring in public module
-    "D103", # Missing docstring in public function
     "TRY301", # Abstract `raise` to an inner function
     "PLR0913", # Too many arguments to function call (7/5)
     "ARG001", # Unused function argument:
     "ARG002", # Unused method argument:
-    "C901", # method is too complex
     "PLR0915", # Too many statements
 
 ]
 ignore = [
     "D203", # one-blank-line-before-class
     "D212", # multi-line-summary-second-line
-]
-extend-ignore = [
-    "ARG001", # Unused function argument:
-    "D104", # Missing docstring in public package
-    "B008", # Do not perform function call `Word` in argument defaults
-    "N803", # Argument name `XX` should be lowercase
-    "PLR0913", # Too many arguments to function call
-    "TRY301", # Abstract `raise` to an inner function
-    "ANN204", # Missing return type annotation for special method
-    "ARG002", # Unused method argument:
-    "N802", # Function name `PC` should be lowercase
-    "RUF100", # Unused `noqa` directive
-    "SLF001", # Private member accessed:
-    "ANN001", # Missing type annotation for function argument
-    "ANN101", # Missing type annotation for `self` in method
-    "ANN102", # Missing type annotation for `cls` in classmethod
-    "ANN201", # Missing return type annotation for public function
-    "D100", # Missing docstring in public module
-    "D103", # Missing docstring in public function
     "PLR2004", # Magic value used in comparison, consider replacing 2 with a constant variable
     "S101", # Use of `assert` detected
     "G004", # Logging statement uses f-string
     "N999", # Invalid module name:
     "TRY003", # Avoid specifying long messages outside the exception class
+]
+extend-ignore = [
+    "ARG001", # Unused function argument:
+    "PLR0913", # Too many arguments to function call
+    "ARG002", # Unused method argument:
+    "D100", # Missing docstring in public module
+    "D103", # Missing docstring in public function
     "EM102", # Exception must not use an f-string literal, assign to variable first
     "I001", # Import block is un-sorted or un-formatted
-    "C901", # method is too complex
     "D417", # D417 Missing argument description in the docstring:
-    "PLR0915", # Too many statements
 ]
 
 fixable=[
     'ANN001', # Missing type annotation for function argument
     'ANN201', # Missing return type annotation for public function
-    'ANN206', # Missing return type annotation for classmethod
     'ANN204', # Missing return type annotation for special method
+    'ANN206', # Missing return type annotation for classmethod
+    'RUF100', # Unused `noqa` directive
+    'Q000', # Single quotes found but double quotes preferred
 ]
 unfixable=[
 ]

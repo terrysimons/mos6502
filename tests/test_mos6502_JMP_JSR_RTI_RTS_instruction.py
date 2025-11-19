@@ -9,7 +9,7 @@ from mos6502 import exceptions, flags, instructions
 log: logging.Logger = logging.getLogger("mos6502")
 log.setLevel(logging.DEBUG)
 
-def check_noop_flags(expected_cpu, actual_cpu) -> None:
+def check_noop_flags(expected_cpu: mos6502.CPU, actual_cpu: mos6502.CPU) -> None:
     assert actual_cpu.flags[flags.C] == expected_cpu.flags[flags.C]
     assert actual_cpu.flags[flags.Z] == expected_cpu.flags[flags.Z]
     assert actual_cpu.flags[flags.B] == expected_cpu.flags[flags.B]
@@ -31,7 +31,7 @@ def check_noop_flags(expected_cpu, actual_cpu) -> None:
 
 
 
-def test_cpu_instruction_JSR_ABSOLUTE_0x20_and_RTS_IMPLIED_0x60():
+def test_cpu_instruction_JSR_ABSOLUTE_0x20_and_RTS_IMPLIED_0x60() -> None:  # noqa: N802
     # given:
     cpu: mos6502.CPU = mos6502.CPU()
     cpu.reset()

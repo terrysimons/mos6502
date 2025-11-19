@@ -9,12 +9,12 @@ from mos6502 import exceptions, flags, instructions
 log = logging.getLogger("mos6502")
 log.setLevel(logging.DEBUG)
 
-def check_noop_flags(expected_cpu, actual_cpu) -> None:
+def check_noop_flags(expected_cpu: mos6502.CPU, actual_cpu: mos6502.CPU) -> None:
     assert actual_cpu.flags[flags.Z] == expected_cpu.flags[flags.Z]
     assert actual_cpu.flags[flags.B] == expected_cpu.flags[flags.B]
     assert actual_cpu.flags[flags.N] == expected_cpu.flags[flags.N]
 
-def test_cpu_instruction_CLC_IMPLIED_0x18() -> None:
+def test_cpu_instruction_CLC_IMPLIED_0x18() -> None:  # noqa: N802
     # given:
     cpu: mos6502.CPU = mos6502.CPU()
     cpu.reset()
@@ -38,7 +38,7 @@ def test_cpu_instruction_CLC_IMPLIED_0x18() -> None:
     assert cpu.flags[flags.V] == initial_cpu.flags[flags.V]
     check_noop_flags(expected_cpu=initial_cpu, actual_cpu=cpu)
 
-def test_cpu_instruction_CLD_IMPLIED_0xD8() -> None:
+def test_cpu_instruction_CLD_IMPLIED_0xD8() -> None:  # noqa: N802
     # given:
     cpu: mos6502.CPU = mos6502.CPU()
     cpu.reset()
@@ -63,7 +63,7 @@ def test_cpu_instruction_CLD_IMPLIED_0xD8() -> None:
     check_noop_flags(expected_cpu=initial_cpu, actual_cpu=cpu)
 
 
-def test_cpu_instruction_CLI_IMPLIED_0x58():
+def test_cpu_instruction_CLI_IMPLIED_0x58() -> None:  # noqa: N802
     # given:
     cpu: mos6502.CPU = mos6502.CPU()
     cpu.reset()
@@ -87,7 +87,7 @@ def test_cpu_instruction_CLI_IMPLIED_0x58():
     assert cpu.flags[flags.V] == initial_cpu.flags[flags.V]
     check_noop_flags(expected_cpu=initial_cpu, actual_cpu=cpu)
 
-def test_cpu_instruction_CLV_IMPLIED_0xB8():
+def test_cpu_instruction_CLV_IMPLIED_0xB8() -> None:  # noqa: N802
     # given:
     cpu: mos6502.CPU = mos6502.CPU()
     cpu.reset()

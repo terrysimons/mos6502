@@ -10,17 +10,20 @@ import mos6502
 import mos6502.memory
 from mos6502.memory import Byte, Word
 
-
+ZERO_BYTE: Byte = Byte(0x00)
+ZERO_WORD: Word = Word(0x00)
 class Registers:
     """The mos6502 register set."""
 
-    def __init__(self: Self,
-                 endianness=mos6502.memory.ENDIANNESS,
-                 PC=Word(0x00),
-                 S=Word(0x00),
-                 A=Byte(0x00),
-                 X=Byte(0x00),
-                 Y=Byte(0x00)) -> None:  # noqa: B008
+    def __init__(
+        self: Self,
+        endianness: str = mos6502.memory.ENDIANNESS,
+        PC: int = ZERO_WORD,  # noqa: N803
+        S: int = ZERO_WORD,  # noqa: N803
+        A: int = ZERO_BYTE,  # noqa: N803
+        X: int = ZERO_BYTE,  # noqa: N803
+        Y: int = ZERO_BYTE,  # noqa: N803
+    ) -> None:
         """
         Return a mos6502 register instance.
 
@@ -55,7 +58,7 @@ class Registers:
         return self._PC.value & 0xFFFF
 
     @PC.setter
-    def PC(self: Self, PC) -> None:  # noqa: ANN001 N802 N803
+    def PC(self: Self, PC: int) -> None:  # noqa: N802, N803
         """Set the PC register as an int with the correct endianness."""
         value: int = PC & 0xFFFF
 

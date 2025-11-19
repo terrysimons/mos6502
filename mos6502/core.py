@@ -872,7 +872,7 @@ class MOS6502CPU(flags.ProcessorStatusFlagsInterface):
 
         self.log.debug(f"{instructions.InstructionSet(instruction).name}: {Byte(value=register)}")
 
-    def execute(self: Self, cycles: int = 1) -> int:
+    def execute(self: Self, cycles: int = 1) -> int:  # noqa: C901, PLR0915
         """
         Fetch and execute a CPU instruction.
 
@@ -1387,9 +1387,9 @@ class MOS6502CPU(flags.ProcessorStatusFlagsInterface):
         -------
             None
         """
-        self.log.debug(f"Flags <- 0x{self._flags._flags:02X}")
-        setattr(self._flags, flags)
+        self.log.debug(f"Flags <- 0x{self._flags.flags:02X}")
 
+        setattr(self._flags, flags)
     @property
     def PC(self: Self) -> Word:  # noqa: N802
         """

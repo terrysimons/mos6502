@@ -1629,7 +1629,7 @@ class InstructionSet(enum.IntEnum):
     """JAM"""
 
     @classmethod
-    def _missing_(cls, value) -> NoReturn:
+    def _missing_(cls: type["InstructionSet"], value: int) -> NoReturn:
         raise IllegalCPUInstructionError(f"{value} ({value:02X}) is not a valid {cls}.")
 
 

@@ -3,10 +3,10 @@ import mos6502
 from mos6502 import __version__, flags
 
 
-def test_version():
+def test_version() -> None:
     assert __version__ == "0.1.0"
 
-def test_mos6502_C_flag():
+def test_mos6502_C_flag() -> None:  # noqa: N802
     cpu: mos6502.CPU = mos6502.CPU()
     cpu.reset()
 
@@ -46,7 +46,7 @@ def test_mos6502_C_flag():
     assert (cpu.C ^ flags.ProcessorStatusFlags.C[flags.C]) == \
            (flags.ProcessorStatusFlags.C[flags.C] ^ flags.ProcessorStatusFlags.C[flags.C])
 
-def test_mos6502_Z_flag():
+def test_mos6502_Z_flag() -> None:  # noqa: N802
     cpu: mos6502.CPU = mos6502.CPU()
     cpu.reset()
 
@@ -86,7 +86,7 @@ def test_mos6502_Z_flag():
     assert (cpu.Z ^ flags.ProcessorStatusFlags.Z[flags.Z]) == \
            (flags.ProcessorStatusFlags.Z[flags.Z] ^ flags.ProcessorStatusFlags.Z[flags.Z])
 
-def test_mos6502_I_flag():
+def test_mos6502_I_flag() -> None:  # noqa: N802
     cpu: mos6502.CPU = mos6502.CPU()
     cpu.reset()
 
@@ -126,7 +126,7 @@ def test_mos6502_I_flag():
     assert (cpu.I ^ flags.ProcessorStatusFlags.I[flags.I]) == \
            (flags.ProcessorStatusFlags.I[flags.I] ^ flags.ProcessorStatusFlags.I[flags.I])
 
-def test_mos6502_D_flag():
+def test_mos6502_D_flag() -> None:  # noqa: N802
     cpu: mos6502.CPU = mos6502.CPU()
     cpu.reset()
 
@@ -166,7 +166,7 @@ def test_mos6502_D_flag():
     assert (cpu.D ^ flags.ProcessorStatusFlags.D[flags.D]) == \
            (flags.ProcessorStatusFlags.D[flags.D] ^ flags.ProcessorStatusFlags.D[flags.D])
 
-def test_mos6502_B_flag():
+def test_mos6502_B_flag() -> None:  # noqa: N802
     cpu: mos6502.CPU = mos6502.CPU()
     cpu.reset()
 
@@ -206,7 +206,7 @@ def test_mos6502_B_flag():
     assert (cpu.B ^ flags.ProcessorStatusFlags.B[flags.B]) == \
            (flags.ProcessorStatusFlags.B[flags.B] ^ flags.ProcessorStatusFlags.B[flags.B])
 
-def test_mos6502_V_flag():
+def test_mos6502_V_flag() -> None:  # noqa: N802
     cpu: mos6502.CPU = mos6502.CPU()
     cpu.reset()
 
@@ -246,7 +246,7 @@ def test_mos6502_V_flag():
     assert (cpu.V ^ flags.ProcessorStatusFlags.V[flags.V]) == \
            (flags.ProcessorStatusFlags.V[flags.V] ^ flags.ProcessorStatusFlags.V[flags.V])
 
-def test_mos6502_N_flag():
+def test_mos6502_N_flag() -> None:  # noqa: N802
     cpu: mos6502.CPU = mos6502.CPU()
     cpu.reset()
 
@@ -290,7 +290,7 @@ def test_all_flags() -> None:
     cpu: mos6502.CPU = mos6502.CPU()
     cpu.reset()
 
-    assert cpu._flags == flags.ProcessorStatusFlags.SET_ZERO
+    assert cpu._flags == flags.ProcessorStatusFlags.SET_ZERO  # noqa: SLF001
 
     cpu.C = flags.ProcessorStatusFlags.C[flags.C]
     cpu.Z = flags.ProcessorStatusFlags.Z[flags.Z]
@@ -300,7 +300,7 @@ def test_all_flags() -> None:
     cpu.V = flags.ProcessorStatusFlags.V[flags.V]
     cpu.N = flags.ProcessorStatusFlags.N[flags.N]
 
-    assert cpu._flags == (
+    assert cpu._flags == (  # noqa: SLF001
         flags.ProcessorStatusFlags.C[flags.C] << flags.C |
         flags.ProcessorStatusFlags.Z[flags.Z] << flags.Z |
         flags.ProcessorStatusFlags.I[flags.I] << flags.I |

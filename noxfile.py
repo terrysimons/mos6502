@@ -1,17 +1,14 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 import argparse
 import nox
 from nox_poetry import session
 
-nox.options.sessions = ['test']
+nox.options.sessions = ["test"]
 
 @session
 def test(session):
-    session.run('ruff', 'mos6502', 'tests', external=True)
-    session.run('pycodestyle', '--max-line-length=100', '--ignore=E741,E743', 'mos6502', external=True)
-    session.run('pydocstyle', 'mos6502', external=True)
-    session.run('pytest', external=True)
+    session.run("ruff", "mos6502", "tests", external=True)
+    session.run("pytest", external=True)
 
 @session
 def release(session: nox.Session) -> None:
@@ -37,7 +34,7 @@ def release(session: nox.Session) -> None:
     # If we get here, we should be good to go
     # Let's do a final check for safety
     confirm = input(
-        f"You are about to bump the {version!r} version. Are you sure? [y/n]: "
+        f"You are about to bump the {version!r} version. Are you sure? [y/n]: ",
     )
 
     # Abort on anything other than 'y'
