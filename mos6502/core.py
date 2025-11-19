@@ -1401,7 +1401,41 @@ class MOS6502CPU(flags.ProcessorStatusFlagsInterface):
 
                     self.log.info("i")
 
-                # CPY
+                # ''' Execute CPY '''
+                case instructions.CPY_IMMEDIATE_0xC0:
+                    # Compare Y Register with Memory (Y - M)
+                    value: int = int(self.fetch_byte())
+                    result: int = (self.Y - value) & 0xFF
+
+                    # Set flags based on comparison
+                    self.flags[flags.Z] = 1 if result == 0 else 0
+                    self.flags[flags.N] = 1 if (result & 0x80) else 0
+                    self.flags[flags.C] = 1 if self.Y >= value else 0  # C=1 if Y >= M (no borrow)
+
+                    self.log.info("i")
+
+                case instructions.CPY_ZEROPAGE_0xC4:
+                    address: int = self.fetch_zeropage_mode_address(offset_register_name=None)
+                    value: int = int(self.read_byte(address=address))
+                    result: int = (self.Y - value) & 0xFF
+
+                    self.flags[flags.Z] = 1 if result == 0 else 0
+                    self.flags[flags.N] = 1 if (result & 0x80) else 0
+                    self.flags[flags.C] = 1 if self.Y >= value else 0
+
+                    self.log.info("i")
+
+                case instructions.CPY_ABSOLUTE_0xCC:
+                    address: int = self.fetch_absolute_mode_address(offset_register_name=None)
+                    value: int = int(self.read_byte(address=address))
+                    result: int = (self.Y - value) & 0xFF
+
+                    self.flags[flags.Z] = 1 if result == 0 else 0
+                    self.flags[flags.N] = 1 if (result & 0x80) else 0
+                    self.flags[flags.C] = 1 if self.Y >= value else 0
+
+                    self.log.info("i")
+
                 # DEC
 
                 # DEX
