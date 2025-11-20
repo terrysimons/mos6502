@@ -964,24 +964,6 @@ class MOS6502CPU(flags.ProcessorStatusFlagsInterface):
                 )
 
             match instruction:
-                # ''' Execute ADC '''
-                case instructions.ADC_IMMEDIATE_0x69:
-                    pass
-                case instructions.ADC_ZEROPAGE_0x65:
-                    pass
-                case instructions.ADC_ZEROPAGE_X_0x75:
-                    pass
-                case instructions.ADC_ABSOLUTE_0x6D:
-                    pass
-                case instructions.ADC_ABSOLUTE_X_0x7D:
-                    pass
-                case instructions.ADC_ABSOLUTE_Y_0x79:
-                    pass
-                case instructions.ADC_INDEXED_INDIRECT_X_0x61:
-                    pass
-                case instructions.ADC_INDIRECT_INDEXED_Y_0x71:
-                    pass
-
                 # ''' Execute AND '''
                 case instructions.AND_IMMEDIATE_0x29:
                     # Bitwise AND with Accumulator
@@ -1607,6 +1589,265 @@ class MOS6502CPU(flags.ProcessorStatusFlagsInterface):
                     # Set N and Z flags
                     self.flags[flags.Z] = 1 if result == 0 else 0
                     self.flags[flags.N] = 1 if (result & BYTE_BIT_7_MASK) else 0
+
+                    self.log.info("i")
+
+                # ''' Execute ADC '''
+                case instructions.ADC_IMMEDIATE_0x69:
+                    # Add with Carry - Immediate
+                    value: int = int(self.fetch_byte())
+
+                    # Binary mode addition
+                    result: int = self.A + value + self.flags[flags.C]
+
+                    # Set Carry flag if result > 255
+                    self.flags[flags.C] = 1 if result > 0xFF else 0
+
+                    # Set Overflow flag: V = (A^result) & (M^result) & 0x80
+                    # Overflow occurs if both operands have same sign and result has different sign
+                    self.flags[flags.V] = 1 if ((self.A ^ result) & (value ^ result) & BYTE_BIT_7_MASK) else 0
+
+                    # Store result (masked to 8 bits)
+                    self.A = result & 0xFF
+
+                    # Set N and Z flags
+                    self.flags[flags.Z] = 1 if self.A == 0 else 0
+                    self.flags[flags.N] = 1 if (self.A & BYTE_BIT_7_MASK) else 0
+
+                    self.log.info("i")
+
+                case instructions.ADC_ZEROPAGE_0x65:
+                    # Add with Carry - Zero Page
+                    address: int = self.fetch_zeropage_mode_address(offset_register_name=None)
+                    value: int = int(self.read_byte(address=address))
+
+                    result: int = self.A + value + self.flags[flags.C]
+                    self.flags[flags.C] = 1 if result > 0xFF else 0
+                    self.flags[flags.V] = 1 if ((self.A ^ result) & (value ^ result) & BYTE_BIT_7_MASK) else 0
+
+                    self.A = result & 0xFF
+                    self.flags[flags.Z] = 1 if self.A == 0 else 0
+                    self.flags[flags.N] = 1 if (self.A & BYTE_BIT_7_MASK) else 0
+
+                    self.log.info("i")
+
+                case instructions.ADC_ZEROPAGE_X_0x75:
+                    # Add with Carry - Zero Page,X
+                    address: int = self.fetch_zeropage_mode_address(offset_register_name="X")
+                    value: int = int(self.read_byte(address=address))
+
+                    result: int = self.A + value + self.flags[flags.C]
+                    self.flags[flags.C] = 1 if result > 0xFF else 0
+                    self.flags[flags.V] = 1 if ((self.A ^ result) & (value ^ result) & BYTE_BIT_7_MASK) else 0
+
+                    self.A = result & 0xFF
+                    self.flags[flags.Z] = 1 if self.A == 0 else 0
+                    self.flags[flags.N] = 1 if (self.A & BYTE_BIT_7_MASK) else 0
+
+                    self.log.info("i")
+
+                case instructions.ADC_ABSOLUTE_0x6D:
+                    # Add with Carry - Absolute
+                    address: int = self.fetch_absolute_mode_address(offset_register_name=None)
+                    value: int = int(self.read_byte(address=address))
+
+                    result: int = self.A + value + self.flags[flags.C]
+                    self.flags[flags.C] = 1 if result > 0xFF else 0
+                    self.flags[flags.V] = 1 if ((self.A ^ result) & (value ^ result) & BYTE_BIT_7_MASK) else 0
+
+                    self.A = result & 0xFF
+                    self.flags[flags.Z] = 1 if self.A == 0 else 0
+                    self.flags[flags.N] = 1 if (self.A & BYTE_BIT_7_MASK) else 0
+
+                    self.log.info("i")
+
+                case instructions.ADC_ABSOLUTE_X_0x7D:
+                    # Add with Carry - Absolute,X
+                    address: int = self.fetch_absolute_mode_address(offset_register_name="X")
+                    value: int = int(self.read_byte(address=address))
+
+                    result: int = self.A + value + self.flags[flags.C]
+                    self.flags[flags.C] = 1 if result > 0xFF else 0
+                    self.flags[flags.V] = 1 if ((self.A ^ result) & (value ^ result) & BYTE_BIT_7_MASK) else 0
+
+                    self.A = result & 0xFF
+                    self.flags[flags.Z] = 1 if self.A == 0 else 0
+                    self.flags[flags.N] = 1 if (self.A & BYTE_BIT_7_MASK) else 0
+
+                    self.log.info("i")
+
+                case instructions.ADC_ABSOLUTE_Y_0x79:
+                    # Add with Carry - Absolute,Y
+                    address: int = self.fetch_absolute_mode_address(offset_register_name="Y")
+                    value: int = int(self.read_byte(address=address))
+
+                    result: int = self.A + value + self.flags[flags.C]
+                    self.flags[flags.C] = 1 if result > 0xFF else 0
+                    self.flags[flags.V] = 1 if ((self.A ^ result) & (value ^ result) & BYTE_BIT_7_MASK) else 0
+
+                    self.A = result & 0xFF
+                    self.flags[flags.Z] = 1 if self.A == 0 else 0
+                    self.flags[flags.N] = 1 if (self.A & BYTE_BIT_7_MASK) else 0
+
+                    self.log.info("i")
+
+                case instructions.ADC_INDEXED_INDIRECT_X_0x61:
+                    # Add with Carry - Indexed Indirect (X)
+                    address: int = self.fetch_indexed_indirect_mode_address()
+                    value: int = int(self.read_byte(address=address))
+
+                    result: int = self.A + value + self.flags[flags.C]
+                    self.flags[flags.C] = 1 if result > 0xFF else 0
+                    self.flags[flags.V] = 1 if ((self.A ^ result) & (value ^ result) & BYTE_BIT_7_MASK) else 0
+
+                    self.A = result & 0xFF
+                    self.flags[flags.Z] = 1 if self.A == 0 else 0
+                    self.flags[flags.N] = 1 if (self.A & BYTE_BIT_7_MASK) else 0
+
+                    self.log.info("i")
+
+                case instructions.ADC_INDIRECT_INDEXED_Y_0x71:
+                    # Add with Carry - Indirect Indexed (Y)
+                    address: int = self.fetch_indirect_indexed_mode_address()
+                    value: int = int(self.read_byte(address=address))
+
+                    result: int = self.A + value + self.flags[flags.C]
+                    self.flags[flags.C] = 1 if result > 0xFF else 0
+                    self.flags[flags.V] = 1 if ((self.A ^ result) & (value ^ result) & BYTE_BIT_7_MASK) else 0
+
+                    self.A = result & 0xFF
+                    self.flags[flags.Z] = 1 if self.A == 0 else 0
+                    self.flags[flags.N] = 1 if (self.A & BYTE_BIT_7_MASK) else 0
+
+                    self.log.info("i")
+
+                # ''' Execute SBC '''
+                case instructions.SBC_IMMEDIATE_0xE9:
+                    # Subtract with Borrow - Immediate
+                    # A - M - (1 - C) = A - M - !C
+                    value: int = int(self.fetch_byte())
+
+                    # Binary mode subtraction
+                    result: int = self.A - value - (1 - self.flags[flags.C])
+
+                    # Set Carry flag (inverted borrow): C=1 if no borrow (A >= M)
+                    self.flags[flags.C] = 1 if result >= 0 else 0
+
+                    # Set Overflow flag: V = (A^M) & (A^result) & 0x80
+                    # Overflow occurs if operands have different signs and result has different sign from A
+                    self.flags[flags.V] = 1 if ((self.A ^ value) & (self.A ^ result) & BYTE_BIT_7_MASK) else 0
+
+                    # Store result (masked to 8 bits)
+                    self.A = result & 0xFF
+
+                    # Set N and Z flags
+                    self.flags[flags.Z] = 1 if self.A == 0 else 0
+                    self.flags[flags.N] = 1 if (self.A & BYTE_BIT_7_MASK) else 0
+
+                    self.log.info("i")
+
+                case instructions.SBC_ZEROPAGE_0xE5:
+                    # Subtract with Borrow - Zero Page
+                    address: int = self.fetch_zeropage_mode_address(offset_register_name=None)
+                    value: int = int(self.read_byte(address=address))
+
+                    result: int = self.A - value - (1 - self.flags[flags.C])
+                    self.flags[flags.C] = 1 if result >= 0 else 0
+                    self.flags[flags.V] = 1 if ((self.A ^ value) & (self.A ^ result) & BYTE_BIT_7_MASK) else 0
+
+                    self.A = result & 0xFF
+                    self.flags[flags.Z] = 1 if self.A == 0 else 0
+                    self.flags[flags.N] = 1 if (self.A & BYTE_BIT_7_MASK) else 0
+
+                    self.log.info("i")
+
+                case instructions.SBC_ZEROPAGE_X_0xF5:
+                    # Subtract with Borrow - Zero Page,X
+                    address: int = self.fetch_zeropage_mode_address(offset_register_name="X")
+                    value: int = int(self.read_byte(address=address))
+
+                    result: int = self.A - value - (1 - self.flags[flags.C])
+                    self.flags[flags.C] = 1 if result >= 0 else 0
+                    self.flags[flags.V] = 1 if ((self.A ^ value) & (self.A ^ result) & BYTE_BIT_7_MASK) else 0
+
+                    self.A = result & 0xFF
+                    self.flags[flags.Z] = 1 if self.A == 0 else 0
+                    self.flags[flags.N] = 1 if (self.A & BYTE_BIT_7_MASK) else 0
+
+                    self.log.info("i")
+
+                case instructions.SBC_ABSOLUTE_0xED:
+                    # Subtract with Borrow - Absolute
+                    address: int = self.fetch_absolute_mode_address(offset_register_name=None)
+                    value: int = int(self.read_byte(address=address))
+
+                    result: int = self.A - value - (1 - self.flags[flags.C])
+                    self.flags[flags.C] = 1 if result >= 0 else 0
+                    self.flags[flags.V] = 1 if ((self.A ^ value) & (self.A ^ result) & BYTE_BIT_7_MASK) else 0
+
+                    self.A = result & 0xFF
+                    self.flags[flags.Z] = 1 if self.A == 0 else 0
+                    self.flags[flags.N] = 1 if (self.A & BYTE_BIT_7_MASK) else 0
+
+                    self.log.info("i")
+
+                case instructions.SBC_ABSOLUTE_X_0xFD:
+                    # Subtract with Borrow - Absolute,X
+                    address: int = self.fetch_absolute_mode_address(offset_register_name="X")
+                    value: int = int(self.read_byte(address=address))
+
+                    result: int = self.A - value - (1 - self.flags[flags.C])
+                    self.flags[flags.C] = 1 if result >= 0 else 0
+                    self.flags[flags.V] = 1 if ((self.A ^ value) & (self.A ^ result) & BYTE_BIT_7_MASK) else 0
+
+                    self.A = result & 0xFF
+                    self.flags[flags.Z] = 1 if self.A == 0 else 0
+                    self.flags[flags.N] = 1 if (self.A & BYTE_BIT_7_MASK) else 0
+
+                    self.log.info("i")
+
+                case instructions.SBC_ABSOLUTE_Y_0xF9:
+                    # Subtract with Borrow - Absolute,Y
+                    address: int = self.fetch_absolute_mode_address(offset_register_name="Y")
+                    value: int = int(self.read_byte(address=address))
+
+                    result: int = self.A - value - (1 - self.flags[flags.C])
+                    self.flags[flags.C] = 1 if result >= 0 else 0
+                    self.flags[flags.V] = 1 if ((self.A ^ value) & (self.A ^ result) & BYTE_BIT_7_MASK) else 0
+
+                    self.A = result & 0xFF
+                    self.flags[flags.Z] = 1 if self.A == 0 else 0
+                    self.flags[flags.N] = 1 if (self.A & BYTE_BIT_7_MASK) else 0
+
+                    self.log.info("i")
+
+                case instructions.SBC_INDEXED_INDIRECT_X_0xE1:
+                    # Subtract with Borrow - Indexed Indirect (X)
+                    address: int = self.fetch_indexed_indirect_mode_address()
+                    value: int = int(self.read_byte(address=address))
+
+                    result: int = self.A - value - (1 - self.flags[flags.C])
+                    self.flags[flags.C] = 1 if result >= 0 else 0
+                    self.flags[flags.V] = 1 if ((self.A ^ value) & (self.A ^ result) & BYTE_BIT_7_MASK) else 0
+
+                    self.A = result & 0xFF
+                    self.flags[flags.Z] = 1 if self.A == 0 else 0
+                    self.flags[flags.N] = 1 if (self.A & BYTE_BIT_7_MASK) else 0
+
+                    self.log.info("i")
+
+                case instructions.SBC_INDIRECT_INDEXED_Y_0xF1:
+                    # Subtract with Borrow - Indirect Indexed (Y)
+                    address: int = self.fetch_indirect_indexed_mode_address()
+                    value: int = int(self.read_byte(address=address))
+
+                    result: int = self.A - value - (1 - self.flags[flags.C])
+                    self.flags[flags.C] = 1 if result >= 0 else 0
+                    self.flags[flags.V] = 1 if ((self.A ^ value) & (self.A ^ result) & BYTE_BIT_7_MASK) else 0
+
+                    self.A = result & 0xFF
+                    self.flags[flags.Z] = 1 if self.A == 0 else 0
+                    self.flags[flags.N] = 1 if (self.A & BYTE_BIT_7_MASK) else 0
 
                     self.log.info("i")
 
