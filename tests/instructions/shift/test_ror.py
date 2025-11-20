@@ -3,7 +3,7 @@ import contextlib
 import logging
 
 import mos6502
-from mos6502 import CPU, exceptions, flags, instructions
+from mos6502 import CPU, errors, flags, instructions
 
 log = logging.getLogger("mos6502")
 log.setLevel(logging.DEBUG)
@@ -20,7 +20,7 @@ def test_cpu_instruction_ROR_ACCUMULATOR_0x6A(cpu: CPU) -> None:  # noqa: N802
     cpu.ram[0xFFFC] = instructions.ROR_ACCUMULATOR_0x6A
 
     # when:
-    with contextlib.suppress(exceptions.CPUCycleExhaustionError):
+    with contextlib.suppress(errors.CPUCycleExhaustionError, errors.IllegalCPUInstructionError):
         cpu.execute(cycles=2)
 
     # then:
@@ -42,7 +42,7 @@ def test_cpu_instruction_ROR_ACCUMULATOR_0x6A_with_carry(cpu: CPU) -> None:  # n
     cpu.ram[0xFFFC] = instructions.ROR_ACCUMULATOR_0x6A
 
     # when:
-    with contextlib.suppress(exceptions.CPUCycleExhaustionError):
+    with contextlib.suppress(errors.CPUCycleExhaustionError, errors.IllegalCPUInstructionError):
         cpu.execute(cycles=2)
 
     # then:
@@ -64,7 +64,7 @@ def test_cpu_instruction_ROR_ACCUMULATOR_0x6A_carry_out(cpu: CPU) -> None:  # no
     cpu.ram[0xFFFC] = instructions.ROR_ACCUMULATOR_0x6A
 
     # when:
-    with contextlib.suppress(exceptions.CPUCycleExhaustionError):
+    with contextlib.suppress(errors.CPUCycleExhaustionError, errors.IllegalCPUInstructionError):
         cpu.execute(cycles=2)
 
     # then:
@@ -87,7 +87,7 @@ def test_cpu_instruction_ROR_ZEROPAGE_0x66(cpu: CPU) -> None:  # noqa: N802
     cpu.ram[0xFFFD] = 0x42
 
     # when:
-    with contextlib.suppress(exceptions.CPUCycleExhaustionError):
+    with contextlib.suppress(errors.CPUCycleExhaustionError, errors.IllegalCPUInstructionError):
         cpu.execute(cycles=5)
 
     # then:
@@ -111,7 +111,7 @@ def test_cpu_instruction_ROR_ZEROPAGE_X_0x76(cpu: CPU) -> None:  # noqa: N802
     cpu.ram[0xFFFD] = 0x42
 
     # when:
-    with contextlib.suppress(exceptions.CPUCycleExhaustionError):
+    with contextlib.suppress(errors.CPUCycleExhaustionError, errors.IllegalCPUInstructionError):
         cpu.execute(cycles=6)
 
     # then:
@@ -135,7 +135,7 @@ def test_cpu_instruction_ROR_ABSOLUTE_0x6E(cpu: CPU) -> None:  # noqa: N802
     cpu.ram[0xFFFE] = 0x12
 
     # when:
-    with contextlib.suppress(exceptions.CPUCycleExhaustionError):
+    with contextlib.suppress(errors.CPUCycleExhaustionError, errors.IllegalCPUInstructionError):
         cpu.execute(cycles=6)
 
     # then:
@@ -160,7 +160,7 @@ def test_cpu_instruction_ROR_ABSOLUTE_X_0x7E(cpu: CPU) -> None:  # noqa: N802
     cpu.ram[0xFFFE] = 0x12
 
     # when:
-    with contextlib.suppress(exceptions.CPUCycleExhaustionError):
+    with contextlib.suppress(errors.CPUCycleExhaustionError, errors.IllegalCPUInstructionError):
         cpu.execute(cycles=7)
 
     # then:

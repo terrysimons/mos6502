@@ -4,7 +4,7 @@ import copy
 import logging
 
 import mos6502
-from mos6502 import exceptions, flags, instructions
+from mos6502 import errors, flags, instructions
 
 log: logging.Logger = logging.getLogger("mos6502")
 log.setLevel(logging.DEBUG)
@@ -30,7 +30,7 @@ def test_cpu_instruction_RTS_IMPLIED_0x60(cpu: CPU) -> None:  # noqa: N802
     cpu.ram[0xFFFE] = 0x42
 
     # Execute JSR first
-    with contextlib.suppress(exceptions.CPUCycleExhaustionError):
+    with contextlib.suppress(errors.CPUCycleExhaustionError):
         cpu.execute(cycles=6)
 
     assert cpu.PC == 0x4243
@@ -42,7 +42,7 @@ def test_cpu_instruction_RTS_IMPLIED_0x60(cpu: CPU) -> None:  # noqa: N802
     cpu.ram[0x4243] = instructions.RTS_IMPLIED_0x60
 
     # when: Execute only RTS (4 cycles based on log)
-    with contextlib.suppress(exceptions.CPUCycleExhaustionError):
+    with contextlib.suppress(errors.CPUCycleExhaustionError):
         cpu.execute(cycles=4)
 
     # then: RTS should return to address after JSR (0xFFFF)

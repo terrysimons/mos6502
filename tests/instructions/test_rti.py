@@ -3,7 +3,7 @@ import contextlib
 import logging
 
 import mos6502
-from mos6502 import CPU, exceptions, flags, instructions
+from mos6502 import CPU, errors, flags, instructions
 from mos6502.memory import Byte
 
 log = logging.getLogger("mos6502")
@@ -32,7 +32,7 @@ def test_cpu_instruction_RTI_IMPLIED_0x40(cpu: CPU) -> None:  # noqa: N802
     cpu.ram[0xFFFC] = instructions.RTI_IMPLIED_0x40
 
     # when:
-    with contextlib.suppress(exceptions.CPUCycleExhaustionError):
+    with contextlib.suppress(errors.CPUCycleExhaustionError):
         cpu.execute(cycles=6)
 
     # then:
@@ -68,7 +68,7 @@ def test_cpu_instruction_RTI_IMPLIED_0x40_stack_pointer(cpu: CPU) -> None:  # no
     cpu.ram[0xFFFC] = instructions.RTI_IMPLIED_0x40
 
     # when:
-    with contextlib.suppress(exceptions.CPUCycleExhaustionError):
+    with contextlib.suppress(errors.CPUCycleExhaustionError):
         cpu.execute(cycles=6)
 
     # then: Stack pointer should be restored

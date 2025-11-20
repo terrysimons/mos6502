@@ -177,7 +177,7 @@ def test_cpu_instruction_LDY_ZEROPAGE_X_0xB4_with_zero_flag(cpu: CPU) -> None:  
         offset=0x42,
         register_name="Y",
         expected_flags=expected_flags,
-        expected_cycles=5,
+        expected_cycles=4,  # Zero Page,X takes 4 cycles, not 5
         offset_register_name="X",
         offset_value=0x08,
     )

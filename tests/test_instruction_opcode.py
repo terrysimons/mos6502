@@ -3,7 +3,7 @@
 
 import pytest
 
-from mos6502 import CPU, exceptions
+from mos6502 import CPU, errors
 from mos6502.instructions import InstructionOpcode
 from mos6502.memory import Byte, RAM
 
@@ -96,7 +96,7 @@ def test_opcode_with_cpu():
 
     # Execute it
     import contextlib
-    with contextlib.suppress(exceptions.CPUCycleExhaustionError):
+    with contextlib.suppress(errors.CPUCycleExhaustionError):
         cpu.execute(cycles=2)
 
     # Should have executed NOP

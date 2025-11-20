@@ -7,7 +7,7 @@ from typing import Literal, Self
 import bitarray
 from bitarray.util import ba2int, int2ba
 
-from mos6502 import exceptions
+from mos6502 import errors
 
 ENDIANNESS: Literal["little"] = "little"
 
@@ -421,7 +421,7 @@ class RAM(MutableSequence):
         if index <= 65535:
             return self.heap[index - 512].value
 
-        raise exceptions.InvalidMemoryLocationError(
+        raise errors.InvalidMemoryLocationError(
             f"Invalid memory location: {index} should be between 0 and "
             f"{len(self.zeropage) + len(self.stack) + len(self.heap) - 1}",
         )
@@ -454,7 +454,7 @@ class RAM(MutableSequence):
                     endianness=self.endianness,
                 )
             else:
-                raise exceptions.InvalidMemoryLocationError(  # noqa: TRY301
+                raise errors.InvalidMemoryLocationError(  # noqa: TRY301
                     f"Invalid memory location: {index} should be between 0 and "
                     f"{len(self.zeropage) + len(self.stack) + len(self.heap) - 1}",
                 )
@@ -482,7 +482,7 @@ class RAM(MutableSequence):
         if address >= 512 and address <= 0xFFFF:
             return "heap"
 
-        raise exceptions.InvalidMemoryLocationError(
+        raise errors.InvalidMemoryLocationError(
             f"Invalid memory location: {address} should be between 0 and "
             f"{len(self.zeropage) + len(self.stack) + len(self.heap) - 1}",
         )
@@ -505,7 +505,7 @@ class RAM(MutableSequence):
         ram_start_address: int = 512
 
         if (data < -127) or (data > 255):
-            raise exceptions.InvalidMemoryAssignmentError(
+            raise errors.InvalidMemoryAssignmentError(
                 f"Data must be written one byte at a time, but got data > 1 byte: {data}",
             )
 

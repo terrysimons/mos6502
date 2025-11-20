@@ -3,7 +3,7 @@ import contextlib
 import logging
 
 import mos6502
-from mos6502 import CPU, exceptions, flags, instructions
+from mos6502 import CPU, errors, flags, instructions
 
 log = logging.getLogger("mos6502")
 log.setLevel(logging.DEBUG)
@@ -21,7 +21,7 @@ def test_cpu_instruction_BCS_RELATIVE_0xB0_branch_taken(cpu: CPU) -> None:  # no
     cpu.ram[0xFFFD] = 0x05
 
     # when:
-    with contextlib.suppress(exceptions.CPUCycleExhaustionError):
+    with contextlib.suppress(errors.CPUCycleExhaustionError):
         cpu.execute(cycles=3)
 
     # then:
@@ -41,7 +41,7 @@ def test_cpu_instruction_BCS_RELATIVE_0xB0_branch_not_taken(cpu: CPU) -> None:  
     cpu.ram[0xFFFD] = 0x05
 
     # when:
-    with contextlib.suppress(exceptions.CPUCycleExhaustionError):
+    with contextlib.suppress(errors.CPUCycleExhaustionError):
         cpu.execute(cycles=2)
 
     # then:
@@ -64,7 +64,7 @@ def test_cpu_instruction_BCS_RELATIVE_0xB0_negative_offset(cpu: CPU) -> None:  #
     cpu.ram[0x0201] = 0xF6  # -10 in signed byte
 
     # when:
-    with contextlib.suppress(exceptions.CPUCycleExhaustionError):
+    with contextlib.suppress(errors.CPUCycleExhaustionError):
         cpu.execute(cycles=3)
 
     # then:
@@ -90,7 +90,7 @@ def test_cpu_instruction_BCS_RELATIVE_0xB0_page_boundary_cross(cpu: CPU) -> None
     cpu.ram[0x02FE] = 0x05
 
     # when:
-    with contextlib.suppress(exceptions.CPUCycleExhaustionError):
+    with contextlib.suppress(errors.CPUCycleExhaustionError):
         cpu.execute(cycles=4)
 
     # then:

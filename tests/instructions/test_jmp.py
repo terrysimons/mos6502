@@ -4,7 +4,7 @@ import copy
 import logging
 
 import mos6502
-from mos6502 import CPU, exceptions, flags, instructions
+from mos6502 import CPU, errors, flags, instructions
 
 log = logging.getLogger("mos6502")
 log.setLevel(logging.DEBUG)
@@ -30,7 +30,7 @@ def test_cpu_instruction_JMP_ABSOLUTE_0x4C(cpu: CPU) -> None:  # noqa: N802
     cpu.ram[0xFFFE] = 0x80  # Jump to 0x8000
 
     # when:
-    with contextlib.suppress(exceptions.CPUCycleExhaustionError):
+    with contextlib.suppress(errors.CPUCycleExhaustionError):
         cpu.execute(cycles=3)
 
     # then:
@@ -53,7 +53,7 @@ def test_cpu_instruction_JMP_INDIRECT_0x6C(cpu: CPU) -> None:  # noqa: N802
     cpu.ram[0x1021] = 0x90  # Jump target = 0x9000
 
     # when:
-    with contextlib.suppress(exceptions.CPUCycleExhaustionError):
+    with contextlib.suppress(errors.CPUCycleExhaustionError):
         cpu.execute(cycles=5)
 
     # then:
@@ -84,7 +84,7 @@ def test_cpu_instruction_JMP_INDIRECT_0x6C_page_boundary_bug_nmos(nmos_cpu: CPU)
     nmos_cpu.ram[0x1100] = 0x56  # This is NOT read on NMOS
 
     # when:
-    with contextlib.suppress(exceptions.CPUCycleExhaustionError):
+    with contextlib.suppress(errors.CPUCycleExhaustionError):
         nmos_cpu.execute(cycles=5)
 
     # then:
@@ -113,7 +113,7 @@ def test_cpu_instruction_JMP_INDIRECT_0x6C_page_boundary_bug_cmos(cmos_cpu: CPU)
     cmos_cpu.ram[0x1100] = 0x56  # High byte (correctly crosses page - FIX)
 
     # when:
-    with contextlib.suppress(exceptions.CPUCycleExhaustionError):
+    with contextlib.suppress(errors.CPUCycleExhaustionError):
         cmos_cpu.execute(cycles=5)
 
     # then:
@@ -138,7 +138,7 @@ def test_cpu_instruction_JMP_INDIRECT_0x6C_not_page_boundary(cpu: CPU) -> None: 
     cpu.ram[0x10FF] = 0xA5  # Jump target = 0xA542
 
     # when:
-    with contextlib.suppress(exceptions.CPUCycleExhaustionError):
+    with contextlib.suppress(errors.CPUCycleExhaustionError):
         cpu.execute(cycles=5)
 
     # then:

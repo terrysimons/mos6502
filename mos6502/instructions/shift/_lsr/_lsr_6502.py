@@ -136,4 +136,7 @@ def lsr_absolute_x_0x5e(cpu: MOS6502CPU) -> None:
     cpu.flags[flags.Z] = 1 if result == 0 else 0
     cpu.flags[flags.N] = 0
 
+    # Read-Modify-Write with Absolute,X always takes 7 cycles (not conditional on page crossing)
+    cpu.spend_cpu_cycles(1)
+
     cpu.log.info("ax")

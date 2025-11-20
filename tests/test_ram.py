@@ -4,7 +4,7 @@ from bitarray.util import int2ba
 
 import mos6502
 import mos6502.memory as ram
-from mos6502 import exceptions
+from mos6502 import errors
 from mos6502.core import INFINITE_CYCLES
 from mos6502.memory import Byte, Word
 
@@ -90,7 +90,7 @@ def test_ram_out_of_bounds() -> None:
     got_exception = False
     try:
         section: None = cpu.ram.memory_section(address=len(cpu.ram) + 1)
-    except exceptions.InvalidMemoryLocationError:
+    except errors.InvalidMemoryLocationError:
         got_exception = True
 
     assert section == expected_section
@@ -99,7 +99,7 @@ def test_ram_out_of_bounds() -> None:
     got_exception = False
     try:
         section: None = cpu.ram.memory_section(-1)
-    except exceptions.InvalidMemoryLocationError:
+    except errors.InvalidMemoryLocationError:
         got_exception = True
 
     assert got_exception is True
@@ -107,7 +107,7 @@ def test_ram_out_of_bounds() -> None:
     got_exception = False
     try:
         section: None = cpu.ram.memory_section(len(cpu.ram) + 1)
-    except exceptions.InvalidMemoryLocationError:
+    except errors.InvalidMemoryLocationError:
         got_exception = True
 
     assert got_exception is True

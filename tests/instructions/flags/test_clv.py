@@ -4,7 +4,7 @@ import copy
 import logging
 
 import mos6502
-from mos6502 import CPU, exceptions, flags, instructions
+from mos6502 import CPU, errors, flags, instructions
 
 log = logging.getLogger("mos6502")
 log.setLevel(logging.DEBUG)
@@ -26,7 +26,7 @@ def test_cpu_instruction_CLV_IMPLIED_0xB8(cpu: CPU) -> None:  # noqa: N802
     cpu.ram[0xFFFC] = instructions.CLV_IMPLIED_0xB8
 
     # when:
-    with contextlib.suppress(exceptions.CPUCycleExhaustionError):
+    with contextlib.suppress(errors.CPUCycleExhaustionError):
         cpu.execute(cycles=2)
 
     # then:

@@ -3,7 +3,7 @@ import contextlib
 import logging
 
 import mos6502
-from mos6502 import CPU, exceptions, flags, instructions
+from mos6502 import CPU, errors, flags, instructions
 
 log = logging.getLogger("mos6502")
 log.setLevel(logging.DEBUG)
@@ -21,7 +21,7 @@ def test_cpu_instruction_ADC_IMMEDIATE_0x69_simple(cpu: CPU) -> None:  # noqa: N
     cpu.ram[0xFFFD] = 0x10
 
     # when:
-    with contextlib.suppress(exceptions.CPUCycleExhaustionError):
+    with contextlib.suppress(errors.CPUCycleExhaustionError):
         cpu.execute(cycles=2)
 
     # then:
@@ -45,7 +45,7 @@ def test_cpu_instruction_ADC_IMMEDIATE_0x69_with_carry(cpu: CPU) -> None:  # noq
     cpu.ram[0xFFFD] = 0x10
 
     # when:
-    with contextlib.suppress(exceptions.CPUCycleExhaustionError):
+    with contextlib.suppress(errors.CPUCycleExhaustionError):
         cpu.execute(cycles=2)
 
     # then:
@@ -69,7 +69,7 @@ def test_cpu_instruction_ADC_IMMEDIATE_0x69_carry_out(cpu: CPU) -> None:  # noqa
     cpu.ram[0xFFFD] = 0x01
 
     # when:
-    with contextlib.suppress(exceptions.CPUCycleExhaustionError):
+    with contextlib.suppress(errors.CPUCycleExhaustionError):
         cpu.execute(cycles=2)
 
     # then:
@@ -93,7 +93,7 @@ def test_cpu_instruction_ADC_IMMEDIATE_0x69_overflow_positive(cpu: CPU) -> None:
     cpu.ram[0xFFFD] = 0x01  # +1
 
     # when:
-    with contextlib.suppress(exceptions.CPUCycleExhaustionError):
+    with contextlib.suppress(errors.CPUCycleExhaustionError):
         cpu.execute(cycles=2)
 
     # then:
@@ -117,7 +117,7 @@ def test_cpu_instruction_ADC_IMMEDIATE_0x69_overflow_negative(cpu: CPU) -> None:
     cpu.ram[0xFFFD] = 0xFF  # -1
 
     # when:
-    with contextlib.suppress(exceptions.CPUCycleExhaustionError):
+    with contextlib.suppress(errors.CPUCycleExhaustionError):
         cpu.execute(cycles=2)
 
     # then:
@@ -142,7 +142,7 @@ def test_cpu_instruction_ADC_ZEROPAGE_0x65(cpu: CPU) -> None:  # noqa: N802
     cpu.ram[0xFFFD] = 0x42
 
     # when:
-    with contextlib.suppress(exceptions.CPUCycleExhaustionError):
+    with contextlib.suppress(errors.CPUCycleExhaustionError):
         cpu.execute(cycles=3)
 
     # then:
@@ -166,7 +166,7 @@ def test_cpu_instruction_ADC_ABSOLUTE_0x6D(cpu: CPU) -> None:  # noqa: N802
     cpu.ram[0xFFFE] = 0x12
 
     # when:
-    with contextlib.suppress(exceptions.CPUCycleExhaustionError):
+    with contextlib.suppress(errors.CPUCycleExhaustionError):
         cpu.execute(cycles=4)
 
     # then:
@@ -192,7 +192,7 @@ def test_cpu_instruction_ADC_IMMEDIATE_0x69_bcd_simple(cpu: CPU) -> None:  # noq
     cpu.ram[0xFFFD] = 0x01  # BCD 01
 
     # when:
-    with contextlib.suppress(exceptions.CPUCycleExhaustionError):
+    with contextlib.suppress(errors.CPUCycleExhaustionError):
         cpu.execute(cycles=2)
 
     # then:
@@ -215,7 +215,7 @@ def test_cpu_instruction_ADC_IMMEDIATE_0x69_bcd_carry_low_nibble(cpu: CPU) -> No
     cpu.ram[0xFFFD] = 0x05  # BCD 05
 
     # when:
-    with contextlib.suppress(exceptions.CPUCycleExhaustionError):
+    with contextlib.suppress(errors.CPUCycleExhaustionError):
         cpu.execute(cycles=2)
 
     # then:
@@ -238,7 +238,7 @@ def test_cpu_instruction_ADC_IMMEDIATE_0x69_bcd_carry_high_nibble(cpu: CPU) -> N
     cpu.ram[0xFFFD] = 0x60  # BCD 60
 
     # when:
-    with contextlib.suppress(exceptions.CPUCycleExhaustionError):
+    with contextlib.suppress(errors.CPUCycleExhaustionError):
         cpu.execute(cycles=2)
 
     # then:
@@ -261,7 +261,7 @@ def test_cpu_instruction_ADC_IMMEDIATE_0x69_bcd_with_carry_in(cpu: CPU) -> None:
     cpu.ram[0xFFFD] = 0x09  # BCD 09
 
     # when:
-    with contextlib.suppress(exceptions.CPUCycleExhaustionError):
+    with contextlib.suppress(errors.CPUCycleExhaustionError):
         cpu.execute(cycles=2)
 
     # then:
@@ -286,7 +286,7 @@ def test_cpu_instruction_ADC_IMMEDIATE_0x69_bcd_99_plus_1_nmos(nmos_cpu: CPU) ->
     nmos_cpu.ram[0xFFFD] = 0x01  # BCD 01
 
     # when:
-    with contextlib.suppress(exceptions.CPUCycleExhaustionError):
+    with contextlib.suppress(errors.CPUCycleExhaustionError):
         nmos_cpu.execute(cycles=2)
 
     # then:
@@ -311,7 +311,7 @@ def test_cpu_instruction_ADC_IMMEDIATE_0x69_bcd_99_plus_1_cmos(cmos_cpu: CPU) ->
     cmos_cpu.ram[0xFFFD] = 0x01  # BCD 01
 
     # when:
-    with contextlib.suppress(exceptions.CPUCycleExhaustionError):
+    with contextlib.suppress(errors.CPUCycleExhaustionError):
         cmos_cpu.execute(cycles=2)
 
     # then:
@@ -334,7 +334,7 @@ def test_cpu_instruction_ADC_IMMEDIATE_0x69_bcd_complex(cpu: CPU) -> None:  # no
     cpu.ram[0xFFFD] = 0x46  # BCD 46
 
     # when:
-    with contextlib.suppress(exceptions.CPUCycleExhaustionError):
+    with contextlib.suppress(errors.CPUCycleExhaustionError):
         cpu.execute(cycles=2)
 
     # then:

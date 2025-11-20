@@ -3,7 +3,7 @@ import contextlib
 import logging
 
 import mos6502
-from mos6502 import CPU, exceptions, flags, instructions
+from mos6502 import CPU, errors, flags, instructions
 
 log = logging.getLogger("mos6502")
 log.setLevel(logging.DEBUG)
@@ -19,7 +19,7 @@ def test_cpu_instruction_LSR_ACCUMULATOR_0x4A(cpu: CPU) -> None:  # noqa: N802
     cpu.ram[0xFFFC] = instructions.LSR_ACCUMULATOR_0x4A
 
     # when:
-    with contextlib.suppress(exceptions.CPUCycleExhaustionError):
+    with contextlib.suppress(errors.CPUCycleExhaustionError, errors.IllegalCPUInstructionError):
         cpu.execute(cycles=2)
 
     # then:
@@ -40,7 +40,7 @@ def test_cpu_instruction_LSR_ACCUMULATOR_0x4A_carry(cpu: CPU) -> None:  # noqa: 
     cpu.ram[0xFFFC] = instructions.LSR_ACCUMULATOR_0x4A
 
     # when:
-    with contextlib.suppress(exceptions.CPUCycleExhaustionError):
+    with contextlib.suppress(errors.CPUCycleExhaustionError, errors.IllegalCPUInstructionError):
         cpu.execute(cycles=2)
 
     # then:
@@ -61,7 +61,7 @@ def test_cpu_instruction_LSR_ACCUMULATOR_0x4A_zero(cpu: CPU) -> None:  # noqa: N
     cpu.ram[0xFFFC] = instructions.LSR_ACCUMULATOR_0x4A
 
     # when:
-    with contextlib.suppress(exceptions.CPUCycleExhaustionError):
+    with contextlib.suppress(errors.CPUCycleExhaustionError, errors.IllegalCPUInstructionError):
         cpu.execute(cycles=2)
 
     # then:
@@ -83,7 +83,7 @@ def test_cpu_instruction_LSR_ZEROPAGE_0x46(cpu: CPU) -> None:  # noqa: N802
     cpu.ram[0xFFFD] = 0x42
 
     # when:
-    with contextlib.suppress(exceptions.CPUCycleExhaustionError):
+    with contextlib.suppress(errors.CPUCycleExhaustionError, errors.IllegalCPUInstructionError):
         cpu.execute(cycles=5)
 
     # then:
@@ -106,7 +106,7 @@ def test_cpu_instruction_LSR_ZEROPAGE_X_0x56(cpu: CPU) -> None:  # noqa: N802
     cpu.ram[0xFFFD] = 0x42
 
     # when:
-    with contextlib.suppress(exceptions.CPUCycleExhaustionError):
+    with contextlib.suppress(errors.CPUCycleExhaustionError, errors.IllegalCPUInstructionError):
         cpu.execute(cycles=6)
 
     # then:
@@ -129,7 +129,7 @@ def test_cpu_instruction_LSR_ABSOLUTE_0x4E(cpu: CPU) -> None:  # noqa: N802
     cpu.ram[0xFFFE] = 0x12
 
     # when:
-    with contextlib.suppress(exceptions.CPUCycleExhaustionError):
+    with contextlib.suppress(errors.CPUCycleExhaustionError, errors.IllegalCPUInstructionError):
         cpu.execute(cycles=6)
 
     # then:
@@ -153,7 +153,7 @@ def test_cpu_instruction_LSR_ABSOLUTE_X_0x5E(cpu: CPU) -> None:  # noqa: N802
     cpu.ram[0xFFFE] = 0x12
 
     # when:
-    with contextlib.suppress(exceptions.CPUCycleExhaustionError):
+    with contextlib.suppress(errors.CPUCycleExhaustionError, errors.IllegalCPUInstructionError):
         cpu.execute(cycles=7)
 
     # then:

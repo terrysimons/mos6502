@@ -6,7 +6,7 @@ import contextlib
 import pytest
 
 import mos6502
-from mos6502 import CPUVariant, exceptions, instructions
+from mos6502 import CPUVariant, errors, instructions
 
 
 def test_cpu_default_variant() -> None:
@@ -64,7 +64,7 @@ def test_nop_dispatch_6502() -> None:
 
     cpu.ram[0xFFFC] = instructions.NOP_IMPLIED_0xEA
 
-    with contextlib.suppress(exceptions.CPUCycleExhaustionError):
+    with contextlib.suppress(errors.CPUCycleExhaustionError):
         cpu.execute(cycles=2)
 
     assert cpu.PC == 0xFFFD
@@ -78,7 +78,7 @@ def test_nop_dispatch_65c02() -> None:
 
     cpu.ram[0xFFFC] = instructions.NOP_IMPLIED_0xEA
 
-    with contextlib.suppress(exceptions.CPUCycleExhaustionError):
+    with contextlib.suppress(errors.CPUCycleExhaustionError):
         cpu.execute(cycles=2)
 
     assert cpu.PC == 0xFFFD
@@ -103,7 +103,7 @@ def test_brk_d_flag_preserved_nmos_6502() -> None:
     cpu.ram[0xFFFC] = instructions.BRK_IMPLIED_0x00
     cpu.ram[0xFFFD] = 0x00
 
-    with contextlib.suppress(exceptions.CPUCycleExhaustionError, exceptions.CPUBreakError):
+    with contextlib.suppress(errors.CPUCycleExhaustionError, errors.CPUBreakError):
         cpu.execute(cycles=7)
 
     # NMOS 6502: D flag should still be set (preserved)
@@ -130,7 +130,7 @@ def test_brk_d_flag_preserved_nmos_6502a() -> None:
     cpu.ram[0xFFFC] = instructions.BRK_IMPLIED_0x00
     cpu.ram[0xFFFD] = 0x00
 
-    with contextlib.suppress(exceptions.CPUCycleExhaustionError, exceptions.CPUBreakError):
+    with contextlib.suppress(errors.CPUCycleExhaustionError, errors.CPUBreakError):
         cpu.execute(cycles=7)
 
     # NMOS 6502A: D flag should still be set (preserved)
@@ -157,7 +157,7 @@ def test_brk_d_flag_preserved_nmos_6502c() -> None:
     cpu.ram[0xFFFC] = instructions.BRK_IMPLIED_0x00
     cpu.ram[0xFFFD] = 0x00
 
-    with contextlib.suppress(exceptions.CPUCycleExhaustionError, exceptions.CPUBreakError):
+    with contextlib.suppress(errors.CPUCycleExhaustionError, errors.CPUBreakError):
         cpu.execute(cycles=7)
 
     # NMOS 6502C: D flag should still be set (preserved)
@@ -185,7 +185,7 @@ def test_brk_d_flag_cleared_cmos_65c02() -> None:
     cpu.ram[0xFFFC] = instructions.BRK_IMPLIED_0x00
     cpu.ram[0xFFFD] = 0x00
 
-    with contextlib.suppress(exceptions.CPUCycleExhaustionError, exceptions.CPUBreakError):
+    with contextlib.suppress(errors.CPUCycleExhaustionError, errors.CPUBreakError):
         cpu.execute(cycles=7)
 
     # CMOS 65C02: D flag should be cleared

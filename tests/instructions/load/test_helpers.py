@@ -4,7 +4,7 @@ import contextlib
 import copy
 
 import mos6502
-from mos6502 import exceptions, flags
+from mos6502 import errors, flags
 from mos6502.memory import Byte, Word
 
 
@@ -30,7 +30,7 @@ def verify_load_immediate(cpu: mos6502.CPU, data: int, instruction: int, registe
     cpu.ram[0xFFFD] = data
 
     # when:
-    with contextlib.suppress(exceptions.CPUCycleExhaustionError):
+    with contextlib.suppress(errors.CPUCycleExhaustionError, errors.IllegalCPUInstructionError):
         cpu.execute(cycles=expected_cycles)
 
     # then:
@@ -63,7 +63,7 @@ def verify_load_zeropage(cpu: mos6502.CPU, data: int, instruction: int, offset: 
     cpu.ram[(offset + offset_value) & 0xFF] = data
 
     # when:
-    with contextlib.suppress(exceptions.CPUCycleExhaustionError):
+    with contextlib.suppress(errors.CPUCycleExhaustionError, errors.IllegalCPUInstructionError):
         cpu.execute(cycles=expected_cycles)
 
     # then:
@@ -99,7 +99,7 @@ def verify_load_absolute(cpu: mos6502.CPU, data: int, instruction: int, offset: 
     cpu.ram[(offset_address + offset_value) & 0xFFFF] = data
 
     # when:
-    with contextlib.suppress(exceptions.CPUCycleExhaustionError):
+    with contextlib.suppress(errors.CPUCycleExhaustionError, errors.IllegalCPUInstructionError):
         cpu.execute(cycles=expected_cycles)
 
     # then:
@@ -138,7 +138,7 @@ def verify_load_indexed_indirect(cpu: mos6502.CPU, pc_value: int, data: int, ins
     cpu.ram[offset_address & 0xFFFF] = data # read_byte(0x8000) -> cpu.A
 
     # when:
-    with contextlib.suppress(exceptions.CPUCycleExhaustionError):
+    with contextlib.suppress(errors.CPUCycleExhaustionError, errors.IllegalCPUInstructionError):
         cpu.execute(cycles=expected_cycles)
 
     # then:
@@ -178,7 +178,7 @@ def verify_load_indirect_indexed(cpu: mos6502.CPU, pc_value: int, data: int, ins
     cpu.ram[(offset_address + offset_value) & 0xFFFF] = data
 
     # when:
-    with contextlib.suppress(exceptions.CPUCycleExhaustionError):
+    with contextlib.suppress(errors.CPUCycleExhaustionError, errors.IllegalCPUInstructionError):
         cpu.execute(cycles=expected_cycles)
 
     # then

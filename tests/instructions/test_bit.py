@@ -3,7 +3,7 @@ import contextlib
 import logging
 
 import mos6502
-from mos6502 import CPU, exceptions, flags, instructions
+from mos6502 import CPU, errors, flags, instructions
 
 log = logging.getLogger("mos6502")
 log.setLevel(logging.DEBUG)
@@ -21,7 +21,7 @@ def test_cpu_instruction_BIT_ZEROPAGE_0x24_zero_result(cpu: CPU) -> None:  # noq
     cpu.ram[0xFFFD] = 0x42
 
     # when:
-    with contextlib.suppress(exceptions.CPUCycleExhaustionError):
+    with contextlib.suppress(errors.CPUCycleExhaustionError):
         cpu.execute(cycles=3)
 
     # then:
@@ -44,7 +44,7 @@ def test_cpu_instruction_BIT_ZEROPAGE_0x24_nonzero_result(cpu: CPU) -> None:  # 
     cpu.ram[0xFFFD] = 0x42
 
     # when:
-    with contextlib.suppress(exceptions.CPUCycleExhaustionError):
+    with contextlib.suppress(errors.CPUCycleExhaustionError):
         cpu.execute(cycles=3)
 
     # then:
@@ -67,7 +67,7 @@ def test_cpu_instruction_BIT_ZEROPAGE_0x24_n_flag_clear(cpu: CPU) -> None:  # no
     cpu.ram[0xFFFD] = 0x42
 
     # when:
-    with contextlib.suppress(exceptions.CPUCycleExhaustionError):
+    with contextlib.suppress(errors.CPUCycleExhaustionError):
         cpu.execute(cycles=3)
 
     # then:
@@ -90,7 +90,7 @@ def test_cpu_instruction_BIT_ZEROPAGE_0x24_v_flag_set(cpu: CPU) -> None:  # noqa
     cpu.ram[0xFFFD] = 0x42
 
     # when:
-    with contextlib.suppress(exceptions.CPUCycleExhaustionError):
+    with contextlib.suppress(errors.CPUCycleExhaustionError):
         cpu.execute(cycles=3)
 
     # then:
@@ -114,7 +114,7 @@ def test_cpu_instruction_BIT_ABSOLUTE_0x2C(cpu: CPU) -> None:  # noqa: N802
     cpu.ram[0xFFFE] = 0x12
 
     # when:
-    with contextlib.suppress(exceptions.CPUCycleExhaustionError):
+    with contextlib.suppress(errors.CPUCycleExhaustionError):
         cpu.execute(cycles=4)
 
     # then:
@@ -138,7 +138,7 @@ def test_cpu_instruction_BIT_ABSOLUTE_0x2C_all_flags_clear(cpu: CPU) -> None:  #
     cpu.ram[0xFFFE] = 0x12
 
     # when:
-    with contextlib.suppress(exceptions.CPUCycleExhaustionError):
+    with contextlib.suppress(errors.CPUCycleExhaustionError):
         cpu.execute(cycles=4)
 
     # then:

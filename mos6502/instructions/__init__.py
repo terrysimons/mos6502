@@ -3,7 +3,7 @@
 import enum
 from typing import NoReturn
 
-from mos6502.exceptions import IllegalCPUInstructionError
+from mos6502.errors import IllegalCPUInstructionError
 
 
 class InstructionOpcode(int):

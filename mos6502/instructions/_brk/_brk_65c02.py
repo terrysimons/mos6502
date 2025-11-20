@@ -57,3 +57,8 @@ def brk_implied_0x00(cpu: MOS6502CPU) -> None:
     cpu.spend_cpu_cycles(cost=3)
 
     cpu.log.info("i")
+
+    # Raise exception to signal BRK was executed
+    from mos6502 import errors
+
+    raise errors.CPUBreakError(f"BRK instruction executed at PC=0x{cpu.PC - 1:04X}")

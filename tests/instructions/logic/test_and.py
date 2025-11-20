@@ -3,7 +3,7 @@ import contextlib
 import logging
 
 import mos6502
-from mos6502 import CPU, exceptions, flags, instructions
+from mos6502 import CPU, errors, flags, instructions
 
 log = logging.getLogger("mos6502")
 log.setLevel(logging.DEBUG)
@@ -20,7 +20,7 @@ def test_cpu_instruction_AND_IMMEDIATE_0x29_basic(cpu: CPU) -> None:  # noqa: N8
     cpu.ram[0xFFFD] = 0b00001111
 
     # when:
-    with contextlib.suppress(exceptions.CPUCycleExhaustionError):
+    with contextlib.suppress(errors.CPUCycleExhaustionError):
         cpu.execute(cycles=2)
 
     # then:
@@ -41,7 +41,7 @@ def test_cpu_instruction_AND_IMMEDIATE_0x29_nonzero(cpu: CPU) -> None:  # noqa: 
     cpu.ram[0xFFFD] = 0b11110000
 
     # when:
-    with contextlib.suppress(exceptions.CPUCycleExhaustionError):
+    with contextlib.suppress(errors.CPUCycleExhaustionError):
         cpu.execute(cycles=2)
 
     # then:
@@ -62,7 +62,7 @@ def test_cpu_instruction_AND_IMMEDIATE_0x29_negative(cpu: CPU) -> None:  # noqa:
     cpu.ram[0xFFFD] = 0x80
 
     # when:
-    with contextlib.suppress(exceptions.CPUCycleExhaustionError):
+    with contextlib.suppress(errors.CPUCycleExhaustionError):
         cpu.execute(cycles=2)
 
     # then:
@@ -84,7 +84,7 @@ def test_cpu_instruction_AND_ZEROPAGE_0x25(cpu: CPU) -> None:  # noqa: N802
     cpu.ram[0xFFFD] = 0x42
 
     # when:
-    with contextlib.suppress(exceptions.CPUCycleExhaustionError):
+    with contextlib.suppress(errors.CPUCycleExhaustionError):
         cpu.execute(cycles=3)
 
     # then:
@@ -107,7 +107,7 @@ def test_cpu_instruction_AND_ABSOLUTE_0x2D(cpu: CPU) -> None:  # noqa: N802
     cpu.ram[0xFFFE] = 0x12
 
     # when:
-    with contextlib.suppress(exceptions.CPUCycleExhaustionError):
+    with contextlib.suppress(errors.CPUCycleExhaustionError):
         cpu.execute(cycles=4)
 
     # then:

@@ -4,7 +4,7 @@ import copy
 import logging
 
 import mos6502
-from mos6502 import CPU, exceptions, flags, instructions
+from mos6502 import CPU, errors, flags, instructions
 
 log = logging.getLogger("mos6502")
 log.setLevel(logging.DEBUG)
@@ -23,7 +23,7 @@ def test_cpu_instruction_PLP_IMPLIED_0x28(cpu: CPU) -> None:  # noqa: N802
     cpu.ram[0xFFFC] = instructions.PLP_IMPLIED_0x28
 
     # when:
-    with contextlib.suppress(exceptions.CPUCycleExhaustionError):
+    with contextlib.suppress(errors.CPUCycleExhaustionError):
         cpu.execute(cycles=4)
 
     # then:
@@ -53,7 +53,7 @@ def test_cpu_instruction_PLP_IMPLIED_0x28_clear_flags(cpu: CPU) -> None:  # noqa
     cpu.ram[0xFFFC] = instructions.PLP_IMPLIED_0x28
 
     # when:
-    with contextlib.suppress(exceptions.CPUCycleExhaustionError):
+    with contextlib.suppress(errors.CPUCycleExhaustionError):
         cpu.execute(cycles=4)
 
     # then:
@@ -82,7 +82,7 @@ def test_cpu_instruction_PLP_IMPLIED_0x28_with_php(cpu: CPU) -> None:  # noqa: N
     cpu.ram[0xFFFD] = instructions.PLP_IMPLIED_0x28
 
     # when:
-    with contextlib.suppress(exceptions.CPUCycleExhaustionError):
+    with contextlib.suppress(errors.CPUCycleExhaustionError):
         cpu.execute(cycles=7)
 
     # then:

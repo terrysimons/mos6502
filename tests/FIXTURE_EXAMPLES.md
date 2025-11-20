@@ -15,7 +15,7 @@ def test_clc_instruction(cpu: CPU) -> None:
     cpu.flags[flags.C] = 1
     cpu.ram[0xFFFC] = instructions.CLC_IMPLIED_0x18
 
-    with contextlib.suppress(exceptions.CPUCycleExhaustionError):
+    with contextlib.suppress(errors.CPUCycleExhaustionError):
         cpu.execute(cycles=2)
 
     assert cpu.flags[flags.C] == 0
@@ -32,7 +32,7 @@ def test_brk_preserves_d_flag(nmos_cpu: CPU) -> None:
     nmos_cpu.D = flags.ProcessorStatusFlags.D[flags.D]
     nmos_cpu.ram[0xFFFC] = instructions.BRK_IMPLIED_0x00
 
-    with contextlib.suppress(exceptions.CPUCycleExhaustionError, exceptions.CPUBreakError):
+    with contextlib.suppress(errors.CPUCycleExhaustionError, errors.CPUBreakError):
         nmos_cpu.execute(cycles=7)
 
     # NMOS variants preserve D flag
@@ -50,7 +50,7 @@ def test_brk_clears_d_flag(cmos_cpu: CPU) -> None:
     cmos_cpu.D = flags.ProcessorStatusFlags.D[flags.D]
     cmos_cpu.ram[0xFFFC] = instructions.BRK_IMPLIED_0x00
 
-    with contextlib.suppress(exceptions.CPUCycleExhaustionError, exceptions.CPUBreakError):
+    with contextlib.suppress(errors.CPUCycleExhaustionError, errors.CPUBreakError):
         cmos_cpu.execute(cycles=7)
 
     # CMOS variants clear D flag

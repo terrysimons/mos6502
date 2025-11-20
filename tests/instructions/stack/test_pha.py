@@ -4,7 +4,7 @@ import copy
 import logging
 
 import mos6502
-from mos6502 import exceptions, flags, instructions
+from mos6502 import errors, flags, instructions
 
 log = logging.getLogger("mos6502")
 log.setLevel(logging.DEBUG)
@@ -31,7 +31,7 @@ def test_cpu_instruction_PHA_IMPLIED_0x48(cpu: CPU) -> None:  # noqa: N802
     cpu.ram[0xFFFC] = instructions.PHA_IMPLIED_0x48
 
     # when:
-    with contextlib.suppress(exceptions.CPUCycleExhaustionError):
+    with contextlib.suppress(errors.CPUCycleExhaustionError):
         cpu.execute(cycles=3)
 
     # then:
@@ -56,7 +56,7 @@ def test_cpu_instruction_PHA_IMPLIED_0x48_stack_grows_down(cpu: CPU) -> None:  #
     cpu.ram[0xFFFE] = instructions.PHA_IMPLIED_0x48
 
     # when:
-    with contextlib.suppress(exceptions.CPUCycleExhaustionError):
+    with contextlib.suppress(errors.CPUCycleExhaustionError):
         cpu.execute(cycles=9)
 
     # then:
@@ -82,7 +82,7 @@ def test_cpu_instruction_PHA_IMPLIED_0x48_near_stack_bottom(cpu: CPU) -> None:  
     cpu.ram[0xFFFC] = instructions.PHA_IMPLIED_0x48
 
     # when:
-    with contextlib.suppress(exceptions.CPUCycleExhaustionError):
+    with contextlib.suppress(errors.CPUCycleExhaustionError):
         cpu.execute(cycles=3)
 
     # then:
@@ -106,7 +106,7 @@ def test_cpu_instruction_PHA_IMPLIED_0x48_near_stack_top(cpu: CPU) -> None:  # n
     cpu.ram[0xFFFC] = instructions.PHA_IMPLIED_0x48
 
     # when:
-    with contextlib.suppress(exceptions.CPUCycleExhaustionError):
+    with contextlib.suppress(errors.CPUCycleExhaustionError):
         cpu.execute(cycles=3)
 
     # then:

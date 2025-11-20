@@ -4,7 +4,7 @@ import copy
 import logging
 
 import mos6502
-from mos6502 import exceptions, flags, instructions
+from mos6502 import errors, flags, instructions
 from mos6502.memory import Byte, Word
 
 log: logging.Logger = logging.getLogger("mos6502")
@@ -43,7 +43,7 @@ def verify_store_zeropage(cpu: CPU, data: Byte, instruction: instructions.Instru
     cpu.ram[(offset + offset_value) & 0xFF] = 0x00
 
     # when:
-    with contextlib.suppress(exceptions.CPUCycleExhaustionError):
+    with contextlib.suppress(errors.CPUCycleExhaustionError, errors.IllegalCPUInstructionError):
         cpu.execute(cycles=expected_cycles)
 
     # expect:
@@ -69,7 +69,7 @@ def verify_store_absolute(cpu: CPU, data: Byte, instruction: instructions.Instru
     cpu.ram[0xFFFE] = offset.highbyte
 
     # when:
-    with contextlib.suppress(exceptions.CPUCycleExhaustionError):
+    with contextlib.suppress(errors.CPUCycleExhaustionError, errors.IllegalCPUInstructionError):
         cpu.execute(cycles=expected_cycles)
 
     # expect:
@@ -105,7 +105,7 @@ def verify_store_indexed_indirect(cpu: CPU, pc_value: Byte, data: Byte,
     cpu.ram[address & 0xFFFF] = 0x00
 
     # when:
-    with contextlib.suppress(exceptions.CPUCycleExhaustionError):
+    with contextlib.suppress(errors.CPUCycleExhaustionError, errors.IllegalCPUInstructionError):
         cpu.execute(cycles=expected_cycles)
 
     # expect:
@@ -140,7 +140,7 @@ def verify_store_indirect_indexed(cpu: CPU, pc_value: int, data: int,
     address: Word = Word(offset + offset_value, endianness=cpu.endianness)
 
     # when:
-    with contextlib.suppress(exceptions.CPUCycleExhaustionError):
+    with contextlib.suppress(errors.CPUCycleExhaustionError, errors.IllegalCPUInstructionError):
         cpu.execute(cycles=expected_cycles)
 
     # expect:

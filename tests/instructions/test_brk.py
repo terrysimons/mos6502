@@ -3,7 +3,7 @@ import contextlib
 import logging
 
 import mos6502
-from mos6502 import CPU, exceptions, flags, instructions
+from mos6502 import CPU, errors, flags, instructions
 from mos6502.memory import Byte
 
 log = logging.getLogger("mos6502")
@@ -36,7 +36,7 @@ def test_cpu_instruction_BRK_IMPLIED_0x00(cpu: CPU) -> None:  # noqa: N802
     cpu.ram[0xFFFD] = 0x00  # Padding byte
 
     # when:
-    with contextlib.suppress(exceptions.CPUCycleExhaustionError, exceptions.CPUBreakError):
+    with contextlib.suppress(errors.CPUCycleExhaustionError, errors.CPUBreakError):
         cpu.execute(cycles=7)
 
     # then:
@@ -87,9 +87,9 @@ def test_cpu_instruction_BRK_IMPLIED_0x00_raises_exception(cpu: CPU) -> None:  #
     # when/then:
     exception_raised = False
     try:
-        with contextlib.suppress(exceptions.CPUCycleExhaustionError):
+        with contextlib.suppress(errors.CPUCycleExhaustionError):
             cpu.execute(cycles=7)
-    except exceptions.CPUBreakError as e:
+    except errors.CPUBreakError as e:
         exception_raised = True
         assert "BRK instruction executed" in str(e)
         assert "PC=0x" in str(e)
@@ -116,7 +116,7 @@ def test_cpu_instruction_BRK_IMPLIED_0x00_with_all_flags_clear(cpu: CPU) -> None
     cpu.ram[0xFFFD] = 0x00
 
     # when:
-    with contextlib.suppress(exceptions.CPUCycleExhaustionError, exceptions.CPUBreakError):
+    with contextlib.suppress(errors.CPUCycleExhaustionError, errors.CPUBreakError):
         cpu.execute(cycles=7)
 
     # then:

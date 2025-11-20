@@ -4,7 +4,7 @@ import copy
 import logging
 
 import mos6502
-from mos6502 import exceptions, flags, instructions
+from mos6502 import errors, flags, instructions
 
 log = logging.getLogger("mos6502")
 log.setLevel(logging.DEBUG)
@@ -30,7 +30,7 @@ def test_cpu_instruction_PLA_IMPLIED_0x68(cpu: CPU) -> None:  # noqa: N802
     cpu.ram[0xFFFC] = instructions.PLA_IMPLIED_0x68
 
     # when:
-    with contextlib.suppress(exceptions.CPUCycleExhaustionError):
+    with contextlib.suppress(errors.CPUCycleExhaustionError):
         cpu.execute(cycles=4)
 
     # then:
@@ -53,7 +53,7 @@ def test_cpu_instruction_PLA_IMPLIED_0x68_zero_flag(cpu: CPU) -> None:  # noqa: 
     cpu.ram[0xFFFC] = instructions.PLA_IMPLIED_0x68
 
     # when:
-    with contextlib.suppress(exceptions.CPUCycleExhaustionError):
+    with contextlib.suppress(errors.CPUCycleExhaustionError):
         cpu.execute(cycles=4)
 
     # then:
@@ -76,7 +76,7 @@ def test_cpu_instruction_PLA_IMPLIED_0x68_negative_flag(cpu: CPU) -> None:  # no
     cpu.ram[0xFFFC] = instructions.PLA_IMPLIED_0x68
 
     # when:
-    with contextlib.suppress(exceptions.CPUCycleExhaustionError):
+    with contextlib.suppress(errors.CPUCycleExhaustionError):
         cpu.execute(cycles=4)
 
     # then:
@@ -99,7 +99,7 @@ def test_cpu_instruction_PLA_IMPLIED_0x68_with_pha(cpu: CPU) -> None:  # noqa: N
     cpu.ram[0xFFFD] = instructions.PLA_IMPLIED_0x68
 
     # when:
-    with contextlib.suppress(exceptions.CPUCycleExhaustionError):
+    with contextlib.suppress(errors.CPUCycleExhaustionError):
         cpu.execute(cycles=7)
 
     # then:
@@ -121,7 +121,7 @@ def test_cpu_instruction_PLA_IMPLIED_0x68_near_stack_bottom(cpu: CPU) -> None:  
     cpu.ram[0xFFFC] = instructions.PLA_IMPLIED_0x68
 
     # when:
-    with contextlib.suppress(exceptions.CPUCycleExhaustionError):
+    with contextlib.suppress(errors.CPUCycleExhaustionError):
         cpu.execute(cycles=4)
 
     # then:
@@ -150,7 +150,7 @@ def test_cpu_instruction_PLA_IMPLIED_0x68_multiple_pulls(cpu: CPU) -> None:  # n
     cpu.ram[0xFFFE] = instructions.PLA_IMPLIED_0x68
 
     # when:
-    with contextlib.suppress(exceptions.CPUCycleExhaustionError):
+    with contextlib.suppress(errors.CPUCycleExhaustionError):
         cpu.execute(cycles=4)  # Pull first value
 
     # then:
@@ -158,7 +158,7 @@ def test_cpu_instruction_PLA_IMPLIED_0x68_multiple_pulls(cpu: CPU) -> None:  # n
     assert cpu.S == 0x1FD
 
     # when:
-    with contextlib.suppress(exceptions.CPUCycleExhaustionError):
+    with contextlib.suppress(errors.CPUCycleExhaustionError):
         cpu.execute(cycles=4)  # Pull second value
 
     # then:
@@ -166,7 +166,7 @@ def test_cpu_instruction_PLA_IMPLIED_0x68_multiple_pulls(cpu: CPU) -> None:  # n
     assert cpu.S == 0x1FE
 
     # when:
-    with contextlib.suppress(exceptions.CPUCycleExhaustionError):
+    with contextlib.suppress(errors.CPUCycleExhaustionError):
         cpu.execute(cycles=4)  # Pull third value
 
     # then:

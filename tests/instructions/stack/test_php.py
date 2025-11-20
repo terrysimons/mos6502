@@ -4,7 +4,7 @@ import copy
 import logging
 
 import mos6502
-from mos6502 import exceptions, flags, instructions
+from mos6502 import errors, flags, instructions
 
 log = logging.getLogger("mos6502")
 log.setLevel(logging.DEBUG)
@@ -36,7 +36,7 @@ def test_cpu_instruction_PHP_IMPLIED_0x08(cpu: CPU) -> None:  # noqa: N802
     cpu.ram[0xFFFC] = instructions.PHP_IMPLIED_0x08
 
     # when:
-    with contextlib.suppress(exceptions.CPUCycleExhaustionError):
+    with contextlib.suppress(errors.CPUCycleExhaustionError):
         cpu.execute(cycles=3)
 
     # then:
@@ -63,7 +63,7 @@ def test_cpu_instruction_PHP_IMPLIED_0x08_b_flag(cpu: CPU) -> None:  # noqa: N80
     cpu.ram[0xFFFC] = instructions.PHP_IMPLIED_0x08
 
     # when:
-    with contextlib.suppress(exceptions.CPUCycleExhaustionError):
+    with contextlib.suppress(errors.CPUCycleExhaustionError):
         cpu.execute(cycles=3)
 
     # then:

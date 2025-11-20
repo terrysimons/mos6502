@@ -4,7 +4,7 @@ import copy
 import logging
 
 import mos6502
-from mos6502 import exceptions, flags, instructions
+from mos6502 import errors, flags, instructions
 
 log = logging.getLogger("mos6502")
 log.setLevel(logging.DEBUG)
@@ -27,7 +27,7 @@ def test_cpu_instruction_TXA_IMPLIED_0x8A(cpu: CPU) -> None:  # noqa: N802
     cpu.ram[0xFFFC] = instructions.TXA_IMPLIED_0x8A
 
     # when:
-    with contextlib.suppress(exceptions.CPUCycleExhaustionError):
+    with contextlib.suppress(errors.CPUCycleExhaustionError):
         cpu.execute(cycles=2)
 
     # then:
@@ -49,7 +49,7 @@ def test_cpu_instruction_TXA_IMPLIED_0x8A_zero_flag(cpu: CPU) -> None:  # noqa: 
     cpu.ram[0xFFFC] = instructions.TXA_IMPLIED_0x8A
 
     # when:
-    with contextlib.suppress(exceptions.CPUCycleExhaustionError):
+    with contextlib.suppress(errors.CPUCycleExhaustionError):
         cpu.execute(cycles=2)
 
     # then:
@@ -70,7 +70,7 @@ def test_cpu_instruction_TXA_IMPLIED_0x8A_negative_flag(cpu: CPU) -> None:  # no
     cpu.ram[0xFFFC] = instructions.TXA_IMPLIED_0x8A
 
     # when:
-    with contextlib.suppress(exceptions.CPUCycleExhaustionError):
+    with contextlib.suppress(errors.CPUCycleExhaustionError):
         cpu.execute(cycles=2)
 
     # then:
