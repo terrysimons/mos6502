@@ -3,17 +3,15 @@ import contextlib
 import logging
 
 import mos6502
-from mos6502 import exceptions, flags, instructions
+from mos6502 import CPU, exceptions, flags, instructions
 
 log = logging.getLogger("mos6502")
 log.setLevel(logging.DEBUG)
 
 
-def test_cpu_instruction_DEC_ZEROPAGE_0xC6() -> None:  # noqa: N802
+def test_cpu_instruction_DEC_ZEROPAGE_0xC6(cpu: CPU) -> None:  # noqa: N802
     """Test DEC Zero Page addressing mode."""
     # given:
-    cpu: mos6502.CPU = mos6502.CPU()
-    cpu.reset()
 
     cpu.ram[0x0042] = 0x05
 
@@ -32,11 +30,9 @@ def test_cpu_instruction_DEC_ZEROPAGE_0xC6() -> None:  # noqa: N802
     assert cpu.cycles_executed == 5
 
 
-def test_cpu_instruction_DEC_ZEROPAGE_0xC6_to_zero() -> None:  # noqa: N802
+def test_cpu_instruction_DEC_ZEROPAGE_0xC6_to_zero(cpu: CPU) -> None:  # noqa: N802
     """Test DEC to zero."""
     # given:
-    cpu: mos6502.CPU = mos6502.CPU()
-    cpu.reset()
 
     cpu.ram[0x0042] = 0x01
 
@@ -55,11 +51,9 @@ def test_cpu_instruction_DEC_ZEROPAGE_0xC6_to_zero() -> None:  # noqa: N802
     assert cpu.cycles_executed == 5
 
 
-def test_cpu_instruction_DEC_ZEROPAGE_0xC6_wrap_to_ff() -> None:  # noqa: N802
+def test_cpu_instruction_DEC_ZEROPAGE_0xC6_wrap_to_ff(cpu: CPU) -> None:  # noqa: N802
     """Test DEC wrapping from 0x00 to 0xFF."""
     # given:
-    cpu: mos6502.CPU = mos6502.CPU()
-    cpu.reset()
 
     cpu.ram[0x0042] = 0x00
 
@@ -78,11 +72,9 @@ def test_cpu_instruction_DEC_ZEROPAGE_0xC6_wrap_to_ff() -> None:  # noqa: N802
     assert cpu.cycles_executed == 5
 
 
-def test_cpu_instruction_DEC_ZEROPAGE_0xC6_negative() -> None:  # noqa: N802
+def test_cpu_instruction_DEC_ZEROPAGE_0xC6_negative(cpu: CPU) -> None:  # noqa: N802
     """Test DEC resulting in negative value (bit 7 set)."""
     # given:
-    cpu: mos6502.CPU = mos6502.CPU()
-    cpu.reset()
 
     cpu.ram[0x0042] = 0x81  # 129
 
@@ -101,11 +93,9 @@ def test_cpu_instruction_DEC_ZEROPAGE_0xC6_negative() -> None:  # noqa: N802
     assert cpu.cycles_executed == 5
 
 
-def test_cpu_instruction_DEC_ZEROPAGE_X_0xD6() -> None:  # noqa: N802
+def test_cpu_instruction_DEC_ZEROPAGE_X_0xD6(cpu: CPU) -> None:  # noqa: N802
     """Test DEC Zero Page,X addressing mode."""
     # given:
-    cpu: mos6502.CPU = mos6502.CPU()
-    cpu.reset()
 
     cpu.X = 0x05
     cpu.ram[0x0047] = 0x10  # 0x42 + 0x05 = 0x47
@@ -125,11 +115,9 @@ def test_cpu_instruction_DEC_ZEROPAGE_X_0xD6() -> None:  # noqa: N802
     assert cpu.cycles_executed == 6
 
 
-def test_cpu_instruction_DEC_ABSOLUTE_0xCE() -> None:  # noqa: N802
+def test_cpu_instruction_DEC_ABSOLUTE_0xCE(cpu: CPU) -> None:  # noqa: N802
     """Test DEC Absolute addressing mode."""
     # given:
-    cpu: mos6502.CPU = mos6502.CPU()
-    cpu.reset()
 
     cpu.ram[0x1234] = 0x42
 
@@ -149,11 +137,9 @@ def test_cpu_instruction_DEC_ABSOLUTE_0xCE() -> None:  # noqa: N802
     assert cpu.cycles_executed == 6
 
 
-def test_cpu_instruction_DEC_ABSOLUTE_X_0xDE() -> None:  # noqa: N802
+def test_cpu_instruction_DEC_ABSOLUTE_X_0xDE(cpu: CPU) -> None:  # noqa: N802
     """Test DEC Absolute,X addressing mode."""
     # given:
-    cpu: mos6502.CPU = mos6502.CPU()
-    cpu.reset()
 
     cpu.X = 0x10
     cpu.ram[0x1244] = 0x80  # 0x1234 + 0x10 = 0x1244

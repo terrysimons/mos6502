@@ -3,17 +3,15 @@ import contextlib
 import logging
 
 import mos6502
-from mos6502 import exceptions, flags, instructions
+from mos6502 import CPU, exceptions, flags, instructions
 
 log = logging.getLogger("mos6502")
 log.setLevel(logging.DEBUG)
 
 
-def test_cpu_instruction_ASL_ACCUMULATOR_0x0A() -> None:  # noqa: N802
+def test_cpu_instruction_ASL_ACCUMULATOR_0x0A(cpu: CPU) -> None:  # noqa: N802
     """Test ASL Accumulator mode."""
     # given:
-    cpu: mos6502.CPU = mos6502.CPU()
-    cpu.reset()
 
     cpu.A = 0x42  # 0100 0010
 
@@ -32,11 +30,9 @@ def test_cpu_instruction_ASL_ACCUMULATOR_0x0A() -> None:  # noqa: N802
     assert cpu.cycles_executed == 2
 
 
-def test_cpu_instruction_ASL_ACCUMULATOR_0x0A_carry() -> None:  # noqa: N802
+def test_cpu_instruction_ASL_ACCUMULATOR_0x0A_carry(cpu: CPU) -> None:  # noqa: N802
     """Test ASL with carry flag set."""
     # given:
-    cpu: mos6502.CPU = mos6502.CPU()
-    cpu.reset()
 
     cpu.A = 0x81  # 1000 0001 (bit 7 set)
 
@@ -55,11 +51,9 @@ def test_cpu_instruction_ASL_ACCUMULATOR_0x0A_carry() -> None:  # noqa: N802
     assert cpu.cycles_executed == 2
 
 
-def test_cpu_instruction_ASL_ACCUMULATOR_0x0A_zero() -> None:  # noqa: N802
+def test_cpu_instruction_ASL_ACCUMULATOR_0x0A_zero(cpu: CPU) -> None:  # noqa: N802
     """Test ASL resulting in zero."""
     # given:
-    cpu: mos6502.CPU = mos6502.CPU()
-    cpu.reset()
 
     cpu.A = 0x80  # 1000 0000
 
@@ -78,11 +72,9 @@ def test_cpu_instruction_ASL_ACCUMULATOR_0x0A_zero() -> None:  # noqa: N802
     assert cpu.cycles_executed == 2
 
 
-def test_cpu_instruction_ASL_ZEROPAGE_0x06() -> None:  # noqa: N802
+def test_cpu_instruction_ASL_ZEROPAGE_0x06(cpu: CPU) -> None:  # noqa: N802
     """Test ASL Zero Page mode."""
     # given:
-    cpu: mos6502.CPU = mos6502.CPU()
-    cpu.reset()
 
     cpu.ram[0x0042] = 0x55  # 0101 0101
 
@@ -102,11 +94,9 @@ def test_cpu_instruction_ASL_ZEROPAGE_0x06() -> None:  # noqa: N802
     assert cpu.cycles_executed == 5
 
 
-def test_cpu_instruction_ASL_ZEROPAGE_X_0x16() -> None:  # noqa: N802
+def test_cpu_instruction_ASL_ZEROPAGE_X_0x16(cpu: CPU) -> None:  # noqa: N802
     """Test ASL Zero Page,X mode."""
     # given:
-    cpu: mos6502.CPU = mos6502.CPU()
-    cpu.reset()
 
     cpu.X = 0x05
     cpu.ram[0x0047] = 0x01  # 0x42 + 0x05
@@ -127,11 +117,9 @@ def test_cpu_instruction_ASL_ZEROPAGE_X_0x16() -> None:  # noqa: N802
     assert cpu.cycles_executed == 6
 
 
-def test_cpu_instruction_ASL_ABSOLUTE_0x0E() -> None:  # noqa: N802
+def test_cpu_instruction_ASL_ABSOLUTE_0x0E(cpu: CPU) -> None:  # noqa: N802
     """Test ASL Absolute mode."""
     # given:
-    cpu: mos6502.CPU = mos6502.CPU()
-    cpu.reset()
 
     cpu.ram[0x1234] = 0x40  # 0100 0000
 
@@ -152,11 +140,9 @@ def test_cpu_instruction_ASL_ABSOLUTE_0x0E() -> None:  # noqa: N802
     assert cpu.cycles_executed == 6
 
 
-def test_cpu_instruction_ASL_ABSOLUTE_X_0x1E() -> None:  # noqa: N802
+def test_cpu_instruction_ASL_ABSOLUTE_X_0x1E(cpu: CPU) -> None:  # noqa: N802
     """Test ASL Absolute,X mode."""
     # given:
-    cpu: mos6502.CPU = mos6502.CPU()
-    cpu.reset()
 
     cpu.X = 0x10
     cpu.ram[0x1244] = 0xFF  # 0x1234 + 0x10

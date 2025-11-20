@@ -4,13 +4,13 @@ import copy
 import logging
 
 import mos6502
-from mos6502 import exceptions, flags, instructions
+from mos6502 import CPU, exceptions, flags, instructions
 
 log = logging.getLogger("mos6502")
 log.setLevel(logging.DEBUG)
 
 
-def check_noop_flags(expected_cpu: mos6502.CPU, actual_cpu: mos6502.CPU) -> None:
+def check_noop_flags(expected_cpu: CPU, actual_cpu: CPU) -> None:
     """JMP does not affect any flags."""
     assert actual_cpu.flags[flags.C] == expected_cpu.flags[flags.C]
     assert actual_cpu.flags[flags.Z] == expected_cpu.flags[flags.Z]
@@ -21,11 +21,9 @@ def check_noop_flags(expected_cpu: mos6502.CPU, actual_cpu: mos6502.CPU) -> None
     assert actual_cpu.flags[flags.N] == expected_cpu.flags[flags.N]
 
 
-def test_cpu_instruction_JMP_ABSOLUTE_0x4C() -> None:  # noqa: N802
+def test_cpu_instruction_JMP_ABSOLUTE_0x4C(cpu: CPU) -> None:  # noqa: N802
     # given:
-    cpu: mos6502.CPU = mos6502.CPU()
-    cpu.reset()
-    initial_cpu: mos6502.CPU = copy.deepcopy(cpu)
+    initial_cpu: CPU = copy.deepcopy(cpu)
 
     cpu.ram[0xFFFC] = instructions.JMP_ABSOLUTE_0x4C
     cpu.ram[0xFFFD] = 0x00
@@ -41,11 +39,9 @@ def test_cpu_instruction_JMP_ABSOLUTE_0x4C() -> None:  # noqa: N802
     check_noop_flags(expected_cpu=initial_cpu, actual_cpu=cpu)
 
 
-def test_cpu_instruction_JMP_INDIRECT_0x6C() -> None:  # noqa: N802
+def test_cpu_instruction_JMP_INDIRECT_0x6C(cpu: CPU) -> None:  # noqa: N802
     # given:
-    cpu: mos6502.CPU = mos6502.CPU()
-    cpu.reset()
-    initial_cpu: mos6502.CPU = copy.deepcopy(cpu)
+    initial_cpu: CPU = copy.deepcopy(cpu)
 
     # JMP ($1020) - normal case (no page boundary)
     cpu.ram[0xFFFC] = instructions.JMP_INDIRECT_0x6C
@@ -66,47 +62,71 @@ def test_cpu_instruction_JMP_INDIRECT_0x6C() -> None:  # noqa: N802
     check_noop_flags(expected_cpu=initial_cpu, actual_cpu=cpu)
 
 
-def test_cpu_instruction_JMP_INDIRECT_0x6C_page_boundary_bug() -> None:  # noqa: N802
-    """Test the famous 6502 page boundary bug in JMP indirect.
+def test_cpu_instruction_JMP_INDIRECT_0x6C_page_boundary_bug_nmos(nmos_cpu: CPU) -> None:  # noqa: N802
+    """Test the famous 6502 page boundary bug in JMP indirect (NMOS variants).
 
-    VARIANT: 6502/6502A - When indirect address is 0xXXFF, the high byte
-    wraps to 0xXX00 instead of crossing to the next page.
-    VARIANT: 65C02 - Bug is fixed, correctly crosses page boundary.
+    VARIANT: 6502 - When indirect address is 0xXXFF, the high byte wraps to
+                    0xXX00 instead of crossing to the next page (BUG)
+    VARIANT: 6502A - Same bug as 6502
+    VARIANT: 6502C - Same bug as 6502
     """
     # given:
-    cpu: mos6502.CPU = mos6502.CPU()
-    cpu.reset()
-    initial_cpu: mos6502.CPU = copy.deepcopy(cpu)
+    initial_cpu: CPU = copy.deepcopy(nmos_cpu)
 
     # JMP ($10FF) - page boundary bug case
-    cpu.ram[0xFFFC] = instructions.JMP_INDIRECT_0x6C
-    cpu.ram[0xFFFD] = 0xFF
-    cpu.ram[0xFFFE] = 0x10  # Indirect address = 0x10FF
+    nmos_cpu.ram[0xFFFC] = instructions.JMP_INDIRECT_0x6C
+    nmos_cpu.ram[0xFFFD] = 0xFF
+    nmos_cpu.ram[0xFFFE] = 0x10  # Indirect address = 0x10FF
 
-    # For 6502/6502A (bug): reads low byte from 0x10FF, high byte from 0x1000
-    cpu.ram[0x10FF] = 0x34  # Low byte
-    cpu.ram[0x1000] = 0x12  # High byte (wraps within page)
-    cpu.ram[0x1100] = 0x56  # This would be high byte on 65C02 (bug fixed)
+    # NMOS bug: reads low byte from 0x10FF, high byte from 0x1000 (wraps within page)
+    nmos_cpu.ram[0x10FF] = 0x34  # Low byte
+    nmos_cpu.ram[0x1000] = 0x12  # High byte (wraps within page - BUG)
+    nmos_cpu.ram[0x1100] = 0x56  # This is NOT read on NMOS
 
     # when:
     with contextlib.suppress(exceptions.CPUCycleExhaustionError):
-        cpu.execute(cycles=5)
+        nmos_cpu.execute(cycles=5)
 
     # then:
-    # VARIANT: 6502/6502A - Jump to 0x1234 (bug behavior)
-    assert cpu.PC == 0x1234
-    # VARIANT: 65C02 - Would jump to 0x5634 (correct behavior)
-
-    assert cpu.cycles_executed == 5
-    check_noop_flags(expected_cpu=initial_cpu, actual_cpu=cpu)
+    # VARIANT: 6502/6502A/6502C - Jump to 0x1234 (bug behavior)
+    assert nmos_cpu.PC == 0x1234  # Jumps to 0x1234 due to page boundary bug
+    assert nmos_cpu.cycles_executed == 5
+    check_noop_flags(expected_cpu=initial_cpu, actual_cpu=nmos_cpu)
 
 
-def test_cpu_instruction_JMP_INDIRECT_0x6C_not_page_boundary() -> None:  # noqa: N802
+def test_cpu_instruction_JMP_INDIRECT_0x6C_page_boundary_bug_cmos(cmos_cpu: CPU) -> None:  # noqa: N802
+    """Test that JMP indirect page boundary bug is FIXED in 65C02.
+
+    VARIANT: 65C02 - Bug is fixed, correctly crosses page boundary
+    """
+    # given:
+    initial_cpu: CPU = copy.deepcopy(cmos_cpu)
+
+    # JMP ($10FF) - page boundary case
+    cmos_cpu.ram[0xFFFC] = instructions.JMP_INDIRECT_0x6C
+    cmos_cpu.ram[0xFFFD] = 0xFF
+    cmos_cpu.ram[0xFFFE] = 0x10  # Indirect address = 0x10FF
+
+    # CMOS fix: reads low byte from 0x10FF, high byte from 0x1100 (correctly crosses page)
+    cmos_cpu.ram[0x10FF] = 0x34  # Low byte
+    cmos_cpu.ram[0x1000] = 0x12  # This is NOT read on CMOS
+    cmos_cpu.ram[0x1100] = 0x56  # High byte (correctly crosses page - FIX)
+
+    # when:
+    with contextlib.suppress(exceptions.CPUCycleExhaustionError):
+        cmos_cpu.execute(cycles=5)
+
+    # then:
+    # VARIANT: 65C02 - Jump to 0x5634 (correct behavior, bug fixed)
+    assert cmos_cpu.PC == 0x5634  # Jumps to 0x5634, bug is fixed
+    assert cmos_cpu.cycles_executed == 5
+    check_noop_flags(expected_cpu=initial_cpu, actual_cpu=cmos_cpu)
+
+
+def test_cpu_instruction_JMP_INDIRECT_0x6C_not_page_boundary(cpu: CPU) -> None:  # noqa: N802
     """Verify that non-page-boundary addresses work normally."""
     # given:
-    cpu: mos6502.CPU = mos6502.CPU()
-    cpu.reset()
-    initial_cpu: mos6502.CPU = copy.deepcopy(cpu)
+    initial_cpu: CPU = copy.deepcopy(cpu)
 
     # JMP ($10FE) - not on page boundary
     cpu.ram[0xFFFC] = instructions.JMP_INDIRECT_0x6C

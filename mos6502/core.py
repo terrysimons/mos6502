@@ -14,7 +14,7 @@ from mos6502 import instructions
 from mos6502 import memory
 from mos6502 import registers
 from mos6502 import variants
-from mos6502.instructions import nop
+from mos6502.instructions import _nop as nop
 from mos6502.memory import Byte
 from mos6502.memory import RAM
 from mos6502.memory import Word
@@ -94,8 +94,8 @@ class MOS6502CPU(flags.ProcessorStatusFlagsInterface):
         """Return the CPU variant name as a string."""
         return str(self._variant)
 
-    # Variant handler cache: {(instruction_package_name, variant): handler}
-    _variant_handler_cache: dict[tuple[str, variants.CPUVariant], Callable[[Self], None]] = {}
+    # Variant handler cache: {(instruction_package_name, function_name, variant): handler}
+    _variant_handler_cache: dict[tuple[str, str, variants.CPUVariant], Callable[[Self], None]] = {}
 
     def _load_variant_handler(
         self: Self,
@@ -115,7 +115,7 @@ class MOS6502CPU(flags.ProcessorStatusFlagsInterface):
         -------
             The handler function for the specified variant
         """
-        cache_key = (instruction_package, self._variant)
+        cache_key = (instruction_package, function_name, self._variant)
         if cache_key in self._variant_handler_cache:
             return self._variant_handler_cache[cache_key]
 
@@ -162,7 +162,7 @@ class MOS6502CPU(flags.ProcessorStatusFlagsInterface):
 
         Example:
         -------
-            with self.instruction_variant(instructions.NOP_IMPLIED_0xEA) as nop:
+            with self.instruction_variant(instruction) as nop:
                 nop()
         """
         # Extract package and function from opcode metadata
@@ -1121,7 +1121,10 @@ class MOS6502CPU(flags.ProcessorStatusFlagsInterface):
                     f"executed cycles with {self.cycles} remaining.",
                 )
 
-            instruction: Byte = self.fetch_byte()
+            instruction_byte: Byte = self.fetch_byte()
+
+            # Convert to InstructionOpcode if available for variant dispatch
+            instruction = instructions.OPCODE_LOOKUP.get(int(instruction_byte), instruction_byte)
 
             # self.log.debug(
 
@@ -1131,8 +1134,8 @@ class MOS6502CPU(flags.ProcessorStatusFlagsInterface):
             operand: memory.MemoryUnit = 0
             assembly = ""
             instruction_cycle_count: int = 0
-            if instruction.value in instructions.InstructionSet.map:
-                instruction_map: int = instructions.InstructionSet.map[instruction.value]
+            if int(instruction) in instructions.InstructionSet.map:
+                instruction_map: int = instructions.InstructionSet.map[int(instruction)]
 
                 instruction_bytes: int = int(instruction_map["bytes"])
 
@@ -1182,1178 +1185,275 @@ class MOS6502CPU(flags.ProcessorStatusFlagsInterface):
 
             match instruction:
                 # ''' Execute AND '''
-                case instructions.AND_IMMEDIATE_0x29:
-                    # Bitwise AND with Accumulator
-                    value: int = int(self.fetch_byte())
-                    self.A = self.A & value
-                    self.set_load_status_flags(register_name="A")
-                    self.log.info("i")
+                case instructions.AND_IMMEDIATE_0x29 as opcode:
+                    with self.instruction_variant(opcode) as and_instr:
+                        and_instr()
 
-                case instructions.AND_ZEROPAGE_0x25:
-                    address: int = self.fetch_zeropage_mode_address(offset_register_name=None)
-                    value: int = int(self.read_byte(address=address))
-                    self.A = self.A & value
-                    self.set_load_status_flags(register_name="A")
-                    self.log.info("i")
+                case instructions.AND_ZEROPAGE_0x25 as opcode:
+                    with self.instruction_variant(opcode) as and_instr:
+                        and_instr()
 
-                case instructions.AND_ZEROPAGE_X_0x35:
-                    address: int = self.fetch_zeropage_mode_address(offset_register_name="X")
-                    value: int = int(self.read_byte(address=address))
-                    self.A = self.A & value
-                    self.set_load_status_flags(register_name="A")
-                    self.log.info("i")
+                case instructions.AND_ZEROPAGE_X_0x35 as opcode:
+                    with self.instruction_variant(opcode) as and_instr:
+                        and_instr()
 
-                case instructions.AND_ABSOLUTE_0x2D:
-                    address: int = self.fetch_absolute_mode_address(offset_register_name=None)
-                    value: int = int(self.read_byte(address=address))
-                    self.A = self.A & value
-                    self.set_load_status_flags(register_name="A")
-                    self.log.info("i")
+                case instructions.AND_ABSOLUTE_0x2D as opcode:
+                    with self.instruction_variant(opcode) as and_instr:
+                        and_instr()
 
-                case instructions.AND_ABSOLUTE_X_0x3D:
-                    address: int = self.fetch_absolute_mode_address(offset_register_name="X")
-                    value: int = int(self.read_byte(address=address))
-                    self.A = self.A & value
-                    self.set_load_status_flags(register_name="A")
-                    self.log.info("i")
+                case instructions.AND_ABSOLUTE_X_0x3D as opcode:
+                    with self.instruction_variant(opcode) as and_instr:
+                        and_instr()
 
-                case instructions.AND_ABSOLUTE_Y_0x39:
-                    address: int = self.fetch_absolute_mode_address(offset_register_name="Y")
-                    value: int = int(self.read_byte(address=address))
-                    self.A = self.A & value
-                    self.set_load_status_flags(register_name="A")
-                    self.log.info("i")
+                case instructions.AND_ABSOLUTE_Y_0x39 as opcode:
+                    with self.instruction_variant(opcode) as and_instr:
+                        and_instr()
 
-                case instructions.AND_INDEXED_INDIRECT_X_0x21:
-                    address: int = self.fetch_indexed_indirect_mode_address()
-                    value: int = int(self.read_byte(address=address))
-                    self.A = self.A & value
-                    self.set_load_status_flags(register_name="A")
-                    self.log.info("i")
+                case instructions.AND_INDEXED_INDIRECT_X_0x21 as opcode:
+                    with self.instruction_variant(opcode) as and_instr:
+                        and_instr()
 
-                case instructions.AND_INDIRECT_INDEXED_Y_0x31:
-                    address: int = self.fetch_indirect_indexed_mode_address()
-                    value: int = int(self.read_byte(address=address))
-                    self.A = self.A & value
-                    self.set_load_status_flags(register_name="A")
-                    self.log.info("i")
-
-                # ''' Execute ASL '''
+                case instructions.AND_INDIRECT_INDEXED_Y_0x31 as opcode:
+                    with self.instruction_variant(opcode) as and_instr:
+                        and_instr()
 
                 # ''' Execute BCC '''
-                case instructions.BCC_RELATIVE_0x90:
-                    # Branch on Carry Clear (C = 0)
-                    offset: int = int(self.fetch_byte())  # Signed byte offset
-
-                    # Convert to signed byte (-128 to +127)
-                    if offset > 127:
-                        offset = offset - 256
-
-                    if self.flags[flags.C] == 0:
-                        # Branch taken
-                        old_pc: int = self.PC
-                        self.PC = (self.PC + offset) & 0xFFFF
-
-                        # Check for page boundary crossing (adds 1 cycle)
-                        if (old_pc & 0xFF00) != (self.PC & 0xFF00):
-                            self.spend_cpu_cycles(1)
-
-                        self.spend_cpu_cycles(1)  # Branch taken costs 1 extra cycle
-
-                    self.log.info("i")
+                case instructions.BCC_RELATIVE_0x90 as opcode:
+                    with self.instruction_variant(opcode) as bcc:
+                        bcc()
 
                 # ''' Execute BCS '''
-                case instructions.BCS_RELATIVE_0xB0:
-                    # Branch on Carry Set (C = 1)
-                    offset: int = int(self.fetch_byte())  # Signed byte offset
-
-                    # Convert to signed byte (-128 to +127)
-                    if offset > 127:
-                        offset = offset - 256
-
-                    if self.flags[flags.C] == 1:
-                        # Branch taken
-                        old_pc: int = self.PC
-                        self.PC = (self.PC + offset) & 0xFFFF
-
-                        # Check for page boundary crossing (adds 1 cycle)
-                        if (old_pc & 0xFF00) != (self.PC & 0xFF00):
-                            self.spend_cpu_cycles(1)
-
-                        self.spend_cpu_cycles(1)  # Branch taken costs 1 extra cycle
-
-                    self.log.info("i")
+                case instructions.BCS_RELATIVE_0xB0 as opcode:
+                    with self.instruction_variant(opcode) as bcs:
+                        bcs()
 
                 # ''' Execute BEQ '''
-                case instructions.BEQ_RELATIVE_0xF0:
-                    # Branch on Equal/Zero (Z = 1)
-                    offset: int = int(self.fetch_byte())  # Signed byte offset
-
-                    # Convert to signed byte (-128 to +127)
-                    if offset > 127:
-                        offset = offset - 256
-
-                    if self.flags[flags.Z] == 1:
-                        # Branch taken
-                        old_pc: int = self.PC
-                        self.PC = (self.PC + offset) & 0xFFFF
-
-                        # Check for page boundary crossing (adds 1 cycle)
-                        if (old_pc & 0xFF00) != (self.PC & 0xFF00):
-                            self.spend_cpu_cycles(1)
-
-                        self.spend_cpu_cycles(1)  # Branch taken costs 1 extra cycle
-
-                    self.log.info("i")
+                case instructions.BEQ_RELATIVE_0xF0 as opcode:
+                    with self.instruction_variant(opcode) as beq:
+                        beq()
 
                 # ''' Execute BIT '''
-                case instructions.BIT_ZEROPAGE_0x24:
-                    # Bit Test - AND A with memory, set flags but don't store result
-                    address: int = self.fetch_zeropage_mode_address(offset_register_name=None)
-                    value: int = int(self.read_byte(address=address))
+                case instructions.BIT_ZEROPAGE_0x24 as opcode:
+                    with self.instruction_variant(opcode) as bit_zeropage:
+                        bit_zeropage()
 
-                    # Z flag set based on A AND memory
-                    result: int = self.A & value
-                    self.flags[flags.Z] = 1 if result == 0 else 0
-
-                    # N flag = bit 7 of memory
-                    self.flags[flags.N] = 1 if (value & BYTE_BIT_7_MASK) else 0
-
-                    # V flag = bit 6 of memory
-                    self.flags[flags.V] = 1 if (value & BYTE_BIT_6_MASK) else 0
-
-                    self.log.info("i")
-
-                case instructions.BIT_ABSOLUTE_0x2C:
-                    # Bit Test - AND A with memory, set flags but don't store result
-                    address: int = self.fetch_absolute_mode_address(offset_register_name=None)
-                    value: int = int(self.read_byte(address=address))
-
-                    # Z flag set based on A AND memory
-                    result: int = self.A & value
-                    self.flags[flags.Z] = 1 if result == 0 else 0
-
-                    # N flag = bit 7 of memory
-                    self.flags[flags.N] = 1 if (value & BYTE_BIT_7_MASK) else 0
-
-                    # V flag = bit 6 of memory
-                    self.flags[flags.V] = 1 if (value & BYTE_BIT_6_MASK) else 0
-
-                    self.log.info("i")
+                case instructions.BIT_ABSOLUTE_0x2C as opcode:
+                    with self.instruction_variant(opcode) as bit_absolute:
+                        bit_absolute()
 
                 # ''' Execute DEC '''
-                case instructions.DEC_ZEROPAGE_0xC6:
-                    # Decrement Memory by One (M - 1 -> M)
-                    address: int = self.fetch_zeropage_mode_address(offset_register_name=None)
-                    value: int = int(self.read_byte(address=address))
+                case instructions.DEC_ZEROPAGE_0xC6 as opcode:
+                    with self.instruction_variant(opcode) as dec_instr:
+                        dec_instr()
 
-                    result: int = (value - 1) & 0xFF
-                    self.write_byte(address=address, data=result)
+                case instructions.DEC_ZEROPAGE_X_0xD6 as opcode:
+                    with self.instruction_variant(opcode) as dec_instr:
+                        dec_instr()
 
-                    # Set N and Z flags
-                    self.flags[flags.Z] = 1 if result == 0 else 0
-                    self.flags[flags.N] = 1 if (result & BYTE_BIT_7_MASK) else 0
+                case instructions.DEC_ABSOLUTE_0xCE as opcode:
+                    with self.instruction_variant(opcode) as dec_instr:
+                        dec_instr()
 
-                    self.log.info("i")
-
-                case instructions.DEC_ZEROPAGE_X_0xD6:
-                    # Decrement Memory by One (M - 1 -> M)
-                    address: int = self.fetch_zeropage_mode_address(offset_register_name="X")
-                    value: int = int(self.read_byte(address=address))
-
-                    result: int = (value - 1) & 0xFF
-                    self.write_byte(address=address, data=result)
-
-                    # Set N and Z flags
-                    self.flags[flags.Z] = 1 if result == 0 else 0
-                    self.flags[flags.N] = 1 if (result & BYTE_BIT_7_MASK) else 0
-
-                    self.log.info("i")
-
-                case instructions.DEC_ABSOLUTE_0xCE:
-                    # Decrement Memory by One (M - 1 -> M)
-                    address: int = self.fetch_absolute_mode_address(offset_register_name=None)
-                    value: int = int(self.read_byte(address=address))
-
-                    result: int = (value - 1) & 0xFF
-                    self.write_byte(address=address & 0xFFFF, data=result)
-
-                    # Set N and Z flags
-                    self.flags[flags.Z] = 1 if result == 0 else 0
-                    self.flags[flags.N] = 1 if (result & BYTE_BIT_7_MASK) else 0
-
-                    self.log.info("i")
-
-                case instructions.DEC_ABSOLUTE_X_0xDE:
-                    # Decrement Memory by One (M - 1 -> M)
-                    address: int = self.fetch_absolute_mode_address(offset_register_name="X")
-                    value: int = int(self.read_byte(address=address))
-
-                    result: int = (value - 1) & 0xFF
-                    self.write_byte(address=address & 0xFFFF, data=result)
-
-                    # Set N and Z flags
-                    self.flags[flags.Z] = 1 if result == 0 else 0
-                    self.flags[flags.N] = 1 if (result & BYTE_BIT_7_MASK) else 0
-
-                    self.log.info("i")
+                case instructions.DEC_ABSOLUTE_X_0xDE as opcode:
+                    with self.instruction_variant(opcode) as dec_instr:
+                        dec_instr()
 
                 # ''' Execute INC '''
-                case instructions.INC_ZEROPAGE_0xE6:
-                    # Increment Memory by One (M + 1 -> M)
-                    address: int = self.fetch_zeropage_mode_address(offset_register_name=None)
-                    value: int = int(self.read_byte(address=address))
+                case instructions.INC_ZEROPAGE_0xE6 as opcode:
+                    with self.instruction_variant(opcode) as inc_instr:
+                        inc_instr()
 
-                    result: int = (value + 1) & 0xFF
-                    self.write_byte(address=address, data=result)
+                case instructions.INC_ZEROPAGE_X_0xF6 as opcode:
+                    with self.instruction_variant(opcode) as inc_instr:
+                        inc_instr()
 
-                    # Set N and Z flags
-                    self.flags[flags.Z] = 1 if result == 0 else 0
-                    self.flags[flags.N] = 1 if (result & BYTE_BIT_7_MASK) else 0
+                case instructions.INC_ABSOLUTE_0xEE as opcode:
+                    with self.instruction_variant(opcode) as inc_instr:
+                        inc_instr()
 
-                    self.log.info("i")
-
-                case instructions.INC_ZEROPAGE_X_0xF6:
-                    # Increment Memory by One (M + 1 -> M)
-                    address: int = self.fetch_zeropage_mode_address(offset_register_name="X")
-                    value: int = int(self.read_byte(address=address))
-
-                    result: int = (value + 1) & 0xFF
-                    self.write_byte(address=address, data=result)
-
-                    # Set N and Z flags
-                    self.flags[flags.Z] = 1 if result == 0 else 0
-                    self.flags[flags.N] = 1 if (result & BYTE_BIT_7_MASK) else 0
-
-                    self.log.info("i")
-
-                case instructions.INC_ABSOLUTE_0xEE:
-                    # Increment Memory by One (M + 1 -> M)
-                    address: int = self.fetch_absolute_mode_address(offset_register_name=None)
-                    value: int = int(self.read_byte(address=address))
-
-                    result: int = (value + 1) & 0xFF
-                    self.write_byte(address=address & 0xFFFF, data=result)
-
-                    # Set N and Z flags
-                    self.flags[flags.Z] = 1 if result == 0 else 0
-                    self.flags[flags.N] = 1 if (result & BYTE_BIT_7_MASK) else 0
-
-                    self.log.info("i")
-
-                case instructions.INC_ABSOLUTE_X_0xFE:
-                    # Increment Memory by One (M + 1 -> M)
-                    address: int = self.fetch_absolute_mode_address(offset_register_name="X")
-                    value: int = int(self.read_byte(address=address))
-
-                    result: int = (value + 1) & 0xFF
-                    self.write_byte(address=address & 0xFFFF, data=result)
-
-                    # Set N and Z flags
-                    self.flags[flags.Z] = 1 if result == 0 else 0
-                    self.flags[flags.N] = 1 if (result & BYTE_BIT_7_MASK) else 0
-
-                    self.log.info("i")
+                case instructions.INC_ABSOLUTE_X_0xFE as opcode:
+                    with self.instruction_variant(opcode) as inc_instr:
+                        inc_instr()
 
                 # ''' Execute ASL '''
-                case instructions.ASL_ACCUMULATOR_0x0A:
-                    # Arithmetic Shift Left - Accumulator
-                    # Shift left one bit: bit 7 -> C, 0 -> bit 0
-                    value: int = self.A
+                case instructions.ASL_ACCUMULATOR_0x0A as opcode:
+                    with self.instruction_variant(opcode) as asl_instr:
+                        asl_instr()
 
-                    # Bit 7 goes to carry flag
-                    self.flags[flags.C] = 1 if (value & BYTE_BIT_7_MASK) else 0
+                case instructions.ASL_ZEROPAGE_0x06 as opcode:
+                    with self.instruction_variant(opcode) as asl_instr:
+                        asl_instr()
 
-                    result: int = (value << 1) & 0xFF
-                    self.A = result
+                case instructions.ASL_ZEROPAGE_X_0x16 as opcode:
+                    with self.instruction_variant(opcode) as asl_instr:
+                        asl_instr()
 
-                    # Set N and Z flags
-                    self.flags[flags.Z] = 1 if result == 0 else 0
-                    self.flags[flags.N] = 1 if (result & BYTE_BIT_7_MASK) else 0
+                case instructions.ASL_ABSOLUTE_0x0E as opcode:
+                    with self.instruction_variant(opcode) as asl_instr:
+                        asl_instr()
 
-                    self.log.info("i")
-
-                case instructions.ASL_ZEROPAGE_0x06:
-                    # Arithmetic Shift Left - Zero Page
-                    address: int = self.fetch_zeropage_mode_address(offset_register_name=None)
-                    value: int = int(self.read_byte(address=address))
-
-                    # Bit 7 goes to carry flag
-                    self.flags[flags.C] = 1 if (value & BYTE_BIT_7_MASK) else 0
-
-                    result: int = (value << 1) & 0xFF
-                    self.write_byte(address=address, data=result)
-
-                    # Set N and Z flags
-                    self.flags[flags.Z] = 1 if result == 0 else 0
-                    self.flags[flags.N] = 1 if (result & BYTE_BIT_7_MASK) else 0
-
-                    self.log.info("i")
-
-                case instructions.ASL_ZEROPAGE_X_0x16:
-                    # Arithmetic Shift Left - Zero Page,X
-                    address: int = self.fetch_zeropage_mode_address(offset_register_name="X")
-                    value: int = int(self.read_byte(address=address))
-
-                    # Bit 7 goes to carry flag
-                    self.flags[flags.C] = 1 if (value & BYTE_BIT_7_MASK) else 0
-
-                    result: int = (value << 1) & 0xFF
-                    self.write_byte(address=address, data=result)
-
-                    # Set N and Z flags
-                    self.flags[flags.Z] = 1 if result == 0 else 0
-                    self.flags[flags.N] = 1 if (result & BYTE_BIT_7_MASK) else 0
-
-                    self.log.info("i")
-
-                case instructions.ASL_ABSOLUTE_0x0E:
-                    # Arithmetic Shift Left - Absolute
-                    address: int = self.fetch_absolute_mode_address(offset_register_name=None)
-                    value: int = int(self.read_byte(address=address))
-
-                    # Bit 7 goes to carry flag
-                    self.flags[flags.C] = 1 if (value & BYTE_BIT_7_MASK) else 0
-
-                    result: int = (value << 1) & 0xFF
-                    self.write_byte(address=address & 0xFFFF, data=result)
-
-                    # Set N and Z flags
-                    self.flags[flags.Z] = 1 if result == 0 else 0
-                    self.flags[flags.N] = 1 if (result & BYTE_BIT_7_MASK) else 0
-
-                    self.log.info("i")
-
-                case instructions.ASL_ABSOLUTE_X_0x1E:
-                    # Arithmetic Shift Left - Absolute,X
-                    address: int = self.fetch_absolute_mode_address(offset_register_name="X")
-                    value: int = int(self.read_byte(address=address))
-
-                    # Bit 7 goes to carry flag
-                    self.flags[flags.C] = 1 if (value & BYTE_BIT_7_MASK) else 0
-
-                    result: int = (value << 1) & 0xFF
-                    self.write_byte(address=address & 0xFFFF, data=result)
-
-                    # Set N and Z flags
-                    self.flags[flags.Z] = 1 if result == 0 else 0
-                    self.flags[flags.N] = 1 if (result & BYTE_BIT_7_MASK) else 0
-
-                    self.log.info("i")
+                case instructions.ASL_ABSOLUTE_X_0x1E as opcode:
+                    with self.instruction_variant(opcode) as asl_instr:
+                        asl_instr()
 
                 # ''' Execute LSR '''
-                case instructions.LSR_ACCUMULATOR_0x4A:
-                    # Logical Shift Right - Accumulator
-                    # Shift right one bit: 0 -> bit 7, bit 0 -> C
-                    value: int = self.A
+                case instructions.LSR_ACCUMULATOR_0x4A as opcode:
+                    with self.instruction_variant(opcode) as lsr_instr:
+                        lsr_instr()
 
-                    # Bit 0 goes to carry flag
-                    self.flags[flags.C] = 1 if (value & BYTE_BIT_0_MASK) else 0
+                case instructions.LSR_ZEROPAGE_0x46 as opcode:
+                    with self.instruction_variant(opcode) as lsr_instr:
+                        lsr_instr()
 
-                    result: int = (value >> 1) & 0xFF
-                    self.A = result
+                case instructions.LSR_ZEROPAGE_X_0x56 as opcode:
+                    with self.instruction_variant(opcode) as lsr_instr:
+                        lsr_instr()
 
-                    # Set N and Z flags (N is always 0 after LSR)
-                    self.flags[flags.Z] = 1 if result == 0 else 0
-                    self.flags[flags.N] = 0  # Always 0 because bit 7 becomes 0
+                case instructions.LSR_ABSOLUTE_0x4E as opcode:
+                    with self.instruction_variant(opcode) as lsr_instr:
+                        lsr_instr()
 
-                    self.log.info("i")
-
-                case instructions.LSR_ZEROPAGE_0x46:
-                    # Logical Shift Right - Zero Page
-                    address: int = self.fetch_zeropage_mode_address(offset_register_name=None)
-                    value: int = int(self.read_byte(address=address))
-
-                    # Bit 0 goes to carry flag
-                    self.flags[flags.C] = 1 if (value & BYTE_BIT_0_MASK) else 0
-
-                    result: int = (value >> 1) & 0xFF
-                    self.write_byte(address=address, data=result)
-
-                    # Set N and Z flags (N is always 0 after LSR)
-                    self.flags[flags.Z] = 1 if result == 0 else 0
-                    self.flags[flags.N] = 0
-
-                    self.log.info("i")
-
-                case instructions.LSR_ZEROPAGE_X_0x56:
-                    # Logical Shift Right - Zero Page,X
-                    address: int = self.fetch_zeropage_mode_address(offset_register_name="X")
-                    value: int = int(self.read_byte(address=address))
-
-                    # Bit 0 goes to carry flag
-                    self.flags[flags.C] = 1 if (value & BYTE_BIT_0_MASK) else 0
-
-                    result: int = (value >> 1) & 0xFF
-                    self.write_byte(address=address, data=result)
-
-                    # Set N and Z flags (N is always 0 after LSR)
-                    self.flags[flags.Z] = 1 if result == 0 else 0
-                    self.flags[flags.N] = 0
-
-                    self.log.info("i")
-
-                case instructions.LSR_ABSOLUTE_0x4E:
-                    # Logical Shift Right - Absolute
-                    address: int = self.fetch_absolute_mode_address(offset_register_name=None)
-                    value: int = int(self.read_byte(address=address))
-
-                    # Bit 0 goes to carry flag
-                    self.flags[flags.C] = 1 if (value & BYTE_BIT_0_MASK) else 0
-
-                    result: int = (value >> 1) & 0xFF
-                    self.write_byte(address=address & 0xFFFF, data=result)
-
-                    # Set N and Z flags (N is always 0 after LSR)
-                    self.flags[flags.Z] = 1 if result == 0 else 0
-                    self.flags[flags.N] = 0
-
-                    self.log.info("i")
-
-                case instructions.LSR_ABSOLUTE_X_0x5E:
-                    # Logical Shift Right - Absolute,X
-                    address: int = self.fetch_absolute_mode_address(offset_register_name="X")
-                    value: int = int(self.read_byte(address=address))
-
-                    # Bit 0 goes to carry flag
-                    self.flags[flags.C] = 1 if (value & BYTE_BIT_0_MASK) else 0
-
-                    result: int = (value >> 1) & 0xFF
-                    self.write_byte(address=address & 0xFFFF, data=result)
-
-                    # Set N and Z flags (N is always 0 after LSR)
-                    self.flags[flags.Z] = 1 if result == 0 else 0
-                    self.flags[flags.N] = 0
-
-                    self.log.info("i")
+                case instructions.LSR_ABSOLUTE_X_0x5E as opcode:
+                    with self.instruction_variant(opcode) as lsr_instr:
+                        lsr_instr()
 
                 # ''' Execute ROL '''
-                case instructions.ROL_ACCUMULATOR_0x2A:
-                    # Rotate Left - Accumulator
-                    # Rotate left through carry: C -> bit 0, bit 7 -> C
-                    value: int = self.A
-                    old_carry: int = self.flags[flags.C]
+                case instructions.ROL_ACCUMULATOR_0x2A as opcode:
+                    with self.instruction_variant(opcode) as rol_instr:
+                        rol_instr()
 
-                    # Bit 7 goes to carry flag
-                    self.flags[flags.C] = 1 if (value & BYTE_BIT_7_MASK) else 0
+                case instructions.ROL_ZEROPAGE_0x26 as opcode:
+                    with self.instruction_variant(opcode) as rol_instr:
+                        rol_instr()
 
-                    result: int = ((value << 1) | old_carry) & 0xFF
-                    self.A = result
+                case instructions.ROL_ZEROPAGE_X_0x36 as opcode:
+                    with self.instruction_variant(opcode) as rol_instr:
+                        rol_instr()
 
-                    # Set N and Z flags
-                    self.flags[flags.Z] = 1 if result == 0 else 0
-                    self.flags[flags.N] = 1 if (result & BYTE_BIT_7_MASK) else 0
+                case instructions.ROL_ABSOLUTE_0x2E as opcode:
+                    with self.instruction_variant(opcode) as rol_instr:
+                        rol_instr()
 
-                    self.log.info("i")
-
-                case instructions.ROL_ZEROPAGE_0x26:
-                    # Rotate Left - Zero Page
-                    address: int = self.fetch_zeropage_mode_address(offset_register_name=None)
-                    value: int = int(self.read_byte(address=address))
-                    old_carry: int = self.flags[flags.C]
-
-                    # Bit 7 goes to carry flag
-                    self.flags[flags.C] = 1 if (value & BYTE_BIT_7_MASK) else 0
-
-                    result: int = ((value << 1) | old_carry) & 0xFF
-                    self.write_byte(address=address, data=result)
-
-                    # Set N and Z flags
-                    self.flags[flags.Z] = 1 if result == 0 else 0
-                    self.flags[flags.N] = 1 if (result & BYTE_BIT_7_MASK) else 0
-
-                    self.log.info("i")
-
-                case instructions.ROL_ZEROPAGE_X_0x36:
-                    # Rotate Left - Zero Page,X
-                    address: int = self.fetch_zeropage_mode_address(offset_register_name="X")
-                    value: int = int(self.read_byte(address=address))
-                    old_carry: int = self.flags[flags.C]
-
-                    # Bit 7 goes to carry flag
-                    self.flags[flags.C] = 1 if (value & BYTE_BIT_7_MASK) else 0
-
-                    result: int = ((value << 1) | old_carry) & 0xFF
-                    self.write_byte(address=address, data=result)
-
-                    # Set N and Z flags
-                    self.flags[flags.Z] = 1 if result == 0 else 0
-                    self.flags[flags.N] = 1 if (result & BYTE_BIT_7_MASK) else 0
-
-                    self.log.info("i")
-
-                case instructions.ROL_ABSOLUTE_0x2E:
-                    # Rotate Left - Absolute
-                    address: int = self.fetch_absolute_mode_address(offset_register_name=None)
-                    value: int = int(self.read_byte(address=address))
-                    old_carry: int = self.flags[flags.C]
-
-                    # Bit 7 goes to carry flag
-                    self.flags[flags.C] = 1 if (value & BYTE_BIT_7_MASK) else 0
-
-                    result: int = ((value << 1) | old_carry) & 0xFF
-                    self.write_byte(address=address & 0xFFFF, data=result)
-
-                    # Set N and Z flags
-                    self.flags[flags.Z] = 1 if result == 0 else 0
-                    self.flags[flags.N] = 1 if (result & BYTE_BIT_7_MASK) else 0
-
-                    self.log.info("i")
-
-                case instructions.ROL_ABSOLUTE_X_0x3E:
-                    # Rotate Left - Absolute,X
-                    address: int = self.fetch_absolute_mode_address(offset_register_name="X")
-                    value: int = int(self.read_byte(address=address))
-                    old_carry: int = self.flags[flags.C]
-
-                    # Bit 7 goes to carry flag
-                    self.flags[flags.C] = 1 if (value & BYTE_BIT_7_MASK) else 0
-
-                    result: int = ((value << 1) | old_carry) & 0xFF
-                    self.write_byte(address=address & 0xFFFF, data=result)
-
-                    # Set N and Z flags
-                    self.flags[flags.Z] = 1 if result == 0 else 0
-                    self.flags[flags.N] = 1 if (result & BYTE_BIT_7_MASK) else 0
-
-                    self.log.info("i")
+                case instructions.ROL_ABSOLUTE_X_0x3E as opcode:
+                    with self.instruction_variant(opcode) as rol_instr:
+                        rol_instr()
 
                 # ''' Execute ROR '''
-                case instructions.ROR_ACCUMULATOR_0x6A:
-                    # Rotate Right - Accumulator
-                    # Rotate right through carry: C -> bit 7, bit 0 -> C
-                    value: int = self.A
-                    old_carry: int = self.flags[flags.C]
+                case instructions.ROR_ACCUMULATOR_0x6A as opcode:
+                    with self.instruction_variant(opcode) as ror_instr:
+                        ror_instr()
 
-                    # Bit 0 goes to carry flag
-                    self.flags[flags.C] = 1 if (value & BYTE_BIT_0_MASK) else 0
+                case instructions.ROR_ZEROPAGE_0x66 as opcode:
+                    with self.instruction_variant(opcode) as ror_instr:
+                        ror_instr()
 
-                    result: int = ((value >> 1) | (old_carry << 7)) & 0xFF
-                    self.A = result
+                case instructions.ROR_ZEROPAGE_X_0x76 as opcode:
+                    with self.instruction_variant(opcode) as ror_instr:
+                        ror_instr()
 
-                    # Set N and Z flags
-                    self.flags[flags.Z] = 1 if result == 0 else 0
-                    self.flags[flags.N] = 1 if (result & BYTE_BIT_7_MASK) else 0
+                case instructions.ROR_ABSOLUTE_0x6E as opcode:
+                    with self.instruction_variant(opcode) as ror_instr:
+                        ror_instr()
 
-                    self.log.info("i")
-
-                case instructions.ROR_ZEROPAGE_0x66:
-                    # Rotate Right - Zero Page
-                    address: int = self.fetch_zeropage_mode_address(offset_register_name=None)
-                    value: int = int(self.read_byte(address=address))
-                    old_carry: int = self.flags[flags.C]
-
-                    # Bit 0 goes to carry flag
-                    self.flags[flags.C] = 1 if (value & BYTE_BIT_0_MASK) else 0
-
-                    result: int = ((value >> 1) | (old_carry << 7)) & 0xFF
-                    self.write_byte(address=address, data=result)
-
-                    # Set N and Z flags
-                    self.flags[flags.Z] = 1 if result == 0 else 0
-                    self.flags[flags.N] = 1 if (result & BYTE_BIT_7_MASK) else 0
-
-                    self.log.info("i")
-
-                case instructions.ROR_ZEROPAGE_X_0x76:
-                    # Rotate Right - Zero Page,X
-                    address: int = self.fetch_zeropage_mode_address(offset_register_name="X")
-                    value: int = int(self.read_byte(address=address))
-                    old_carry: int = self.flags[flags.C]
-
-                    # Bit 0 goes to carry flag
-                    self.flags[flags.C] = 1 if (value & BYTE_BIT_0_MASK) else 0
-
-                    result: int = ((value >> 1) | (old_carry << 7)) & 0xFF
-                    self.write_byte(address=address, data=result)
-
-                    # Set N and Z flags
-                    self.flags[flags.Z] = 1 if result == 0 else 0
-                    self.flags[flags.N] = 1 if (result & BYTE_BIT_7_MASK) else 0
-
-                    self.log.info("i")
-
-                case instructions.ROR_ABSOLUTE_0x6E:
-                    # Rotate Right - Absolute
-                    address: int = self.fetch_absolute_mode_address(offset_register_name=None)
-                    value: int = int(self.read_byte(address=address))
-                    old_carry: int = self.flags[flags.C]
-
-                    # Bit 0 goes to carry flag
-                    self.flags[flags.C] = 1 if (value & BYTE_BIT_0_MASK) else 0
-
-                    result: int = ((value >> 1) | (old_carry << 7)) & 0xFF
-                    self.write_byte(address=address & 0xFFFF, data=result)
-
-                    # Set N and Z flags
-                    self.flags[flags.Z] = 1 if result == 0 else 0
-                    self.flags[flags.N] = 1 if (result & BYTE_BIT_7_MASK) else 0
-
-                    self.log.info("i")
-
-                case instructions.ROR_ABSOLUTE_X_0x7E:
-                    # Rotate Right - Absolute,X
-                    address: int = self.fetch_absolute_mode_address(offset_register_name="X")
-                    value: int = int(self.read_byte(address=address))
-                    old_carry: int = self.flags[flags.C]
-
-                    # Bit 0 goes to carry flag
-                    self.flags[flags.C] = 1 if (value & BYTE_BIT_0_MASK) else 0
-
-                    result: int = ((value >> 1) | (old_carry << 7)) & 0xFF
-                    self.write_byte(address=address & 0xFFFF, data=result)
-
-                    # Set N and Z flags
-                    self.flags[flags.Z] = 1 if result == 0 else 0
-                    self.flags[flags.N] = 1 if (result & BYTE_BIT_7_MASK) else 0
-
-                    self.log.info("i")
+                case instructions.ROR_ABSOLUTE_X_0x7E as opcode:
+                    with self.instruction_variant(opcode) as ror_instr:
+                        ror_instr()
 
                 # ''' Execute ADC '''
-                case instructions.ADC_IMMEDIATE_0x69:
-                    # Add with Carry - Immediate
-                    value: int = int(self.fetch_byte())
+                case instructions.ADC_IMMEDIATE_0x69 as opcode:
+                    with self.instruction_variant(opcode) as adc_instr:
+                        adc_instr()
 
-                    if self.flags[flags.D]:
-                        # BCD (Decimal) mode addition
-                        result, carry_out, overflow, _ = self._adc_bcd(self.A, value, self.flags[flags.C])
-                        self.flags[flags.C] = carry_out
-                        self.flags[flags.V] = overflow
-                        self.A = result
-                    else:
-                        # Binary mode addition
-                        result: int = self.A + value + self.flags[flags.C]
+                case instructions.ADC_ZEROPAGE_0x65 as opcode:
+                    with self.instruction_variant(opcode) as adc_instr:
+                        adc_instr()
 
-                        # Set Carry flag if result > 255
-                        self.flags[flags.C] = 1 if result > 0xFF else 0
+                case instructions.ADC_ZEROPAGE_X_0x75 as opcode:
+                    with self.instruction_variant(opcode) as adc_instr:
+                        adc_instr()
 
-                        # Set Overflow flag: V = (A^result) & (M^result) & 0x80
-                        # Overflow occurs if both operands have same sign and result has different sign
-                        self.flags[flags.V] = 1 if ((self.A ^ result) & (value ^ result) & BYTE_BIT_7_MASK) else 0
+                case instructions.ADC_ABSOLUTE_0x6D as opcode:
+                    with self.instruction_variant(opcode) as adc_instr:
+                        adc_instr()
 
-                        # Store result (masked to 8 bits)
-                        self.A = result & 0xFF
+                case instructions.ADC_ABSOLUTE_X_0x7D as opcode:
+                    with self.instruction_variant(opcode) as adc_instr:
+                        adc_instr()
 
-                    # Set N and Z flags (always set for both BCD and binary modes)
-                    # VARIANT: 6502 - N and Z flags are set from BCD result
-                    # VARIANT: 65C02 - N and Z flags are set from binary result
-                    self.flags[flags.Z] = 1 if self.A == 0 else 0
-                    self.flags[flags.N] = 1 if (self.A & BYTE_BIT_7_MASK) else 0
+                case instructions.ADC_ABSOLUTE_Y_0x79 as opcode:
+                    with self.instruction_variant(opcode) as adc_instr:
+                        adc_instr()
 
-                    self.log.info("i")
+                case instructions.ADC_INDEXED_INDIRECT_X_0x61 as opcode:
+                    with self.instruction_variant(opcode) as adc_instr:
+                        adc_instr()
 
-                case instructions.ADC_ZEROPAGE_0x65:
-                    # Add with Carry - Zero Page
-                    address: int = self.fetch_zeropage_mode_address(offset_register_name=None)
-                    value: int = int(self.read_byte(address=address))
-
-                    if self.flags[flags.D]:
-                        # BCD (Decimal) mode addition
-                        result, carry_out, overflow, _ = self._adc_bcd(self.A, value, self.flags[flags.C])
-                        self.flags[flags.C] = carry_out
-                        self.flags[flags.V] = overflow
-                        self.A = result
-                    else:
-                        # Binary mode addition
-                        result: int = self.A + value + self.flags[flags.C]
-                        self.flags[flags.C] = 1 if result > 0xFF else 0
-                        self.flags[flags.V] = 1 if ((self.A ^ result) & (value ^ result) & BYTE_BIT_7_MASK) else 0
-                        self.A = result & 0xFF
-
-                    # Set N and Z flags
-                    self.flags[flags.Z] = 1 if self.A == 0 else 0
-                    self.flags[flags.N] = 1 if (self.A & BYTE_BIT_7_MASK) else 0
-
-                    self.log.info("i")
-
-                case instructions.ADC_ZEROPAGE_X_0x75:
-                    # Add with Carry - Zero Page,X
-                    address: int = self.fetch_zeropage_mode_address(offset_register_name="X")
-                    value: int = int(self.read_byte(address=address))
-
-                    if self.flags[flags.D]:
-                        # BCD (Decimal) mode addition
-                        result, carry_out, overflow, _ = self._adc_bcd(self.A, value, self.flags[flags.C])
-                        self.flags[flags.C] = carry_out
-                        self.flags[flags.V] = overflow
-                        self.A = result
-                    else:
-                        # Binary mode addition
-                        result: int = self.A + value + self.flags[flags.C]
-                        self.flags[flags.C] = 1 if result > 0xFF else 0
-                        self.flags[flags.V] = 1 if ((self.A ^ result) & (value ^ result) & BYTE_BIT_7_MASK) else 0
-                        self.A = result & 0xFF
-
-                    # Set N and Z flags
-                    self.flags[flags.Z] = 1 if self.A == 0 else 0
-                    self.flags[flags.N] = 1 if (self.A & BYTE_BIT_7_MASK) else 0
-
-                    self.log.info("i")
-
-                case instructions.ADC_ABSOLUTE_0x6D:
-                    # Add with Carry - Absolute
-                    address: int = self.fetch_absolute_mode_address(offset_register_name=None)
-                    value: int = int(self.read_byte(address=address))
-
-                    if self.flags[flags.D]:
-                        # BCD (Decimal) mode addition
-                        result, carry_out, overflow, _ = self._adc_bcd(self.A, value, self.flags[flags.C])
-                        self.flags[flags.C] = carry_out
-                        self.flags[flags.V] = overflow
-                        self.A = result
-                    else:
-                        # Binary mode addition
-                        result: int = self.A + value + self.flags[flags.C]
-                        self.flags[flags.C] = 1 if result > 0xFF else 0
-                        self.flags[flags.V] = 1 if ((self.A ^ result) & (value ^ result) & BYTE_BIT_7_MASK) else 0
-                        self.A = result & 0xFF
-
-                    # Set N and Z flags
-                    self.flags[flags.Z] = 1 if self.A == 0 else 0
-                    self.flags[flags.N] = 1 if (self.A & BYTE_BIT_7_MASK) else 0
-
-                    self.log.info("i")
-
-                case instructions.ADC_ABSOLUTE_X_0x7D:
-                    # Add with Carry - Absolute,X
-                    address: int = self.fetch_absolute_mode_address(offset_register_name="X")
-                    value: int = int(self.read_byte(address=address))
-
-                    if self.flags[flags.D]:
-                        # BCD (Decimal) mode addition
-                        result, carry_out, overflow, _ = self._adc_bcd(self.A, value, self.flags[flags.C])
-                        self.flags[flags.C] = carry_out
-                        self.flags[flags.V] = overflow
-                        self.A = result
-                    else:
-                        # Binary mode addition
-                        result: int = self.A + value + self.flags[flags.C]
-                        self.flags[flags.C] = 1 if result > 0xFF else 0
-                        self.flags[flags.V] = 1 if ((self.A ^ result) & (value ^ result) & BYTE_BIT_7_MASK) else 0
-                        self.A = result & 0xFF
-
-                    # Set N and Z flags
-                    self.flags[flags.Z] = 1 if self.A == 0 else 0
-                    self.flags[flags.N] = 1 if (self.A & BYTE_BIT_7_MASK) else 0
-
-                    self.log.info("i")
-
-                case instructions.ADC_ABSOLUTE_Y_0x79:
-                    # Add with Carry - Absolute,Y
-                    address: int = self.fetch_absolute_mode_address(offset_register_name="Y")
-                    value: int = int(self.read_byte(address=address))
-
-                    if self.flags[flags.D]:
-                        # BCD (Decimal) mode addition
-                        result, carry_out, overflow, _ = self._adc_bcd(self.A, value, self.flags[flags.C])
-                        self.flags[flags.C] = carry_out
-                        self.flags[flags.V] = overflow
-                        self.A = result
-                    else:
-                        # Binary mode addition
-                        result: int = self.A + value + self.flags[flags.C]
-                        self.flags[flags.C] = 1 if result > 0xFF else 0
-                        self.flags[flags.V] = 1 if ((self.A ^ result) & (value ^ result) & BYTE_BIT_7_MASK) else 0
-                        self.A = result & 0xFF
-
-                    # Set N and Z flags
-                    self.flags[flags.Z] = 1 if self.A == 0 else 0
-                    self.flags[flags.N] = 1 if (self.A & BYTE_BIT_7_MASK) else 0
-
-                    self.log.info("i")
-
-                case instructions.ADC_INDEXED_INDIRECT_X_0x61:
-                    # Add with Carry - Indexed Indirect (X)
-                    address: int = self.fetch_indexed_indirect_mode_address()
-                    value: int = int(self.read_byte(address=address))
-
-                    if self.flags[flags.D]:
-                        # BCD (Decimal) mode addition
-                        result, carry_out, overflow, _ = self._adc_bcd(self.A, value, self.flags[flags.C])
-                        self.flags[flags.C] = carry_out
-                        self.flags[flags.V] = overflow
-                        self.A = result
-                    else:
-                        # Binary mode addition
-                        result: int = self.A + value + self.flags[flags.C]
-                        self.flags[flags.C] = 1 if result > 0xFF else 0
-                        self.flags[flags.V] = 1 if ((self.A ^ result) & (value ^ result) & BYTE_BIT_7_MASK) else 0
-                        self.A = result & 0xFF
-
-                    # Set N and Z flags
-                    self.flags[flags.Z] = 1 if self.A == 0 else 0
-                    self.flags[flags.N] = 1 if (self.A & BYTE_BIT_7_MASK) else 0
-
-                    self.log.info("i")
-
-                case instructions.ADC_INDIRECT_INDEXED_Y_0x71:
-                    # Add with Carry - Indirect Indexed (Y)
-                    address: int = self.fetch_indirect_indexed_mode_address()
-                    value: int = int(self.read_byte(address=address))
-
-                    if self.flags[flags.D]:
-                        # BCD (Decimal) mode addition
-                        result, carry_out, overflow, _ = self._adc_bcd(self.A, value, self.flags[flags.C])
-                        self.flags[flags.C] = carry_out
-                        self.flags[flags.V] = overflow
-                        self.A = result
-                    else:
-                        # Binary mode addition
-                        result: int = self.A + value + self.flags[flags.C]
-                        self.flags[flags.C] = 1 if result > 0xFF else 0
-                        self.flags[flags.V] = 1 if ((self.A ^ result) & (value ^ result) & BYTE_BIT_7_MASK) else 0
-                        self.A = result & 0xFF
-
-                    # Set N and Z flags
-                    self.flags[flags.Z] = 1 if self.A == 0 else 0
-                    self.flags[flags.N] = 1 if (self.A & BYTE_BIT_7_MASK) else 0
-
-                    self.log.info("i")
+                case instructions.ADC_INDIRECT_INDEXED_Y_0x71 as opcode:
+                    with self.instruction_variant(opcode) as adc_instr:
+                        adc_instr()
 
                 # ''' Execute SBC '''
-                case instructions.SBC_IMMEDIATE_0xE9:
-                    # Subtract with Borrow - Immediate
-                    # A - M - (1 - C) = A - M - !C
-                    value: int = int(self.fetch_byte())
+                case instructions.SBC_IMMEDIATE_0xE9 as opcode:
+                    with self.instruction_variant(opcode) as sbc_instr:
+                        sbc_instr()
 
-                    if self.flags[flags.D]:
-                        # BCD (Decimal) mode subtraction
-                        result, carry_out, overflow, _ = self._sbc_bcd(self.A, value, self.flags[flags.C])
-                        self.flags[flags.C] = carry_out
-                        self.flags[flags.V] = overflow
-                        self.A = result
-                    else:
-                        # Binary mode subtraction
-                        result: int = self.A - value - (1 - self.flags[flags.C])
+                case instructions.SBC_ZEROPAGE_0xE5 as opcode:
+                    with self.instruction_variant(opcode) as sbc_instr:
+                        sbc_instr()
 
-                        # Set Carry flag (inverted borrow): C=1 if no borrow (A >= M)
-                        self.flags[flags.C] = 1 if result >= 0 else 0
+                case instructions.SBC_ZEROPAGE_X_0xF5 as opcode:
+                    with self.instruction_variant(opcode) as sbc_instr:
+                        sbc_instr()
 
-                        # Set Overflow flag: V = (A^M) & (A^result) & 0x80
-                        # Overflow occurs if operands have different signs and result has different sign from A
-                        self.flags[flags.V] = 1 if ((self.A ^ value) & (self.A ^ result) & BYTE_BIT_7_MASK) else 0
+                case instructions.SBC_ABSOLUTE_0xED as opcode:
+                    with self.instruction_variant(opcode) as sbc_instr:
+                        sbc_instr()
 
-                        # Store result (masked to 8 bits)
-                        self.A = result & 0xFF
+                case instructions.SBC_ABSOLUTE_X_0xFD as opcode:
+                    with self.instruction_variant(opcode) as sbc_instr:
+                        sbc_instr()
 
-                    # Set N and Z flags (always set for both BCD and binary modes)
-                    # VARIANT: 6502 - N and Z flags are set from BCD result
-                    # VARIANT: 65C02 - N and Z flags are set from binary result
-                    self.flags[flags.Z] = 1 if self.A == 0 else 0
-                    self.flags[flags.N] = 1 if (self.A & BYTE_BIT_7_MASK) else 0
+                case instructions.SBC_ABSOLUTE_Y_0xF9 as opcode:
+                    with self.instruction_variant(opcode) as sbc_instr:
+                        sbc_instr()
 
-                    self.log.info("i")
+                case instructions.SBC_INDEXED_INDIRECT_X_0xE1 as opcode:
+                    with self.instruction_variant(opcode) as sbc_instr:
+                        sbc_instr()
 
-                case instructions.SBC_ZEROPAGE_0xE5:
-                    # Subtract with Borrow - Zero Page
-                    address: int = self.fetch_zeropage_mode_address(offset_register_name=None)
-                    value: int = int(self.read_byte(address=address))
-
-                    if self.flags[flags.D]:
-                        # BCD (Decimal) mode subtraction
-                        result, carry_out, overflow, _ = self._sbc_bcd(self.A, value, self.flags[flags.C])
-                        self.flags[flags.C] = carry_out
-                        self.flags[flags.V] = overflow
-                        self.A = result
-                    else:
-                        # Binary mode subtraction
-                        result: int = self.A - value - (1 - self.flags[flags.C])
-                        self.flags[flags.C] = 1 if result >= 0 else 0
-                        self.flags[flags.V] = 1 if ((self.A ^ value) & (self.A ^ result) & BYTE_BIT_7_MASK) else 0
-                        self.A = result & 0xFF
-
-                    # Set N and Z flags
-                    self.flags[flags.Z] = 1 if self.A == 0 else 0
-                    self.flags[flags.N] = 1 if (self.A & BYTE_BIT_7_MASK) else 0
-
-                    self.log.info("i")
-
-                case instructions.SBC_ZEROPAGE_X_0xF5:
-                    # Subtract with Borrow - Zero Page,X
-                    address: int = self.fetch_zeropage_mode_address(offset_register_name="X")
-                    value: int = int(self.read_byte(address=address))
-
-                    if self.flags[flags.D]:
-                        # BCD (Decimal) mode subtraction
-                        result, carry_out, overflow, _ = self._sbc_bcd(self.A, value, self.flags[flags.C])
-                        self.flags[flags.C] = carry_out
-                        self.flags[flags.V] = overflow
-                        self.A = result
-                    else:
-                        # Binary mode subtraction
-                        result: int = self.A - value - (1 - self.flags[flags.C])
-                        self.flags[flags.C] = 1 if result >= 0 else 0
-                        self.flags[flags.V] = 1 if ((self.A ^ value) & (self.A ^ result) & BYTE_BIT_7_MASK) else 0
-                        self.A = result & 0xFF
-
-                    # Set N and Z flags
-                    self.flags[flags.Z] = 1 if self.A == 0 else 0
-                    self.flags[flags.N] = 1 if (self.A & BYTE_BIT_7_MASK) else 0
-
-                    self.log.info("i")
-
-                case instructions.SBC_ABSOLUTE_0xED:
-                    # Subtract with Borrow - Absolute
-                    address: int = self.fetch_absolute_mode_address(offset_register_name=None)
-                    value: int = int(self.read_byte(address=address))
-
-                    if self.flags[flags.D]:
-                        # BCD (Decimal) mode subtraction
-                        result, carry_out, overflow, _ = self._sbc_bcd(self.A, value, self.flags[flags.C])
-                        self.flags[flags.C] = carry_out
-                        self.flags[flags.V] = overflow
-                        self.A = result
-                    else:
-                        # Binary mode subtraction
-                        result: int = self.A - value - (1 - self.flags[flags.C])
-                        self.flags[flags.C] = 1 if result >= 0 else 0
-                        self.flags[flags.V] = 1 if ((self.A ^ value) & (self.A ^ result) & BYTE_BIT_7_MASK) else 0
-                        self.A = result & 0xFF
-
-                    # Set N and Z flags
-                    self.flags[flags.Z] = 1 if self.A == 0 else 0
-                    self.flags[flags.N] = 1 if (self.A & BYTE_BIT_7_MASK) else 0
-
-                    self.log.info("i")
-
-                case instructions.SBC_ABSOLUTE_X_0xFD:
-                    # Subtract with Borrow - Absolute,X
-                    address: int = self.fetch_absolute_mode_address(offset_register_name="X")
-                    value: int = int(self.read_byte(address=address))
-
-                    if self.flags[flags.D]:
-                        # BCD (Decimal) mode subtraction
-                        result, carry_out, overflow, _ = self._sbc_bcd(self.A, value, self.flags[flags.C])
-                        self.flags[flags.C] = carry_out
-                        self.flags[flags.V] = overflow
-                        self.A = result
-                    else:
-                        # Binary mode subtraction
-                        result: int = self.A - value - (1 - self.flags[flags.C])
-                        self.flags[flags.C] = 1 if result >= 0 else 0
-                        self.flags[flags.V] = 1 if ((self.A ^ value) & (self.A ^ result) & BYTE_BIT_7_MASK) else 0
-                        self.A = result & 0xFF
-
-                    # Set N and Z flags
-                    self.flags[flags.Z] = 1 if self.A == 0 else 0
-                    self.flags[flags.N] = 1 if (self.A & BYTE_BIT_7_MASK) else 0
-
-                    self.log.info("i")
-
-                case instructions.SBC_ABSOLUTE_Y_0xF9:
-                    # Subtract with Borrow - Absolute,Y
-                    address: int = self.fetch_absolute_mode_address(offset_register_name="Y")
-                    value: int = int(self.read_byte(address=address))
-
-                    if self.flags[flags.D]:
-                        # BCD (Decimal) mode subtraction
-                        result, carry_out, overflow, _ = self._sbc_bcd(self.A, value, self.flags[flags.C])
-                        self.flags[flags.C] = carry_out
-                        self.flags[flags.V] = overflow
-                        self.A = result
-                    else:
-                        # Binary mode subtraction
-                        result: int = self.A - value - (1 - self.flags[flags.C])
-                        self.flags[flags.C] = 1 if result >= 0 else 0
-                        self.flags[flags.V] = 1 if ((self.A ^ value) & (self.A ^ result) & BYTE_BIT_7_MASK) else 0
-                        self.A = result & 0xFF
-
-                    # Set N and Z flags
-                    self.flags[flags.Z] = 1 if self.A == 0 else 0
-                    self.flags[flags.N] = 1 if (self.A & BYTE_BIT_7_MASK) else 0
-
-                    self.log.info("i")
-
-                case instructions.SBC_INDEXED_INDIRECT_X_0xE1:
-                    # Subtract with Borrow - Indexed Indirect (X)
-                    address: int = self.fetch_indexed_indirect_mode_address()
-                    value: int = int(self.read_byte(address=address))
-
-                    if self.flags[flags.D]:
-                        # BCD (Decimal) mode subtraction
-                        result, carry_out, overflow, _ = self._sbc_bcd(self.A, value, self.flags[flags.C])
-                        self.flags[flags.C] = carry_out
-                        self.flags[flags.V] = overflow
-                        self.A = result
-                    else:
-                        # Binary mode subtraction
-                        result: int = self.A - value - (1 - self.flags[flags.C])
-                        self.flags[flags.C] = 1 if result >= 0 else 0
-                        self.flags[flags.V] = 1 if ((self.A ^ value) & (self.A ^ result) & BYTE_BIT_7_MASK) else 0
-                        self.A = result & 0xFF
-
-                    # Set N and Z flags
-                    self.flags[flags.Z] = 1 if self.A == 0 else 0
-                    self.flags[flags.N] = 1 if (self.A & BYTE_BIT_7_MASK) else 0
-
-                    self.log.info("i")
-
-                case instructions.SBC_INDIRECT_INDEXED_Y_0xF1:
-                    # Subtract with Borrow - Indirect Indexed (Y)
-                    address: int = self.fetch_indirect_indexed_mode_address()
-                    value: int = int(self.read_byte(address=address))
-
-                    if self.flags[flags.D]:
-                        # BCD (Decimal) mode subtraction
-                        result, carry_out, overflow, _ = self._sbc_bcd(self.A, value, self.flags[flags.C])
-                        self.flags[flags.C] = carry_out
-                        self.flags[flags.V] = overflow
-                        self.A = result
-                    else:
-                        # Binary mode subtraction
-                        result: int = self.A - value - (1 - self.flags[flags.C])
-                        self.flags[flags.C] = 1 if result >= 0 else 0
-                        self.flags[flags.V] = 1 if ((self.A ^ value) & (self.A ^ result) & BYTE_BIT_7_MASK) else 0
-                        self.A = result & 0xFF
-
-                    # Set N and Z flags
-                    self.flags[flags.Z] = 1 if self.A == 0 else 0
-                    self.flags[flags.N] = 1 if (self.A & BYTE_BIT_7_MASK) else 0
-
-                    self.log.info("i")
+                case instructions.SBC_INDIRECT_INDEXED_Y_0xF1 as opcode:
+                    with self.instruction_variant(opcode) as sbc_instr:
+                        sbc_instr()
 
                 # ''' Execute BMI '''
-                case instructions.BMI_RELATIVE_0x30:
-                    # Branch on Minus/Negative (N = 1)
-                    offset: int = int(self.fetch_byte())  # Signed byte offset
-
-                    # Convert to signed byte (-128 to +127)
-                    if offset > 127:
-                        offset = offset - 256
-
-                    if self.flags[flags.N] == 1:
-                        # Branch taken
-                        old_pc: int = self.PC
-                        self.PC = (self.PC + offset) & 0xFFFF
-
-                        # Check for page boundary crossing (adds 1 cycle)
-                        if (old_pc & 0xFF00) != (self.PC & 0xFF00):
-                            self.spend_cpu_cycles(1)
-
-                        self.spend_cpu_cycles(1)  # Branch taken costs 1 extra cycle
-
-                    self.log.info("i")
+                case instructions.BMI_RELATIVE_0x30 as opcode:
+                    with self.instruction_variant(opcode) as bmi:
+                        bmi()
 
                 # ''' Execute BNE '''
-                case instructions.BNE_RELATIVE_0xD0:
-                    # Branch on Not Equal (Z = 0)
-                    offset: int = int(self.fetch_byte())  # Signed byte offset
-
-                    # Convert to signed byte (-128 to +127)
-                    if offset > 127:
-                        offset = offset - 256
-
-                    if self.flags[flags.Z] == 0:
-                        # Branch taken
-                        old_pc: int = self.PC
-                        self.PC = (self.PC + offset) & 0xFFFF
-
-                        # Check for page boundary crossing (adds 1 cycle)
-                        if (old_pc & 0xFF00) != (self.PC & 0xFF00):
-                            self.spend_cpu_cycles(1)
-
-                        self.spend_cpu_cycles(1)  # Branch taken costs 1 extra cycle
-
-                    self.log.info("i")
+                case instructions.BNE_RELATIVE_0xD0 as opcode:
+                    with self.instruction_variant(opcode) as bne:
+                        bne()
 
                 # ''' Execute BPL '''
-                case instructions.BPL_RELATIVE_0x10:
-                    # Branch on Plus/Positive (N = 0)
-                    offset: int = int(self.fetch_byte())  # Signed byte offset
-
-                    # Convert to signed byte (-128 to +127)
-                    if offset > 127:
-                        offset = offset - 256
-
-                    if self.flags[flags.N] == 0:
-                        # Branch taken
-                        old_pc: int = self.PC
-                        self.PC = (self.PC + offset) & 0xFFFF
-
-                        # Check for page boundary crossing (adds 1 cycle)
-                        if (old_pc & 0xFF00) != (self.PC & 0xFF00):
-                            self.spend_cpu_cycles(1)
-
-                        self.spend_cpu_cycles(1)  # Branch taken costs 1 extra cycle
-
-                    self.log.info("i")
+                case instructions.BPL_RELATIVE_0x10 as opcode:
+                    with self.instruction_variant(opcode) as bpl:
+                        bpl()
 
                 # ''' Execute BVC '''
-                case instructions.BVC_RELATIVE_0x50:
-                    # Branch on Overflow Clear (V = 0)
-                    offset: int = int(self.fetch_byte())  # Signed byte offset
-
-                    # Convert to signed byte (-128 to +127)
-                    if offset > 127:
-                        offset = offset - 256
-
-                    if self.flags[flags.V] == 0:
-                        # Branch taken
-                        old_pc: int = self.PC
-                        self.PC = (self.PC + offset) & 0xFFFF
-
-                        # Check for page boundary crossing (adds 1 cycle)
-                        if (old_pc & 0xFF00) != (self.PC & 0xFF00):
-                            self.spend_cpu_cycles(1)
-
-                        self.spend_cpu_cycles(1)  # Branch taken costs 1 extra cycle
-
-                    self.log.info("i")
+                case instructions.BVC_RELATIVE_0x50 as opcode:
+                    with self.instruction_variant(opcode) as bvc:
+                        bvc()
 
                 # ''' Execute BVS '''
-                case instructions.BVS_RELATIVE_0x70:
-                    # Branch on Overflow Set (V = 1)
-                    offset: int = int(self.fetch_byte())  # Signed byte offset
-
-                    # Convert to signed byte (-128 to +127)
-                    if offset > 127:
-                        offset = offset - 256
-
-                    if self.flags[flags.V] == 1:
-                        # Branch taken
-                        old_pc: int = self.PC
-                        self.PC = (self.PC + offset) & 0xFFFF
-
-                        # Check for page boundary crossing (adds 1 cycle)
-                        if (old_pc & 0xFF00) != (self.PC & 0xFF00):
-                            self.spend_cpu_cycles(1)
-
-                        self.spend_cpu_cycles(1)  # Branch taken costs 1 extra cycle
-
-                    self.log.info("i")
+                case instructions.BVS_RELATIVE_0x70 as opcode:
+                    with self.instruction_variant(opcode) as bvs:
+                        bvs()
 
                 # ''' Execute BRK '''
-                case instructions.BRK_IMPLIED_0x00:
-                    # VARIANT: 6502 - D (decimal) flag is NOT cleared by BRK or any interrupt (IRQ, NMI, RESET)
-                    # VARIANT: 6502A - D (decimal) flag is NOT cleared by BRK or any interrupt (IRQ, NMI, RESET)
-                    # VARIANT: 65C02 - D (decimal) flag IS cleared by BRK and all interrupts (IRQ, NMI, RESET)
-                    # This implementation follows the NMOS 6502/6502A behavior (does not clear D flag)
-
-                    # BRK pushes PC+2, then SR (with B flag set), then sets I flag
-                    # Total: 7 cycles (1 for fetch + 2 for write_word + 1 for write_byte + 3 for overhead)
-                    # BRK is documented as pushing PC+2, but after fetch_byte(), PC is already +1
-                    # So we push PC (current value, which is already original PC+1)
-                    self.write_word(address=self.S - 1, data=self.PC)
-                    self.S -= 2
-
-                    # Push status register with B flag set
-                    # Create a copy of flags with B flag set
-                    status_with_break: Byte = Byte(self._flags.value | (1 << flags.B))
-                    self.write_byte(address=self.S, data=status_with_break)
-                    self.S -= 1
-
-                    # Set interrupt disable flag
-                    self.I = flags.ProcessorStatusFlags.I[flags.I]
-
-                    # Load PC from IRQ vector at 0xFFFE/0xFFFF
-                    # (In a real system, this would jump to the interrupt handler)
-                    # For our emulator, we'll raise an exception instead
-                    # We've spent 4 cycles so far (1 fetch + 2 write_word + 1 write_byte)
-                    # Need 3 more to total 7
-                    self.spend_cpu_cycles(cost=3)
-
-                    self.log.info("i")
-                    self.log.debug(f"{instructions.InstructionSet(int(instruction)).name}")
+                case instructions.BRK_IMPLIED_0x00 as opcode:
+                    with self.instruction_variant(opcode) as brk:
+                        brk()
 
                     raise exceptions.CPUBreakError(
                         f"BRK instruction executed at PC=0x{self.PC - 1:04X}",
@@ -2362,728 +1462,406 @@ class MOS6502CPU(flags.ProcessorStatusFlagsInterface):
                 # BVC
                 # BVS
                 # CLC
-                case instructions.CLC_IMPLIED_0x18:
-                    self.C = 0
-                    self.log.info("i")
-                    self.spend_cpu_cycles(1)
+                case instructions.CLC_IMPLIED_0x18 as opcode:
+                    with self.instruction_variant(opcode) as clc:
+                        clc()
 
                 # CLD
-                case instructions.CLD_IMPLIED_0xD8:
-                    self.D = 0
-                    self.log.info("i")
-                    self.spend_cpu_cycles(1)
+                case instructions.CLD_IMPLIED_0xD8 as opcode:
+                    with self.instruction_variant(opcode) as cld:
+                        cld()
 
                 # CLI
-                case instructions.CLI_IMPLIED_0x58:
-                    self.I = 0
-                    self.log.info("i")
-                    self.spend_cpu_cycles(1)
+                case instructions.CLI_IMPLIED_0x58 as opcode:
+                    with self.instruction_variant(opcode) as cli:
+                        cli()
 
                 # CLV
-                case instructions.CLV_IMPLIED_0xB8:
-                    self.V = 0
-                    self.log.info("i")
-                    self.spend_cpu_cycles(1)
+                case instructions.CLV_IMPLIED_0xB8 as opcode:
+                    with self.instruction_variant(opcode) as clv:
+                        clv()
 
                 # SEC
-                case instructions.SEC_IMPLIED_0x38:
-                    self.C = 1
-                    self.log.info("i")
-                    self.spend_cpu_cycles(1)
+                case instructions.SEC_IMPLIED_0x38 as opcode:
+                    with self.instruction_variant(opcode) as sec:
+                        sec()
 
                 # SED
-                case instructions.SED_IMPLIED_0xF8:
-                    self.D = 1
-                    self.log.info("i")
-                    self.spend_cpu_cycles(1)
+                case instructions.SED_IMPLIED_0xF8 as opcode:
+                    with self.instruction_variant(opcode) as sed:
+                        sed()
 
                 # SEI
-                case instructions.SEI_IMPLIED_0x78:
-                    self.I = 1
-                    self.log.info("i")
-                    self.spend_cpu_cycles(1)
+                case instructions.SEI_IMPLIED_0x78 as opcode:
+                    with self.instruction_variant(opcode) as sei:
+                        sei()
 
                 # TAX
-                case instructions.TAX_IMPLIED_0xAA:
-                    self.X = self.A
-                    self.set_load_status_flags(register_name="X")
-                    self.log.info("i")
-                    self.spend_cpu_cycles(1)
+                case instructions.TAX_IMPLIED_0xAA as opcode:
+                    with self.instruction_variant(opcode) as tax:
+                        tax()
 
                 # TAY
-                case instructions.TAY_IMPLIED_0xA8:
-                    self.Y = self.A
-                    self.set_load_status_flags(register_name="Y")
-                    self.log.info("i")
-                    self.spend_cpu_cycles(1)
+                case instructions.TAY_IMPLIED_0xA8 as opcode:
+                    with self.instruction_variant(opcode) as tay:
+                        tay()
 
                 # TSX
-                case instructions.TSX_IMPLIED_0xBA:
-                    self.X = self.S & 0xFF
-                    self.set_load_status_flags(register_name="X")
-                    self.log.info("i")
-                    self.spend_cpu_cycles(1)
+                case instructions.TSX_IMPLIED_0xBA as opcode:
+                    with self.instruction_variant(opcode) as tsx:
+                        tsx()
 
                 # TXA
-                case instructions.TXA_IMPLIED_0x8A:
-                    self.A = self.X
-                    self.set_load_status_flags(register_name="A")
-                    self.log.info("i")
-                    self.spend_cpu_cycles(1)
+                case instructions.TXA_IMPLIED_0x8A as opcode:
+                    with self.instruction_variant(opcode) as txa:
+                        txa()
 
                 # TXS
-                case instructions.TXS_IMPLIED_0x9A:
-                    self.S = 0x100 | self.X
-                    self.log.info("i")
-                    self.spend_cpu_cycles(1)
+                case instructions.TXS_IMPLIED_0x9A as opcode:
+                    with self.instruction_variant(opcode) as txs:
+                        txs()
 
                 # TYA
-                case instructions.TYA_IMPLIED_0x98:
-                    self.A = self.Y
-                    self.set_load_status_flags(register_name="A")
-                    self.log.info("i")
-                    self.spend_cpu_cycles(1)
+                case instructions.TYA_IMPLIED_0x98 as opcode:
+                    with self.instruction_variant(opcode) as tya:
+                        tya()
 
                 # ''' Execute CMP '''
-                case instructions.CMP_IMMEDIATE_0xC9:
-                    # Compare Accumulator with Memory (A - M)
-                    value: int = int(self.fetch_byte())
-                    result: int = (self.A - value) & 0xFF
+                case instructions.CMP_IMMEDIATE_0xC9 as opcode:
+                    with self.instruction_variant(opcode) as cmp:
+                        cmp()
 
-                    # Set flags based on comparison
-                    self.flags[flags.Z] = 1 if result == 0 else 0
-                    self.flags[flags.N] = 1 if (result & 0x80) else 0
-                    self.flags[flags.C] = 1 if self.A >= value else 0  # C=1 if A >= M (no borrow)
+                case instructions.CMP_ZEROPAGE_0xC5 as opcode:
+                    with self.instruction_variant(opcode) as cmp:
+                        cmp()
 
-                    self.log.info("i")
+                case instructions.CMP_ZEROPAGE_X_0xD5 as opcode:
+                    with self.instruction_variant(opcode) as cmp:
+                        cmp()
 
-                case instructions.CMP_ZEROPAGE_0xC5:
-                    address: int = self.fetch_zeropage_mode_address(offset_register_name=None)
-                    value: int = int(self.read_byte(address=address))
-                    result: int = (self.A - value) & 0xFF
+                case instructions.CMP_ABSOLUTE_0xCD as opcode:
+                    with self.instruction_variant(opcode) as cmp:
+                        cmp()
 
-                    self.flags[flags.Z] = 1 if result == 0 else 0
-                    self.flags[flags.N] = 1 if (result & 0x80) else 0
-                    self.flags[flags.C] = 1 if self.A >= value else 0
+                case instructions.CMP_ABSOLUTE_X_0xDD as opcode:
+                    with self.instruction_variant(opcode) as cmp:
+                        cmp()
 
-                    self.log.info("i")
+                case instructions.CMP_ABSOLUTE_Y_0xD9 as opcode:
+                    with self.instruction_variant(opcode) as cmp:
+                        cmp()
 
-                case instructions.CMP_ZEROPAGE_X_0xD5:
-                    address: int = self.fetch_zeropage_mode_address(offset_register_name="X")
-                    value: int = int(self.read_byte(address=address))
-                    result: int = (self.A - value) & 0xFF
+                case instructions.CMP_INDEXED_INDIRECT_X_0xC1 as opcode:
+                    with self.instruction_variant(opcode) as cmp:
+                        cmp()
 
-                    self.flags[flags.Z] = 1 if result == 0 else 0
-                    self.flags[flags.N] = 1 if (result & 0x80) else 0
-                    self.flags[flags.C] = 1 if self.A >= value else 0
-
-                    self.log.info("i")
-
-                case instructions.CMP_ABSOLUTE_0xCD:
-                    address: int = self.fetch_absolute_mode_address(offset_register_name=None)
-                    value: int = int(self.read_byte(address=address))
-                    result: int = (self.A - value) & 0xFF
-
-                    self.flags[flags.Z] = 1 if result == 0 else 0
-                    self.flags[flags.N] = 1 if (result & 0x80) else 0
-                    self.flags[flags.C] = 1 if self.A >= value else 0
-
-                    self.log.info("i")
-
-                case instructions.CMP_ABSOLUTE_X_0xDD:
-                    address: int = self.fetch_absolute_mode_address(offset_register_name="X")
-                    value: int = int(self.read_byte(address=address))
-                    result: int = (self.A - value) & 0xFF
-
-                    self.flags[flags.Z] = 1 if result == 0 else 0
-                    self.flags[flags.N] = 1 if (result & 0x80) else 0
-                    self.flags[flags.C] = 1 if self.A >= value else 0
-
-                    self.log.info("i")
-
-                case instructions.CMP_ABSOLUTE_Y_0xD9:
-                    address: int = self.fetch_absolute_mode_address(offset_register_name="Y")
-                    value: int = int(self.read_byte(address=address))
-                    result: int = (self.A - value) & 0xFF
-
-                    self.flags[flags.Z] = 1 if result == 0 else 0
-                    self.flags[flags.N] = 1 if (result & 0x80) else 0
-                    self.flags[flags.C] = 1 if self.A >= value else 0
-
-                    self.log.info("i")
-
-                case instructions.CMP_INDEXED_INDIRECT_X_0xC1:
-                    address: int = self.fetch_indexed_indirect_mode_address()
-                    value: int = int(self.read_byte(address=address))
-                    result: int = (self.A - value) & 0xFF
-
-                    self.flags[flags.Z] = 1 if result == 0 else 0
-                    self.flags[flags.N] = 1 if (result & 0x80) else 0
-                    self.flags[flags.C] = 1 if self.A >= value else 0
-
-                    self.log.info("i")
-
-                case instructions.CMP_INDIRECT_INDEXED_Y_0xD1:
-                    address: int = self.fetch_indirect_indexed_mode_address()
-                    value: int = int(self.read_byte(address=address))
-                    result: int = (self.A - value) & 0xFF
-
-                    self.flags[flags.Z] = 1 if result == 0 else 0
-                    self.flags[flags.N] = 1 if (result & 0x80) else 0
-                    self.flags[flags.C] = 1 if self.A >= value else 0
-
-                    self.log.info("i")
+                case instructions.CMP_INDIRECT_INDEXED_Y_0xD1 as opcode:
+                    with self.instruction_variant(opcode) as cmp:
+                        cmp()
 
                 # ''' Execute CPX '''
-                case instructions.CPX_IMMEDIATE_0xE0:
-                    # Compare X Register with Memory (X - M)
-                    value: int = int(self.fetch_byte())
-                    result: int = (self.X - value) & 0xFF
+                case instructions.CPX_IMMEDIATE_0xE0 as opcode:
+                    with self.instruction_variant(opcode) as cpx:
+                        cpx()
 
-                    # Set flags based on comparison
-                    self.flags[flags.Z] = 1 if result == 0 else 0
-                    self.flags[flags.N] = 1 if (result & 0x80) else 0
-                    self.flags[flags.C] = 1 if self.X >= value else 0  # C=1 if X >= M (no borrow)
+                case instructions.CPX_ZEROPAGE_0xE4 as opcode:
+                    with self.instruction_variant(opcode) as cpx:
+                        cpx()
 
-                    self.log.info("i")
-
-                case instructions.CPX_ZEROPAGE_0xE4:
-                    address: int = self.fetch_zeropage_mode_address(offset_register_name=None)
-                    value: int = int(self.read_byte(address=address))
-                    result: int = (self.X - value) & 0xFF
-
-                    self.flags[flags.Z] = 1 if result == 0 else 0
-                    self.flags[flags.N] = 1 if (result & 0x80) else 0
-                    self.flags[flags.C] = 1 if self.X >= value else 0
-
-                    self.log.info("i")
-
-                case instructions.CPX_ABSOLUTE_0xEC:
-                    address: int = self.fetch_absolute_mode_address(offset_register_name=None)
-                    value: int = int(self.read_byte(address=address))
-                    result: int = (self.X - value) & 0xFF
-
-                    self.flags[flags.Z] = 1 if result == 0 else 0
-                    self.flags[flags.N] = 1 if (result & 0x80) else 0
-                    self.flags[flags.C] = 1 if self.X >= value else 0
-
-                    self.log.info("i")
+                case instructions.CPX_ABSOLUTE_0xEC as opcode:
+                    with self.instruction_variant(opcode) as cpx:
+                        cpx()
 
                 # ''' Execute CPY '''
-                case instructions.CPY_IMMEDIATE_0xC0:
-                    # Compare Y Register with Memory (Y - M)
-                    value: int = int(self.fetch_byte())
-                    result: int = (self.Y - value) & 0xFF
+                case instructions.CPY_IMMEDIATE_0xC0 as opcode:
+                    with self.instruction_variant(opcode) as cpy:
+                        cpy()
 
-                    # Set flags based on comparison
-                    self.flags[flags.Z] = 1 if result == 0 else 0
-                    self.flags[flags.N] = 1 if (result & 0x80) else 0
-                    self.flags[flags.C] = 1 if self.Y >= value else 0  # C=1 if Y >= M (no borrow)
+                case instructions.CPY_ZEROPAGE_0xC4 as opcode:
+                    with self.instruction_variant(opcode) as cpy:
+                        cpy()
 
-                    self.log.info("i")
-
-                case instructions.CPY_ZEROPAGE_0xC4:
-                    address: int = self.fetch_zeropage_mode_address(offset_register_name=None)
-                    value: int = int(self.read_byte(address=address))
-                    result: int = (self.Y - value) & 0xFF
-
-                    self.flags[flags.Z] = 1 if result == 0 else 0
-                    self.flags[flags.N] = 1 if (result & 0x80) else 0
-                    self.flags[flags.C] = 1 if self.Y >= value else 0
-
-                    self.log.info("i")
-
-                case instructions.CPY_ABSOLUTE_0xCC:
-                    address: int = self.fetch_absolute_mode_address(offset_register_name=None)
-                    value: int = int(self.read_byte(address=address))
-                    result: int = (self.Y - value) & 0xFF
-
-                    self.flags[flags.Z] = 1 if result == 0 else 0
-                    self.flags[flags.N] = 1 if (result & 0x80) else 0
-                    self.flags[flags.C] = 1 if self.Y >= value else 0
-
-                    self.log.info("i")
+                case instructions.CPY_ABSOLUTE_0xCC as opcode:
+                    with self.instruction_variant(opcode) as cpy:
+                        cpy()
 
                 # DEC
 
                 # DEX
-                case instructions.DEX_IMPLIED_0xCA:
-                    self.X = (self.X - 1) & 0xFF
-                    self.set_load_status_flags(register_name="X")
-                    self.log.info("i")
-                    self.spend_cpu_cycles(1)
+                case instructions.DEX_IMPLIED_0xCA as opcode:
+                    with self.instruction_variant(opcode) as dex:
+                        dex()
 
                 # DEY
-                case instructions.DEY_IMPLIED_0x88:
-                    self.Y = (self.Y - 1) & 0xFF
-                    self.set_load_status_flags(register_name="Y")
-                    self.log.info("i")
-                    self.spend_cpu_cycles(1)
+                case instructions.DEY_IMPLIED_0x88 as opcode:
+                    with self.instruction_variant(opcode) as dey:
+                        dey()
 
                 # ''' Execute EOR '''
-                case instructions.EOR_IMMEDIATE_0x49:
-                    # Bitwise Exclusive OR with Accumulator
-                    value: int = int(self.fetch_byte())
-                    self.A = self.A ^ value
-                    self.set_load_status_flags(register_name="A")
-                    self.log.info("i")
+                case instructions.EOR_IMMEDIATE_0x49 as opcode:
+                    with self.instruction_variant(opcode) as eor:
+                        eor()
 
-                case instructions.EOR_ZEROPAGE_0x45:
-                    address: int = self.fetch_zeropage_mode_address(offset_register_name=None)
-                    value: int = int(self.read_byte(address=address))
-                    self.A = self.A ^ value
-                    self.set_load_status_flags(register_name="A")
-                    self.log.info("i")
+                case instructions.EOR_ZEROPAGE_0x45 as opcode:
+                    with self.instruction_variant(opcode) as eor:
+                        eor()
 
-                case instructions.EOR_ZEROPAGE_X_0x55:
-                    address: int = self.fetch_zeropage_mode_address(offset_register_name="X")
-                    value: int = int(self.read_byte(address=address))
-                    self.A = self.A ^ value
-                    self.set_load_status_flags(register_name="A")
-                    self.log.info("i")
+                case instructions.EOR_ZEROPAGE_X_0x55 as opcode:
+                    with self.instruction_variant(opcode) as eor:
+                        eor()
 
-                case instructions.EOR_ABSOLUTE_0x4D:
-                    address: int = self.fetch_absolute_mode_address(offset_register_name=None)
-                    value: int = int(self.read_byte(address=address))
-                    self.A = self.A ^ value
-                    self.set_load_status_flags(register_name="A")
-                    self.log.info("i")
+                case instructions.EOR_ABSOLUTE_0x4D as opcode:
+                    with self.instruction_variant(opcode) as eor:
+                        eor()
 
-                case instructions.EOR_ABSOLUTE_X_0x5D:
-                    address: int = self.fetch_absolute_mode_address(offset_register_name="X")
-                    value: int = int(self.read_byte(address=address))
-                    self.A = self.A ^ value
-                    self.set_load_status_flags(register_name="A")
-                    self.log.info("i")
+                case instructions.EOR_ABSOLUTE_X_0x5D as opcode:
+                    with self.instruction_variant(opcode) as eor:
+                        eor()
 
-                case instructions.EOR_ABSOLUTE_Y_0x59:
-                    address: int = self.fetch_absolute_mode_address(offset_register_name="Y")
-                    value: int = int(self.read_byte(address=address))
-                    self.A = self.A ^ value
-                    self.set_load_status_flags(register_name="A")
-                    self.log.info("i")
+                case instructions.EOR_ABSOLUTE_Y_0x59 as opcode:
+                    with self.instruction_variant(opcode) as eor:
+                        eor()
 
-                case instructions.EOR_INDEXED_INDIRECT_X_0x41:
-                    address: int = self.fetch_indexed_indirect_mode_address()
-                    value: int = int(self.read_byte(address=address))
-                    self.A = self.A ^ value
-                    self.set_load_status_flags(register_name="A")
-                    self.log.info("i")
+                case instructions.EOR_INDEXED_INDIRECT_X_0x41 as opcode:
+                    with self.instruction_variant(opcode) as eor:
+                        eor()
 
-                case instructions.EOR_INDIRECT_INDEXED_Y_0x51:
-                    address: int = self.fetch_indirect_indexed_mode_address()
-                    value: int = int(self.read_byte(address=address))
-                    self.A = self.A ^ value
-                    self.set_load_status_flags(register_name="A")
-                    self.log.info("i")
+                case instructions.EOR_INDIRECT_INDEXED_Y_0x51 as opcode:
+                    with self.instruction_variant(opcode) as eor:
+                        eor()
 
                 # INC
 
                 # INX
-                case instructions.INX_IMPLIED_0xE8:
-                    self.X = (self.X + 1) & 0xFF
-                    self.set_load_status_flags(register_name="X")
-                    self.log.info("i")
-                    self.spend_cpu_cycles(1)
+                case instructions.INX_IMPLIED_0xE8 as opcode:
+                    with self.instruction_variant(opcode) as inx:
+                        inx()
 
                 # INY
-                case instructions.INY_IMPLIED_0xC8:
-                    self.Y = (self.Y + 1) & 0xFF
-                    self.set_load_status_flags(register_name="Y")
-                    self.log.info("i")
-                    self.spend_cpu_cycles(1)
+                case instructions.INY_IMPLIED_0xC8 as opcode:
+                    with self.instruction_variant(opcode) as iny:
+                        iny()
 
                 # JMP
-                case instructions.JMP_ABSOLUTE_0x4C:
-                    jump_address: Word = self.fetch_word()
-                    self.PC = jump_address
-                    self.log.info("i")
-                    # No additional cycles - fetch_word already spent 2
+                case instructions.JMP_ABSOLUTE_0x4C as opcode:
+                    with self.instruction_variant(opcode) as jmp:
+                        jmp()
 
-                case instructions.JMP_INDIRECT_0x6C:
-                    indirect_address: Word = self.fetch_word()
-
-                    # VARIANT: 6502/6502A - Page boundary bug
-                    # If indirect_address is 0xXXFF, the 6502 wraps within the page
-                    # instead of crossing to the next page for the high byte.
-                    # Example: JMP ($10FF) reads low byte from $10FF and high byte
-                    # from $1000 (not $1100 as expected).
-                    # VARIANT: 65C02 - Bug fixed, correctly reads across page boundary
-
-                    if (indirect_address & 0xFF) == 0xFF:
-                        # Page boundary bug: wrap within same page
-                        low_byte: Byte = self.read_byte(address=indirect_address)
-                        high_byte: Byte = self.read_byte(address=indirect_address & 0xFF00)
-                        jump_address: Word = Word((high_byte << 8) | low_byte)
-                    else:
-                        # Normal case: read word normally
-                        jump_address: Word = self.read_word(address=indirect_address)
-
-                    self.PC = jump_address
-                    self.log.info("i")
-                    # No additional cycles - fetch_word already spent 2, read operations spent 2
+                case instructions.JMP_INDIRECT_0x6C as opcode:
+                    with self.instruction_variant(opcode) as jmp_indirect:
+                        jmp_indirect()
 
                 # ''' Execute JSR '''
-                case instructions.JSR_ABSOLUTE_0x20:
-                    subroutine_address: Word = self.fetch_word()
-
-                    # The stack is top-down, so starts at 0x1FF, so we need to
-                    # write to S - 1
-                    self.write_word(address=self.S - 1, data=self.PC + 1)
-
-                    # Since we wrote a word, we need to decrement by 2
-                    # so our stack pointer would be 0xFD if it started at 0xFF here
-                    self.S -= 2
-                    self.PC = subroutine_address
-                    self.spend_cpu_cycles(cost=1)
-
-                    self.log.info("i")
-
-                    self.log.debug(
-                        f"{instructions.InstructionSet(int(instruction)).name}: "
-                        f"{hex(subroutine_address)}",
-                    )
+                case instructions.JSR_ABSOLUTE_0x20 as opcode:
+                    with self.instruction_variant(opcode) as jsr:
+                        jsr()
 
                 # ''' Execute Load Immediate '''
-                case instructions.LDA_IMMEDIATE_0xA9:
-                    self.execute_load_immediate(
-                        instruction=instruction,
-                        register_name="A",
-                    )
+                case instructions.LDA_IMMEDIATE_0xA9 as opcode:
+                    with self.instruction_variant(opcode) as lda:
+                        lda()
 
-                case instructions.LDX_IMMEDIATE_0xA2:
-                    self.execute_load_immediate(
-                        instruction=instruction,
-                        register_name="X",
-                    )
+                case instructions.LDX_IMMEDIATE_0xA2 as opcode:
+                    with self.instruction_variant(opcode) as ldx:
+                        ldx()
 
-                case instructions.LDY_IMMEDIATE_0xA0:
-                    self.execute_load_immediate(
-                        instruction=instruction,
-                        register_name="Y",
-                    )
+                case instructions.LDY_IMMEDIATE_0xA0 as opcode:
+                    with self.instruction_variant(opcode) as ldy:
+                        ldy()
 
                 # ''' Execute Load Zero Page '''
-                case instructions.LDA_ZEROPAGE_0xA5:
-                    self.execute_load_zeropage(
-                        instruction=instruction,
-                        register_name="A",
-                        offset_register_name=None,
-                    )
+                case instructions.LDA_ZEROPAGE_0xA5 as opcode:
+                    with self.instruction_variant(opcode) as lda:
+                        lda()
 
-                case instructions.LDX_ZEROPAGE_0xA6:
-                    self.execute_load_zeropage(
-                        instruction=instruction,
-                        register_name="X",
-                        offset_register_name=None,
-                    )
+                case instructions.LDX_ZEROPAGE_0xA6 as opcode:
+                    with self.instruction_variant(opcode) as ldx:
+                        ldx()
 
-                case instructions.LDY_ZEROPAGE_0xA4:
-                    self.execute_load_zeropage(
-                        instruction=instruction,
-                        register_name="Y",
-                        offset_register_name=None,
-                    )
+                case instructions.LDY_ZEROPAGE_0xA4 as opcode:
+                    with self.instruction_variant(opcode) as ldy:
+                        ldy()
 
                 # ''' Execute Load Zero Page X '''
-                case instructions.LDY_ZEROPAGE_X_0xB4:
-                    self.execute_load_zeropage(
-                        instruction=instruction,
-                        register_name="Y",
-                        offset_register_name="X",
-                    )
+                case instructions.LDY_ZEROPAGE_X_0xB4 as opcode:
+                    with self.instruction_variant(opcode) as ldy:
+                        ldy()
 
-                case instructions.LDA_ZEROPAGE_X_0xB5:
-                    self.execute_load_zeropage(
-                        instruction=instruction,
-                        register_name="A",
-                        offset_register_name="X",
-                    )
+                case instructions.LDA_ZEROPAGE_X_0xB5 as opcode:
+                    with self.instruction_variant(opcode) as lda:
+                        lda()
 
                 # ''' Execute Load Zero Page Y '''
-                case instructions.LDX_ZEROPAGE_Y_0xB6:
-                    self.execute_load_zeropage(
-                        instruction=instruction,
-                        register_name="X",
-                        offset_register_name="Y",
-                    )
+                case instructions.LDX_ZEROPAGE_Y_0xB6 as opcode:
+                    with self.instruction_variant(opcode) as ldx:
+                        ldx()
 
                 # ''' Execute Loada Absolute '''
-                case instructions.LDA_ABSOLUTE_0xAD:
-                    self.execute_load_absolute(
-                        instruction=instruction,
-                        register_name="A",
-                        offset_register_name=None,
-                    )
+                case instructions.LDA_ABSOLUTE_0xAD as opcode:
+                    with self.instruction_variant(opcode) as lda:
+                        lda()
 
-                case instructions.LDX_ABSOLUTE_0xAE:
-                    self.execute_load_absolute(
-                        instruction=instruction,
-                        register_name="X",
-                        offset_register_name=None,
-                    )
+                case instructions.LDX_ABSOLUTE_0xAE as opcode:
+                    with self.instruction_variant(opcode) as ldx:
+                        ldx()
 
-                case instructions.LDY_ABSOLUTE_0xAC:
-                    self.execute_load_absolute(
-                        instruction=instruction,
-                        register_name="Y",
-                        offset_register_name=None,
-                    )
+                case instructions.LDY_ABSOLUTE_0xAC as opcode:
+                    with self.instruction_variant(opcode) as ldy:
+                        ldy()
 
-                case instructions.LDA_ABSOLUTE_X_0xBD:
-                    self.execute_load_absolute(
-                        instruction=instruction,
-                        register_name="A",
-                        offset_register_name="X",
-                    )
+                case instructions.LDA_ABSOLUTE_X_0xBD as opcode:
+                    with self.instruction_variant(opcode) as lda:
+                        lda()
 
-                case instructions.LDA_ABSOLUTE_Y_0xB9:
-                    self.execute_load_absolute(
-                        instruction=instruction,
-                        register_name="A",
-                        offset_register_name="Y",
-                    )
+                case instructions.LDA_ABSOLUTE_Y_0xB9 as opcode:
+                    with self.instruction_variant(opcode) as lda:
+                        lda()
 
-                case instructions.LDX_ABSOLUTE_Y_0xBE:
-                    self.execute_load_absolute(
-                        instruction=instruction,
-                        register_name="X",
-                        offset_register_name="Y",
-                    )
+                case instructions.LDX_ABSOLUTE_Y_0xBE as opcode:
+                    with self.instruction_variant(opcode) as ldx:
+                        ldx()
 
-                case instructions.LDY_ABSOLUTE_X_0xBC:
-                    self.execute_load_absolute(
-                        instruction=instruction,
-                        register_name="Y",
-                        offset_register_name="X",
-                    )
+                case instructions.LDY_ABSOLUTE_X_0xBC as opcode:
+                    with self.instruction_variant(opcode) as ldy:
+                        ldy()
 
                 # ''' Execute Indexed Indirect '''
-                case instructions.LDA_INDEXED_INDIRECT_X_0xA1:
-                    self.execute_load_indexed_indirect(
-                        instruction=instruction,
-                        register_name="A",
-                    )
+                case instructions.LDA_INDEXED_INDIRECT_X_0xA1 as opcode:
+                    with self.instruction_variant(opcode) as lda:
+                        lda()
 
                 # ''' Execute Indirect Indexed'''
-                case instructions.LDA_INDIRECT_INDEXED_Y_0xB1:
-                    self.execute_load_indirect_indexed(
-                        instruction=instruction,
-                        register_name="A",
-                    )
+                case instructions.LDA_INDIRECT_INDEXED_Y_0xB1 as opcode:
+                    with self.instruction_variant(opcode) as lda:
+                        lda()
 
                 # ''' LSR '''
                 # NOP
-                case instructions.NOP_IMPLIED_0xEA:
-                    with self.instruction_variant(instructions.NOP_IMPLIED_0xEA) as nop:
+                case instructions.NOP_IMPLIED_0xEA as opcode:
+                    with self.instruction_variant(opcode) as nop:
                         nop()
                 # ''' Execute ORA '''
-                case instructions.ORA_IMMEDIATE_0x09:
-                    # Bitwise OR with Accumulator
-                    value: int = int(self.fetch_byte())
-                    self.A = self.A | value
-                    self.set_load_status_flags(register_name="A")
-                    self.log.info("i")
+                case instructions.ORA_IMMEDIATE_0x09 as opcode:
+                    with self.instruction_variant(opcode) as ora:
+                        ora()
 
-                case instructions.ORA_ZEROPAGE_0x05:
-                    address: int = self.fetch_zeropage_mode_address(offset_register_name=None)
-                    value: int = int(self.read_byte(address=address))
-                    self.A = self.A | value
-                    self.set_load_status_flags(register_name="A")
-                    self.log.info("i")
+                case instructions.ORA_ZEROPAGE_0x05 as opcode:
+                    with self.instruction_variant(opcode) as ora:
+                        ora()
 
-                case instructions.ORA_ZEROPAGE_X_0x15:
-                    address: int = self.fetch_zeropage_mode_address(offset_register_name="X")
-                    value: int = int(self.read_byte(address=address))
-                    self.A = self.A | value
-                    self.set_load_status_flags(register_name="A")
-                    self.log.info("i")
+                case instructions.ORA_ZEROPAGE_X_0x15 as opcode:
+                    with self.instruction_variant(opcode) as ora:
+                        ora()
 
-                case instructions.ORA_ABSOLUTE_0x0D:
-                    address: int = self.fetch_absolute_mode_address(offset_register_name=None)
-                    value: int = int(self.read_byte(address=address))
-                    self.A = self.A | value
-                    self.set_load_status_flags(register_name="A")
-                    self.log.info("i")
+                case instructions.ORA_ABSOLUTE_0x0D as opcode:
+                    with self.instruction_variant(opcode) as ora:
+                        ora()
 
-                case instructions.ORA_ABSOLUTE_X_0x1D:
-                    address: int = self.fetch_absolute_mode_address(offset_register_name="X")
-                    value: int = int(self.read_byte(address=address))
-                    self.A = self.A | value
-                    self.set_load_status_flags(register_name="A")
-                    self.log.info("i")
+                case instructions.ORA_ABSOLUTE_X_0x1D as opcode:
+                    with self.instruction_variant(opcode) as ora:
+                        ora()
 
-                case instructions.ORA_ABSOLUTE_Y_0x19:
-                    address: int = self.fetch_absolute_mode_address(offset_register_name="Y")
-                    value: int = int(self.read_byte(address=address))
-                    self.A = self.A | value
-                    self.set_load_status_flags(register_name="A")
-                    self.log.info("i")
+                case instructions.ORA_ABSOLUTE_Y_0x19 as opcode:
+                    with self.instruction_variant(opcode) as ora:
+                        ora()
 
-                case instructions.ORA_INDEXED_INDIRECT_X_0x01:
-                    address: int = self.fetch_indexed_indirect_mode_address()
-                    value: int = int(self.read_byte(address=address))
-                    self.A = self.A | value
-                    self.set_load_status_flags(register_name="A")
-                    self.log.info("i")
+                case instructions.ORA_INDEXED_INDIRECT_X_0x01 as opcode:
+                    with self.instruction_variant(opcode) as ora:
+                        ora()
 
-                case instructions.ORA_INDIRECT_INDEXED_Y_0x11:
-                    address: int = self.fetch_indirect_indexed_mode_address()
-                    value: int = int(self.read_byte(address=address))
-                    self.A = self.A | value
-                    self.set_load_status_flags(register_name="A")
-                    self.log.info("i")
+                case instructions.ORA_INDIRECT_INDEXED_Y_0x11 as opcode:
+                    with self.instruction_variant(opcode) as ora:
+                        ora()
 
                 # PHA
-                case instructions.PHA_IMPLIED_0x48:
-                    self.write_byte(address=self.S, data=self.A)
-                    self.S -= 1
-                    self.log.info("i")
-                    self.spend_cpu_cycles(1)
+                case instructions.PHA_IMPLIED_0x48 as opcode:
+                    with self.instruction_variant(opcode) as pha:
+                        pha()
 
                 # PHP
-                case instructions.PHP_IMPLIED_0x08:
-                    # Push processor status with B flag set
-                    status_with_b: Byte = Byte(self.flags.value | 0b00110000)
-                    self.write_byte(address=self.S, data=status_with_b)
-                    self.S -= 1
-                    self.log.info("i")
-                    self.spend_cpu_cycles(1)
+                case instructions.PHP_IMPLIED_0x08 as opcode:
+                    with self.instruction_variant(opcode) as php:
+                        php()
 
                 # PLA
-                case instructions.PLA_IMPLIED_0x68:
-                    self.S += 1
-                    self.A = self.read_byte(address=self.S)
-                    self.set_load_status_flags(register_name="A")
-                    self.log.info("i")
-                    self.spend_cpu_cycles(2)
+                case instructions.PLA_IMPLIED_0x68 as opcode:
+                    with self.instruction_variant(opcode) as pla:
+                        pla()
 
                 # PLP
-                case instructions.PLP_IMPLIED_0x28:
-                    self.S += 1
-                    status_byte: int = self.read_byte(address=self.S)
-                    # Restore all flags from stack by replacing the entire Byte
-                    self._flags = Byte(status_byte)
-                    self.log.info("i")
-                    self.spend_cpu_cycles(2)
+                case instructions.PLP_IMPLIED_0x28 as opcode:
+                    with self.instruction_variant(opcode) as plp:
+                        plp()
 
                 # ROL
                 # ROR
                 # RTI
-                case instructions.RTI_IMPLIED_0x40:
-                    # Pull status register from stack
-                    self.S += 1
-                    self._flags = Byte(self.read_byte(address=self.S))
-
-                    # Pull PC from stack
-                    self.S += 1
-                    self.PC = self.read_word(address=self.S)
-                    self.S += 1
-
-                    self.log.info("i")
-                    self.spend_cpu_cycles(4)
+                case instructions.RTI_IMPLIED_0x40 as opcode:
+                    with self.instruction_variant(opcode) as rti:
+                        rti()
 
                 # '''RTS'''
-                case instructions.RTS_IMPLIED_0x60:
-                    self.log.info("i")
-                    self.spend_cpu_cycles(cost=1)
-                    self.PC = self.read_word(address=self.S + 1)
-                    self.S += 2
+                case instructions.RTS_IMPLIED_0x60 as opcode:
+                    with self.instruction_variant(opcode) as rts:
+                        rts()
                 # SBC
                 # SEC
                 # SED
                 # SEI
                 # ''' STA '''
-                case instructions.STA_ZEROPAGE_0x85:
-                    self.execute_store_zeropage(
-                        instruction=instruction,
-                        register_name="A",
-                        offset_register_name=None,
-                    )
+                case instructions.STA_ZEROPAGE_0x85 as opcode:
+                    with self.instruction_variant(opcode) as sta:
+                        sta()
 
-                case instructions.STA_ZEROPAGE_X_0x95:
-                    self.execute_store_zeropage(
-                        instruction=instruction,
-                        register_name="A",
-                        offset_register_name="X",
-                    )
+                case instructions.STA_ZEROPAGE_X_0x95 as opcode:
+                    with self.instruction_variant(opcode) as sta:
+                        sta()
 
-                case instructions.STA_ABSOLUTE_0x8D:
-                    self.execute_store_absolute(
-                        instruction=instruction,
-                        register_name="A",
-                        offset_register_name=None,
-                    )
+                case instructions.STA_ABSOLUTE_0x8D as opcode:
+                    with self.instruction_variant(opcode) as sta:
+                        sta()
 
-                case instructions.STA_ABSOLUTE_X_0x9D:
-                    self.execute_store_absolute(
-                        instruction=instruction,
-                        register_name="A",
-                        offset_register_name="X",
-                    )
+                case instructions.STA_ABSOLUTE_X_0x9D as opcode:
+                    with self.instruction_variant(opcode) as sta:
+                        sta()
 
-                case instructions.STA_ABSOLUTE_Y_0x99:
-                    self.execute_store_absolute(
-                        instruction=instruction,
-                        register_name="A",
-                        offset_register_name="Y",
-                    )
+                case instructions.STA_ABSOLUTE_Y_0x99 as opcode:
+                    with self.instruction_variant(opcode) as sta:
+                        sta()
 
-                case instructions.STA_INDEXED_INDIRECT_X_0x81:
-                    self.execute_store_indexed_indirect(
-                        instruction=instruction,
-                        register_name="A",
-                    )
+                case instructions.STA_INDEXED_INDIRECT_X_0x81 as opcode:
+                    with self.instruction_variant(opcode) as sta:
+                        sta()
 
-                case instructions.STA_INDIRECT_INDEXED_Y_0x91:
-                    self.execute_store_indirect_indexed(
-                        instruction=instruction,
-                        register_name="A",
-                    )
+                case instructions.STA_INDIRECT_INDEXED_Y_0x91 as opcode:
+                    with self.instruction_variant(opcode) as sta:
+                        sta()
 
                 # ''' STX '''
-                case instructions.STX_ABSOLUTE_0x8E:
-                    self.execute_store_absolute(
-                        instruction=instruction,
-                        register_name="X",
-                        offset_register_name=None,
-                    )
+                case instructions.STX_ABSOLUTE_0x8E as opcode:
+                    with self.instruction_variant(opcode) as stx:
+                        stx()
 
-                case instructions.STX_ZEROPAGE_0x86:
-                    self.execute_store_zeropage(
-                        instruction=instruction,
-                        register_name="X",
-                        offset_register_name=None,
-                    )
+                case instructions.STX_ZEROPAGE_0x86 as opcode:
+                    with self.instruction_variant(opcode) as stx:
+                        stx()
 
-                case instructions.STX_ZEROPAGE_Y_0x96:
-                    self.execute_store_zeropage(
-                        instruction=instruction,
-                        register_name="X",
-                        offset_register_name="Y",
-                    )
+                case instructions.STX_ZEROPAGE_Y_0x96 as opcode:
+                    with self.instruction_variant(opcode) as stx:
+                        stx()
 
                 # ''' STY '''
-                case instructions.STY_ABSOLUTE_0x8C:
-                    self.execute_store_absolute(
-                        instruction=instruction,
-                        register_name="Y",
-                        offset_register_name=None,
-                    )
+                case instructions.STY_ABSOLUTE_0x8C as opcode:
+                    with self.instruction_variant(opcode) as sty:
+                        sty()
 
-                case instructions.STY_ZEROPAGE_0x84:
-                    self.execute_store_zeropage(
-                        instruction=instruction,
-                        register_name="Y",
-                        offset_register_name=None,
-                    )
+                case instructions.STY_ZEROPAGE_0x84 as opcode:
+                    with self.instruction_variant(opcode) as sty:
+                        sty()
 
-                case instructions.STY_ZEROPAGE_X_0x94:
-                    self.execute_store_zeropage(
-                        instruction=instruction,
-                        register_name="Y",
-                        offset_register_name="X",
-                    )
+                case instructions.STY_ZEROPAGE_X_0x94 as opcode:
+                    with self.instruction_variant(opcode) as sty:
+                        sty()
 
                 # TAX
                 # TAY

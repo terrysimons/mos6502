@@ -3,17 +3,15 @@ import contextlib
 import logging
 
 import mos6502
-from mos6502 import exceptions, flags, instructions
+from mos6502 import CPU, exceptions, flags, instructions
 
 log = logging.getLogger("mos6502")
 log.setLevel(logging.DEBUG)
 
 
-def test_cpu_instruction_CMP_IMMEDIATE_0xC9_equal() -> None:  # noqa: N802
+def test_cpu_instruction_CMP_IMMEDIATE_0xC9_equal(cpu: CPU) -> None:  # noqa: N802
     """Test CMP when A == M (sets Z=1, C=1, N=0)."""
     # given:
-    cpu: mos6502.CPU = mos6502.CPU()
-    cpu.reset()
 
     cpu.A = 0x42
 
@@ -33,11 +31,9 @@ def test_cpu_instruction_CMP_IMMEDIATE_0xC9_equal() -> None:  # noqa: N802
     assert cpu.cycles_executed == 2
 
 
-def test_cpu_instruction_CMP_IMMEDIATE_0xC9_greater() -> None:  # noqa: N802
+def test_cpu_instruction_CMP_IMMEDIATE_0xC9_greater(cpu: CPU) -> None:  # noqa: N802
     """Test CMP when A > M (sets Z=0, C=1, N varies)."""
     # given:
-    cpu: mos6502.CPU = mos6502.CPU()
-    cpu.reset()
 
     cpu.A = 0x50
 
@@ -57,11 +53,9 @@ def test_cpu_instruction_CMP_IMMEDIATE_0xC9_greater() -> None:  # noqa: N802
     assert cpu.cycles_executed == 2
 
 
-def test_cpu_instruction_CMP_IMMEDIATE_0xC9_less() -> None:  # noqa: N802
+def test_cpu_instruction_CMP_IMMEDIATE_0xC9_less(cpu: CPU) -> None:  # noqa: N802
     """Test CMP when A < M (sets Z=0, C=0, N=1)."""
     # given:
-    cpu: mos6502.CPU = mos6502.CPU()
-    cpu.reset()
 
     cpu.A = 0x30
 
@@ -81,11 +75,9 @@ def test_cpu_instruction_CMP_IMMEDIATE_0xC9_less() -> None:  # noqa: N802
     assert cpu.cycles_executed == 2
 
 
-def test_cpu_instruction_CMP_IMMEDIATE_0xC9_zero() -> None:  # noqa: N802
+def test_cpu_instruction_CMP_IMMEDIATE_0xC9_zero(cpu: CPU) -> None:  # noqa: N802
     """Test CMP when A = 0 and M = 0."""
     # given:
-    cpu: mos6502.CPU = mos6502.CPU()
-    cpu.reset()
 
     cpu.A = 0x00
 
@@ -105,11 +97,9 @@ def test_cpu_instruction_CMP_IMMEDIATE_0xC9_zero() -> None:  # noqa: N802
     assert cpu.cycles_executed == 2
 
 
-def test_cpu_instruction_CMP_ZEROPAGE_0xC5() -> None:  # noqa: N802
+def test_cpu_instruction_CMP_ZEROPAGE_0xC5(cpu: CPU) -> None:  # noqa: N802
     """Test CMP Zero Page addressing mode."""
     # given:
-    cpu: mos6502.CPU = mos6502.CPU()
-    cpu.reset()
 
     cpu.A = 0x50
     cpu.ram[0x0042] = 0x30  # Value at zero page address
@@ -130,11 +120,9 @@ def test_cpu_instruction_CMP_ZEROPAGE_0xC5() -> None:  # noqa: N802
     assert cpu.cycles_executed == 3
 
 
-def test_cpu_instruction_CMP_ABSOLUTE_0xCD() -> None:  # noqa: N802
+def test_cpu_instruction_CMP_ABSOLUTE_0xCD(cpu: CPU) -> None:  # noqa: N802
     """Test CMP Absolute addressing mode."""
     # given:
-    cpu: mos6502.CPU = mos6502.CPU()
-    cpu.reset()
 
     cpu.A = 0x20
     cpu.ram[0x1234] = 0x30  # Value at absolute address

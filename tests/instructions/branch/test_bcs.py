@@ -3,17 +3,15 @@ import contextlib
 import logging
 
 import mos6502
-from mos6502 import exceptions, flags, instructions
+from mos6502 import CPU, exceptions, flags, instructions
 
 log = logging.getLogger("mos6502")
 log.setLevel(logging.DEBUG)
 
 
-def test_cpu_instruction_BCS_RELATIVE_0xB0_branch_taken() -> None:  # noqa: N802
+def test_cpu_instruction_BCS_RELATIVE_0xB0_branch_taken(cpu: CPU) -> None:  # noqa: N802
     """Test BCS when carry flag is set (branch taken)."""
     # given:
-    cpu: mos6502.CPU = mos6502.CPU()
-    cpu.reset()
 
     # Set carry flag
     cpu.flags[flags.C] = 1
@@ -31,11 +29,9 @@ def test_cpu_instruction_BCS_RELATIVE_0xB0_branch_taken() -> None:  # noqa: N802
     assert cpu.cycles_executed == 3  # 1 opcode + 1 read offset + 1 branch taken
 
 
-def test_cpu_instruction_BCS_RELATIVE_0xB0_branch_not_taken() -> None:  # noqa: N802
+def test_cpu_instruction_BCS_RELATIVE_0xB0_branch_not_taken(cpu: CPU) -> None:  # noqa: N802
     """Test BCS when carry flag is clear (branch not taken)."""
     # given:
-    cpu: mos6502.CPU = mos6502.CPU()
-    cpu.reset()
 
     # Clear carry flag
     cpu.flags[flags.C] = 0
@@ -53,11 +49,9 @@ def test_cpu_instruction_BCS_RELATIVE_0xB0_branch_not_taken() -> None:  # noqa: 
     assert cpu.cycles_executed == 2  # 1 opcode + 1 read offset
 
 
-def test_cpu_instruction_BCS_RELATIVE_0xB0_negative_offset() -> None:  # noqa: N802
+def test_cpu_instruction_BCS_RELATIVE_0xB0_negative_offset(cpu: CPU) -> None:  # noqa: N802
     """Test BCS with negative offset (branch backward)."""
     # given:
-    cpu: mos6502.CPU = mos6502.CPU()
-    cpu.reset()
 
     # Set carry flag
     cpu.flags[flags.C] = 1
@@ -78,11 +72,9 @@ def test_cpu_instruction_BCS_RELATIVE_0xB0_negative_offset() -> None:  # noqa: N
     assert cpu.cycles_executed == 3
 
 
-def test_cpu_instruction_BCS_RELATIVE_0xB0_page_boundary_cross() -> None:  # noqa: N802
+def test_cpu_instruction_BCS_RELATIVE_0xB0_page_boundary_cross(cpu: CPU) -> None:  # noqa: N802
     """Test BCS with page boundary crossing (costs extra cycle)."""
     # given:
-    cpu: mos6502.CPU = mos6502.CPU()
-    cpu.reset()
 
     # Set carry flag
     cpu.flags[flags.C] = 1

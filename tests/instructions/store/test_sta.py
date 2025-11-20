@@ -11,7 +11,7 @@ log: logging.Logger = logging.getLogger("mos6502")
 log.setLevel(logging.DEBUG)
 
 
-def check_noop_flags(expected_cpu: mos6502.CPU, actual_cpu: mos6502.CPU) -> None:
+def check_noop_flags(expected_cpu: CPU, actual_cpu: CPU) -> None:
     assert actual_cpu.flags[flags.C] == expected_cpu.flags[flags.C]
     assert actual_cpu.flags[flags.B] == expected_cpu.flags[flags.B]
     assert actual_cpu.flags[flags.D] == expected_cpu.flags[flags.D]
@@ -21,12 +21,12 @@ def check_noop_flags(expected_cpu: mos6502.CPU, actual_cpu: mos6502.CPU) -> None
     assert actual_cpu.flags[flags.Z] == expected_cpu.flags[flags.Z]
 
 
-def verify_store_zeropage(cpu: mos6502.CPU, data: Byte, instruction: instructions.InstructionSet,
+def verify_store_zeropage(cpu: CPU, data: Byte, instruction: instructions.InstructionSet,
                           offset: Byte, register_name: str,
                           expected_flags: flags.ProcessorStatusFlags, expected_cycles: int,
                           offset_register_name: str = None, offset_value: int = 0x00) -> None:
     # given:
-    initial_cpu: mos6502.CPU = copy.deepcopy(cpu)
+    initial_cpu: CPU = copy.deepcopy(cpu)
 
     # Load the register with a value to be stored in memory
     setattr(cpu, register_name, data)
@@ -53,12 +53,12 @@ def verify_store_zeropage(cpu: mos6502.CPU, data: Byte, instruction: instruction
     check_noop_flags(expected_cpu=initial_cpu, actual_cpu=cpu)
 
 
-def verify_store_absolute(cpu: mos6502.CPU, data: Byte, instruction: instructions.InstructionSet,
+def verify_store_absolute(cpu: CPU, data: Byte, instruction: instructions.InstructionSet,
                           offset: Byte, register_name: str,
                           expected_flags: flags.ProcessorStatusFlags, expected_cycles: int,
                           offset_register_name: str = None, offset_value: int = 0x00) -> None:
     # given:
-    initial_cpu: mos6502.CPU = copy.deepcopy(cpu)
+    initial_cpu: CPU = copy.deepcopy(cpu)
 
     # Load the register with a value to be stored in memory
     setattr(cpu, register_name, data)
@@ -79,14 +79,15 @@ def verify_store_absolute(cpu: mos6502.CPU, data: Byte, instruction: instruction
     check_noop_flags(expected_cpu=initial_cpu, actual_cpu=cpu)
 
 
-def verify_store_indexed_indirect(cpu: mos6502.CPU, pc_value: Byte, data: Byte,
+def verify_store_indexed_indirect(cpu: CPU, pc_value: Byte, data: Byte,
                                   instruction: instructions.InstructionSet, offset: int,
                                   register_name: str, expected_flags: flags.ProcessorStatusFlags,
                                   expected_cycles: int, offset_value: int = 0x00) -> None:
     # given:
-    initial_cpu: mos6502.CPU = copy.deepcopy(cpu)
+    initial_cpu: CPU = copy.deepcopy(cpu)
 
-    setattr(cpu, register_name, 0x00)
+    # Load the register with a value to be stored in memory
+    setattr(cpu, register_name, data)
     cpu.X = offset_value
 
     # Store with indirect x offset
@@ -100,8 +101,8 @@ def verify_store_indexed_indirect(cpu: mos6502.CPU, pc_value: Byte, data: Byte,
 
     address: Word = Word(offset)
 
-    # @ RAM
-    cpu.ram[address & 0xFFFF] = data
+    # @ RAM - initialize to 0x00 so we can verify the store happened
+    cpu.ram[address & 0xFFFF] = 0x00
 
     # when:
     with contextlib.suppress(exceptions.CPUCycleExhaustionError):
@@ -110,20 +111,19 @@ def verify_store_indexed_indirect(cpu: mos6502.CPU, pc_value: Byte, data: Byte,
     # expect:
     assert cpu.cycles_executed == expected_cycles
     assert cpu.ram[address & 0xFFFF] == data
-    assert getattr(cpu, register_name) == data
     assert cpu.flags == expected_flags
     check_noop_flags(expected_cpu=initial_cpu, actual_cpu=cpu)
 
 
-def verify_store_indirect_indexed(cpu: mos6502.CPU, pc_value: int, data: int,
+def verify_store_indirect_indexed(cpu: CPU, pc_value: int, data: int,
                                   instruction: int, offset: int, register_name: str,
                                   expected_flags: flags.ProcessorStatusFlags, expected_cycles: int,
                                   offset_value: int = 0x00) -> None:
     # given:
-    initial_cpu: mos6502.CPU = copy.deepcopy(cpu)
+    initial_cpu: CPU = copy.deepcopy(cpu)
 
     # Load the register with a value to be stored in memory
-    setattr(cpu, register_name, 0x00)
+    setattr(cpu, register_name, data)
     cpu.Y = offset_value
 
     # Load with indirect x offset
@@ -134,8 +134,8 @@ def verify_store_indirect_indexed(cpu: mos6502.CPU, pc_value: int, data: int,
     cpu.ram[(pc_value) & 0xFF] = (offset) & 0xFF # zeropage addr
     cpu.ram[(pc_value + 1) & 0xFF] = (offset >> 8) & 0xFF # zerpage addr + 1
 
-    # @Address
-    cpu.ram[(offset + offset_value) & 0xFFFF] = data
+    # @Address - initialize to 0x00 so we can verify the store happened
+    cpu.ram[(offset + offset_value) & 0xFFFF] = 0x00
 
     address: Word = Word(offset + offset_value, endianness=cpu.endianness)
 
@@ -153,9 +153,7 @@ def verify_store_indirect_indexed(cpu: mos6502.CPU, pc_value: int, data: int,
 """STA"""
 
 
-def test_cpu_instruction_STA_ABSOLUTE_0x8D() -> None:  # noqa: N802
-    cpu: mos6502.CPU = mos6502.CPU()
-    cpu.reset()
+def test_cpu_instruction_STA_ABSOLUTE_0x8D(cpu: CPU) -> None:  # noqa: N802
     expected_flags: Byte = copy.deepcopy(cpu.flags)
 
     verify_store_absolute(
@@ -169,9 +167,7 @@ def test_cpu_instruction_STA_ABSOLUTE_0x8D() -> None:  # noqa: N802
     )
 
 
-def test_cpu_instruction_STA_ABSOLUTE_X_0x9D() -> None:  # noqa: N802
-    cpu: mos6502.CPU = mos6502.CPU()
-    cpu.reset()
+def test_cpu_instruction_STA_ABSOLUTE_X_0x9D(cpu: CPU) -> None:  # noqa: N802
     expected_flags: Byte = copy.deepcopy(cpu.flags)
 
     verify_store_absolute(
@@ -187,9 +183,7 @@ def test_cpu_instruction_STA_ABSOLUTE_X_0x9D() -> None:  # noqa: N802
     )
 
 
-def test_cpu_instruction_STA_ABSOLUTE_Y_0x99() -> None:  # noqa: N802
-    cpu: mos6502.CPU = mos6502.CPU()
-    cpu.reset()
+def test_cpu_instruction_STA_ABSOLUTE_Y_0x99(cpu: CPU) -> None:  # noqa: N802
     expected_flags: Byte = copy.deepcopy(cpu.flags)
 
     verify_store_absolute(
@@ -205,9 +199,7 @@ def test_cpu_instruction_STA_ABSOLUTE_Y_0x99() -> None:  # noqa: N802
     )
 
 
-def test_cpu_instruction_STA_INDEXED_INDIRECT_X_0x81() -> None:  # noqa: N802
-    cpu: mos6502.CPU = mos6502.CPU()
-    cpu.reset()
+def test_cpu_instruction_STA_INDEXED_INDIRECT_X_0x81(cpu: CPU) -> None:  # noqa: N802
     expected_flags: Byte = copy.deepcopy(cpu.flags)
 
     verify_store_indexed_indirect(
@@ -223,9 +215,7 @@ def test_cpu_instruction_STA_INDEXED_INDIRECT_X_0x81() -> None:  # noqa: N802
     )
 
 
-def test_cpu_instruction_STA_INDIRECT_INDEXED_Y_0x91() -> None:  # noqa: N802
-    cpu: mos6502.CPU = mos6502.CPU()
-    cpu.reset()
+def test_cpu_instruction_STA_INDIRECT_INDEXED_Y_0x91(cpu: CPU) -> None:  # noqa: N802
     expected_flags: Byte = copy.deepcopy(cpu.flags)
 
     verify_store_indirect_indexed(
@@ -241,9 +231,7 @@ def test_cpu_instruction_STA_INDIRECT_INDEXED_Y_0x91() -> None:  # noqa: N802
     )
 
 
-def test_cpu_instruction_STA_ZEROPAGE_0x85() -> None:  # noqa: N802
-    cpu: mos6502.CPU = mos6502.CPU()
-    cpu.reset()
+def test_cpu_instruction_STA_ZEROPAGE_0x85(cpu: CPU) -> None:  # noqa: N802
     expected_flags: Byte = copy.deepcopy(cpu.flags)
 
     verify_store_zeropage(
@@ -257,9 +245,7 @@ def test_cpu_instruction_STA_ZEROPAGE_0x85() -> None:  # noqa: N802
     )
 
 
-def test_cpu_instruction_STA_ZEROPAGE_X_0x95() -> None:  # noqa: N802
-    cpu: mos6502.CPU = mos6502.CPU()
-    cpu.reset()
+def test_cpu_instruction_STA_ZEROPAGE_X_0x95(cpu: CPU) -> None:  # noqa: N802
     expected_flags: Byte = copy.deepcopy(cpu.flags)
 
     verify_store_zeropage(

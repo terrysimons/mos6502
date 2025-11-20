@@ -2,7 +2,7 @@
 """Arithmetic instructions for the MOS 6502 CPU."""
 
 # Import from individual arithmetic instruction modules
-from mos6502.instructions.arithmetic.adc import (  # noqa: F401
+from mos6502.instructions.arithmetic._adc import (  # noqa: F401
     ADC_ABSOLUTE_0x6D,
     ADC_ABSOLUTE_X_0x7D,
     ADC_ABSOLUTE_Y_0x79,
@@ -13,25 +13,25 @@ from mos6502.instructions.arithmetic.adc import (  # noqa: F401
     ADC_ZEROPAGE_X_0x75,
     register_adc_instructions,
 )
-from mos6502.instructions.arithmetic.dec import (  # noqa: F401
+from mos6502.instructions.arithmetic._dec import (  # noqa: F401
     DEC_ABSOLUTE_0xCE,
     DEC_ABSOLUTE_X_0xDE,
     DEC_ZEROPAGE_0xC6,
     DEC_ZEROPAGE_X_0xD6,
     register_dec_instructions,
 )
-from mos6502.instructions.arithmetic.dex import DEX_IMPLIED_0xCA, register_dex_instructions  # noqa: F401
-from mos6502.instructions.arithmetic.dey import DEY_IMPLIED_0x88, register_dey_instructions  # noqa: F401
-from mos6502.instructions.arithmetic.inc import (  # noqa: F401
+from mos6502.instructions.arithmetic._dex import DEX_IMPLIED_0xCA, register_dex_instructions  # noqa: F401
+from mos6502.instructions.arithmetic._dey import DEY_IMPLIED_0x88, register_dey_instructions  # noqa: F401
+from mos6502.instructions.arithmetic._inc import (  # noqa: F401
     INC_ABSOLUTE_0xEE,
     INC_ABSOLUTE_X_0xFE,
     INC_ZEROPAGE_0xE6,
     INC_ZEROPAGE_X_0xF6,
     register_inc_instructions,
 )
-from mos6502.instructions.arithmetic.inx import INX_IMPLIED_0xE8, register_inx_instructions  # noqa: F401
-from mos6502.instructions.arithmetic.iny import INY_IMPLIED_0xC8, register_iny_instructions  # noqa: F401
-from mos6502.instructions.arithmetic.sbc import (  # noqa: F401
+from mos6502.instructions.arithmetic._inx import INX_IMPLIED_0xE8, register_inx_instructions  # noqa: F401
+from mos6502.instructions.arithmetic._iny import INY_IMPLIED_0xC8, register_iny_instructions  # noqa: F401
+from mos6502.instructions.arithmetic._sbc import (  # noqa: F401
     SBC_ABSOLUTE_0xED,
     SBC_ABSOLUTE_X_0xFD,
     SBC_ABSOLUTE_Y_0xF9,

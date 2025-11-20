@@ -4,16 +4,14 @@ import copy
 import logging
 
 import mos6502
-from mos6502 import exceptions, flags, instructions
+from mos6502 import CPU, exceptions, flags, instructions
 
 log = logging.getLogger("mos6502")
 log.setLevel(logging.DEBUG)
 
 
-def test_cpu_instruction_PLP_IMPLIED_0x28() -> None:  # noqa: N802
+def test_cpu_instruction_PLP_IMPLIED_0x28(cpu: CPU) -> None:  # noqa: N802
     # given:
-    cpu: mos6502.CPU = mos6502.CPU()
-    cpu.reset()
 
     # Push a status value onto the stack
     # Bit layout: C=7, Z=6, I=5, D=4, B=3, -, V=1, N=0
@@ -40,10 +38,8 @@ def test_cpu_instruction_PLP_IMPLIED_0x28() -> None:  # noqa: N802
     assert cpu.flags[flags.N] == 1
 
 
-def test_cpu_instruction_PLP_IMPLIED_0x28_clear_flags() -> None:  # noqa: N802
+def test_cpu_instruction_PLP_IMPLIED_0x28_clear_flags(cpu: CPU) -> None:  # noqa: N802
     # given:
-    cpu: mos6502.CPU = mos6502.CPU()
-    cpu.reset()
 
     # Set some flags initially using individual flag setters
     cpu.flags[flags.C] = 1
@@ -72,11 +68,9 @@ def test_cpu_instruction_PLP_IMPLIED_0x28_clear_flags() -> None:  # noqa: N802
     assert cpu.flags[flags.N] == 0
 
 
-def test_cpu_instruction_PLP_IMPLIED_0x28_with_php() -> None:  # noqa: N802
+def test_cpu_instruction_PLP_IMPLIED_0x28_with_php(cpu: CPU) -> None:  # noqa: N802
     """Test PLP after PHP - round trip."""
     # given:
-    cpu: mos6502.CPU = mos6502.CPU()
-    cpu.reset()
 
     # Set some specific flags
     cpu.flags[flags.C] = 1

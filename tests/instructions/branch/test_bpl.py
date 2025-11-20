@@ -3,17 +3,15 @@ import contextlib
 import logging
 
 import mos6502
-from mos6502 import exceptions, flags, instructions
+from mos6502 import CPU, exceptions, flags, instructions
 
 log = logging.getLogger("mos6502")
 log.setLevel(logging.DEBUG)
 
 
-def test_cpu_instruction_BPL_RELATIVE_0x10_branch_taken() -> None:  # noqa: N802
+def test_cpu_instruction_BPL_RELATIVE_0x10_branch_taken(cpu: CPU) -> None:  # noqa: N802
     """Test BPL when negative flag is clear (branch taken)."""
     # given:
-    cpu: mos6502.CPU = mos6502.CPU()
-    cpu.reset()
 
     # Clear negative flag
     cpu.flags[flags.N] = 0
@@ -31,11 +29,9 @@ def test_cpu_instruction_BPL_RELATIVE_0x10_branch_taken() -> None:  # noqa: N802
     assert cpu.cycles_executed == 3  # 1 opcode + 1 read offset + 1 branch taken
 
 
-def test_cpu_instruction_BPL_RELATIVE_0x10_branch_not_taken() -> None:  # noqa: N802
+def test_cpu_instruction_BPL_RELATIVE_0x10_branch_not_taken(cpu: CPU) -> None:  # noqa: N802
     """Test BPL when negative flag is set (branch not taken)."""
     # given:
-    cpu: mos6502.CPU = mos6502.CPU()
-    cpu.reset()
 
     # Set negative flag
     cpu.flags[flags.N] = 1
@@ -53,11 +49,9 @@ def test_cpu_instruction_BPL_RELATIVE_0x10_branch_not_taken() -> None:  # noqa: 
     assert cpu.cycles_executed == 2  # 1 opcode + 1 read offset
 
 
-def test_cpu_instruction_BPL_RELATIVE_0x10_negative_offset() -> None:  # noqa: N802
+def test_cpu_instruction_BPL_RELATIVE_0x10_negative_offset(cpu: CPU) -> None:  # noqa: N802
     """Test BPL with negative offset (branch backward)."""
     # given:
-    cpu: mos6502.CPU = mos6502.CPU()
-    cpu.reset()
 
     # Clear negative flag
     cpu.flags[flags.N] = 0
@@ -78,11 +72,9 @@ def test_cpu_instruction_BPL_RELATIVE_0x10_negative_offset() -> None:  # noqa: N
     assert cpu.cycles_executed == 3
 
 
-def test_cpu_instruction_BPL_RELATIVE_0x10_page_boundary_cross() -> None:  # noqa: N802
+def test_cpu_instruction_BPL_RELATIVE_0x10_page_boundary_cross(cpu: CPU) -> None:  # noqa: N802
     """Test BPL with page boundary crossing (costs extra cycle)."""
     # given:
-    cpu: mos6502.CPU = mos6502.CPU()
-    cpu.reset()
 
     # Clear negative flag
     cpu.flags[flags.N] = 0

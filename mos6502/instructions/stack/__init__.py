@@ -2,10 +2,10 @@
 """Stack manipulation instructions for the MOS 6502 CPU."""
 
 # Import from individual stack instruction modules
-from mos6502.instructions.stack.pha import PHA_IMPLIED_0x48, register_pha_instructions  # noqa: F401
-from mos6502.instructions.stack.php import PHP_IMPLIED_0x08, register_php_instructions  # noqa: F401
-from mos6502.instructions.stack.pla import PLA_IMPLIED_0x68, register_pla_instructions  # noqa: F401
-from mos6502.instructions.stack.plp import PLP_IMPLIED_0x28, register_plp_instructions  # noqa: F401
+from mos6502.instructions.stack._pha import PHA_IMPLIED_0x48, register_pha_instructions  # noqa: F401
+from mos6502.instructions.stack._php import PHP_IMPLIED_0x08, register_php_instructions  # noqa: F401
+from mos6502.instructions.stack._pla import PLA_IMPLIED_0x68, register_pla_instructions  # noqa: F401
+from mos6502.instructions.stack._plp import PLP_IMPLIED_0x28, register_plp_instructions  # noqa: F401
 
 __all__ = [
     # PHA

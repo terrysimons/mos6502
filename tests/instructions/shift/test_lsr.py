@@ -3,17 +3,15 @@ import contextlib
 import logging
 
 import mos6502
-from mos6502 import exceptions, flags, instructions
+from mos6502 import CPU, exceptions, flags, instructions
 
 log = logging.getLogger("mos6502")
 log.setLevel(logging.DEBUG)
 
 
-def test_cpu_instruction_LSR_ACCUMULATOR_0x4A() -> None:  # noqa: N802
+def test_cpu_instruction_LSR_ACCUMULATOR_0x4A(cpu: CPU) -> None:  # noqa: N802
     """Test LSR Accumulator mode."""
     # given:
-    cpu: mos6502.CPU = mos6502.CPU()
-    cpu.reset()
 
     cpu.A = 0x42  # 0100 0010
 
@@ -32,11 +30,9 @@ def test_cpu_instruction_LSR_ACCUMULATOR_0x4A() -> None:  # noqa: N802
     assert cpu.cycles_executed == 2
 
 
-def test_cpu_instruction_LSR_ACCUMULATOR_0x4A_carry() -> None:  # noqa: N802
+def test_cpu_instruction_LSR_ACCUMULATOR_0x4A_carry(cpu: CPU) -> None:  # noqa: N802
     """Test LSR with carry flag set."""
     # given:
-    cpu: mos6502.CPU = mos6502.CPU()
-    cpu.reset()
 
     cpu.A = 0x81  # 1000 0001 (bit 0 set)
 
@@ -55,11 +51,9 @@ def test_cpu_instruction_LSR_ACCUMULATOR_0x4A_carry() -> None:  # noqa: N802
     assert cpu.cycles_executed == 2
 
 
-def test_cpu_instruction_LSR_ACCUMULATOR_0x4A_zero() -> None:  # noqa: N802
+def test_cpu_instruction_LSR_ACCUMULATOR_0x4A_zero(cpu: CPU) -> None:  # noqa: N802
     """Test LSR resulting in zero."""
     # given:
-    cpu: mos6502.CPU = mos6502.CPU()
-    cpu.reset()
 
     cpu.A = 0x01  # 0000 0001
 
@@ -78,11 +72,9 @@ def test_cpu_instruction_LSR_ACCUMULATOR_0x4A_zero() -> None:  # noqa: N802
     assert cpu.cycles_executed == 2
 
 
-def test_cpu_instruction_LSR_ZEROPAGE_0x46() -> None:  # noqa: N802
+def test_cpu_instruction_LSR_ZEROPAGE_0x46(cpu: CPU) -> None:  # noqa: N802
     """Test LSR Zero Page mode."""
     # given:
-    cpu: mos6502.CPU = mos6502.CPU()
-    cpu.reset()
 
     cpu.ram[0x0042] = 0xAA  # 1010 1010
 
@@ -102,11 +94,9 @@ def test_cpu_instruction_LSR_ZEROPAGE_0x46() -> None:  # noqa: N802
     assert cpu.cycles_executed == 5
 
 
-def test_cpu_instruction_LSR_ZEROPAGE_X_0x56() -> None:  # noqa: N802
+def test_cpu_instruction_LSR_ZEROPAGE_X_0x56(cpu: CPU) -> None:  # noqa: N802
     """Test LSR Zero Page,X mode."""
     # given:
-    cpu: mos6502.CPU = mos6502.CPU()
-    cpu.reset()
 
     cpu.X = 0x05
     cpu.ram[0x0047] = 0x02  # 0x42 + 0x05
@@ -127,11 +117,9 @@ def test_cpu_instruction_LSR_ZEROPAGE_X_0x56() -> None:  # noqa: N802
     assert cpu.cycles_executed == 6
 
 
-def test_cpu_instruction_LSR_ABSOLUTE_0x4E() -> None:  # noqa: N802
+def test_cpu_instruction_LSR_ABSOLUTE_0x4E(cpu: CPU) -> None:  # noqa: N802
     """Test LSR Absolute mode."""
     # given:
-    cpu: mos6502.CPU = mos6502.CPU()
-    cpu.reset()
 
     cpu.ram[0x1234] = 0x80  # 1000 0000
 
@@ -152,11 +140,9 @@ def test_cpu_instruction_LSR_ABSOLUTE_0x4E() -> None:  # noqa: N802
     assert cpu.cycles_executed == 6
 
 
-def test_cpu_instruction_LSR_ABSOLUTE_X_0x5E() -> None:  # noqa: N802
+def test_cpu_instruction_LSR_ABSOLUTE_X_0x5E(cpu: CPU) -> None:  # noqa: N802
     """Test LSR Absolute,X mode."""
     # given:
-    cpu: mos6502.CPU = mos6502.CPU()
-    cpu.reset()
 
     cpu.X = 0x10
     cpu.ram[0x1244] = 0xFF  # 0x1234 + 0x10

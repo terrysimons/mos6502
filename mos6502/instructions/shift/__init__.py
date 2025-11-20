@@ -2,7 +2,7 @@
 """Shift and rotate instructions for the MOS 6502 CPU."""
 
 # Import from individual shift instruction modules
-from mos6502.instructions.shift.asl import (  # noqa: F401
+from mos6502.instructions.shift._asl import (  # noqa: F401
     ASL_ABSOLUTE_0x0E,
     ASL_ABSOLUTE_X_0x1E,
     ASL_ACCUMULATOR_0x0A,
@@ -10,7 +10,7 @@ from mos6502.instructions.shift.asl import (  # noqa: F401
     ASL_ZEROPAGE_X_0x16,
     register_asl_instructions,
 )
-from mos6502.instructions.shift.lsr import (  # noqa: F401
+from mos6502.instructions.shift._lsr import (  # noqa: F401
     LSR_ABSOLUTE_0x4E,
     LSR_ABSOLUTE_X_0x5E,
     LSR_ACCUMULATOR_0x4A,
@@ -18,7 +18,7 @@ from mos6502.instructions.shift.lsr import (  # noqa: F401
     LSR_ZEROPAGE_X_0x56,
     register_lsr_instructions,
 )
-from mos6502.instructions.shift.rol import (  # noqa: F401
+from mos6502.instructions.shift._rol import (  # noqa: F401
     ROL_ABSOLUTE_0x2E,
     ROL_ABSOLUTE_X_0x3E,
     ROL_ACCUMULATOR_0x2A,
@@ -26,7 +26,7 @@ from mos6502.instructions.shift.rol import (  # noqa: F401
     ROL_ZEROPAGE_X_0x36,
     register_rol_instructions,
 )
-from mos6502.instructions.shift.ror import (  # noqa: F401
+from mos6502.instructions.shift._ror import (  # noqa: F401
     ROR_ABSOLUTE_0x6E,
     ROR_ABSOLUTE_X_0x7E,
     ROR_ACCUMULATOR_0x6A,

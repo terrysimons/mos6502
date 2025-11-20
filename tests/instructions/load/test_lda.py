@@ -3,7 +3,7 @@ import copy
 import logging
 
 import mos6502
-from mos6502 import flags, instructions
+from mos6502 import CPU, flags, instructions
 
 from .test_helpers import (
     check_noop_flags,
@@ -19,9 +19,7 @@ log.setLevel(logging.DEBUG)
 
 
 """ LDA """
-def test_cpu_instruction_LDA_IMMEDIATE_0xA9_with_negative_flag() -> None:  # noqa: N802
-    cpu: mos6502.CPU = mos6502.CPU()
-    cpu.reset()
+def test_cpu_instruction_LDA_IMMEDIATE_0xA9_with_negative_flag(cpu: CPU) -> None:  # noqa: N802
     expected_flags: mos6502.flags.ProcessorStatusFlags = copy.deepcopy(cpu.flags)
 
     expected_flags[flags.Z] = False
@@ -38,9 +36,7 @@ def test_cpu_instruction_LDA_IMMEDIATE_0xA9_with_negative_flag() -> None:  # noq
         expected_cycles=2,
     )
 
-def test_cpu_instruction_LDA_IMMEDIATE_0xA9_without_negative_flag() -> None:  # noqa: N802
-    cpu: mos6502.CPU = mos6502.CPU()
-    cpu.reset()
+def test_cpu_instruction_LDA_IMMEDIATE_0xA9_without_negative_flag(cpu: CPU) -> None:  # noqa: N802
     expected_flags: mos6502.flags.ProcessorStatusFlags = copy.deepcopy(cpu.flags)
 
     expected_flags[flags.Z] = False
@@ -57,9 +53,7 @@ def test_cpu_instruction_LDA_IMMEDIATE_0xA9_without_negative_flag() -> None:  # 
         expected_cycles=2,
     )
 
-def test_cpu_instruction_LDA_IMMEDIATE_0xA9_with_zero_flag() -> None:  # noqa: N802
-    cpu: mos6502.CPU = mos6502.CPU()
-    cpu.reset()
+def test_cpu_instruction_LDA_IMMEDIATE_0xA9_with_zero_flag(cpu: CPU) -> None:  # noqa: N802
     expected_flags: mos6502.flags.ProcessorStatusFlags = copy.deepcopy(cpu.flags)
 
     expected_flags[flags.Z] = True
@@ -76,9 +70,7 @@ def test_cpu_instruction_LDA_IMMEDIATE_0xA9_with_zero_flag() -> None:  # noqa: N
         expected_cycles=2,
     )
 
-def test_cpu_instruction_LDA_ZEROPAGE_0xA5_with_negative_flag() -> None:  # noqa: N802
-    cpu: mos6502.CPU = mos6502.CPU()
-    cpu.reset()
+def test_cpu_instruction_LDA_ZEROPAGE_0xA5_with_negative_flag(cpu: CPU) -> None:  # noqa: N802
     expected_flags: mos6502.flags.ProcessorStatusFlags = copy.deepcopy(cpu.flags)
 
     expected_flags[flags.Z] = False
@@ -96,9 +88,7 @@ def test_cpu_instruction_LDA_ZEROPAGE_0xA5_with_negative_flag() -> None:  # noqa
         expected_cycles=4,
     )
 
-def test_cpu_instruction_LDA_ZEROPAGE_0xA5_without_negative_flag() -> None:  # noqa: N802
-    cpu: mos6502.CPU = mos6502.CPU()
-    cpu.reset()
+def test_cpu_instruction_LDA_ZEROPAGE_0xA5_without_negative_flag(cpu: CPU) -> None:  # noqa: N802
     expected_flags: mos6502.flags.ProcessorStatusFlags = copy.deepcopy(cpu.flags)
 
     expected_flags[flags.Z] = False
@@ -116,9 +106,7 @@ def test_cpu_instruction_LDA_ZEROPAGE_0xA5_without_negative_flag() -> None:  # n
         expected_cycles=4,
     )
 
-def test_cpu_instruction_LDA_ZEROPAGE_0xA5_with_zero_flag() -> None:  # noqa: N802
-    cpu: mos6502.CPU = mos6502.CPU()
-    cpu.reset()
+def test_cpu_instruction_LDA_ZEROPAGE_0xA5_with_zero_flag(cpu: CPU) -> None:  # noqa: N802
     expected_flags: mos6502.flags.ProcessorStatusFlags = copy.deepcopy(cpu.flags)
 
     expected_flags[flags.Z] = True
@@ -136,9 +124,7 @@ def test_cpu_instruction_LDA_ZEROPAGE_0xA5_with_zero_flag() -> None:  # noqa: N8
         expected_cycles=4,
     )
 
-def test_cpu_instruction_LDA_ZEROPAGE_X_0xB5_with_negative_flag() -> None:  # noqa: N802
-    cpu: mos6502.CPU = mos6502.CPU()
-    cpu.reset()
+def test_cpu_instruction_LDA_ZEROPAGE_X_0xB5_with_negative_flag(cpu: CPU) -> None:  # noqa: N802
     expected_flags: mos6502.flags.ProcessorStatusFlags = copy.deepcopy(cpu.flags)
 
     expected_flags[flags.Z] = False
@@ -158,9 +144,7 @@ def test_cpu_instruction_LDA_ZEROPAGE_X_0xB5_with_negative_flag() -> None:  # no
         offset_value=0x08,
     )
 
-def test_cpu_instruction_LDA_ZEROPAGE_X_0xB5_without_negative_flag() -> None:  # noqa: N802
-    cpu: mos6502.CPU = mos6502.CPU()
-    cpu.reset()
+def test_cpu_instruction_LDA_ZEROPAGE_X_0xB5_without_negative_flag(cpu: CPU) -> None:  # noqa: N802
     expected_flags: mos6502.flags.ProcessorStatusFlags = copy.deepcopy(cpu.flags)
 
     expected_flags[flags.Z] = False
@@ -180,9 +164,7 @@ def test_cpu_instruction_LDA_ZEROPAGE_X_0xB5_without_negative_flag() -> None:  #
         offset_value=0x08,
     )
 
-def test_cpu_instruction_LDA_ZEROPAGE_X_0xB5_with_zero_flag() -> None:  # noqa: N802
-    cpu: mos6502.CPU = mos6502.CPU()
-    cpu.reset()
+def test_cpu_instruction_LDA_ZEROPAGE_X_0xB5_with_zero_flag(cpu: CPU) -> None:  # noqa: N802
     expected_flags: mos6502.flags.ProcessorStatusFlags = copy.deepcopy(cpu.flags)
 
     expected_flags[flags.Z] = True
@@ -202,9 +184,7 @@ def test_cpu_instruction_LDA_ZEROPAGE_X_0xB5_with_zero_flag() -> None:  # noqa: 
         offset_value=0x08,
     )
 
-def test_cpu_instruction_LDA_ZEROPAGE_X_0xB5_wrap_with_negative_flag() -> None:  # noqa: N802
-    cpu: mos6502.CPU = mos6502.CPU()
-    cpu.reset()
+def test_cpu_instruction_LDA_ZEROPAGE_X_0xB5_wrap_with_negative_flag(cpu: CPU) -> None:  # noqa: N802
     expected_flags: mos6502.flags.ProcessorStatusFlags = copy.deepcopy(cpu.flags)
 
     expected_flags[flags.Z] = False
@@ -224,9 +204,7 @@ def test_cpu_instruction_LDA_ZEROPAGE_X_0xB5_wrap_with_negative_flag() -> None: 
         offset_value=0xFF,
     )
 
-def test_cpu_instruction_LDA_ZEROPAGE_X_0xB5_wrap_without_negative_flag() -> None:  # noqa: N802
-    cpu: mos6502.CPU = mos6502.CPU()
-    cpu.reset()
+def test_cpu_instruction_LDA_ZEROPAGE_X_0xB5_wrap_without_negative_flag(cpu: CPU) -> None:  # noqa: N802
     expected_flags: mos6502.flags.ProcessorStatusFlags = copy.deepcopy(cpu.flags)
 
     expected_flags[flags.Z] = False
@@ -246,9 +224,7 @@ def test_cpu_instruction_LDA_ZEROPAGE_X_0xB5_wrap_without_negative_flag() -> Non
         offset_value=0xFF,
     )
 
-def test_cpu_instruction_LDA_ZEROPAGE_X_0xB5_wrap_with_zero_flag() -> None:  # noqa: N802
-    cpu: mos6502.CPU = mos6502.CPU()
-    cpu.reset()
+def test_cpu_instruction_LDA_ZEROPAGE_X_0xB5_wrap_with_zero_flag(cpu: CPU) -> None:  # noqa: N802
     expected_flags: mos6502.flags.ProcessorStatusFlags = copy.deepcopy(cpu.flags)
 
     expected_flags[flags.Z] = True
@@ -268,9 +244,7 @@ def test_cpu_instruction_LDA_ZEROPAGE_X_0xB5_wrap_with_zero_flag() -> None:  # n
         offset_value=0xFF,
     )
 
-def test_cpu_instruction_LDA_ABSOLUTE_0xAD_with_negative_flag() -> None:  # noqa: N802
-    cpu: mos6502.CPU = mos6502.CPU()
-    cpu.reset()
+def test_cpu_instruction_LDA_ABSOLUTE_0xAD_with_negative_flag(cpu: CPU) -> None:  # noqa: N802
     expected_flags: mos6502.flags.ProcessorStatusFlags = copy.deepcopy(cpu.flags)
 
     expected_flags[flags.Z] = False
@@ -288,9 +262,7 @@ def test_cpu_instruction_LDA_ABSOLUTE_0xAD_with_negative_flag() -> None:  # noqa
         expected_cycles=4,
     )
 
-def test_cpu_instruction_LDA_ABSOLUTE_0xAD_without_negative_flag() -> None:  # noqa: N802
-    cpu: mos6502.CPU = mos6502.CPU()
-    cpu.reset()
+def test_cpu_instruction_LDA_ABSOLUTE_0xAD_without_negative_flag(cpu: CPU) -> None:  # noqa: N802
     expected_flags: mos6502.flags.ProcessorStatusFlags = copy.deepcopy(cpu.flags)
 
     expected_flags[flags.Z] = False
@@ -308,9 +280,7 @@ def test_cpu_instruction_LDA_ABSOLUTE_0xAD_without_negative_flag() -> None:  # n
         expected_cycles=4,
     )
 
-def test_cpu_instruction_LDA_ABSOLUTE_0xAD_with_zero_flag() -> None:  # noqa: N802
-    cpu: mos6502.CPU = mos6502.CPU()
-    cpu.reset()
+def test_cpu_instruction_LDA_ABSOLUTE_0xAD_with_zero_flag(cpu: CPU) -> None:  # noqa: N802
     expected_flags: mos6502.flags.ProcessorStatusFlags = copy.deepcopy(cpu.flags)
 
     expected_flags[flags.Z] = True
@@ -328,9 +298,7 @@ def test_cpu_instruction_LDA_ABSOLUTE_0xAD_with_zero_flag() -> None:  # noqa: N8
         expected_cycles=4,
     )
 
-def test_cpu_instruction_LDA_ABSOLUTE_X_0xBD_with_negative_flag() -> None:  # noqa: N802
-    cpu: mos6502.CPU = mos6502.CPU()
-    cpu.reset()
+def test_cpu_instruction_LDA_ABSOLUTE_X_0xBD_with_negative_flag(cpu: CPU) -> None:  # noqa: N802
     expected_flags: mos6502.flags.ProcessorStatusFlags = copy.deepcopy(cpu.flags)
 
     expected_flags[flags.Z] = False
@@ -350,9 +318,7 @@ def test_cpu_instruction_LDA_ABSOLUTE_X_0xBD_with_negative_flag() -> None:  # no
         offset_value=0x01,
     )
 
-def test_cpu_instruction_LDA_ABSOLUTE_X_0xBD_without_negative_flag() -> None:  # noqa: N802
-    cpu: mos6502.CPU = mos6502.CPU()
-    cpu.reset()
+def test_cpu_instruction_LDA_ABSOLUTE_X_0xBD_without_negative_flag(cpu: CPU) -> None:  # noqa: N802
     expected_flags: mos6502.flags.ProcessorStatusFlags = copy.deepcopy(cpu.flags)
 
     expected_flags[flags.Z] = False
@@ -372,9 +338,7 @@ def test_cpu_instruction_LDA_ABSOLUTE_X_0xBD_without_negative_flag() -> None:  #
         offset_value=0x01,
     )
 
-def test_cpu_instruction_LDA_ABSOLUTE_X_0xBD_with_zero_flag() -> None:  # noqa: N802
-    cpu: mos6502.CPU = mos6502.CPU()
-    cpu.reset()
+def test_cpu_instruction_LDA_ABSOLUTE_X_0xBD_with_zero_flag(cpu: CPU) -> None:  # noqa: N802
     expected_flags: mos6502.flags.ProcessorStatusFlags = copy.deepcopy(cpu.flags)
 
     expected_flags[flags.Z] = True
@@ -394,9 +358,7 @@ def test_cpu_instruction_LDA_ABSOLUTE_X_0xBD_with_zero_flag() -> None:  # noqa: 
         offset_value=0x01,
     )
 
-def test_cpu_instruction_LDA_ABSOLUTE_X_0xBD_with_negative_flag_crossing_page_boundary() -> None:  # noqa: E501, N802
-    cpu: mos6502.CPU = mos6502.CPU()
-    cpu.reset()
+def test_cpu_instruction_LDA_ABSOLUTE_X_0xBD_with_negative_flag_crossing_page_boundary(cpu: CPU) -> None:  # noqa: E501, N802
     expected_flags: mos6502.flags.ProcessorStatusFlags = copy.deepcopy(cpu.flags)
 
     expected_flags[flags.Z] = False
@@ -416,9 +378,7 @@ def test_cpu_instruction_LDA_ABSOLUTE_X_0xBD_with_negative_flag_crossing_page_bo
         offset_value=0xFF,
     )
 
-def test_cpu_instruction_LDA_ABSOLUTE_X_0xBD_without_negative_flag_crossing_page_boundary() -> None:  # noqa: E501, N802
-    cpu: mos6502.CPU = mos6502.CPU()
-    cpu.reset()
+def test_cpu_instruction_LDA_ABSOLUTE_X_0xBD_without_negative_flag_crossing_page_boundary(cpu: CPU) -> None:  # noqa: E501, N802
     expected_flags: mos6502.flags.ProcessorStatusFlags = copy.deepcopy(cpu.flags)
 
     expected_flags[flags.Z] = False
@@ -438,9 +398,7 @@ def test_cpu_instruction_LDA_ABSOLUTE_X_0xBD_without_negative_flag_crossing_page
         offset_value=0xFF,
     )
 
-def test_cpu_instruction_LDA_ABSOLUTE_X_0xBD_with_zero_flag_crossing_page_boundary() -> None:  # noqa: E501, N802
-    cpu: mos6502.CPU = mos6502.CPU()
-    cpu.reset()
+def test_cpu_instruction_LDA_ABSOLUTE_X_0xBD_with_zero_flag_crossing_page_boundary(cpu: CPU) -> None:  # noqa: E501, N802
     expected_flags: mos6502.flags.ProcessorStatusFlags = copy.deepcopy(cpu.flags)
 
     expected_flags[flags.Z] = True
@@ -461,9 +419,7 @@ def test_cpu_instruction_LDA_ABSOLUTE_X_0xBD_with_zero_flag_crossing_page_bounda
     )
 
 
-def test_cpu_instruction_LDA_ABSOLUTE_Y_0xB9_with_negative_flag() -> None:  # noqa: N802
-    cpu: mos6502.CPU = mos6502.CPU()
-    cpu.reset()
+def test_cpu_instruction_LDA_ABSOLUTE_Y_0xB9_with_negative_flag(cpu: CPU) -> None:  # noqa: N802
     expected_flags: mos6502.flags.ProcessorStatusFlags = copy.deepcopy(cpu.flags)
 
     expected_flags[flags.Z] = False
@@ -483,9 +439,7 @@ def test_cpu_instruction_LDA_ABSOLUTE_Y_0xB9_with_negative_flag() -> None:  # no
         offset_value=0x01,
     )
 
-def test_cpu_instruction_LDA_ABSOLUTE_Y_0xB9_without_negative_flag() -> None:  # noqa: N802
-    cpu: mos6502.CPU = mos6502.CPU()
-    cpu.reset()
+def test_cpu_instruction_LDA_ABSOLUTE_Y_0xB9_without_negative_flag(cpu: CPU) -> None:  # noqa: N802
     expected_flags: mos6502.flags.ProcessorStatusFlags = copy.deepcopy(cpu.flags)
 
     expected_flags[flags.Z] = False
@@ -505,9 +459,7 @@ def test_cpu_instruction_LDA_ABSOLUTE_Y_0xB9_without_negative_flag() -> None:  #
         offset_value=0x01,
     )
 
-def test_cpu_instruction_LDA_ABSOLUTE_Y_0xB9_with_zero_flag() -> None:  # noqa: N802
-    cpu: mos6502.CPU = mos6502.CPU()
-    cpu.reset()
+def test_cpu_instruction_LDA_ABSOLUTE_Y_0xB9_with_zero_flag(cpu: CPU) -> None:  # noqa: N802
     expected_flags: mos6502.flags.ProcessorStatusFlags = copy.deepcopy(cpu.flags)
 
     expected_flags[flags.Z] = True
@@ -527,9 +479,7 @@ def test_cpu_instruction_LDA_ABSOLUTE_Y_0xB9_with_zero_flag() -> None:  # noqa: 
         offset_value=0x01,
     )
 
-def test_cpu_instruction_LDA_ABSOLUTE_Y_0xB9_with_negative_flag_crossing_page_boundary() -> None:  # noqa: E501, N802
-    cpu: mos6502.CPU = mos6502.CPU()
-    cpu.reset()
+def test_cpu_instruction_LDA_ABSOLUTE_Y_0xB9_with_negative_flag_crossing_page_boundary(cpu: CPU) -> None:  # noqa: E501, N802
     expected_flags: mos6502.flags.ProcessorStatusFlags = copy.deepcopy(cpu.flags)
 
     expected_flags[flags.Z] = False
@@ -549,9 +499,7 @@ def test_cpu_instruction_LDA_ABSOLUTE_Y_0xB9_with_negative_flag_crossing_page_bo
         offset_value=0xFF,
     )
 
-def test_cpu_instruction_LDA_ABSOLUTE_Y_0xB9_without_negative_flag_crossing_page_boundary() -> None:  # noqa: E501, N802
-    cpu: mos6502.CPU = mos6502.CPU()
-    cpu.reset()
+def test_cpu_instruction_LDA_ABSOLUTE_Y_0xB9_without_negative_flag_crossing_page_boundary(cpu: CPU) -> None:  # noqa: E501, N802
     expected_flags: mos6502.flags.ProcessorStatusFlags = copy.deepcopy(cpu.flags)
 
     expected_flags[flags.Z] = False
@@ -571,9 +519,7 @@ def test_cpu_instruction_LDA_ABSOLUTE_Y_0xB9_without_negative_flag_crossing_page
         offset_value=0xFF,
     )
 
-def test_cpu_instruction_LDA_ABSOLUTE_Y_0xB9_with_zero_flag_crossing_page_boundary() -> None:  # noqa: E501, N802
-    cpu: mos6502.CPU = mos6502.CPU()
-    cpu.reset()
+def test_cpu_instruction_LDA_ABSOLUTE_Y_0xB9_with_zero_flag_crossing_page_boundary(cpu: CPU) -> None:  # noqa: E501, N802
     expected_flags: mos6502.flags.ProcessorStatusFlags = copy.deepcopy(cpu.flags)
 
     expected_flags[flags.Z] = True
@@ -593,9 +539,7 @@ def test_cpu_instruction_LDA_ABSOLUTE_Y_0xB9_with_zero_flag_crossing_page_bounda
         offset_value=0xFF,
     )
 
-def test_cpu_instruction_LDA_INDEXED_INDIRECT_X_0xA1_with_negative_flag() -> None:  # noqa: N802
-    cpu: mos6502.CPU = mos6502.CPU()
-    cpu.reset()
+def test_cpu_instruction_LDA_INDEXED_INDIRECT_X_0xA1_with_negative_flag(cpu: CPU) -> None:  # noqa: N802
     expected_flags: mos6502.flags.ProcessorStatusFlags = copy.deepcopy(cpu.flags)
 
     expected_flags[flags.Z] = False
@@ -615,9 +559,7 @@ def test_cpu_instruction_LDA_INDEXED_INDIRECT_X_0xA1_with_negative_flag() -> Non
         offset_value=0x04,
     )
 
-def test_cpu_instruction_LDA_INDEXED_INDIRECT_X_0xA1_without_negative_flag() -> None:  # noqa: N802
-    cpu: mos6502.CPU = mos6502.CPU()
-    cpu.reset()
+def test_cpu_instruction_LDA_INDEXED_INDIRECT_X_0xA1_without_negative_flag(cpu: CPU) -> None:  # noqa: N802
     expected_flags: mos6502.flags.ProcessorStatusFlags = copy.deepcopy(cpu.flags)
 
     expected_flags[flags.Z] = False
@@ -637,9 +579,7 @@ def test_cpu_instruction_LDA_INDEXED_INDIRECT_X_0xA1_without_negative_flag() -> 
         offset_value=0x04,
     )
 
-def test_cpu_instruction_LDA_INDEXED_INDIRECT_X_0xA1_with_zero_flag() -> None:  # noqa: N802
-    cpu: mos6502.CPU = mos6502.CPU()
-    cpu.reset()
+def test_cpu_instruction_LDA_INDEXED_INDIRECT_X_0xA1_with_zero_flag(cpu: CPU) -> None:  # noqa: N802
     expected_flags: mos6502.flags.ProcessorStatusFlags = copy.deepcopy(cpu.flags)
 
     expected_flags[flags.Z] = True
@@ -659,9 +599,7 @@ def test_cpu_instruction_LDA_INDEXED_INDIRECT_X_0xA1_with_zero_flag() -> None:  
         offset_value=0x04,
     )
 
-def test_cpu_instruction_LDA_INDIRECT_INDEXED_Y_0xB1_with_negative_flag() -> None:  # noqa: N802
-    cpu: mos6502.CPU = mos6502.CPU()
-    cpu.reset()
+def test_cpu_instruction_LDA_INDIRECT_INDEXED_Y_0xB1_with_negative_flag(cpu: CPU) -> None:  # noqa: N802
     expected_flags: mos6502.flags.ProcessorStatusFlags = copy.deepcopy(cpu.flags)
 
     expected_flags[flags.Z] = False
@@ -681,9 +619,7 @@ def test_cpu_instruction_LDA_INDIRECT_INDEXED_Y_0xB1_with_negative_flag() -> Non
         offset_value=0x04,
     )
 
-def test_cpu_instruction_LDA_INDIRECT_INDEXED_Y_0xB1_without_negative_flag() -> None:  # noqa: N802
-    cpu: mos6502.CPU = mos6502.CPU()
-    cpu.reset()
+def test_cpu_instruction_LDA_INDIRECT_INDEXED_Y_0xB1_without_negative_flag(cpu: CPU) -> None:  # noqa: N802
     expected_flags: mos6502.flags.ProcessorStatusFlags = copy.deepcopy(cpu.flags)
 
     expected_flags[flags.Z] = False
@@ -703,9 +639,7 @@ def test_cpu_instruction_LDA_INDIRECT_INDEXED_Y_0xB1_without_negative_flag() -> 
         offset_value=0x04,
     )
 
-def test_cpu_instruction_LDA_INDIRECT_INDEXED_Y_0xB1_with_zero_flag() -> None:  # noqa: N802
-    cpu: mos6502.CPU = mos6502.CPU()
-    cpu.reset()
+def test_cpu_instruction_LDA_INDIRECT_INDEXED_Y_0xB1_with_zero_flag(cpu: CPU) -> None:  # noqa: N802
     expected_flags: mos6502.flags.ProcessorStatusFlags = copy.deepcopy(cpu.flags)
 
     expected_flags[flags.Z] = True
@@ -725,9 +659,7 @@ def test_cpu_instruction_LDA_INDIRECT_INDEXED_Y_0xB1_with_zero_flag() -> None:  
         offset_value=0x04,
     )
 
-def test_cpu_instruction_LDA_INDIRECT_INDEXED_Y_0xB1_with_negative_flag_crossing_page_boundary() -> None:  # noqa: E501, N802
-    cpu: mos6502.CPU = mos6502.CPU()
-    cpu.reset()
+def test_cpu_instruction_LDA_INDIRECT_INDEXED_Y_0xB1_with_negative_flag_crossing_page_boundary(cpu: CPU) -> None:  # noqa: E501, N802
     expected_flags: mos6502.flags.ProcessorStatusFlags = copy.deepcopy(cpu.flags)
 
     expected_flags[flags.Z] = False
@@ -747,9 +679,7 @@ def test_cpu_instruction_LDA_INDIRECT_INDEXED_Y_0xB1_with_negative_flag_crossing
         offset_value=0xFF,
     )
 
-def test_cpu_instruction_LDA_INDIRECT_INDEXED_Y_0xB1_without_negative_flag_crossing_page_boundary() -> None:  # noqa: E501, N802
-    cpu: mos6502.CPU = mos6502.CPU()
-    cpu.reset()
+def test_cpu_instruction_LDA_INDIRECT_INDEXED_Y_0xB1_without_negative_flag_crossing_page_boundary(cpu: CPU) -> None:  # noqa: E501, N802
     expected_flags: mos6502.flags.ProcessorStatusFlags = copy.deepcopy(cpu.flags)
 
     expected_flags[flags.Z] = False
@@ -769,9 +699,7 @@ def test_cpu_instruction_LDA_INDIRECT_INDEXED_Y_0xB1_without_negative_flag_cross
         offset_value=0xFF,
     )
 
-def test_cpu_instruction_LDA_INDIRECT_INDEXED_Y_0xB1_with_zero_flag_crossing_page_boundary() -> None:  # noqa: E501, N802
-    cpu: mos6502.CPU = mos6502.CPU()
-    cpu.reset()
+def test_cpu_instruction_LDA_INDIRECT_INDEXED_Y_0xB1_with_zero_flag_crossing_page_boundary(cpu: CPU) -> None:  # noqa: E501, N802
     expected_flags: mos6502.flags.ProcessorStatusFlags = copy.deepcopy(cpu.flags)
 
     expected_flags[flags.Z] = True

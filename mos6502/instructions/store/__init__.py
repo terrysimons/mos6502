@@ -2,7 +2,7 @@
 """Store instructions for the MOS 6502 CPU."""
 
 # Import from individual store instruction modules
-from mos6502.instructions.store.sta import (  # noqa: F401
+from mos6502.instructions.store._sta import (  # noqa: F401
     STA_ABSOLUTE_0x8D,
     STA_ABSOLUTE_X_0x9D,
     STA_ABSOLUTE_Y_0x99,
@@ -12,13 +12,13 @@ from mos6502.instructions.store.sta import (  # noqa: F401
     STA_ZEROPAGE_X_0x95,
     register_sta_instructions,
 )
-from mos6502.instructions.store.stx import (  # noqa: F401
+from mos6502.instructions.store._stx import (  # noqa: F401
     STX_ABSOLUTE_0x8E,
     STX_ZEROPAGE_0x86,
     STX_ZEROPAGE_Y_0x96,
     register_stx_instructions,
 )
-from mos6502.instructions.store.sty import (  # noqa: F401
+from mos6502.instructions.store._sty import (  # noqa: F401
     STY_ABSOLUTE_0x8C,
     STY_ZEROPAGE_0x84,
     STY_ZEROPAGE_X_0x94,

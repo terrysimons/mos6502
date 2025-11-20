@@ -10,7 +10,7 @@ log = logging.getLogger("mos6502")
 log.setLevel(logging.DEBUG)
 
 
-def check_noop_flags(expected_cpu: mos6502.CPU, actual_cpu: mos6502.CPU) -> None:
+def check_noop_flags(expected_cpu: CPU, actual_cpu: CPU) -> None:
     assert actual_cpu.flags[flags.C] == expected_cpu.flags[flags.C]
     assert actual_cpu.flags[flags.B] == expected_cpu.flags[flags.B]
     assert actual_cpu.flags[flags.D] == expected_cpu.flags[flags.D]
@@ -18,11 +18,9 @@ def check_noop_flags(expected_cpu: mos6502.CPU, actual_cpu: mos6502.CPU) -> None
     assert actual_cpu.flags[flags.V] == expected_cpu.flags[flags.V]
 
 
-def test_cpu_instruction_INX_IMPLIED_0xE8() -> None:  # noqa: N802
+def test_cpu_instruction_INX_IMPLIED_0xE8(cpu: CPU) -> None:  # noqa: N802
     # given:
-    cpu: mos6502.CPU = mos6502.CPU()
-    cpu.reset()
-    initial_cpu: mos6502.CPU = copy.deepcopy(cpu)
+    initial_cpu: CPU = copy.deepcopy(cpu)
 
     cpu.X = 0x42
 
@@ -41,11 +39,9 @@ def test_cpu_instruction_INX_IMPLIED_0xE8() -> None:  # noqa: N802
     check_noop_flags(expected_cpu=initial_cpu, actual_cpu=cpu)
 
 
-def test_cpu_instruction_INX_IMPLIED_0xE8_zero_flag() -> None:  # noqa: N802
+def test_cpu_instruction_INX_IMPLIED_0xE8_zero_flag(cpu: CPU) -> None:  # noqa: N802
     # given:
-    cpu: mos6502.CPU = mos6502.CPU()
-    cpu.reset()
-    initial_cpu: mos6502.CPU = copy.deepcopy(cpu)
+    initial_cpu: CPU = copy.deepcopy(cpu)
 
     cpu.X = 0xFF
 
@@ -64,11 +60,9 @@ def test_cpu_instruction_INX_IMPLIED_0xE8_zero_flag() -> None:  # noqa: N802
     check_noop_flags(expected_cpu=initial_cpu, actual_cpu=cpu)
 
 
-def test_cpu_instruction_INX_IMPLIED_0xE8_negative_flag() -> None:  # noqa: N802
+def test_cpu_instruction_INX_IMPLIED_0xE8_negative_flag(cpu: CPU) -> None:  # noqa: N802
     # given:
-    cpu: mos6502.CPU = mos6502.CPU()
-    cpu.reset()
-    initial_cpu: mos6502.CPU = copy.deepcopy(cpu)
+    initial_cpu: CPU = copy.deepcopy(cpu)
 
     cpu.X = 0x7F
 

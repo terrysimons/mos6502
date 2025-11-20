@@ -3,17 +3,15 @@ import contextlib
 import logging
 
 import mos6502
-from mos6502 import exceptions, flags, instructions
+from mos6502 import CPU, exceptions, flags, instructions
 
 log = logging.getLogger("mos6502")
 log.setLevel(logging.DEBUG)
 
 
-def test_cpu_instruction_CPY_IMMEDIATE_0xC0_equal() -> None:  # noqa: N802
+def test_cpu_instruction_CPY_IMMEDIATE_0xC0_equal(cpu: CPU) -> None:  # noqa: N802
     """Test CPY when Y == M (sets Z=1, C=1, N=0)."""
     # given:
-    cpu: mos6502.CPU = mos6502.CPU()
-    cpu.reset()
 
     cpu.Y = 0x42
 
@@ -33,11 +31,9 @@ def test_cpu_instruction_CPY_IMMEDIATE_0xC0_equal() -> None:  # noqa: N802
     assert cpu.cycles_executed == 2
 
 
-def test_cpu_instruction_CPY_IMMEDIATE_0xC0_greater() -> None:  # noqa: N802
+def test_cpu_instruction_CPY_IMMEDIATE_0xC0_greater(cpu: CPU) -> None:  # noqa: N802
     """Test CPY when Y > M (sets Z=0, C=1, N varies)."""
     # given:
-    cpu: mos6502.CPU = mos6502.CPU()
-    cpu.reset()
 
     cpu.Y = 0x50
 
@@ -57,11 +53,9 @@ def test_cpu_instruction_CPY_IMMEDIATE_0xC0_greater() -> None:  # noqa: N802
     assert cpu.cycles_executed == 2
 
 
-def test_cpu_instruction_CPY_IMMEDIATE_0xC0_less() -> None:  # noqa: N802
+def test_cpu_instruction_CPY_IMMEDIATE_0xC0_less(cpu: CPU) -> None:  # noqa: N802
     """Test CPY when Y < M (sets Z=0, C=0, N=1)."""
     # given:
-    cpu: mos6502.CPU = mos6502.CPU()
-    cpu.reset()
 
     cpu.Y = 0x30
 
@@ -81,11 +75,9 @@ def test_cpu_instruction_CPY_IMMEDIATE_0xC0_less() -> None:  # noqa: N802
     assert cpu.cycles_executed == 2
 
 
-def test_cpu_instruction_CPY_ZEROPAGE_0xC4() -> None:  # noqa: N802
+def test_cpu_instruction_CPY_ZEROPAGE_0xC4(cpu: CPU) -> None:  # noqa: N802
     """Test CPY Zero Page addressing mode."""
     # given:
-    cpu: mos6502.CPU = mos6502.CPU()
-    cpu.reset()
 
     cpu.Y = 0x50
     cpu.ram[0x0042] = 0x30  # Value at zero page address
@@ -106,11 +98,9 @@ def test_cpu_instruction_CPY_ZEROPAGE_0xC4() -> None:  # noqa: N802
     assert cpu.cycles_executed == 3
 
 
-def test_cpu_instruction_CPY_ABSOLUTE_0xCC() -> None:  # noqa: N802
+def test_cpu_instruction_CPY_ABSOLUTE_0xCC(cpu: CPU) -> None:  # noqa: N802
     """Test CPY Absolute addressing mode."""
     # given:
-    cpu: mos6502.CPU = mos6502.CPU()
-    cpu.reset()
 
     cpu.Y = 0x20
     cpu.ram[0x1234] = 0x30  # Value at absolute address

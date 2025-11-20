@@ -3,17 +3,15 @@ import contextlib
 import logging
 
 import mos6502
-from mos6502 import exceptions, flags, instructions
+from mos6502 import CPU, exceptions, flags, instructions
 
 log = logging.getLogger("mos6502")
 log.setLevel(logging.DEBUG)
 
 
-def test_cpu_instruction_BNE_RELATIVE_0xD0_branch_taken() -> None:  # noqa: N802
+def test_cpu_instruction_BNE_RELATIVE_0xD0_branch_taken(cpu: CPU) -> None:  # noqa: N802
     """Test BNE when zero flag is clear (branch taken)."""
     # given:
-    cpu: mos6502.CPU = mos6502.CPU()
-    cpu.reset()
 
     # Clear zero flag
     cpu.flags[flags.Z] = 0
@@ -31,11 +29,9 @@ def test_cpu_instruction_BNE_RELATIVE_0xD0_branch_taken() -> None:  # noqa: N802
     assert cpu.cycles_executed == 3  # 1 opcode + 1 read offset + 1 branch taken
 
 
-def test_cpu_instruction_BNE_RELATIVE_0xD0_branch_not_taken() -> None:  # noqa: N802
+def test_cpu_instruction_BNE_RELATIVE_0xD0_branch_not_taken(cpu: CPU) -> None:  # noqa: N802
     """Test BNE when zero flag is set (branch not taken)."""
     # given:
-    cpu: mos6502.CPU = mos6502.CPU()
-    cpu.reset()
 
     # Set zero flag
     cpu.flags[flags.Z] = 1
@@ -53,11 +49,9 @@ def test_cpu_instruction_BNE_RELATIVE_0xD0_branch_not_taken() -> None:  # noqa: 
     assert cpu.cycles_executed == 2  # 1 opcode + 1 read offset
 
 
-def test_cpu_instruction_BNE_RELATIVE_0xD0_negative_offset() -> None:  # noqa: N802
+def test_cpu_instruction_BNE_RELATIVE_0xD0_negative_offset(cpu: CPU) -> None:  # noqa: N802
     """Test BNE with negative offset (branch backward)."""
     # given:
-    cpu: mos6502.CPU = mos6502.CPU()
-    cpu.reset()
 
     # Clear zero flag
     cpu.flags[flags.Z] = 0
@@ -78,11 +72,9 @@ def test_cpu_instruction_BNE_RELATIVE_0xD0_negative_offset() -> None:  # noqa: N
     assert cpu.cycles_executed == 3
 
 
-def test_cpu_instruction_BNE_RELATIVE_0xD0_page_boundary_cross() -> None:  # noqa: N802
+def test_cpu_instruction_BNE_RELATIVE_0xD0_page_boundary_cross(cpu: CPU) -> None:  # noqa: N802
     """Test BNE with page boundary crossing (costs extra cycle)."""
     # given:
-    cpu: mos6502.CPU = mos6502.CPU()
-    cpu.reset()
 
     # Clear zero flag
     cpu.flags[flags.Z] = 0

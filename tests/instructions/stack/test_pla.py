@@ -10,7 +10,7 @@ log = logging.getLogger("mos6502")
 log.setLevel(logging.DEBUG)
 
 
-def check_noop_flags(expected_cpu: mos6502.CPU, actual_cpu: mos6502.CPU) -> None:
+def check_noop_flags(expected_cpu: CPU, actual_cpu: CPU) -> None:
     """PLA only affects N and Z flags."""
     assert actual_cpu.flags[flags.C] == expected_cpu.flags[flags.C]
     assert actual_cpu.flags[flags.B] == expected_cpu.flags[flags.B]
@@ -19,11 +19,9 @@ def check_noop_flags(expected_cpu: mos6502.CPU, actual_cpu: mos6502.CPU) -> None
     assert actual_cpu.flags[flags.V] == expected_cpu.flags[flags.V]
 
 
-def test_cpu_instruction_PLA_IMPLIED_0x68() -> None:  # noqa: N802
+def test_cpu_instruction_PLA_IMPLIED_0x68(cpu: CPU) -> None:  # noqa: N802
     # given:
-    cpu: mos6502.CPU = mos6502.CPU()
-    cpu.reset()
-    initial_cpu: mos6502.CPU = copy.deepcopy(cpu)
+    initial_cpu: CPU = copy.deepcopy(cpu)
 
     # Push a value onto the stack first
     cpu.ram[cpu.S] = 0x42
@@ -44,11 +42,9 @@ def test_cpu_instruction_PLA_IMPLIED_0x68() -> None:  # noqa: N802
     check_noop_flags(expected_cpu=initial_cpu, actual_cpu=cpu)
 
 
-def test_cpu_instruction_PLA_IMPLIED_0x68_zero_flag() -> None:  # noqa: N802
+def test_cpu_instruction_PLA_IMPLIED_0x68_zero_flag(cpu: CPU) -> None:  # noqa: N802
     # given:
-    cpu: mos6502.CPU = mos6502.CPU()
-    cpu.reset()
-    initial_cpu: mos6502.CPU = copy.deepcopy(cpu)
+    initial_cpu: CPU = copy.deepcopy(cpu)
 
     # Push zero onto the stack
     cpu.ram[cpu.S] = 0x00
@@ -69,11 +65,9 @@ def test_cpu_instruction_PLA_IMPLIED_0x68_zero_flag() -> None:  # noqa: N802
     check_noop_flags(expected_cpu=initial_cpu, actual_cpu=cpu)
 
 
-def test_cpu_instruction_PLA_IMPLIED_0x68_negative_flag() -> None:  # noqa: N802
+def test_cpu_instruction_PLA_IMPLIED_0x68_negative_flag(cpu: CPU) -> None:  # noqa: N802
     # given:
-    cpu: mos6502.CPU = mos6502.CPU()
-    cpu.reset()
-    initial_cpu: mos6502.CPU = copy.deepcopy(cpu)
+    initial_cpu: CPU = copy.deepcopy(cpu)
 
     # Push negative value onto the stack
     cpu.ram[cpu.S] = 0x80
@@ -94,12 +88,10 @@ def test_cpu_instruction_PLA_IMPLIED_0x68_negative_flag() -> None:  # noqa: N802
     check_noop_flags(expected_cpu=initial_cpu, actual_cpu=cpu)
 
 
-def test_cpu_instruction_PLA_IMPLIED_0x68_with_pha() -> None:  # noqa: N802
+def test_cpu_instruction_PLA_IMPLIED_0x68_with_pha(cpu: CPU) -> None:  # noqa: N802
     """Test PLA after PHA - round trip."""
     # given:
-    cpu: mos6502.CPU = mos6502.CPU()
-    cpu.reset()
-    initial_cpu: mos6502.CPU = copy.deepcopy(cpu)
+    initial_cpu: CPU = copy.deepcopy(cpu)
 
     cpu.A = 0x55
 
@@ -117,12 +109,10 @@ def test_cpu_instruction_PLA_IMPLIED_0x68_with_pha() -> None:  # noqa: N802
     check_noop_flags(expected_cpu=initial_cpu, actual_cpu=cpu)
 
 
-def test_cpu_instruction_PLA_IMPLIED_0x68_near_stack_bottom() -> None:  # noqa: N802
+def test_cpu_instruction_PLA_IMPLIED_0x68_near_stack_bottom(cpu: CPU) -> None:  # noqa: N802
     """Test PLA when pulling from near bottom of stack."""
     # given:
-    cpu: mos6502.CPU = mos6502.CPU()
-    cpu.reset()
-    initial_cpu: mos6502.CPU = copy.deepcopy(cpu)
+    initial_cpu: CPU = copy.deepcopy(cpu)
 
     # Set stack pointer to a low value
     cpu.S = 0x101
@@ -144,12 +134,10 @@ def test_cpu_instruction_PLA_IMPLIED_0x68_near_stack_bottom() -> None:  # noqa: 
     check_noop_flags(expected_cpu=initial_cpu, actual_cpu=cpu)
 
 
-def test_cpu_instruction_PLA_IMPLIED_0x68_multiple_pulls() -> None:  # noqa: N802
+def test_cpu_instruction_PLA_IMPLIED_0x68_multiple_pulls(cpu: CPU) -> None:  # noqa: N802
     """Test multiple PLA operations in sequence."""
     # given:
-    cpu: mos6502.CPU = mos6502.CPU()
-    cpu.reset()
-    initial_cpu: mos6502.CPU = copy.deepcopy(cpu)
+    initial_cpu: CPU = copy.deepcopy(cpu)
 
     # Set up stack with three values
     cpu.S = 0x1FC  # Stack pointer below three values (hardware: 0xFC)

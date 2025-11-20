@@ -2,7 +2,7 @@
 """Load instructions for the MOS 6502 CPU."""
 
 # Import from individual load instruction modules
-from mos6502.instructions.load.lda import (  # noqa: F401
+from mos6502.instructions.load._lda import (  # noqa: F401
     LDA_ABSOLUTE_0xAD,
     LDA_ABSOLUTE_X_0xBD,
     LDA_ABSOLUTE_Y_0xB9,
@@ -13,7 +13,7 @@ from mos6502.instructions.load.lda import (  # noqa: F401
     LDA_ZEROPAGE_X_0xB5,
     register_lda_instructions,
 )
-from mos6502.instructions.load.ldx import (  # noqa: F401
+from mos6502.instructions.load._ldx import (  # noqa: F401
     LDX_ABSOLUTE_0xAE,
     LDX_ABSOLUTE_Y_0xBE,
     LDX_IMMEDIATE_0xA2,
@@ -21,7 +21,7 @@ from mos6502.instructions.load.ldx import (  # noqa: F401
     LDX_ZEROPAGE_Y_0xB6,
     register_ldx_instructions,
 )
-from mos6502.instructions.load.ldy import (  # noqa: F401
+from mos6502.instructions.load._ldy import (  # noqa: F401
     LDY_ABSOLUTE_0xAC,
     LDY_ABSOLUTE_X_0xBC,
     LDY_IMMEDIATE_0xA0,

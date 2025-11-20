@@ -2,7 +2,7 @@
 """Logic instructions for the MOS 6502 CPU."""
 
 # Import from individual logic instruction modules
-from mos6502.instructions.logic.and_ import (  # noqa: F401
+from mos6502.instructions.logic._and import (  # noqa: F401
     AND_ABSOLUTE_0x2D,
     AND_ABSOLUTE_X_0x3D,
     AND_ABSOLUTE_Y_0x39,
@@ -13,7 +13,7 @@ from mos6502.instructions.logic.and_ import (  # noqa: F401
     AND_ZEROPAGE_X_0x35,
     register_and_instructions,
 )
-from mos6502.instructions.logic.eor import (  # noqa: F401
+from mos6502.instructions.logic._eor import (  # noqa: F401
     EOR_ABSOLUTE_0x4D,
     EOR_ABSOLUTE_X_0x5D,
     EOR_ABSOLUTE_Y_0x59,
@@ -24,7 +24,7 @@ from mos6502.instructions.logic.eor import (  # noqa: F401
     EOR_ZEROPAGE_X_0x55,
     register_eor_instructions,
 )
-from mos6502.instructions.logic.ora import (  # noqa: F401
+from mos6502.instructions.logic._ora import (  # noqa: F401
     ORA_ABSOLUTE_0x0D,
     ORA_ABSOLUTE_X_0x1D,
     ORA_ABSOLUTE_Y_0x19,

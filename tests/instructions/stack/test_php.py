@@ -10,7 +10,7 @@ log = logging.getLogger("mos6502")
 log.setLevel(logging.DEBUG)
 
 
-def check_noop_flags(expected_cpu: mos6502.CPU, actual_cpu: mos6502.CPU) -> None:
+def check_noop_flags(expected_cpu: CPU, actual_cpu: CPU) -> None:
     """PHP does not affect any flags."""
     assert actual_cpu.flags[flags.C] == expected_cpu.flags[flags.C]
     assert actual_cpu.flags[flags.Z] == expected_cpu.flags[flags.Z]
@@ -21,11 +21,9 @@ def check_noop_flags(expected_cpu: mos6502.CPU, actual_cpu: mos6502.CPU) -> None
     assert actual_cpu.flags[flags.N] == expected_cpu.flags[flags.N]
 
 
-def test_cpu_instruction_PHP_IMPLIED_0x08() -> None:  # noqa: N802
+def test_cpu_instruction_PHP_IMPLIED_0x08(cpu: CPU) -> None:  # noqa: N802
     # given:
-    cpu: mos6502.CPU = mos6502.CPU()
-    cpu.reset()
-    initial_cpu: mos6502.CPU = copy.deepcopy(cpu)
+    initial_cpu: CPU = copy.deepcopy(cpu)
 
     # Set some flags
     cpu.flags[flags.C] = 1
@@ -54,11 +52,9 @@ def test_cpu_instruction_PHP_IMPLIED_0x08() -> None:  # noqa: N802
     assert cpu.flags.value == initial_flags
 
 
-def test_cpu_instruction_PHP_IMPLIED_0x08_b_flag() -> None:  # noqa: N802
+def test_cpu_instruction_PHP_IMPLIED_0x08_b_flag(cpu: CPU) -> None:  # noqa: N802
     """Test that PHP sets B flag in pushed status."""
     # given:
-    cpu: mos6502.CPU = mos6502.CPU()
-    cpu.reset()
 
     # Flags are already 0 after reset
     initial_sp: int = cpu.S

@@ -3,14 +3,14 @@ import contextlib
 import logging
 
 import mos6502
-from mos6502 import exceptions, flags, instructions
+from mos6502 import CPU, exceptions, flags, instructions
 from mos6502.memory import Byte
 
 log = logging.getLogger("mos6502")
 log.setLevel(logging.DEBUG)
 
 
-def test_cpu_instruction_BRK_IMPLIED_0x00() -> None:  # noqa: N802
+def test_cpu_instruction_BRK_IMPLIED_0x00(cpu: CPU) -> None:  # noqa: N802
     """Test BRK instruction behavior.
 
     BRK should:
@@ -21,8 +21,6 @@ def test_cpu_instruction_BRK_IMPLIED_0x00() -> None:  # noqa: N802
     5. Take 7 cycles
     """
     # given:
-    cpu: mos6502.CPU = mos6502.CPU()
-    cpu.reset()
 
     # Set some flags to verify they're preserved in stack
     cpu.C = flags.ProcessorStatusFlags.C[flags.C]
@@ -79,11 +77,9 @@ def test_cpu_instruction_BRK_IMPLIED_0x00() -> None:  # noqa: N802
         f"BRK should take 7 cycles, got {cpu.cycles_executed}"
 
 
-def test_cpu_instruction_BRK_IMPLIED_0x00_raises_exception() -> None:  # noqa: N802
+def test_cpu_instruction_BRK_IMPLIED_0x00_raises_exception(cpu: CPU) -> None:  # noqa: N802
     """Test that BRK raises CPUBreakError exception."""
     # given:
-    cpu: mos6502.CPU = mos6502.CPU()
-    cpu.reset()
 
     cpu.ram[0xFFFC] = instructions.BRK_IMPLIED_0x00
     cpu.ram[0xFFFD] = 0x00
@@ -101,11 +97,9 @@ def test_cpu_instruction_BRK_IMPLIED_0x00_raises_exception() -> None:  # noqa: N
     assert exception_raised, "BRK should raise CPUBreakError"
 
 
-def test_cpu_instruction_BRK_IMPLIED_0x00_with_all_flags_clear() -> None:  # noqa: N802
+def test_cpu_instruction_BRK_IMPLIED_0x00_with_all_flags_clear(cpu: CPU) -> None:  # noqa: N802
     """Test BRK when all flags are initially clear."""
     # given:
-    cpu: mos6502.CPU = mos6502.CPU()
-    cpu.reset()
 
     # Clear all flags
     cpu.C = 0

@@ -3,17 +3,15 @@ import contextlib
 import logging
 
 import mos6502
-from mos6502 import exceptions, flags, instructions
+from mos6502 import CPU, exceptions, flags, instructions
 from mos6502.memory import Byte
 
 log = logging.getLogger("mos6502")
 log.setLevel(logging.DEBUG)
 
 
-def test_cpu_instruction_RTI_IMPLIED_0x40() -> None:  # noqa: N802
+def test_cpu_instruction_RTI_IMPLIED_0x40(cpu: CPU) -> None:  # noqa: N802
     # given:
-    cpu: mos6502.CPU = mos6502.CPU()
-    cpu.reset()
 
     # Simulate interrupt state: PC and status pushed on stack
     # (BRK pushes PC first, then status)
@@ -49,11 +47,9 @@ def test_cpu_instruction_RTI_IMPLIED_0x40() -> None:  # noqa: N802
     assert cpu.flags[flags.N] == 1
 
 
-def test_cpu_instruction_RTI_IMPLIED_0x40_stack_pointer() -> None:  # noqa: N802
+def test_cpu_instruction_RTI_IMPLIED_0x40_stack_pointer(cpu: CPU) -> None:  # noqa: N802
     """Test that RTI correctly adjusts stack pointer."""
     # given:
-    cpu: mos6502.CPU = mos6502.CPU()
-    cpu.reset()
 
     initial_sp: int = cpu.S
 

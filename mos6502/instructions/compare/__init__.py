@@ -2,7 +2,7 @@
 """Compare instructions for the MOS 6502 CPU."""
 
 # Import from individual compare instruction modules
-from mos6502.instructions.compare.cmp import (  # noqa: F401
+from mos6502.instructions.compare._cmp import (  # noqa: F401
     CMP_ABSOLUTE_0xCD,
     CMP_ABSOLUTE_X_0xDD,
     CMP_ABSOLUTE_Y_0xD9,
@@ -13,13 +13,13 @@ from mos6502.instructions.compare.cmp import (  # noqa: F401
     CMP_ZEROPAGE_X_0xD5,
     register_cmp_instructions,
 )
-from mos6502.instructions.compare.cpx import (  # noqa: F401
+from mos6502.instructions.compare._cpx import (  # noqa: F401
     CPX_ABSOLUTE_0xEC,
     CPX_IMMEDIATE_0xE0,
     CPX_ZEROPAGE_0xE4,
     register_cpx_instructions,
 )
-from mos6502.instructions.compare.cpy import (  # noqa: F401
+from mos6502.instructions.compare._cpy import (  # noqa: F401
     CPY_ABSOLUTE_0xCC,
     CPY_IMMEDIATE_0xC0,
     CPY_ZEROPAGE_0xC4,

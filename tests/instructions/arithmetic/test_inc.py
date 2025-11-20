@@ -3,17 +3,15 @@ import contextlib
 import logging
 
 import mos6502
-from mos6502 import exceptions, flags, instructions
+from mos6502 import CPU, exceptions, flags, instructions
 
 log = logging.getLogger("mos6502")
 log.setLevel(logging.DEBUG)
 
 
-def test_cpu_instruction_INC_ZEROPAGE_0xE6() -> None:  # noqa: N802
+def test_cpu_instruction_INC_ZEROPAGE_0xE6(cpu: CPU) -> None:  # noqa: N802
     """Test INC Zero Page addressing mode."""
     # given:
-    cpu: mos6502.CPU = mos6502.CPU()
-    cpu.reset()
 
     cpu.ram[0x0042] = 0x05
 
@@ -32,11 +30,9 @@ def test_cpu_instruction_INC_ZEROPAGE_0xE6() -> None:  # noqa: N802
     assert cpu.cycles_executed == 5
 
 
-def test_cpu_instruction_INC_ZEROPAGE_0xE6_wrap_to_zero() -> None:  # noqa: N802
+def test_cpu_instruction_INC_ZEROPAGE_0xE6_wrap_to_zero(cpu: CPU) -> None:  # noqa: N802
     """Test INC wrapping from 0xFF to 0x00."""
     # given:
-    cpu: mos6502.CPU = mos6502.CPU()
-    cpu.reset()
 
     cpu.ram[0x0042] = 0xFF
 
@@ -55,11 +51,9 @@ def test_cpu_instruction_INC_ZEROPAGE_0xE6_wrap_to_zero() -> None:  # noqa: N802
     assert cpu.cycles_executed == 5
 
 
-def test_cpu_instruction_INC_ZEROPAGE_0xE6_negative() -> None:  # noqa: N802
+def test_cpu_instruction_INC_ZEROPAGE_0xE6_negative(cpu: CPU) -> None:  # noqa: N802
     """Test INC resulting in negative value (bit 7 set)."""
     # given:
-    cpu: mos6502.CPU = mos6502.CPU()
-    cpu.reset()
 
     cpu.ram[0x0042] = 0x7F  # 127
 
@@ -78,11 +72,9 @@ def test_cpu_instruction_INC_ZEROPAGE_0xE6_negative() -> None:  # noqa: N802
     assert cpu.cycles_executed == 5
 
 
-def test_cpu_instruction_INC_ZEROPAGE_X_0xF6() -> None:  # noqa: N802
+def test_cpu_instruction_INC_ZEROPAGE_X_0xF6(cpu: CPU) -> None:  # noqa: N802
     """Test INC Zero Page,X addressing mode."""
     # given:
-    cpu: mos6502.CPU = mos6502.CPU()
-    cpu.reset()
 
     cpu.X = 0x05
     cpu.ram[0x0047] = 0x10  # 0x42 + 0x05 = 0x47
@@ -102,11 +94,9 @@ def test_cpu_instruction_INC_ZEROPAGE_X_0xF6() -> None:  # noqa: N802
     assert cpu.cycles_executed == 6
 
 
-def test_cpu_instruction_INC_ABSOLUTE_0xEE() -> None:  # noqa: N802
+def test_cpu_instruction_INC_ABSOLUTE_0xEE(cpu: CPU) -> None:  # noqa: N802
     """Test INC Absolute addressing mode."""
     # given:
-    cpu: mos6502.CPU = mos6502.CPU()
-    cpu.reset()
 
     cpu.ram[0x1234] = 0x42
 
@@ -126,11 +116,9 @@ def test_cpu_instruction_INC_ABSOLUTE_0xEE() -> None:  # noqa: N802
     assert cpu.cycles_executed == 6
 
 
-def test_cpu_instruction_INC_ABSOLUTE_X_0xFE() -> None:  # noqa: N802
+def test_cpu_instruction_INC_ABSOLUTE_X_0xFE(cpu: CPU) -> None:  # noqa: N802
     """Test INC Absolute,X addressing mode."""
     # given:
-    cpu: mos6502.CPU = mos6502.CPU()
-    cpu.reset()
 
     cpu.X = 0x10
     cpu.ram[0x1244] = 0xFE  # 0x1234 + 0x10 = 0x1244

@@ -10,7 +10,7 @@ log = logging.getLogger("mos6502")
 log.setLevel(logging.DEBUG)
 
 
-def check_noop_flags(expected_cpu: mos6502.CPU, actual_cpu: mos6502.CPU) -> None:
+def check_noop_flags(expected_cpu: CPU, actual_cpu: CPU) -> None:
     """PHA does not affect any flags."""
     assert actual_cpu.flags[flags.C] == expected_cpu.flags[flags.C]
     assert actual_cpu.flags[flags.Z] == expected_cpu.flags[flags.Z]
@@ -21,11 +21,9 @@ def check_noop_flags(expected_cpu: mos6502.CPU, actual_cpu: mos6502.CPU) -> None
     assert actual_cpu.flags[flags.N] == expected_cpu.flags[flags.N]
 
 
-def test_cpu_instruction_PHA_IMPLIED_0x48() -> None:  # noqa: N802
+def test_cpu_instruction_PHA_IMPLIED_0x48(cpu: CPU) -> None:  # noqa: N802
     # given:
-    cpu: mos6502.CPU = mos6502.CPU()
-    cpu.reset()
-    initial_cpu: mos6502.CPU = copy.deepcopy(cpu)
+    initial_cpu: CPU = copy.deepcopy(cpu)
 
     cpu.A = 0x42
     initial_sp: int = cpu.S
@@ -45,12 +43,10 @@ def test_cpu_instruction_PHA_IMPLIED_0x48() -> None:  # noqa: N802
     check_noop_flags(expected_cpu=initial_cpu, actual_cpu=cpu)
 
 
-def test_cpu_instruction_PHA_IMPLIED_0x48_stack_grows_down() -> None:  # noqa: N802
+def test_cpu_instruction_PHA_IMPLIED_0x48_stack_grows_down(cpu: CPU) -> None:  # noqa: N802
     """Test that stack grows downward with multiple pushes."""
     # given:
-    cpu: mos6502.CPU = mos6502.CPU()
-    cpu.reset()
-    initial_cpu: mos6502.CPU = copy.deepcopy(cpu)
+    initial_cpu: CPU = copy.deepcopy(cpu)
     initial_sp: int = cpu.S
 
     # Set A to different value and push three times
@@ -74,12 +70,10 @@ def test_cpu_instruction_PHA_IMPLIED_0x48_stack_grows_down() -> None:  # noqa: N
     check_noop_flags(expected_cpu=initial_cpu, actual_cpu=cpu)
 
 
-def test_cpu_instruction_PHA_IMPLIED_0x48_near_stack_bottom() -> None:  # noqa: N802
+def test_cpu_instruction_PHA_IMPLIED_0x48_near_stack_bottom(cpu: CPU) -> None:  # noqa: N802
     """Test PHA near the bottom of the stack."""
     # given:
-    cpu: mos6502.CPU = mos6502.CPU()
-    cpu.reset()
-    initial_cpu: mos6502.CPU = copy.deepcopy(cpu)
+    initial_cpu: CPU = copy.deepcopy(cpu)
 
     # Set stack pointer to a low value
     cpu.S = 0x102
@@ -100,12 +94,10 @@ def test_cpu_instruction_PHA_IMPLIED_0x48_near_stack_bottom() -> None:  # noqa: 
     check_noop_flags(expected_cpu=initial_cpu, actual_cpu=cpu)
 
 
-def test_cpu_instruction_PHA_IMPLIED_0x48_near_stack_top() -> None:  # noqa: N802
+def test_cpu_instruction_PHA_IMPLIED_0x48_near_stack_top(cpu: CPU) -> None:  # noqa: N802
     """Test PHA near the top of the stack."""
     # given:
-    cpu: mos6502.CPU = mos6502.CPU()
-    cpu.reset()
-    initial_cpu: mos6502.CPU = copy.deepcopy(cpu)
+    initial_cpu: CPU = copy.deepcopy(cpu)
 
     # Set stack pointer near top (0x1FF = hardware 0xFF)
     cpu.S = 0x1FF

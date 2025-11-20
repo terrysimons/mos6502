@@ -3,17 +3,15 @@ import contextlib
 import logging
 
 import mos6502
-from mos6502 import exceptions, flags, instructions
+from mos6502 import CPU, exceptions, flags, instructions
 
 log = logging.getLogger("mos6502")
 log.setLevel(logging.DEBUG)
 
 
-def test_cpu_instruction_SBC_IMMEDIATE_0xE9_simple() -> None:  # noqa: N802
+def test_cpu_instruction_SBC_IMMEDIATE_0xE9_simple(cpu: CPU) -> None:  # noqa: N802
     """Test SBC Immediate mode with simple subtraction."""
     # given:
-    cpu: mos6502.CPU = mos6502.CPU()
-    cpu.reset()
 
     cpu.A = 0x50
     cpu.flags[flags.C] = 1  # No borrow
@@ -35,11 +33,9 @@ def test_cpu_instruction_SBC_IMMEDIATE_0xE9_simple() -> None:  # noqa: N802
     assert cpu.cycles_executed == 2
 
 
-def test_cpu_instruction_SBC_IMMEDIATE_0xE9_with_borrow() -> None:  # noqa: N802
+def test_cpu_instruction_SBC_IMMEDIATE_0xE9_with_borrow(cpu: CPU) -> None:  # noqa: N802
     """Test SBC with borrow (C=0)."""
     # given:
-    cpu: mos6502.CPU = mos6502.CPU()
-    cpu.reset()
 
     cpu.A = 0x50
     cpu.flags[flags.C] = 0  # Borrow set
@@ -61,11 +57,9 @@ def test_cpu_instruction_SBC_IMMEDIATE_0xE9_with_borrow() -> None:  # noqa: N802
     assert cpu.cycles_executed == 2
 
 
-def test_cpu_instruction_SBC_IMMEDIATE_0xE9_borrow_out() -> None:  # noqa: N802
+def test_cpu_instruction_SBC_IMMEDIATE_0xE9_borrow_out(cpu: CPU) -> None:  # noqa: N802
     """Test SBC with borrow out (underflow)."""
     # given:
-    cpu: mos6502.CPU = mos6502.CPU()
-    cpu.reset()
 
     cpu.A = 0x00
     cpu.flags[flags.C] = 1  # No borrow in
@@ -87,11 +81,9 @@ def test_cpu_instruction_SBC_IMMEDIATE_0xE9_borrow_out() -> None:  # noqa: N802
     assert cpu.cycles_executed == 2
 
 
-def test_cpu_instruction_SBC_IMMEDIATE_0xE9_zero() -> None:  # noqa: N802
+def test_cpu_instruction_SBC_IMMEDIATE_0xE9_zero(cpu: CPU) -> None:  # noqa: N802
     """Test SBC resulting in zero."""
     # given:
-    cpu: mos6502.CPU = mos6502.CPU()
-    cpu.reset()
 
     cpu.A = 0x50
     cpu.flags[flags.C] = 1
@@ -113,11 +105,9 @@ def test_cpu_instruction_SBC_IMMEDIATE_0xE9_zero() -> None:  # noqa: N802
     assert cpu.cycles_executed == 2
 
 
-def test_cpu_instruction_SBC_IMMEDIATE_0xE9_overflow() -> None:  # noqa: N802
+def test_cpu_instruction_SBC_IMMEDIATE_0xE9_overflow(cpu: CPU) -> None:  # noqa: N802
     """Test SBC signed overflow: positive - negative = negative."""
     # given:
-    cpu: mos6502.CPU = mos6502.CPU()
-    cpu.reset()
 
     cpu.A = 0x50  # +80
     cpu.flags[flags.C] = 1
@@ -139,11 +129,9 @@ def test_cpu_instruction_SBC_IMMEDIATE_0xE9_overflow() -> None:  # noqa: N802
     assert cpu.cycles_executed == 2
 
 
-def test_cpu_instruction_SBC_ZEROPAGE_0xE5() -> None:  # noqa: N802
+def test_cpu_instruction_SBC_ZEROPAGE_0xE5(cpu: CPU) -> None:  # noqa: N802
     """Test SBC Zero Page mode."""
     # given:
-    cpu: mos6502.CPU = mos6502.CPU()
-    cpu.reset()
 
     cpu.A = 0x50
     cpu.ram[0x0042] = 0x30
@@ -164,11 +152,9 @@ def test_cpu_instruction_SBC_ZEROPAGE_0xE5() -> None:  # noqa: N802
     assert cpu.cycles_executed == 3
 
 
-def test_cpu_instruction_SBC_ABSOLUTE_0xED() -> None:  # noqa: N802
+def test_cpu_instruction_SBC_ABSOLUTE_0xED(cpu: CPU) -> None:  # noqa: N802
     """Test SBC Absolute mode."""
     # given:
-    cpu: mos6502.CPU = mos6502.CPU()
-    cpu.reset()
 
     cpu.A = 0x50
     cpu.ram[0x1234] = 0x25
@@ -193,11 +179,9 @@ def test_cpu_instruction_SBC_ABSOLUTE_0xED() -> None:  # noqa: N802
 # BCD (Decimal) Mode Tests
 
 
-def test_cpu_instruction_SBC_IMMEDIATE_0xE9_bcd_simple() -> None:  # noqa: N802
+def test_cpu_instruction_SBC_IMMEDIATE_0xE9_bcd_simple(cpu: CPU) -> None:  # noqa: N802
     """Test SBC in BCD mode with simple subtraction."""
     # given:
-    cpu: mos6502.CPU = mos6502.CPU()
-    cpu.reset()
 
     cpu.A = 0x09  # BCD 09
     cpu.flags[flags.C] = 1  # No borrow
@@ -218,11 +202,9 @@ def test_cpu_instruction_SBC_IMMEDIATE_0xE9_bcd_simple() -> None:  # noqa: N802
     assert cpu.cycles_executed == 2
 
 
-def test_cpu_instruction_SBC_IMMEDIATE_0xE9_bcd_borrow_low_nibble() -> None:  # noqa: N802
+def test_cpu_instruction_SBC_IMMEDIATE_0xE9_bcd_borrow_low_nibble(cpu: CPU) -> None:  # noqa: N802
     """Test SBC in BCD mode with borrow from low nibble."""
     # given:
-    cpu: mos6502.CPU = mos6502.CPU()
-    cpu.reset()
 
     cpu.A = 0x12  # BCD 12
     cpu.flags[flags.C] = 1  # No borrow
@@ -243,11 +225,9 @@ def test_cpu_instruction_SBC_IMMEDIATE_0xE9_bcd_borrow_low_nibble() -> None:  # 
     assert cpu.cycles_executed == 2
 
 
-def test_cpu_instruction_SBC_IMMEDIATE_0xE9_bcd_underflow() -> None:  # noqa: N802
+def test_cpu_instruction_SBC_IMMEDIATE_0xE9_bcd_underflow(cpu: CPU) -> None:  # noqa: N802
     """Test SBC in BCD mode with underflow."""
     # given:
-    cpu: mos6502.CPU = mos6502.CPU()
-    cpu.reset()
 
     cpu.A = 0x00  # BCD 00
     cpu.flags[flags.C] = 1  # No borrow in
@@ -268,11 +248,9 @@ def test_cpu_instruction_SBC_IMMEDIATE_0xE9_bcd_underflow() -> None:  # noqa: N8
     assert cpu.cycles_executed == 2
 
 
-def test_cpu_instruction_SBC_IMMEDIATE_0xE9_bcd_with_borrow_in() -> None:  # noqa: N802
+def test_cpu_instruction_SBC_IMMEDIATE_0xE9_bcd_with_borrow_in(cpu: CPU) -> None:  # noqa: N802
     """Test SBC in BCD mode with borrow in."""
     # given:
-    cpu: mos6502.CPU = mos6502.CPU()
-    cpu.reset()
 
     cpu.A = 0x50  # BCD 50
     cpu.flags[flags.C] = 0  # Borrow in
@@ -293,11 +271,9 @@ def test_cpu_instruction_SBC_IMMEDIATE_0xE9_bcd_with_borrow_in() -> None:  # noq
     assert cpu.cycles_executed == 2
 
 
-def test_cpu_instruction_SBC_IMMEDIATE_0xE9_bcd_zero_result() -> None:  # noqa: N802
+def test_cpu_instruction_SBC_IMMEDIATE_0xE9_bcd_zero_result(cpu: CPU) -> None:  # noqa: N802
     """Test SBC in BCD mode resulting in zero."""
     # given:
-    cpu: mos6502.CPU = mos6502.CPU()
-    cpu.reset()
 
     cpu.A = 0x50  # BCD 50
     cpu.flags[flags.C] = 1  # No borrow
@@ -318,11 +294,9 @@ def test_cpu_instruction_SBC_IMMEDIATE_0xE9_bcd_zero_result() -> None:  # noqa: 
     assert cpu.cycles_executed == 2
 
 
-def test_cpu_instruction_SBC_IMMEDIATE_0xE9_bcd_complex() -> None:  # noqa: N802
+def test_cpu_instruction_SBC_IMMEDIATE_0xE9_bcd_complex(cpu: CPU) -> None:  # noqa: N802
     """Test SBC in BCD mode with complex subtraction."""
     # given:
-    cpu: mos6502.CPU = mos6502.CPU()
-    cpu.reset()
 
     cpu.A = 0x73  # BCD 73
     cpu.flags[flags.C] = 0  # Borrow in

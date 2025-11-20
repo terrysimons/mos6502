@@ -4,21 +4,22 @@ import copy
 import logging
 
 import mos6502
-from mos6502 import exceptions, flags, instructions
+from mos6502 import CPU, exceptions, flags, instructions
 
 log = logging.getLogger("mos6502")
 log.setLevel(logging.DEBUG)
 
-def check_noop_flags(expected_cpu: mos6502.CPU, actual_cpu: mos6502.CPU) -> None:
+
+def check_noop_flags(expected_cpu: CPU, actual_cpu: CPU) -> None:
     assert actual_cpu.flags[flags.Z] == expected_cpu.flags[flags.Z]
     assert actual_cpu.flags[flags.B] == expected_cpu.flags[flags.B]
     assert actual_cpu.flags[flags.N] == expected_cpu.flags[flags.N]
 
-def test_cpu_instruction_CLD_IMPLIED_0xD8() -> None:  # noqa: N802
+
+def test_cpu_instruction_CLD_IMPLIED_0xD8(cpu: CPU) -> None:  # noqa: N802
+    """Test CLD instruction clears decimal flag on all CPU variants."""
     # given:
-    cpu: mos6502.CPU = mos6502.CPU()
-    cpu.reset()
-    initial_cpu: mos6502.CPU = copy.deepcopy(cpu)
+    initial_cpu: CPU = copy.deepcopy(cpu)
 
     cpu.flags[flags.D] = 1
 

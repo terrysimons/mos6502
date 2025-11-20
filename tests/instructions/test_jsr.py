@@ -10,7 +10,7 @@ log: logging.Logger = logging.getLogger("mos6502")
 log.setLevel(logging.DEBUG)
 
 
-def check_noop_flags(expected_cpu: mos6502.CPU, actual_cpu: mos6502.CPU) -> None:
+def check_noop_flags(expected_cpu: CPU, actual_cpu: CPU) -> None:
     assert actual_cpu.flags[flags.C] == expected_cpu.flags[flags.C]
     assert actual_cpu.flags[flags.Z] == expected_cpu.flags[flags.Z]
     assert actual_cpu.flags[flags.B] == expected_cpu.flags[flags.B]
@@ -20,10 +20,8 @@ def check_noop_flags(expected_cpu: mos6502.CPU, actual_cpu: mos6502.CPU) -> None
     assert actual_cpu.flags[flags.N] == expected_cpu.flags[flags.N]
 
 
-def test_cpu_instruction_JSR_ABSOLUTE_0x20() -> None:  # noqa: N802
+def test_cpu_instruction_JSR_ABSOLUTE_0x20(cpu: CPU) -> None:  # noqa: N802
     # given:
-    cpu: mos6502.CPU = mos6502.CPU()
-    cpu.reset()
     copy.deepcopy(cpu)
 
     # Jump to 0x4243

@@ -3,17 +3,15 @@ import contextlib
 import logging
 
 import mos6502
-from mos6502 import exceptions, flags, instructions
+from mos6502 import CPU, exceptions, flags, instructions
 
 log = logging.getLogger("mos6502")
 log.setLevel(logging.DEBUG)
 
 
-def test_cpu_instruction_ROL_ACCUMULATOR_0x2A() -> None:  # noqa: N802
+def test_cpu_instruction_ROL_ACCUMULATOR_0x2A(cpu: CPU) -> None:  # noqa: N802
     """Test ROL Accumulator mode with carry clear."""
     # given:
-    cpu: mos6502.CPU = mos6502.CPU()
-    cpu.reset()
 
     cpu.A = 0x42  # 0100 0010
     cpu.flags[flags.C] = 0
@@ -33,11 +31,9 @@ def test_cpu_instruction_ROL_ACCUMULATOR_0x2A() -> None:  # noqa: N802
     assert cpu.cycles_executed == 2
 
 
-def test_cpu_instruction_ROL_ACCUMULATOR_0x2A_with_carry() -> None:  # noqa: N802
+def test_cpu_instruction_ROL_ACCUMULATOR_0x2A_with_carry(cpu: CPU) -> None:  # noqa: N802
     """Test ROL with carry set."""
     # given:
-    cpu: mos6502.CPU = mos6502.CPU()
-    cpu.reset()
 
     cpu.A = 0x42  # 0100 0010
     cpu.flags[flags.C] = 1  # Carry set
@@ -57,11 +53,9 @@ def test_cpu_instruction_ROL_ACCUMULATOR_0x2A_with_carry() -> None:  # noqa: N80
     assert cpu.cycles_executed == 2
 
 
-def test_cpu_instruction_ROL_ACCUMULATOR_0x2A_carry_out() -> None:  # noqa: N802
+def test_cpu_instruction_ROL_ACCUMULATOR_0x2A_carry_out(cpu: CPU) -> None:  # noqa: N802
     """Test ROL with bit 7 set (carry out)."""
     # given:
-    cpu: mos6502.CPU = mos6502.CPU()
-    cpu.reset()
 
     cpu.A = 0x81  # 1000 0001 (bit 7 set)
     cpu.flags[flags.C] = 0
@@ -81,11 +75,9 @@ def test_cpu_instruction_ROL_ACCUMULATOR_0x2A_carry_out() -> None:  # noqa: N802
     assert cpu.cycles_executed == 2
 
 
-def test_cpu_instruction_ROL_ZEROPAGE_0x26() -> None:  # noqa: N802
+def test_cpu_instruction_ROL_ZEROPAGE_0x26(cpu: CPU) -> None:  # noqa: N802
     """Test ROL Zero Page mode."""
     # given:
-    cpu: mos6502.CPU = mos6502.CPU()
-    cpu.reset()
 
     cpu.ram[0x0042] = 0x55  # 0101 0101
     cpu.flags[flags.C] = 1
@@ -106,11 +98,9 @@ def test_cpu_instruction_ROL_ZEROPAGE_0x26() -> None:  # noqa: N802
     assert cpu.cycles_executed == 5
 
 
-def test_cpu_instruction_ROL_ZEROPAGE_X_0x36() -> None:  # noqa: N802
+def test_cpu_instruction_ROL_ZEROPAGE_X_0x36(cpu: CPU) -> None:  # noqa: N802
     """Test ROL Zero Page,X mode."""
     # given:
-    cpu: mos6502.CPU = mos6502.CPU()
-    cpu.reset()
 
     cpu.X = 0x05
     cpu.ram[0x0047] = 0x80  # 0x42 + 0x05
@@ -132,11 +122,9 @@ def test_cpu_instruction_ROL_ZEROPAGE_X_0x36() -> None:  # noqa: N802
     assert cpu.cycles_executed == 6
 
 
-def test_cpu_instruction_ROL_ABSOLUTE_0x2E() -> None:  # noqa: N802
+def test_cpu_instruction_ROL_ABSOLUTE_0x2E(cpu: CPU) -> None:  # noqa: N802
     """Test ROL Absolute mode."""
     # given:
-    cpu: mos6502.CPU = mos6502.CPU()
-    cpu.reset()
 
     cpu.ram[0x1234] = 0xFF  # 1111 1111
     cpu.flags[flags.C] = 0
@@ -158,11 +146,9 @@ def test_cpu_instruction_ROL_ABSOLUTE_0x2E() -> None:  # noqa: N802
     assert cpu.cycles_executed == 6
 
 
-def test_cpu_instruction_ROL_ABSOLUTE_X_0x3E() -> None:  # noqa: N802
+def test_cpu_instruction_ROL_ABSOLUTE_X_0x3E(cpu: CPU) -> None:  # noqa: N802
     """Test ROL Absolute,X mode."""
     # given:
-    cpu: mos6502.CPU = mos6502.CPU()
-    cpu.reset()
 
     cpu.X = 0x10
     cpu.ram[0x1244] = 0x01  # 0x1234 + 0x10
