@@ -1256,6 +1256,360 @@ class MOS6502CPU(flags.ProcessorStatusFlagsInterface):
 
                     self.log.info("i")
 
+                # ''' Execute ASL '''
+                case instructions.ASL_ACCUMULATOR_0x0A:
+                    # Arithmetic Shift Left - Accumulator
+                    # Shift left one bit: bit 7 -> C, 0 -> bit 0
+                    value: int = self.A
+
+                    # Bit 7 goes to carry flag
+                    self.flags[flags.C] = 1 if (value & BYTE_BIT_7_MASK) else 0
+
+                    result: int = (value << 1) & 0xFF
+                    self.A = result
+
+                    # Set N and Z flags
+                    self.flags[flags.Z] = 1 if result == 0 else 0
+                    self.flags[flags.N] = 1 if (result & BYTE_BIT_7_MASK) else 0
+
+                    self.log.info("i")
+
+                case instructions.ASL_ZEROPAGE_0x06:
+                    # Arithmetic Shift Left - Zero Page
+                    address: int = self.fetch_zeropage_mode_address(offset_register_name=None)
+                    value: int = int(self.read_byte(address=address))
+
+                    # Bit 7 goes to carry flag
+                    self.flags[flags.C] = 1 if (value & BYTE_BIT_7_MASK) else 0
+
+                    result: int = (value << 1) & 0xFF
+                    self.write_byte(address=address, data=result)
+
+                    # Set N and Z flags
+                    self.flags[flags.Z] = 1 if result == 0 else 0
+                    self.flags[flags.N] = 1 if (result & BYTE_BIT_7_MASK) else 0
+
+                    self.log.info("i")
+
+                case instructions.ASL_ZEROPAGE_X_0x16:
+                    # Arithmetic Shift Left - Zero Page,X
+                    address: int = self.fetch_zeropage_mode_address(offset_register_name="X")
+                    value: int = int(self.read_byte(address=address))
+
+                    # Bit 7 goes to carry flag
+                    self.flags[flags.C] = 1 if (value & BYTE_BIT_7_MASK) else 0
+
+                    result: int = (value << 1) & 0xFF
+                    self.write_byte(address=address, data=result)
+
+                    # Set N and Z flags
+                    self.flags[flags.Z] = 1 if result == 0 else 0
+                    self.flags[flags.N] = 1 if (result & BYTE_BIT_7_MASK) else 0
+
+                    self.log.info("i")
+
+                case instructions.ASL_ABSOLUTE_0x0E:
+                    # Arithmetic Shift Left - Absolute
+                    address: int = self.fetch_absolute_mode_address(offset_register_name=None)
+                    value: int = int(self.read_byte(address=address))
+
+                    # Bit 7 goes to carry flag
+                    self.flags[flags.C] = 1 if (value & BYTE_BIT_7_MASK) else 0
+
+                    result: int = (value << 1) & 0xFF
+                    self.write_byte(address=address & 0xFFFF, data=result)
+
+                    # Set N and Z flags
+                    self.flags[flags.Z] = 1 if result == 0 else 0
+                    self.flags[flags.N] = 1 if (result & BYTE_BIT_7_MASK) else 0
+
+                    self.log.info("i")
+
+                case instructions.ASL_ABSOLUTE_X_0x1E:
+                    # Arithmetic Shift Left - Absolute,X
+                    address: int = self.fetch_absolute_mode_address(offset_register_name="X")
+                    value: int = int(self.read_byte(address=address))
+
+                    # Bit 7 goes to carry flag
+                    self.flags[flags.C] = 1 if (value & BYTE_BIT_7_MASK) else 0
+
+                    result: int = (value << 1) & 0xFF
+                    self.write_byte(address=address & 0xFFFF, data=result)
+
+                    # Set N and Z flags
+                    self.flags[flags.Z] = 1 if result == 0 else 0
+                    self.flags[flags.N] = 1 if (result & BYTE_BIT_7_MASK) else 0
+
+                    self.log.info("i")
+
+                # ''' Execute LSR '''
+                case instructions.LSR_ACCUMULATOR_0x4A:
+                    # Logical Shift Right - Accumulator
+                    # Shift right one bit: 0 -> bit 7, bit 0 -> C
+                    value: int = self.A
+
+                    # Bit 0 goes to carry flag
+                    self.flags[flags.C] = 1 if (value & BYTE_BIT_0_MASK) else 0
+
+                    result: int = (value >> 1) & 0xFF
+                    self.A = result
+
+                    # Set N and Z flags (N is always 0 after LSR)
+                    self.flags[flags.Z] = 1 if result == 0 else 0
+                    self.flags[flags.N] = 0  # Always 0 because bit 7 becomes 0
+
+                    self.log.info("i")
+
+                case instructions.LSR_ZEROPAGE_0x46:
+                    # Logical Shift Right - Zero Page
+                    address: int = self.fetch_zeropage_mode_address(offset_register_name=None)
+                    value: int = int(self.read_byte(address=address))
+
+                    # Bit 0 goes to carry flag
+                    self.flags[flags.C] = 1 if (value & BYTE_BIT_0_MASK) else 0
+
+                    result: int = (value >> 1) & 0xFF
+                    self.write_byte(address=address, data=result)
+
+                    # Set N and Z flags (N is always 0 after LSR)
+                    self.flags[flags.Z] = 1 if result == 0 else 0
+                    self.flags[flags.N] = 0
+
+                    self.log.info("i")
+
+                case instructions.LSR_ZEROPAGE_X_0x56:
+                    # Logical Shift Right - Zero Page,X
+                    address: int = self.fetch_zeropage_mode_address(offset_register_name="X")
+                    value: int = int(self.read_byte(address=address))
+
+                    # Bit 0 goes to carry flag
+                    self.flags[flags.C] = 1 if (value & BYTE_BIT_0_MASK) else 0
+
+                    result: int = (value >> 1) & 0xFF
+                    self.write_byte(address=address, data=result)
+
+                    # Set N and Z flags (N is always 0 after LSR)
+                    self.flags[flags.Z] = 1 if result == 0 else 0
+                    self.flags[flags.N] = 0
+
+                    self.log.info("i")
+
+                case instructions.LSR_ABSOLUTE_0x4E:
+                    # Logical Shift Right - Absolute
+                    address: int = self.fetch_absolute_mode_address(offset_register_name=None)
+                    value: int = int(self.read_byte(address=address))
+
+                    # Bit 0 goes to carry flag
+                    self.flags[flags.C] = 1 if (value & BYTE_BIT_0_MASK) else 0
+
+                    result: int = (value >> 1) & 0xFF
+                    self.write_byte(address=address & 0xFFFF, data=result)
+
+                    # Set N and Z flags (N is always 0 after LSR)
+                    self.flags[flags.Z] = 1 if result == 0 else 0
+                    self.flags[flags.N] = 0
+
+                    self.log.info("i")
+
+                case instructions.LSR_ABSOLUTE_X_0x5E:
+                    # Logical Shift Right - Absolute,X
+                    address: int = self.fetch_absolute_mode_address(offset_register_name="X")
+                    value: int = int(self.read_byte(address=address))
+
+                    # Bit 0 goes to carry flag
+                    self.flags[flags.C] = 1 if (value & BYTE_BIT_0_MASK) else 0
+
+                    result: int = (value >> 1) & 0xFF
+                    self.write_byte(address=address & 0xFFFF, data=result)
+
+                    # Set N and Z flags (N is always 0 after LSR)
+                    self.flags[flags.Z] = 1 if result == 0 else 0
+                    self.flags[flags.N] = 0
+
+                    self.log.info("i")
+
+                # ''' Execute ROL '''
+                case instructions.ROL_ACCUMULATOR_0x2A:
+                    # Rotate Left - Accumulator
+                    # Rotate left through carry: C -> bit 0, bit 7 -> C
+                    value: int = self.A
+                    old_carry: int = self.flags[flags.C]
+
+                    # Bit 7 goes to carry flag
+                    self.flags[flags.C] = 1 if (value & BYTE_BIT_7_MASK) else 0
+
+                    result: int = ((value << 1) | old_carry) & 0xFF
+                    self.A = result
+
+                    # Set N and Z flags
+                    self.flags[flags.Z] = 1 if result == 0 else 0
+                    self.flags[flags.N] = 1 if (result & BYTE_BIT_7_MASK) else 0
+
+                    self.log.info("i")
+
+                case instructions.ROL_ZEROPAGE_0x26:
+                    # Rotate Left - Zero Page
+                    address: int = self.fetch_zeropage_mode_address(offset_register_name=None)
+                    value: int = int(self.read_byte(address=address))
+                    old_carry: int = self.flags[flags.C]
+
+                    # Bit 7 goes to carry flag
+                    self.flags[flags.C] = 1 if (value & BYTE_BIT_7_MASK) else 0
+
+                    result: int = ((value << 1) | old_carry) & 0xFF
+                    self.write_byte(address=address, data=result)
+
+                    # Set N and Z flags
+                    self.flags[flags.Z] = 1 if result == 0 else 0
+                    self.flags[flags.N] = 1 if (result & BYTE_BIT_7_MASK) else 0
+
+                    self.log.info("i")
+
+                case instructions.ROL_ZEROPAGE_X_0x36:
+                    # Rotate Left - Zero Page,X
+                    address: int = self.fetch_zeropage_mode_address(offset_register_name="X")
+                    value: int = int(self.read_byte(address=address))
+                    old_carry: int = self.flags[flags.C]
+
+                    # Bit 7 goes to carry flag
+                    self.flags[flags.C] = 1 if (value & BYTE_BIT_7_MASK) else 0
+
+                    result: int = ((value << 1) | old_carry) & 0xFF
+                    self.write_byte(address=address, data=result)
+
+                    # Set N and Z flags
+                    self.flags[flags.Z] = 1 if result == 0 else 0
+                    self.flags[flags.N] = 1 if (result & BYTE_BIT_7_MASK) else 0
+
+                    self.log.info("i")
+
+                case instructions.ROL_ABSOLUTE_0x2E:
+                    # Rotate Left - Absolute
+                    address: int = self.fetch_absolute_mode_address(offset_register_name=None)
+                    value: int = int(self.read_byte(address=address))
+                    old_carry: int = self.flags[flags.C]
+
+                    # Bit 7 goes to carry flag
+                    self.flags[flags.C] = 1 if (value & BYTE_BIT_7_MASK) else 0
+
+                    result: int = ((value << 1) | old_carry) & 0xFF
+                    self.write_byte(address=address & 0xFFFF, data=result)
+
+                    # Set N and Z flags
+                    self.flags[flags.Z] = 1 if result == 0 else 0
+                    self.flags[flags.N] = 1 if (result & BYTE_BIT_7_MASK) else 0
+
+                    self.log.info("i")
+
+                case instructions.ROL_ABSOLUTE_X_0x3E:
+                    # Rotate Left - Absolute,X
+                    address: int = self.fetch_absolute_mode_address(offset_register_name="X")
+                    value: int = int(self.read_byte(address=address))
+                    old_carry: int = self.flags[flags.C]
+
+                    # Bit 7 goes to carry flag
+                    self.flags[flags.C] = 1 if (value & BYTE_BIT_7_MASK) else 0
+
+                    result: int = ((value << 1) | old_carry) & 0xFF
+                    self.write_byte(address=address & 0xFFFF, data=result)
+
+                    # Set N and Z flags
+                    self.flags[flags.Z] = 1 if result == 0 else 0
+                    self.flags[flags.N] = 1 if (result & BYTE_BIT_7_MASK) else 0
+
+                    self.log.info("i")
+
+                # ''' Execute ROR '''
+                case instructions.ROR_ACCUMULATOR_0x6A:
+                    # Rotate Right - Accumulator
+                    # Rotate right through carry: C -> bit 7, bit 0 -> C
+                    value: int = self.A
+                    old_carry: int = self.flags[flags.C]
+
+                    # Bit 0 goes to carry flag
+                    self.flags[flags.C] = 1 if (value & BYTE_BIT_0_MASK) else 0
+
+                    result: int = ((value >> 1) | (old_carry << 7)) & 0xFF
+                    self.A = result
+
+                    # Set N and Z flags
+                    self.flags[flags.Z] = 1 if result == 0 else 0
+                    self.flags[flags.N] = 1 if (result & BYTE_BIT_7_MASK) else 0
+
+                    self.log.info("i")
+
+                case instructions.ROR_ZEROPAGE_0x66:
+                    # Rotate Right - Zero Page
+                    address: int = self.fetch_zeropage_mode_address(offset_register_name=None)
+                    value: int = int(self.read_byte(address=address))
+                    old_carry: int = self.flags[flags.C]
+
+                    # Bit 0 goes to carry flag
+                    self.flags[flags.C] = 1 if (value & BYTE_BIT_0_MASK) else 0
+
+                    result: int = ((value >> 1) | (old_carry << 7)) & 0xFF
+                    self.write_byte(address=address, data=result)
+
+                    # Set N and Z flags
+                    self.flags[flags.Z] = 1 if result == 0 else 0
+                    self.flags[flags.N] = 1 if (result & BYTE_BIT_7_MASK) else 0
+
+                    self.log.info("i")
+
+                case instructions.ROR_ZEROPAGE_X_0x76:
+                    # Rotate Right - Zero Page,X
+                    address: int = self.fetch_zeropage_mode_address(offset_register_name="X")
+                    value: int = int(self.read_byte(address=address))
+                    old_carry: int = self.flags[flags.C]
+
+                    # Bit 0 goes to carry flag
+                    self.flags[flags.C] = 1 if (value & BYTE_BIT_0_MASK) else 0
+
+                    result: int = ((value >> 1) | (old_carry << 7)) & 0xFF
+                    self.write_byte(address=address, data=result)
+
+                    # Set N and Z flags
+                    self.flags[flags.Z] = 1 if result == 0 else 0
+                    self.flags[flags.N] = 1 if (result & BYTE_BIT_7_MASK) else 0
+
+                    self.log.info("i")
+
+                case instructions.ROR_ABSOLUTE_0x6E:
+                    # Rotate Right - Absolute
+                    address: int = self.fetch_absolute_mode_address(offset_register_name=None)
+                    value: int = int(self.read_byte(address=address))
+                    old_carry: int = self.flags[flags.C]
+
+                    # Bit 0 goes to carry flag
+                    self.flags[flags.C] = 1 if (value & BYTE_BIT_0_MASK) else 0
+
+                    result: int = ((value >> 1) | (old_carry << 7)) & 0xFF
+                    self.write_byte(address=address & 0xFFFF, data=result)
+
+                    # Set N and Z flags
+                    self.flags[flags.Z] = 1 if result == 0 else 0
+                    self.flags[flags.N] = 1 if (result & BYTE_BIT_7_MASK) else 0
+
+                    self.log.info("i")
+
+                case instructions.ROR_ABSOLUTE_X_0x7E:
+                    # Rotate Right - Absolute,X
+                    address: int = self.fetch_absolute_mode_address(offset_register_name="X")
+                    value: int = int(self.read_byte(address=address))
+                    old_carry: int = self.flags[flags.C]
+
+                    # Bit 0 goes to carry flag
+                    self.flags[flags.C] = 1 if (value & BYTE_BIT_0_MASK) else 0
+
+                    result: int = ((value >> 1) | (old_carry << 7)) & 0xFF
+                    self.write_byte(address=address & 0xFFFF, data=result)
+
+                    # Set N and Z flags
+                    self.flags[flags.Z] = 1 if result == 0 else 0
+                    self.flags[flags.N] = 1 if (result & BYTE_BIT_7_MASK) else 0
+
+                    self.log.info("i")
+
                 # ''' Execute BMI '''
                 case instructions.BMI_RELATIVE_0x30:
                     # Branch on Minus/Negative (N = 1)
