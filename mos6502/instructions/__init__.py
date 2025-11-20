@@ -49,6 +49,13 @@ from mos6502.instructions.illegal._lax import (  # noqa: F401
     LAX_IMMEDIATE_0xAB,
     register_lax_instructions,
 )
+from mos6502.instructions.illegal._sax import (  # noqa: F401
+    SAX_ZEROPAGE_0x87,
+    SAX_ZEROPAGE_Y_0x97,
+    SAX_INDEXED_INDIRECT_X_0x83,
+    SAX_ABSOLUTE_0x8F,
+    register_sax_instructions,
+)
 from mos6502.instructions.load._lda import (  # noqa: F401
     LDA_IMMEDIATE_0xA9,
     LDA_ZEROPAGE_0xA5,
@@ -378,6 +385,12 @@ __all__ = [
     'LAX_ABSOLUTE_Y_0xBF',
     'LAX_IMMEDIATE_0xAB',
 
+    # Illegal: SAX
+    'SAX_ZEROPAGE_0x87',
+    'SAX_ZEROPAGE_Y_0x97',
+    'SAX_INDEXED_INDIRECT_X_0x83',
+    'SAX_ABSOLUTE_0x8F',
+
     # LSR
     'LSR_ACCUMULATOR_0x4A',
     'LSR_ZEROPAGE_0x46',
@@ -511,6 +524,7 @@ register_rti_instructions(InstructionSet, InstructionSet.map)
 register_rts_instructions(InstructionSet, InstructionSet.map)
 # Illegal instructions
 register_lax_instructions(InstructionSet, InstructionSet.map)
+register_sax_instructions(InstructionSet, InstructionSet.map)
 # register_all_arithmetic_instructions(InstructionSet, InstructionSet.map)  # MIGRATED to adc/sbc/inc/dec packages
 # register_all_branch_instructions(InstructionSet, InstructionSet.map)  # MIGRATED to individual branch packages
 # register_all_compare_instructions(InstructionSet, InstructionSet.map)  # MIGRATED to cmp/cpx/cpy packages
