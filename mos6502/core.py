@@ -2,8 +2,9 @@
 """CPU core for the mos6502."""
 
 import contextlib
+import importlib
 import logging
-from typing import TYPE_CHECKING, Literal, Self
+from typing import TYPE_CHECKING, Callable, Generator, Literal, Self
 
 from bitarray.util import ba2int
 
@@ -12,6 +13,8 @@ from mos6502 import flags
 from mos6502 import instructions
 from mos6502 import memory
 from mos6502 import registers
+from mos6502 import variants
+from mos6502.instructions import nop
 from mos6502.memory import Byte
 from mos6502.memory import RAM
 from mos6502.memory import Word
@@ -48,9 +51,27 @@ class MOS6502CPU(flags.ProcessorStatusFlagsInterface):
 
     log: logging.Logger = logging.getLogger("mos6502.cpu")
 
-    def __init__(self: Self) -> Self:
-        """Instantiate a mos6502 CPU core."""
+    def __init__(
+        self: Self,
+        cpu_variant: str | variants.CPUVariant = variants.CPUVariant.NMOS_6502,
+    ) -> Self:
+        """Instantiate a mos6502 CPU core.
+
+        Arguments:
+        ---------
+            cpu_variant: CPU variant to emulate. Can be:
+                - CPUVariant enum value
+                - String: "6502", "6502A", "6502C", "65C02"
+                Defaults to NMOS 6502 for backward compatibility.
+        """
         super().__init__()
+
+        # Handle variant parameter
+        if isinstance(cpu_variant, str):
+            self._variant = variants.CPUVariant.from_string(cpu_variant)
+        else:
+            self._variant = cpu_variant
+
         self.endianness: str = "little"
 
         # As a convenience for code simplification we can set the default endianness
@@ -62,6 +83,108 @@ class MOS6502CPU(flags.ProcessorStatusFlagsInterface):
         self.ram: RAM = RAM(endianness=self.endianness)
         self.cycles = 0
         self.cycles_executed: Literal[0] = 0
+
+    @property
+    def variant(self: Self) -> variants.CPUVariant:
+        """Return the CPU variant being emulated."""
+        return self._variant
+
+    @property
+    def variant_name(self: Self) -> str:
+        """Return the CPU variant name as a string."""
+        return str(self._variant)
+
+    # Variant handler cache: {(instruction_package_name, variant): handler}
+    _variant_handler_cache: dict[tuple[str, variants.CPUVariant], Callable[[Self], None]] = {}
+
+    def _load_variant_handler(
+        self: Self,
+        instruction_package: str,
+        function_name: str,
+    ) -> Callable[[Self], None]:
+        """Dynamically load variant-specific handler for an instruction.
+
+        Tries to load <instruction>_<variant>.py, falls back to <instruction>_6502.py if not found.
+
+        Arguments:
+        ---------
+            instruction_package: Package name (e.g., "mos6502.instructions.nop")
+            function_name: Function name to load (e.g., "nop_implied_0xea")
+
+        Returns:
+        -------
+            The handler function for the specified variant
+        """
+        cache_key = (instruction_package, self._variant)
+        if cache_key in self._variant_handler_cache:
+            return self._variant_handler_cache[cache_key]
+
+        # Convert variant to module name (e.g., CMOS_65C02 -> 65c02)
+        variant_name = str(self._variant).lower()
+
+        # Extract instruction name from package (e.g., "mos6502.instructions.nop" -> "nop")
+        instruction_name = instruction_package.split(".")[-1]
+
+        # Try to load variant-specific module
+        try:
+            module = importlib.import_module(
+                f".{instruction_name}_{variant_name}",
+                package=instruction_package,
+            )
+        except ImportError:
+            # Fall back to _6502 (default implementation)
+            module = importlib.import_module(
+                f".{instruction_name}_6502",
+                package=instruction_package,
+            )
+
+        handler = getattr(module, function_name)
+        self._variant_handler_cache[cache_key] = handler
+        return handler
+
+    @contextlib.contextmanager
+    def instruction_variant(
+        self: Self,
+        opcode: instructions.InstructionOpcode,
+    ) -> Generator[Callable[[], None], None, None]:
+        """Context manager for executing variant-specific instruction.
+
+        Provides debugging support by wrapping instruction execution with
+        entry/exit hooks for logging, state validation, and error handling.
+
+        Arguments:
+        ---------
+            opcode: The instruction opcode carrying variant metadata
+
+        Yields:
+        ------
+            A callable instruction that executes the variant-specific implementation
+
+        Example:
+        -------
+            with self.instruction_variant(instructions.NOP_IMPLIED_0xEA) as nop:
+                nop()
+        """
+        # Extract package and function from opcode metadata
+        instruction_package = opcode.package  # type: ignore
+        function_name = opcode.function  # type: ignore
+
+        # Look up the variant-specific handler
+        handler = self._load_variant_handler(instruction_package, function_name)
+
+        # Create a bound callable that doesn't require arguments
+        def instruction() -> None:
+            handler(self)
+
+        # TODO: Add debug logging here if needed
+        # self.log.debug(f"Executing {function_name} (variant: {self.variant_name})")
+
+        try:
+            yield instruction
+        finally:
+            # TODO: Add exit logging/validation here if needed
+            # self.log.debug(f"Completed {function_name} (variant: {self.variant_name})")
+            pass
 
     def __enter__(self: Self) -> Self:
         """With entrypoint."""
@@ -2752,8 +2875,8 @@ class MOS6502CPU(flags.ProcessorStatusFlagsInterface):
                 # ''' LSR '''
                 # NOP
                 case instructions.NOP_IMPLIED_0xEA:
-                    self.log.info("i")
-                    self.spend_cpu_cycles(cost=1)
+                    with self.instruction_variant(instructions.NOP_IMPLIED_0xEA) as nop:
+                        nop()
                 # ''' Execute ORA '''
                 case instructions.ORA_IMMEDIATE_0x09:
                     # Bitwise OR with Accumulator

@@ -5,6 +5,36 @@ from typing import NoReturn
 
 from mos6502.exceptions import IllegalCPUInstructionError
 
+
+class InstructionOpcode(int):
+    """Instruction opcode that carries its variant metadata.
+
+    This class extends int to carry package and function names for variant dispatch,
+    while remaining fully compatible with existing code that expects plain integers.
+
+    Example:
+    -------
+        NOP_IMPLIED_0xEA = InstructionOpcode(
+            0xEA,
+            "mos6502.instructions.nop",
+            "nop_implied_0xea"
+        )
+    """
+
+    def __new__(cls, value: int, package: str, function: str):
+        """Create instruction opcode with metadata.
+
+        Arguments:
+        ---------
+            value: The opcode value (e.g., 0xEA)
+            package: Package name (e.g., "mos6502.instructions.nop")
+            function: Function name (e.g., "nop_implied_0xea")
+        """
+        obj = int.__new__(cls, value)
+        obj.package = package  # type: ignore
+        obj.function = function  # type: ignore
+        return obj
+
 # Import from individual instruction modules
 from mos6502.instructions.bit import BIT_ZEROPAGE_0x24, BIT_ABSOLUTE_0x2C, register_bit_instructions  # noqa: F401
 from mos6502.instructions.brk import BRK_IMPLIED_0x00, register_brk_instructions  # noqa: F401
