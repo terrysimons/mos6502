@@ -688,14 +688,14 @@ register_arr_instructions(InstructionSet, InstructionSet.map)
 register_sbx_instructions(InstructionSet, InstructionSet.map)
 register_las_instructions(InstructionSet, InstructionSet.map)
 # register_all_arithmetic_instructions(InstructionSet, InstructionSet.map)  # MIGRATED to adc/sbc/inc/dec packages
-# register_all_branch_instructions(InstructionSet, InstructionSet.map)  # MIGRATED to individual branch packages
+register_all_branch_instructions(InstructionSet, InstructionSet.map)  # MIGRATED to individual branch packages
 # register_all_compare_instructions(InstructionSet, InstructionSet.map)  # MIGRATED to cmp/cpx/cpy packages
-# register_all_flag_instructions(InstructionSet, InstructionSet.map)  # MIGRATED to individual flag packages
+register_all_flag_instructions(InstructionSet, InstructionSet.map)  # MIGRATED to individual flag packages
 # register_all_load_instructions(InstructionSet, InstructionSet.map)  # MIGRATED to lda/ldx/ldy packages
 # register_all_shift_instructions(InstructionSet, InstructionSet.map)  # MIGRATED to asl/lsr/rol/ror packages
-# register_all_stack_instructions(InstructionSet, InstructionSet.map)  # MIGRATED to individual stack packages
+register_all_stack_instructions(InstructionSet, InstructionSet.map)  # MIGRATED to individual stack packages
 # register_all_store_instructions(InstructionSet, InstructionSet.map)  # MIGRATED to sta/stx/sty packages
-# register_all_transfer_instructions(InstructionSet, InstructionSet.map)  # MIGRATED to individual transfer packages
+register_all_transfer_instructions(InstructionSet, InstructionSet.map)  # MIGRATED to individual transfer packages
 
 
 # Build opcode lookup map for variant dispatch

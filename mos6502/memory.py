@@ -387,6 +387,7 @@ class RAM(MutableSequence):
         self.stack = []
         self.heap = []
         self.endianness: str = endianness
+        self.memory_handler = None  # Optional external memory handler (for C64 banking, etc.)
         self.initialize()
 
     def initialize(self: Self) -> None:
@@ -414,6 +415,11 @@ class RAM(MutableSequence):
 
     def __getitem__(self: Self, index: int) -> int:
         """Get the RAM item at index {index}."""
+        # Delegate to external memory handler if set (e.g., C64 banking)
+        if self.memory_handler is not None:
+            return self.memory_handler.read(index)
+
+        # Default RAM access
         if index >= 0 and index < 256:
             return self.zeropage[index].value
         if index >= 256 and index < 512:
@@ -431,6 +437,11 @@ class RAM(MutableSequence):
 
     def __setitem__(self: Self, index: int, value: int, length: int = 8) -> None:
         """Set the RAM item at index {index} to value {value}."""
+        # Delegate to external memory handler if set (e.g., C64 banking)
+        if self.memory_handler is not None:
+            self.memory_handler.write(index, value)
+            return
+
         data_type: type[Byte] = Byte
 
         if length == 16:
