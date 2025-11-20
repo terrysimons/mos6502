@@ -1142,6 +1142,120 @@ class MOS6502CPU(flags.ProcessorStatusFlagsInterface):
 
                     self.log.info("i")
 
+                # ''' Execute DEC '''
+                case instructions.DEC_ZEROPAGE_0xC6:
+                    # Decrement Memory by One (M - 1 -> M)
+                    address: int = self.fetch_zeropage_mode_address(offset_register_name=None)
+                    value: int = int(self.read_byte(address=address))
+
+                    result: int = (value - 1) & 0xFF
+                    self.write_byte(address=address, data=result)
+
+                    # Set N and Z flags
+                    self.flags[flags.Z] = 1 if result == 0 else 0
+                    self.flags[flags.N] = 1 if (result & BYTE_BIT_7_MASK) else 0
+
+                    self.log.info("i")
+
+                case instructions.DEC_ZEROPAGE_X_0xD6:
+                    # Decrement Memory by One (M - 1 -> M)
+                    address: int = self.fetch_zeropage_mode_address(offset_register_name="X")
+                    value: int = int(self.read_byte(address=address))
+
+                    result: int = (value - 1) & 0xFF
+                    self.write_byte(address=address, data=result)
+
+                    # Set N and Z flags
+                    self.flags[flags.Z] = 1 if result == 0 else 0
+                    self.flags[flags.N] = 1 if (result & BYTE_BIT_7_MASK) else 0
+
+                    self.log.info("i")
+
+                case instructions.DEC_ABSOLUTE_0xCE:
+                    # Decrement Memory by One (M - 1 -> M)
+                    address: int = self.fetch_absolute_mode_address(offset_register_name=None)
+                    value: int = int(self.read_byte(address=address))
+
+                    result: int = (value - 1) & 0xFF
+                    self.write_byte(address=address & 0xFFFF, data=result)
+
+                    # Set N and Z flags
+                    self.flags[flags.Z] = 1 if result == 0 else 0
+                    self.flags[flags.N] = 1 if (result & BYTE_BIT_7_MASK) else 0
+
+                    self.log.info("i")
+
+                case instructions.DEC_ABSOLUTE_X_0xDE:
+                    # Decrement Memory by One (M - 1 -> M)
+                    address: int = self.fetch_absolute_mode_address(offset_register_name="X")
+                    value: int = int(self.read_byte(address=address))
+
+                    result: int = (value - 1) & 0xFF
+                    self.write_byte(address=address & 0xFFFF, data=result)
+
+                    # Set N and Z flags
+                    self.flags[flags.Z] = 1 if result == 0 else 0
+                    self.flags[flags.N] = 1 if (result & BYTE_BIT_7_MASK) else 0
+
+                    self.log.info("i")
+
+                # ''' Execute INC '''
+                case instructions.INC_ZEROPAGE_0xE6:
+                    # Increment Memory by One (M + 1 -> M)
+                    address: int = self.fetch_zeropage_mode_address(offset_register_name=None)
+                    value: int = int(self.read_byte(address=address))
+
+                    result: int = (value + 1) & 0xFF
+                    self.write_byte(address=address, data=result)
+
+                    # Set N and Z flags
+                    self.flags[flags.Z] = 1 if result == 0 else 0
+                    self.flags[flags.N] = 1 if (result & BYTE_BIT_7_MASK) else 0
+
+                    self.log.info("i")
+
+                case instructions.INC_ZEROPAGE_X_0xF6:
+                    # Increment Memory by One (M + 1 -> M)
+                    address: int = self.fetch_zeropage_mode_address(offset_register_name="X")
+                    value: int = int(self.read_byte(address=address))
+
+                    result: int = (value + 1) & 0xFF
+                    self.write_byte(address=address, data=result)
+
+                    # Set N and Z flags
+                    self.flags[flags.Z] = 1 if result == 0 else 0
+                    self.flags[flags.N] = 1 if (result & BYTE_BIT_7_MASK) else 0
+
+                    self.log.info("i")
+
+                case instructions.INC_ABSOLUTE_0xEE:
+                    # Increment Memory by One (M + 1 -> M)
+                    address: int = self.fetch_absolute_mode_address(offset_register_name=None)
+                    value: int = int(self.read_byte(address=address))
+
+                    result: int = (value + 1) & 0xFF
+                    self.write_byte(address=address & 0xFFFF, data=result)
+
+                    # Set N and Z flags
+                    self.flags[flags.Z] = 1 if result == 0 else 0
+                    self.flags[flags.N] = 1 if (result & BYTE_BIT_7_MASK) else 0
+
+                    self.log.info("i")
+
+                case instructions.INC_ABSOLUTE_X_0xFE:
+                    # Increment Memory by One (M + 1 -> M)
+                    address: int = self.fetch_absolute_mode_address(offset_register_name="X")
+                    value: int = int(self.read_byte(address=address))
+
+                    result: int = (value + 1) & 0xFF
+                    self.write_byte(address=address & 0xFFFF, data=result)
+
+                    # Set N and Z flags
+                    self.flags[flags.Z] = 1 if result == 0 else 0
+                    self.flags[flags.N] = 1 if (result & BYTE_BIT_7_MASK) else 0
+
+                    self.log.info("i")
+
                 # ''' Execute BMI '''
                 case instructions.BMI_RELATIVE_0x30:
                     # Branch on Minus/Negative (N = 1)
