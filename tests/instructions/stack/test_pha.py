@@ -72,3 +72,55 @@ def test_cpu_instruction_PHA_IMPLIED_0x48_stack_grows_down() -> None:  # noqa: N
     assert cpu.ram[initial_sp - 1] == 0x33  # Second push
     assert cpu.ram[initial_sp - 2] == 0x33  # Third push
     check_noop_flags(expected_cpu=initial_cpu, actual_cpu=cpu)
+
+
+def test_cpu_instruction_PHA_IMPLIED_0x48_near_stack_bottom() -> None:  # noqa: N802
+    """Test PHA near the bottom of the stack."""
+    # given:
+    cpu: mos6502.CPU = mos6502.CPU()
+    cpu.reset()
+    initial_cpu: mos6502.CPU = copy.deepcopy(cpu)
+
+    # Set stack pointer to a low value
+    cpu.S = 0x102
+    cpu.A = 0xAA
+
+    cpu.ram[0xFFFC] = instructions.PHA_IMPLIED_0x48
+
+    # when:
+    with contextlib.suppress(exceptions.CPUCycleExhaustionError):
+        cpu.execute(cycles=3)
+
+    # then:
+    assert cpu.PC == 0xFFFD
+    assert cpu.cycles_executed == 3
+    assert cpu.A == 0xAA  # A unchanged
+    assert cpu.S == 0x101  # Stack pointer decremented
+    assert cpu.ram[0x0102] == 0xAA  # Value pushed to stack
+    check_noop_flags(expected_cpu=initial_cpu, actual_cpu=cpu)
+
+
+def test_cpu_instruction_PHA_IMPLIED_0x48_near_stack_top() -> None:  # noqa: N802
+    """Test PHA near the top of the stack."""
+    # given:
+    cpu: mos6502.CPU = mos6502.CPU()
+    cpu.reset()
+    initial_cpu: mos6502.CPU = copy.deepcopy(cpu)
+
+    # Set stack pointer near top (0x1FF = hardware 0xFF)
+    cpu.S = 0x1FF
+    cpu.A = 0x77
+
+    cpu.ram[0xFFFC] = instructions.PHA_IMPLIED_0x48
+
+    # when:
+    with contextlib.suppress(exceptions.CPUCycleExhaustionError):
+        cpu.execute(cycles=3)
+
+    # then:
+    assert cpu.PC == 0xFFFD
+    assert cpu.cycles_executed == 3
+    assert cpu.A == 0x77  # A unchanged
+    assert cpu.S == 0x1FE  # Stack pointer decremented
+    assert cpu.ram[0x01FF] == 0x77  # Value pushed to top of stack
+    check_noop_flags(expected_cpu=initial_cpu, actual_cpu=cpu)

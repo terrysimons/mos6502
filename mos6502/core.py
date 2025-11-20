@@ -882,6 +882,100 @@ class MOS6502CPU(flags.ProcessorStatusFlagsInterface):
 
         self.log.debug(f"{instructions.InstructionSet(int(instruction)).name}: {Byte(value=register)}")
 
+    def _adc_bcd(self: Self, a: int, value: int, carry_in: int) -> tuple[int, int, int, int]:
+        """
+        Perform BCD (Binary-Coded Decimal) addition.
+
+        Arguments:
+            a: Accumulator value (0x00-0xFF)
+            value: Value to add (0x00-0xFF)
+            carry_in: Carry flag value (0 or 1)
+
+        Returns:
+            Tuple of (result, carry_out, overflow, binary_result)
+
+        VARIANT: 6502 - V flag is undefined in BCD mode
+        VARIANT: 65C02 - V flag is calculated from binary result before BCD adjustment
+        VARIANT: 6502 - N and Z flags are set from BCD result
+        VARIANT: 65C02 - N and Z flags are set from binary result
+        """
+        # Add low nibbles (bits 0-3)
+        low_nibble: int = (a & 0x0F) + (value & 0x0F) + carry_in
+        half_carry: int = 0
+
+        # Adjust if low nibble > 9
+        if low_nibble > 0x09:
+            low_nibble += 0x06
+            half_carry = 1
+
+        # Add high nibbles (bits 4-7)
+        high_nibble: int = ((a >> 4) & 0x0F) + ((value >> 4) & 0x0F) + half_carry
+
+        # Calculate binary result for V flag (65C02 behavior)
+        binary_result: int = a + value + carry_in
+
+        # Adjust if high nibble > 9
+        carry_out: int = 0
+        if high_nibble > 0x09:
+            high_nibble += 0x06
+            carry_out = 1
+
+        # Combine nibbles
+        result: int = ((high_nibble << 4) | (low_nibble & 0x0F)) & 0xFF
+
+        # VARIANT: 6502 - V flag is undefined, we calculate it from binary result
+        # VARIANT: 65C02 - V flag is calculated from binary result before BCD adjustment
+        overflow: int = 1 if ((a ^ binary_result) & (value ^ binary_result) & BYTE_BIT_7_MASK) else 0
+
+        return result, carry_out, overflow, binary_result
+
+    def _sbc_bcd(self: Self, a: int, value: int, carry_in: int) -> tuple[int, int, int, int]:
+        """
+        Perform BCD (Binary-Coded Decimal) subtraction.
+
+        Arguments:
+            a: Accumulator value (0x00-0xFF)
+            value: Value to subtract (0x00-0xFF)
+            carry_in: Carry flag value (0 or 1, inverted borrow)
+
+        Returns:
+            Tuple of (result, carry_out, overflow, binary_result)
+
+        VARIANT: 6502 - V flag is undefined in BCD mode
+        VARIANT: 65C02 - V flag is calculated from binary result before BCD adjustment
+        VARIANT: 6502 - N and Z flags are set from BCD result
+        VARIANT: 65C02 - N and Z flags are set from binary result
+        """
+        # Subtract low nibbles (bits 0-3)
+        low_nibble: int = (a & 0x0F) - (value & 0x0F) - (1 - carry_in)
+        half_borrow: int = 0
+
+        # Adjust if low nibble < 0
+        if low_nibble < 0:
+            low_nibble -= 0x06
+            half_borrow = 1
+
+        # Subtract high nibbles (bits 4-7)
+        high_nibble: int = ((a >> 4) & 0x0F) - ((value >> 4) & 0x0F) - half_borrow
+
+        # Calculate binary result for V flag (65C02 behavior)
+        binary_result: int = a - value - (1 - carry_in)
+
+        # Adjust if high nibble < 0
+        carry_out: int = 1  # No borrow by default
+        if high_nibble < 0:
+            high_nibble -= 0x06
+            carry_out = 0  # Borrow occurred
+
+        # Combine nibbles
+        result: int = ((high_nibble << 4) | (low_nibble & 0x0F)) & 0xFF
+
+        # VARIANT: 6502 - V flag is undefined, we calculate it from binary result
+        # VARIANT: 65C02 - V flag is calculated from binary result before BCD adjustment
+        overflow: int = 1 if ((a ^ value) & (a ^ binary_result) & BYTE_BIT_7_MASK) else 0
+
+        return result, carry_out, overflow, binary_result
+
     def execute(self: Self, cycles: int = 1) -> int:  # noqa: C901, PLR0915
         """
         Fetch and execute a CPU instruction.
@@ -1597,20 +1691,29 @@ class MOS6502CPU(flags.ProcessorStatusFlagsInterface):
                     # Add with Carry - Immediate
                     value: int = int(self.fetch_byte())
 
-                    # Binary mode addition
-                    result: int = self.A + value + self.flags[flags.C]
+                    if self.flags[flags.D]:
+                        # BCD (Decimal) mode addition
+                        result, carry_out, overflow, _ = self._adc_bcd(self.A, value, self.flags[flags.C])
+                        self.flags[flags.C] = carry_out
+                        self.flags[flags.V] = overflow
+                        self.A = result
+                    else:
+                        # Binary mode addition
+                        result: int = self.A + value + self.flags[flags.C]
 
-                    # Set Carry flag if result > 255
-                    self.flags[flags.C] = 1 if result > 0xFF else 0
+                        # Set Carry flag if result > 255
+                        self.flags[flags.C] = 1 if result > 0xFF else 0
 
-                    # Set Overflow flag: V = (A^result) & (M^result) & 0x80
-                    # Overflow occurs if both operands have same sign and result has different sign
-                    self.flags[flags.V] = 1 if ((self.A ^ result) & (value ^ result) & BYTE_BIT_7_MASK) else 0
+                        # Set Overflow flag: V = (A^result) & (M^result) & 0x80
+                        # Overflow occurs if both operands have same sign and result has different sign
+                        self.flags[flags.V] = 1 if ((self.A ^ result) & (value ^ result) & BYTE_BIT_7_MASK) else 0
 
-                    # Store result (masked to 8 bits)
-                    self.A = result & 0xFF
+                        # Store result (masked to 8 bits)
+                        self.A = result & 0xFF
 
-                    # Set N and Z flags
+                    # Set N and Z flags (always set for both BCD and binary modes)
+                    # VARIANT: 6502 - N and Z flags are set from BCD result
+                    # VARIANT: 65C02 - N and Z flags are set from binary result
                     self.flags[flags.Z] = 1 if self.A == 0 else 0
                     self.flags[flags.N] = 1 if (self.A & BYTE_BIT_7_MASK) else 0
 
@@ -1621,11 +1724,20 @@ class MOS6502CPU(flags.ProcessorStatusFlagsInterface):
                     address: int = self.fetch_zeropage_mode_address(offset_register_name=None)
                     value: int = int(self.read_byte(address=address))
 
-                    result: int = self.A + value + self.flags[flags.C]
-                    self.flags[flags.C] = 1 if result > 0xFF else 0
-                    self.flags[flags.V] = 1 if ((self.A ^ result) & (value ^ result) & BYTE_BIT_7_MASK) else 0
+                    if self.flags[flags.D]:
+                        # BCD (Decimal) mode addition
+                        result, carry_out, overflow, _ = self._adc_bcd(self.A, value, self.flags[flags.C])
+                        self.flags[flags.C] = carry_out
+                        self.flags[flags.V] = overflow
+                        self.A = result
+                    else:
+                        # Binary mode addition
+                        result: int = self.A + value + self.flags[flags.C]
+                        self.flags[flags.C] = 1 if result > 0xFF else 0
+                        self.flags[flags.V] = 1 if ((self.A ^ result) & (value ^ result) & BYTE_BIT_7_MASK) else 0
+                        self.A = result & 0xFF
 
-                    self.A = result & 0xFF
+                    # Set N and Z flags
                     self.flags[flags.Z] = 1 if self.A == 0 else 0
                     self.flags[flags.N] = 1 if (self.A & BYTE_BIT_7_MASK) else 0
 
@@ -1636,11 +1748,20 @@ class MOS6502CPU(flags.ProcessorStatusFlagsInterface):
                     address: int = self.fetch_zeropage_mode_address(offset_register_name="X")
                     value: int = int(self.read_byte(address=address))
 
-                    result: int = self.A + value + self.flags[flags.C]
-                    self.flags[flags.C] = 1 if result > 0xFF else 0
-                    self.flags[flags.V] = 1 if ((self.A ^ result) & (value ^ result) & BYTE_BIT_7_MASK) else 0
+                    if self.flags[flags.D]:
+                        # BCD (Decimal) mode addition
+                        result, carry_out, overflow, _ = self._adc_bcd(self.A, value, self.flags[flags.C])
+                        self.flags[flags.C] = carry_out
+                        self.flags[flags.V] = overflow
+                        self.A = result
+                    else:
+                        # Binary mode addition
+                        result: int = self.A + value + self.flags[flags.C]
+                        self.flags[flags.C] = 1 if result > 0xFF else 0
+                        self.flags[flags.V] = 1 if ((self.A ^ result) & (value ^ result) & BYTE_BIT_7_MASK) else 0
+                        self.A = result & 0xFF
 
-                    self.A = result & 0xFF
+                    # Set N and Z flags
                     self.flags[flags.Z] = 1 if self.A == 0 else 0
                     self.flags[flags.N] = 1 if (self.A & BYTE_BIT_7_MASK) else 0
 
@@ -1651,11 +1772,20 @@ class MOS6502CPU(flags.ProcessorStatusFlagsInterface):
                     address: int = self.fetch_absolute_mode_address(offset_register_name=None)
                     value: int = int(self.read_byte(address=address))
 
-                    result: int = self.A + value + self.flags[flags.C]
-                    self.flags[flags.C] = 1 if result > 0xFF else 0
-                    self.flags[flags.V] = 1 if ((self.A ^ result) & (value ^ result) & BYTE_BIT_7_MASK) else 0
+                    if self.flags[flags.D]:
+                        # BCD (Decimal) mode addition
+                        result, carry_out, overflow, _ = self._adc_bcd(self.A, value, self.flags[flags.C])
+                        self.flags[flags.C] = carry_out
+                        self.flags[flags.V] = overflow
+                        self.A = result
+                    else:
+                        # Binary mode addition
+                        result: int = self.A + value + self.flags[flags.C]
+                        self.flags[flags.C] = 1 if result > 0xFF else 0
+                        self.flags[flags.V] = 1 if ((self.A ^ result) & (value ^ result) & BYTE_BIT_7_MASK) else 0
+                        self.A = result & 0xFF
 
-                    self.A = result & 0xFF
+                    # Set N and Z flags
                     self.flags[flags.Z] = 1 if self.A == 0 else 0
                     self.flags[flags.N] = 1 if (self.A & BYTE_BIT_7_MASK) else 0
 
@@ -1666,11 +1796,20 @@ class MOS6502CPU(flags.ProcessorStatusFlagsInterface):
                     address: int = self.fetch_absolute_mode_address(offset_register_name="X")
                     value: int = int(self.read_byte(address=address))
 
-                    result: int = self.A + value + self.flags[flags.C]
-                    self.flags[flags.C] = 1 if result > 0xFF else 0
-                    self.flags[flags.V] = 1 if ((self.A ^ result) & (value ^ result) & BYTE_BIT_7_MASK) else 0
+                    if self.flags[flags.D]:
+                        # BCD (Decimal) mode addition
+                        result, carry_out, overflow, _ = self._adc_bcd(self.A, value, self.flags[flags.C])
+                        self.flags[flags.C] = carry_out
+                        self.flags[flags.V] = overflow
+                        self.A = result
+                    else:
+                        # Binary mode addition
+                        result: int = self.A + value + self.flags[flags.C]
+                        self.flags[flags.C] = 1 if result > 0xFF else 0
+                        self.flags[flags.V] = 1 if ((self.A ^ result) & (value ^ result) & BYTE_BIT_7_MASK) else 0
+                        self.A = result & 0xFF
 
-                    self.A = result & 0xFF
+                    # Set N and Z flags
                     self.flags[flags.Z] = 1 if self.A == 0 else 0
                     self.flags[flags.N] = 1 if (self.A & BYTE_BIT_7_MASK) else 0
 
@@ -1681,11 +1820,20 @@ class MOS6502CPU(flags.ProcessorStatusFlagsInterface):
                     address: int = self.fetch_absolute_mode_address(offset_register_name="Y")
                     value: int = int(self.read_byte(address=address))
 
-                    result: int = self.A + value + self.flags[flags.C]
-                    self.flags[flags.C] = 1 if result > 0xFF else 0
-                    self.flags[flags.V] = 1 if ((self.A ^ result) & (value ^ result) & BYTE_BIT_7_MASK) else 0
+                    if self.flags[flags.D]:
+                        # BCD (Decimal) mode addition
+                        result, carry_out, overflow, _ = self._adc_bcd(self.A, value, self.flags[flags.C])
+                        self.flags[flags.C] = carry_out
+                        self.flags[flags.V] = overflow
+                        self.A = result
+                    else:
+                        # Binary mode addition
+                        result: int = self.A + value + self.flags[flags.C]
+                        self.flags[flags.C] = 1 if result > 0xFF else 0
+                        self.flags[flags.V] = 1 if ((self.A ^ result) & (value ^ result) & BYTE_BIT_7_MASK) else 0
+                        self.A = result & 0xFF
 
-                    self.A = result & 0xFF
+                    # Set N and Z flags
                     self.flags[flags.Z] = 1 if self.A == 0 else 0
                     self.flags[flags.N] = 1 if (self.A & BYTE_BIT_7_MASK) else 0
 
@@ -1696,11 +1844,20 @@ class MOS6502CPU(flags.ProcessorStatusFlagsInterface):
                     address: int = self.fetch_indexed_indirect_mode_address()
                     value: int = int(self.read_byte(address=address))
 
-                    result: int = self.A + value + self.flags[flags.C]
-                    self.flags[flags.C] = 1 if result > 0xFF else 0
-                    self.flags[flags.V] = 1 if ((self.A ^ result) & (value ^ result) & BYTE_BIT_7_MASK) else 0
+                    if self.flags[flags.D]:
+                        # BCD (Decimal) mode addition
+                        result, carry_out, overflow, _ = self._adc_bcd(self.A, value, self.flags[flags.C])
+                        self.flags[flags.C] = carry_out
+                        self.flags[flags.V] = overflow
+                        self.A = result
+                    else:
+                        # Binary mode addition
+                        result: int = self.A + value + self.flags[flags.C]
+                        self.flags[flags.C] = 1 if result > 0xFF else 0
+                        self.flags[flags.V] = 1 if ((self.A ^ result) & (value ^ result) & BYTE_BIT_7_MASK) else 0
+                        self.A = result & 0xFF
 
-                    self.A = result & 0xFF
+                    # Set N and Z flags
                     self.flags[flags.Z] = 1 if self.A == 0 else 0
                     self.flags[flags.N] = 1 if (self.A & BYTE_BIT_7_MASK) else 0
 
@@ -1711,11 +1868,20 @@ class MOS6502CPU(flags.ProcessorStatusFlagsInterface):
                     address: int = self.fetch_indirect_indexed_mode_address()
                     value: int = int(self.read_byte(address=address))
 
-                    result: int = self.A + value + self.flags[flags.C]
-                    self.flags[flags.C] = 1 if result > 0xFF else 0
-                    self.flags[flags.V] = 1 if ((self.A ^ result) & (value ^ result) & BYTE_BIT_7_MASK) else 0
+                    if self.flags[flags.D]:
+                        # BCD (Decimal) mode addition
+                        result, carry_out, overflow, _ = self._adc_bcd(self.A, value, self.flags[flags.C])
+                        self.flags[flags.C] = carry_out
+                        self.flags[flags.V] = overflow
+                        self.A = result
+                    else:
+                        # Binary mode addition
+                        result: int = self.A + value + self.flags[flags.C]
+                        self.flags[flags.C] = 1 if result > 0xFF else 0
+                        self.flags[flags.V] = 1 if ((self.A ^ result) & (value ^ result) & BYTE_BIT_7_MASK) else 0
+                        self.A = result & 0xFF
 
-                    self.A = result & 0xFF
+                    # Set N and Z flags
                     self.flags[flags.Z] = 1 if self.A == 0 else 0
                     self.flags[flags.N] = 1 if (self.A & BYTE_BIT_7_MASK) else 0
 
@@ -1727,20 +1893,29 @@ class MOS6502CPU(flags.ProcessorStatusFlagsInterface):
                     # A - M - (1 - C) = A - M - !C
                     value: int = int(self.fetch_byte())
 
-                    # Binary mode subtraction
-                    result: int = self.A - value - (1 - self.flags[flags.C])
+                    if self.flags[flags.D]:
+                        # BCD (Decimal) mode subtraction
+                        result, carry_out, overflow, _ = self._sbc_bcd(self.A, value, self.flags[flags.C])
+                        self.flags[flags.C] = carry_out
+                        self.flags[flags.V] = overflow
+                        self.A = result
+                    else:
+                        # Binary mode subtraction
+                        result: int = self.A - value - (1 - self.flags[flags.C])
 
-                    # Set Carry flag (inverted borrow): C=1 if no borrow (A >= M)
-                    self.flags[flags.C] = 1 if result >= 0 else 0
+                        # Set Carry flag (inverted borrow): C=1 if no borrow (A >= M)
+                        self.flags[flags.C] = 1 if result >= 0 else 0
 
-                    # Set Overflow flag: V = (A^M) & (A^result) & 0x80
-                    # Overflow occurs if operands have different signs and result has different sign from A
-                    self.flags[flags.V] = 1 if ((self.A ^ value) & (self.A ^ result) & BYTE_BIT_7_MASK) else 0
+                        # Set Overflow flag: V = (A^M) & (A^result) & 0x80
+                        # Overflow occurs if operands have different signs and result has different sign from A
+                        self.flags[flags.V] = 1 if ((self.A ^ value) & (self.A ^ result) & BYTE_BIT_7_MASK) else 0
 
-                    # Store result (masked to 8 bits)
-                    self.A = result & 0xFF
+                        # Store result (masked to 8 bits)
+                        self.A = result & 0xFF
 
-                    # Set N and Z flags
+                    # Set N and Z flags (always set for both BCD and binary modes)
+                    # VARIANT: 6502 - N and Z flags are set from BCD result
+                    # VARIANT: 65C02 - N and Z flags are set from binary result
                     self.flags[flags.Z] = 1 if self.A == 0 else 0
                     self.flags[flags.N] = 1 if (self.A & BYTE_BIT_7_MASK) else 0
 
@@ -1751,11 +1926,20 @@ class MOS6502CPU(flags.ProcessorStatusFlagsInterface):
                     address: int = self.fetch_zeropage_mode_address(offset_register_name=None)
                     value: int = int(self.read_byte(address=address))
 
-                    result: int = self.A - value - (1 - self.flags[flags.C])
-                    self.flags[flags.C] = 1 if result >= 0 else 0
-                    self.flags[flags.V] = 1 if ((self.A ^ value) & (self.A ^ result) & BYTE_BIT_7_MASK) else 0
+                    if self.flags[flags.D]:
+                        # BCD (Decimal) mode subtraction
+                        result, carry_out, overflow, _ = self._sbc_bcd(self.A, value, self.flags[flags.C])
+                        self.flags[flags.C] = carry_out
+                        self.flags[flags.V] = overflow
+                        self.A = result
+                    else:
+                        # Binary mode subtraction
+                        result: int = self.A - value - (1 - self.flags[flags.C])
+                        self.flags[flags.C] = 1 if result >= 0 else 0
+                        self.flags[flags.V] = 1 if ((self.A ^ value) & (self.A ^ result) & BYTE_BIT_7_MASK) else 0
+                        self.A = result & 0xFF
 
-                    self.A = result & 0xFF
+                    # Set N and Z flags
                     self.flags[flags.Z] = 1 if self.A == 0 else 0
                     self.flags[flags.N] = 1 if (self.A & BYTE_BIT_7_MASK) else 0
 
@@ -1766,11 +1950,20 @@ class MOS6502CPU(flags.ProcessorStatusFlagsInterface):
                     address: int = self.fetch_zeropage_mode_address(offset_register_name="X")
                     value: int = int(self.read_byte(address=address))
 
-                    result: int = self.A - value - (1 - self.flags[flags.C])
-                    self.flags[flags.C] = 1 if result >= 0 else 0
-                    self.flags[flags.V] = 1 if ((self.A ^ value) & (self.A ^ result) & BYTE_BIT_7_MASK) else 0
+                    if self.flags[flags.D]:
+                        # BCD (Decimal) mode subtraction
+                        result, carry_out, overflow, _ = self._sbc_bcd(self.A, value, self.flags[flags.C])
+                        self.flags[flags.C] = carry_out
+                        self.flags[flags.V] = overflow
+                        self.A = result
+                    else:
+                        # Binary mode subtraction
+                        result: int = self.A - value - (1 - self.flags[flags.C])
+                        self.flags[flags.C] = 1 if result >= 0 else 0
+                        self.flags[flags.V] = 1 if ((self.A ^ value) & (self.A ^ result) & BYTE_BIT_7_MASK) else 0
+                        self.A = result & 0xFF
 
-                    self.A = result & 0xFF
+                    # Set N and Z flags
                     self.flags[flags.Z] = 1 if self.A == 0 else 0
                     self.flags[flags.N] = 1 if (self.A & BYTE_BIT_7_MASK) else 0
 
@@ -1781,11 +1974,20 @@ class MOS6502CPU(flags.ProcessorStatusFlagsInterface):
                     address: int = self.fetch_absolute_mode_address(offset_register_name=None)
                     value: int = int(self.read_byte(address=address))
 
-                    result: int = self.A - value - (1 - self.flags[flags.C])
-                    self.flags[flags.C] = 1 if result >= 0 else 0
-                    self.flags[flags.V] = 1 if ((self.A ^ value) & (self.A ^ result) & BYTE_BIT_7_MASK) else 0
+                    if self.flags[flags.D]:
+                        # BCD (Decimal) mode subtraction
+                        result, carry_out, overflow, _ = self._sbc_bcd(self.A, value, self.flags[flags.C])
+                        self.flags[flags.C] = carry_out
+                        self.flags[flags.V] = overflow
+                        self.A = result
+                    else:
+                        # Binary mode subtraction
+                        result: int = self.A - value - (1 - self.flags[flags.C])
+                        self.flags[flags.C] = 1 if result >= 0 else 0
+                        self.flags[flags.V] = 1 if ((self.A ^ value) & (self.A ^ result) & BYTE_BIT_7_MASK) else 0
+                        self.A = result & 0xFF
 
-                    self.A = result & 0xFF
+                    # Set N and Z flags
                     self.flags[flags.Z] = 1 if self.A == 0 else 0
                     self.flags[flags.N] = 1 if (self.A & BYTE_BIT_7_MASK) else 0
 
@@ -1796,11 +1998,20 @@ class MOS6502CPU(flags.ProcessorStatusFlagsInterface):
                     address: int = self.fetch_absolute_mode_address(offset_register_name="X")
                     value: int = int(self.read_byte(address=address))
 
-                    result: int = self.A - value - (1 - self.flags[flags.C])
-                    self.flags[flags.C] = 1 if result >= 0 else 0
-                    self.flags[flags.V] = 1 if ((self.A ^ value) & (self.A ^ result) & BYTE_BIT_7_MASK) else 0
+                    if self.flags[flags.D]:
+                        # BCD (Decimal) mode subtraction
+                        result, carry_out, overflow, _ = self._sbc_bcd(self.A, value, self.flags[flags.C])
+                        self.flags[flags.C] = carry_out
+                        self.flags[flags.V] = overflow
+                        self.A = result
+                    else:
+                        # Binary mode subtraction
+                        result: int = self.A - value - (1 - self.flags[flags.C])
+                        self.flags[flags.C] = 1 if result >= 0 else 0
+                        self.flags[flags.V] = 1 if ((self.A ^ value) & (self.A ^ result) & BYTE_BIT_7_MASK) else 0
+                        self.A = result & 0xFF
 
-                    self.A = result & 0xFF
+                    # Set N and Z flags
                     self.flags[flags.Z] = 1 if self.A == 0 else 0
                     self.flags[flags.N] = 1 if (self.A & BYTE_BIT_7_MASK) else 0
 
@@ -1811,11 +2022,20 @@ class MOS6502CPU(flags.ProcessorStatusFlagsInterface):
                     address: int = self.fetch_absolute_mode_address(offset_register_name="Y")
                     value: int = int(self.read_byte(address=address))
 
-                    result: int = self.A - value - (1 - self.flags[flags.C])
-                    self.flags[flags.C] = 1 if result >= 0 else 0
-                    self.flags[flags.V] = 1 if ((self.A ^ value) & (self.A ^ result) & BYTE_BIT_7_MASK) else 0
+                    if self.flags[flags.D]:
+                        # BCD (Decimal) mode subtraction
+                        result, carry_out, overflow, _ = self._sbc_bcd(self.A, value, self.flags[flags.C])
+                        self.flags[flags.C] = carry_out
+                        self.flags[flags.V] = overflow
+                        self.A = result
+                    else:
+                        # Binary mode subtraction
+                        result: int = self.A - value - (1 - self.flags[flags.C])
+                        self.flags[flags.C] = 1 if result >= 0 else 0
+                        self.flags[flags.V] = 1 if ((self.A ^ value) & (self.A ^ result) & BYTE_BIT_7_MASK) else 0
+                        self.A = result & 0xFF
 
-                    self.A = result & 0xFF
+                    # Set N and Z flags
                     self.flags[flags.Z] = 1 if self.A == 0 else 0
                     self.flags[flags.N] = 1 if (self.A & BYTE_BIT_7_MASK) else 0
 
@@ -1826,11 +2046,20 @@ class MOS6502CPU(flags.ProcessorStatusFlagsInterface):
                     address: int = self.fetch_indexed_indirect_mode_address()
                     value: int = int(self.read_byte(address=address))
 
-                    result: int = self.A - value - (1 - self.flags[flags.C])
-                    self.flags[flags.C] = 1 if result >= 0 else 0
-                    self.flags[flags.V] = 1 if ((self.A ^ value) & (self.A ^ result) & BYTE_BIT_7_MASK) else 0
+                    if self.flags[flags.D]:
+                        # BCD (Decimal) mode subtraction
+                        result, carry_out, overflow, _ = self._sbc_bcd(self.A, value, self.flags[flags.C])
+                        self.flags[flags.C] = carry_out
+                        self.flags[flags.V] = overflow
+                        self.A = result
+                    else:
+                        # Binary mode subtraction
+                        result: int = self.A - value - (1 - self.flags[flags.C])
+                        self.flags[flags.C] = 1 if result >= 0 else 0
+                        self.flags[flags.V] = 1 if ((self.A ^ value) & (self.A ^ result) & BYTE_BIT_7_MASK) else 0
+                        self.A = result & 0xFF
 
-                    self.A = result & 0xFF
+                    # Set N and Z flags
                     self.flags[flags.Z] = 1 if self.A == 0 else 0
                     self.flags[flags.N] = 1 if (self.A & BYTE_BIT_7_MASK) else 0
 
@@ -1841,11 +2070,20 @@ class MOS6502CPU(flags.ProcessorStatusFlagsInterface):
                     address: int = self.fetch_indirect_indexed_mode_address()
                     value: int = int(self.read_byte(address=address))
 
-                    result: int = self.A - value - (1 - self.flags[flags.C])
-                    self.flags[flags.C] = 1 if result >= 0 else 0
-                    self.flags[flags.V] = 1 if ((self.A ^ value) & (self.A ^ result) & BYTE_BIT_7_MASK) else 0
+                    if self.flags[flags.D]:
+                        # BCD (Decimal) mode subtraction
+                        result, carry_out, overflow, _ = self._sbc_bcd(self.A, value, self.flags[flags.C])
+                        self.flags[flags.C] = carry_out
+                        self.flags[flags.V] = overflow
+                        self.A = result
+                    else:
+                        # Binary mode subtraction
+                        result: int = self.A - value - (1 - self.flags[flags.C])
+                        self.flags[flags.C] = 1 if result >= 0 else 0
+                        self.flags[flags.V] = 1 if ((self.A ^ value) & (self.A ^ result) & BYTE_BIT_7_MASK) else 0
+                        self.A = result & 0xFF
 
-                    self.A = result & 0xFF
+                    # Set N and Z flags
                     self.flags[flags.Z] = 1 if self.A == 0 else 0
                     self.flags[flags.N] = 1 if (self.A & BYTE_BIT_7_MASK) else 0
 

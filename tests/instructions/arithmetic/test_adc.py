@@ -188,3 +188,156 @@ def test_cpu_instruction_ADC_ABSOLUTE_0x6D() -> None:  # noqa: N802
     assert cpu.flags[flags.C] == 0
     assert cpu.flags[flags.V] == 0
     assert cpu.cycles_executed == 4
+
+
+# BCD (Decimal) Mode Tests
+
+
+def test_cpu_instruction_ADC_IMMEDIATE_0x69_bcd_simple() -> None:  # noqa: N802
+    """Test ADC in BCD mode with simple addition."""
+    # given:
+    cpu: mos6502.CPU = mos6502.CPU()
+    cpu.reset()
+
+    cpu.A = 0x09  # BCD 09
+    cpu.flags[flags.C] = 0
+    cpu.flags[flags.D] = 1  # Enable decimal mode
+
+    # ADC #$01
+    cpu.ram[0xFFFC] = instructions.ADC_IMMEDIATE_0x69
+    cpu.ram[0xFFFD] = 0x01  # BCD 01
+
+    # when:
+    with contextlib.suppress(exceptions.CPUCycleExhaustionError):
+        cpu.execute(cycles=2)
+
+    # then:
+    assert cpu.A == 0x10  # BCD 09 + 01 = 10
+    assert cpu.flags[flags.C] == 0  # No carry
+    assert cpu.flags[flags.Z] == 0  # Not zero
+    assert cpu.cycles_executed == 2
+
+
+def test_cpu_instruction_ADC_IMMEDIATE_0x69_bcd_carry_low_nibble() -> None:  # noqa: N802
+    """Test ADC in BCD mode with carry from low nibble."""
+    # given:
+    cpu: mos6502.CPU = mos6502.CPU()
+    cpu.reset()
+
+    cpu.A = 0x08  # BCD 08
+    cpu.flags[flags.C] = 0
+    cpu.flags[flags.D] = 1  # Enable decimal mode
+
+    # ADC #$05
+    cpu.ram[0xFFFC] = instructions.ADC_IMMEDIATE_0x69
+    cpu.ram[0xFFFD] = 0x05  # BCD 05
+
+    # when:
+    with contextlib.suppress(exceptions.CPUCycleExhaustionError):
+        cpu.execute(cycles=2)
+
+    # then:
+    assert cpu.A == 0x13  # BCD 08 + 05 = 13
+    assert cpu.flags[flags.C] == 0  # No carry out
+    assert cpu.flags[flags.Z] == 0
+    assert cpu.cycles_executed == 2
+
+
+def test_cpu_instruction_ADC_IMMEDIATE_0x69_bcd_carry_high_nibble() -> None:  # noqa: N802
+    """Test ADC in BCD mode with carry from high nibble."""
+    # given:
+    cpu: mos6502.CPU = mos6502.CPU()
+    cpu.reset()
+
+    cpu.A = 0x50  # BCD 50
+    cpu.flags[flags.C] = 0
+    cpu.flags[flags.D] = 1  # Enable decimal mode
+
+    # ADC #$60
+    cpu.ram[0xFFFC] = instructions.ADC_IMMEDIATE_0x69
+    cpu.ram[0xFFFD] = 0x60  # BCD 60
+
+    # when:
+    with contextlib.suppress(exceptions.CPUCycleExhaustionError):
+        cpu.execute(cycles=2)
+
+    # then:
+    assert cpu.A == 0x10  # BCD 50 + 60 = 110, wraps to 10
+    assert cpu.flags[flags.C] == 1  # Carry out
+    assert cpu.flags[flags.Z] == 0
+    assert cpu.cycles_executed == 2
+
+
+def test_cpu_instruction_ADC_IMMEDIATE_0x69_bcd_with_carry_in() -> None:  # noqa: N802
+    """Test ADC in BCD mode with carry in."""
+    # given:
+    cpu: mos6502.CPU = mos6502.CPU()
+    cpu.reset()
+
+    cpu.A = 0x09  # BCD 09
+    cpu.flags[flags.C] = 1  # Carry in
+    cpu.flags[flags.D] = 1  # Enable decimal mode
+
+    # ADC #$09
+    cpu.ram[0xFFFC] = instructions.ADC_IMMEDIATE_0x69
+    cpu.ram[0xFFFD] = 0x09  # BCD 09
+
+    # when:
+    with contextlib.suppress(exceptions.CPUCycleExhaustionError):
+        cpu.execute(cycles=2)
+
+    # then:
+    assert cpu.A == 0x19  # BCD 09 + 09 + 1 = 19
+    assert cpu.flags[flags.C] == 0  # No carry out
+    assert cpu.flags[flags.Z] == 0
+    assert cpu.cycles_executed == 2
+
+
+def test_cpu_instruction_ADC_IMMEDIATE_0x69_bcd_99_plus_1() -> None:  # noqa: N802
+    """Test ADC in BCD mode: 99 + 1 = 00 with carry."""
+    # given:
+    cpu: mos6502.CPU = mos6502.CPU()
+    cpu.reset()
+
+    cpu.A = 0x99  # BCD 99
+    cpu.flags[flags.C] = 0
+    cpu.flags[flags.D] = 1  # Enable decimal mode
+
+    # ADC #$01
+    cpu.ram[0xFFFC] = instructions.ADC_IMMEDIATE_0x69
+    cpu.ram[0xFFFD] = 0x01  # BCD 01
+
+    # when:
+    with contextlib.suppress(exceptions.CPUCycleExhaustionError):
+        cpu.execute(cycles=2)
+
+    # then:
+    assert cpu.A == 0x00  # BCD 99 + 01 = 100, wraps to 00
+    assert cpu.flags[flags.C] == 1  # Carry out
+    assert cpu.flags[flags.Z] == 1  # Zero
+    assert cpu.cycles_executed == 2
+
+
+def test_cpu_instruction_ADC_IMMEDIATE_0x69_bcd_complex() -> None:  # noqa: N802
+    """Test ADC in BCD mode with complex addition."""
+    # given:
+    cpu: mos6502.CPU = mos6502.CPU()
+    cpu.reset()
+
+    cpu.A = 0x58  # BCD 58
+    cpu.flags[flags.C] = 1  # Carry in
+    cpu.flags[flags.D] = 1  # Enable decimal mode
+
+    # ADC #$46
+    cpu.ram[0xFFFC] = instructions.ADC_IMMEDIATE_0x69
+    cpu.ram[0xFFFD] = 0x46  # BCD 46
+
+    # when:
+    with contextlib.suppress(exceptions.CPUCycleExhaustionError):
+        cpu.execute(cycles=2)
+
+    # then:
+    assert cpu.A == 0x05  # BCD 58 + 46 + 1 = 105, wraps to 05
+    assert cpu.flags[flags.C] == 1  # Carry out
+    assert cpu.flags[flags.Z] == 0
+    assert cpu.cycles_executed == 2

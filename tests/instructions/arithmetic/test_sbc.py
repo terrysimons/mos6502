@@ -188,3 +188,156 @@ def test_cpu_instruction_SBC_ABSOLUTE_0xED() -> None:  # noqa: N802
     assert cpu.flags[flags.C] == 1
     assert cpu.flags[flags.V] == 0
     assert cpu.cycles_executed == 4
+
+
+# BCD (Decimal) Mode Tests
+
+
+def test_cpu_instruction_SBC_IMMEDIATE_0xE9_bcd_simple() -> None:  # noqa: N802
+    """Test SBC in BCD mode with simple subtraction."""
+    # given:
+    cpu: mos6502.CPU = mos6502.CPU()
+    cpu.reset()
+
+    cpu.A = 0x09  # BCD 09
+    cpu.flags[flags.C] = 1  # No borrow
+    cpu.flags[flags.D] = 1  # Enable decimal mode
+
+    # SBC #$05
+    cpu.ram[0xFFFC] = instructions.SBC_IMMEDIATE_0xE9
+    cpu.ram[0xFFFD] = 0x05  # BCD 05
+
+    # when:
+    with contextlib.suppress(exceptions.CPUCycleExhaustionError):
+        cpu.execute(cycles=2)
+
+    # then:
+    assert cpu.A == 0x04  # BCD 09 - 05 = 04
+    assert cpu.flags[flags.C] == 1  # No borrow
+    assert cpu.flags[flags.Z] == 0
+    assert cpu.cycles_executed == 2
+
+
+def test_cpu_instruction_SBC_IMMEDIATE_0xE9_bcd_borrow_low_nibble() -> None:  # noqa: N802
+    """Test SBC in BCD mode with borrow from low nibble."""
+    # given:
+    cpu: mos6502.CPU = mos6502.CPU()
+    cpu.reset()
+
+    cpu.A = 0x12  # BCD 12
+    cpu.flags[flags.C] = 1  # No borrow
+    cpu.flags[flags.D] = 1  # Enable decimal mode
+
+    # SBC #$09
+    cpu.ram[0xFFFC] = instructions.SBC_IMMEDIATE_0xE9
+    cpu.ram[0xFFFD] = 0x09  # BCD 09
+
+    # when:
+    with contextlib.suppress(exceptions.CPUCycleExhaustionError):
+        cpu.execute(cycles=2)
+
+    # then:
+    assert cpu.A == 0x03  # BCD 12 - 09 = 03
+    assert cpu.flags[flags.C] == 1  # No borrow out
+    assert cpu.flags[flags.Z] == 0
+    assert cpu.cycles_executed == 2
+
+
+def test_cpu_instruction_SBC_IMMEDIATE_0xE9_bcd_underflow() -> None:  # noqa: N802
+    """Test SBC in BCD mode with underflow."""
+    # given:
+    cpu: mos6502.CPU = mos6502.CPU()
+    cpu.reset()
+
+    cpu.A = 0x00  # BCD 00
+    cpu.flags[flags.C] = 1  # No borrow in
+    cpu.flags[flags.D] = 1  # Enable decimal mode
+
+    # SBC #$01
+    cpu.ram[0xFFFC] = instructions.SBC_IMMEDIATE_0xE9
+    cpu.ram[0xFFFD] = 0x01  # BCD 01
+
+    # when:
+    with contextlib.suppress(exceptions.CPUCycleExhaustionError):
+        cpu.execute(cycles=2)
+
+    # then:
+    assert cpu.A == 0x99  # BCD 00 - 01 = -01, wraps to 99
+    assert cpu.flags[flags.C] == 0  # Borrow occurred
+    assert cpu.flags[flags.Z] == 0
+    assert cpu.cycles_executed == 2
+
+
+def test_cpu_instruction_SBC_IMMEDIATE_0xE9_bcd_with_borrow_in() -> None:  # noqa: N802
+    """Test SBC in BCD mode with borrow in."""
+    # given:
+    cpu: mos6502.CPU = mos6502.CPU()
+    cpu.reset()
+
+    cpu.A = 0x50  # BCD 50
+    cpu.flags[flags.C] = 0  # Borrow in
+    cpu.flags[flags.D] = 1  # Enable decimal mode
+
+    # SBC #$10
+    cpu.ram[0xFFFC] = instructions.SBC_IMMEDIATE_0xE9
+    cpu.ram[0xFFFD] = 0x10  # BCD 10
+
+    # when:
+    with contextlib.suppress(exceptions.CPUCycleExhaustionError):
+        cpu.execute(cycles=2)
+
+    # then:
+    assert cpu.A == 0x39  # BCD 50 - 10 - 1 = 39
+    assert cpu.flags[flags.C] == 1  # No borrow out
+    assert cpu.flags[flags.Z] == 0
+    assert cpu.cycles_executed == 2
+
+
+def test_cpu_instruction_SBC_IMMEDIATE_0xE9_bcd_zero_result() -> None:  # noqa: N802
+    """Test SBC in BCD mode resulting in zero."""
+    # given:
+    cpu: mos6502.CPU = mos6502.CPU()
+    cpu.reset()
+
+    cpu.A = 0x50  # BCD 50
+    cpu.flags[flags.C] = 1  # No borrow
+    cpu.flags[flags.D] = 1  # Enable decimal mode
+
+    # SBC #$50
+    cpu.ram[0xFFFC] = instructions.SBC_IMMEDIATE_0xE9
+    cpu.ram[0xFFFD] = 0x50  # BCD 50
+
+    # when:
+    with contextlib.suppress(exceptions.CPUCycleExhaustionError):
+        cpu.execute(cycles=2)
+
+    # then:
+    assert cpu.A == 0x00  # BCD 50 - 50 = 00
+    assert cpu.flags[flags.C] == 1  # No borrow
+    assert cpu.flags[flags.Z] == 1  # Zero
+    assert cpu.cycles_executed == 2
+
+
+def test_cpu_instruction_SBC_IMMEDIATE_0xE9_bcd_complex() -> None:  # noqa: N802
+    """Test SBC in BCD mode with complex subtraction."""
+    # given:
+    cpu: mos6502.CPU = mos6502.CPU()
+    cpu.reset()
+
+    cpu.A = 0x73  # BCD 73
+    cpu.flags[flags.C] = 0  # Borrow in
+    cpu.flags[flags.D] = 1  # Enable decimal mode
+
+    # SBC #$46
+    cpu.ram[0xFFFC] = instructions.SBC_IMMEDIATE_0xE9
+    cpu.ram[0xFFFD] = 0x46  # BCD 46
+
+    # when:
+    with contextlib.suppress(exceptions.CPUCycleExhaustionError):
+        cpu.execute(cycles=2)
+
+    # then:
+    assert cpu.A == 0x26  # BCD 73 - 46 - 1 = 26
+    assert cpu.flags[flags.C] == 1  # No borrow out
+    assert cpu.flags[flags.Z] == 0
+    assert cpu.cycles_executed == 2
