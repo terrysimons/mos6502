@@ -38,6 +38,17 @@ class InstructionOpcode(int):
 # Import from individual instruction modules
 from mos6502.instructions._bit import BIT_ZEROPAGE_0x24, BIT_ABSOLUTE_0x2C, register_bit_instructions  # noqa: F401
 from mos6502.instructions._brk import BRK_IMPLIED_0x00, register_brk_instructions  # noqa: F401
+# Illegal instructions
+from mos6502.instructions.illegal._lax import (  # noqa: F401
+    LAX_ZEROPAGE_0xA7,
+    LAX_ZEROPAGE_Y_0xB7,
+    LAX_INDEXED_INDIRECT_X_0xA3,
+    LAX_INDIRECT_INDEXED_Y_0xB3,
+    LAX_ABSOLUTE_0xAF,
+    LAX_ABSOLUTE_Y_0xBF,
+    LAX_IMMEDIATE_0xAB,
+    register_lax_instructions,
+)
 from mos6502.instructions.load._lda import (  # noqa: F401
     LDA_IMMEDIATE_0xA9,
     LDA_ZEROPAGE_0xA5,
@@ -358,6 +369,15 @@ __all__ = [
     'LDY_ABSOLUTE_0xAC',
     'LDY_ABSOLUTE_X_0xBC',
 
+    # Illegal: LAX
+    'LAX_ZEROPAGE_0xA7',
+    'LAX_ZEROPAGE_Y_0xB7',
+    'LAX_INDEXED_INDIRECT_X_0xA3',
+    'LAX_INDIRECT_INDEXED_Y_0xB3',
+    'LAX_ABSOLUTE_0xAF',
+    'LAX_ABSOLUTE_Y_0xBF',
+    'LAX_IMMEDIATE_0xAB',
+
     # LSR
     'LSR_ACCUMULATOR_0x4A',
     'LSR_ZEROPAGE_0x46',
@@ -489,6 +509,8 @@ register_ror_instructions(InstructionSet, InstructionSet.map)
 register_nop_instructions(InstructionSet, InstructionSet.map)
 register_rti_instructions(InstructionSet, InstructionSet.map)
 register_rts_instructions(InstructionSet, InstructionSet.map)
+# Illegal instructions
+register_lax_instructions(InstructionSet, InstructionSet.map)
 # register_all_arithmetic_instructions(InstructionSet, InstructionSet.map)  # MIGRATED to adc/sbc/inc/dec packages
 # register_all_branch_instructions(InstructionSet, InstructionSet.map)  # MIGRATED to individual branch packages
 # register_all_compare_instructions(InstructionSet, InstructionSet.map)  # MIGRATED to cmp/cpx/cpy packages
