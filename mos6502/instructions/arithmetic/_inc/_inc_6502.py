@@ -69,6 +69,9 @@ def inc_absolute_0xee(cpu: MOS6502CPU) -> None:
     address: int = cpu.fetch_absolute_mode_address(offset_register_name=None)
     value: int = int(cpu.read_byte(address=address))
 
+    # Read-Modify-Write operations have an internal processing cycle
+    cpu.spend_cpu_cycles(1)
+
     result: int = (value + 1) & 0xFF
     cpu.write_byte(address=address & 0xFFFF, data=result)
 
@@ -89,7 +92,14 @@ def inc_absolute_x_0xfe(cpu: MOS6502CPU) -> None:
     from mos6502 import flags
 
     address: int = cpu.fetch_absolute_mode_address(offset_register_name="X")
+
+    # Read-Modify-Write with Absolute,X always does a dummy read regardless of page crossing
+    cpu.spend_cpu_cycles(1)
+
     value: int = int(cpu.read_byte(address=address))
+
+    # Internal processing cycle for RMW operation
+    cpu.spend_cpu_cycles(1)
 
     result: int = (value + 1) & 0xFF
     cpu.write_byte(address=address & 0xFFFF, data=result)
@@ -97,8 +107,5 @@ def inc_absolute_x_0xfe(cpu: MOS6502CPU) -> None:
     # Set N and Z flags
     cpu.flags[flags.Z] = 1 if result == 0 else 0
     cpu.flags[flags.N] = 1 if (result & 0x80) else 0
-
-    # Read-Modify-Write with Absolute,X always takes 7 cycles (not conditional on page crossing)
-    cpu.spend_cpu_cycles(1)
 
     cpu.log.info("ax")

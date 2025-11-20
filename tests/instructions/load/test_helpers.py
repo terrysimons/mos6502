@@ -2,10 +2,23 @@
 """Helper functions for load instruction tests."""
 import contextlib
 import copy
+import logging
 
 import mos6502
 from mos6502 import errors, flags
 from mos6502.memory import Byte, Word
+
+
+@contextlib.contextmanager
+def suppress_illegal_instruction_logs():
+    """Temporarily disable ERROR logs for illegal instruction detection."""
+    logger = logging.getLogger("mos6502.cpu")
+    original_level = logger.level
+    logger.setLevel(logging.CRITICAL)
+    try:
+        yield
+    finally:
+        logger.setLevel(original_level)
 
 
 def check_noop_flags(expected_cpu: mos6502.CPU, actual_cpu: mos6502.CPU) -> None:
@@ -30,7 +43,8 @@ def verify_load_immediate(cpu: mos6502.CPU, data: int, instruction: int, registe
     cpu.ram[0xFFFD] = data
 
     # when:
-    with contextlib.suppress(errors.CPUCycleExhaustionError, errors.IllegalCPUInstructionError):
+    with suppress_illegal_instruction_logs(), \
+         contextlib.suppress(errors.CPUCycleExhaustionError, errors.IllegalCPUInstructionError):
         cpu.execute(cycles=expected_cycles)
 
     # then:
@@ -63,7 +77,8 @@ def verify_load_zeropage(cpu: mos6502.CPU, data: int, instruction: int, offset: 
     cpu.ram[(offset + offset_value) & 0xFF] = data
 
     # when:
-    with contextlib.suppress(errors.CPUCycleExhaustionError, errors.IllegalCPUInstructionError):
+    with suppress_illegal_instruction_logs(), \
+         contextlib.suppress(errors.CPUCycleExhaustionError, errors.IllegalCPUInstructionError):
         cpu.execute(cycles=expected_cycles)
 
     # then:
@@ -99,7 +114,8 @@ def verify_load_absolute(cpu: mos6502.CPU, data: int, instruction: int, offset: 
     cpu.ram[(offset_address + offset_value) & 0xFFFF] = data
 
     # when:
-    with contextlib.suppress(errors.CPUCycleExhaustionError, errors.IllegalCPUInstructionError):
+    with suppress_illegal_instruction_logs(), \
+         contextlib.suppress(errors.CPUCycleExhaustionError, errors.IllegalCPUInstructionError):
         cpu.execute(cycles=expected_cycles)
 
     # then:
@@ -138,7 +154,8 @@ def verify_load_indexed_indirect(cpu: mos6502.CPU, pc_value: int, data: int, ins
     cpu.ram[offset_address & 0xFFFF] = data # read_byte(0x8000) -> cpu.A
 
     # when:
-    with contextlib.suppress(errors.CPUCycleExhaustionError, errors.IllegalCPUInstructionError):
+    with suppress_illegal_instruction_logs(), \
+         contextlib.suppress(errors.CPUCycleExhaustionError, errors.IllegalCPUInstructionError):
         cpu.execute(cycles=expected_cycles)
 
     # then:
@@ -178,7 +195,8 @@ def verify_load_indirect_indexed(cpu: mos6502.CPU, pc_value: int, data: int, ins
     cpu.ram[(offset_address + offset_value) & 0xFFFF] = data
 
     # when:
-    with contextlib.suppress(errors.CPUCycleExhaustionError, errors.IllegalCPUInstructionError):
+    with suppress_illegal_instruction_logs(), \
+         contextlib.suppress(errors.CPUCycleExhaustionError, errors.IllegalCPUInstructionError):
         cpu.execute(cycles=expected_cycles)
 
     # then

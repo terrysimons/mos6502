@@ -89,6 +89,11 @@ def sta_absolute_x_0x9d(cpu: MOS6502CPU) -> None:
         cpu: The CPU instance to operate on
     """
     address: int = cpu.fetch_absolute_mode_address(offset_register_name="X")
+
+    # Store operations always take 5 cycles due to a dummy read that occurs
+    # before the write, regardless of page boundary crossing
+    cpu.spend_cpu_cycles(1)
+
     cpu.write_byte(address=address & 0xFFFF, data=cpu.A)
     cpu.log.info("i")
 
@@ -110,6 +115,11 @@ def sta_absolute_y_0x99(cpu: MOS6502CPU) -> None:
         cpu: The CPU instance to operate on
     """
     address: int = cpu.fetch_absolute_mode_address(offset_register_name="Y")
+
+    # Store operations always take 5 cycles due to a dummy read that occurs
+    # before the write, regardless of page boundary crossing
+    cpu.spend_cpu_cycles(1)
+
     cpu.write_byte(address=address & 0xFFFF, data=cpu.A)
     cpu.log.info("i")
 
