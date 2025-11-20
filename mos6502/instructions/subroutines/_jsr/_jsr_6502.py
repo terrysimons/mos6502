@@ -31,7 +31,10 @@ def jsr_absolute_0x20(cpu: MOS6502CPU) -> None:
 
     # The stack is top-down, so starts at 0x1FF, so we need to
     # write to S - 1
-    cpu.write_word(address=cpu.S - 1, data=cpu.PC + 1)
+    # JSR pushes the return address minus 1 (PC-1) to the stack
+    # After fetch_word(), PC points to the byte after the JSR instruction
+    # So we push PC-1, which is the address of the last byte of the JSR instruction
+    cpu.write_word(address=cpu.S - 1, data=cpu.PC - 1)
 
     # Since we wrote a word, we need to decrement by 2
     # so our stack pointer would be 0xFD if it started at 0xFF here

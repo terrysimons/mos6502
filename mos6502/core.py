@@ -290,7 +290,7 @@ class MOS6502CPU(flags.ProcessorStatusFlagsInterface):
         """
         Fetch a Word() from RAM[self.PC].
 
-        Increments self.PC by 1.
+        Increments self.PC by 2.
 
         Costs 2 CPU cycles.
 
@@ -308,6 +308,8 @@ class MOS6502CPU(flags.ProcessorStatusFlagsInterface):
         highbyte: Byte = self.ram[self.PC]
         self.log.info("f")
         self.spend_cpu_cycles(cost=1)
+
+        self.PC = self.PC + 1
 
         word = (highbyte << 8) + lowbyte
 
@@ -1115,6 +1117,9 @@ class MOS6502CPU(flags.ProcessorStatusFlagsInterface):
         self.cycles: int = cycles
 
         while True:
+            # Check for cycle exhaustion BEFORE fetching the next instruction
+            # This prevents PC from being incremented into the next instruction
+            # when we don't have enough cycles to execute it
             if self.cycles <= 0:
                 raise errors.CPUCycleExhaustionError(
                     f"Exhausted available CPU cycles after {self.cycles_executed} "
@@ -1146,7 +1151,8 @@ class MOS6502CPU(flags.ProcessorStatusFlagsInterface):
 
                 # Subtract 1 for the instruction
                 for i in range(instruction_bytes - 1):
-                    machine_code.append(int(self.ram[self.PC + i]))
+                    # Wrap address to stay within 16-bit address space (0-65535)
+                    machine_code.append(int(self.ram[(self.PC + i) & 0xFFFF]))
 
                 if len(machine_code) > 2:
                     raise errors.MachineCodeExecutionException(

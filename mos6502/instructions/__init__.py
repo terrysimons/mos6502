@@ -56,6 +56,87 @@ from mos6502.instructions.illegal._sax import (  # noqa: F401
     SAX_ABSOLUTE_0x8F,
     register_sax_instructions,
 )
+from mos6502.instructions.illegal._dcp import (  # noqa: F401
+    DCP_ZEROPAGE_0xC7,
+    DCP_ZEROPAGE_X_0xD7,
+    DCP_INDEXED_INDIRECT_X_0xC3,
+    DCP_INDIRECT_INDEXED_Y_0xD3,
+    DCP_ABSOLUTE_0xCF,
+    DCP_ABSOLUTE_X_0xDF,
+    DCP_ABSOLUTE_Y_0xDB,
+    register_dcp_instructions,
+)
+from mos6502.instructions.illegal._isc import (  # noqa: F401
+    ISC_ZEROPAGE_0xE7,
+    ISC_ZEROPAGE_X_0xF7,
+    ISC_INDEXED_INDIRECT_X_0xE3,
+    ISC_INDIRECT_INDEXED_Y_0xF3,
+    ISC_ABSOLUTE_0xEF,
+    ISC_ABSOLUTE_X_0xFF,
+    ISC_ABSOLUTE_Y_0xFB,
+    register_isc_instructions,
+)
+from mos6502.instructions.illegal._slo import (  # noqa: F401
+    SLO_ZEROPAGE_0x07,
+    SLO_ZEROPAGE_X_0x17,
+    SLO_INDEXED_INDIRECT_X_0x03,
+    SLO_INDIRECT_INDEXED_Y_0x13,
+    SLO_ABSOLUTE_0x0F,
+    SLO_ABSOLUTE_X_0x1F,
+    SLO_ABSOLUTE_Y_0x1B,
+    register_slo_instructions,
+)
+from mos6502.instructions.illegal._rla import (  # noqa: F401
+    RLA_ZEROPAGE_0x27,
+    RLA_ZEROPAGE_X_0x37,
+    RLA_INDEXED_INDIRECT_X_0x23,
+    RLA_INDIRECT_INDEXED_Y_0x33,
+    RLA_ABSOLUTE_0x2F,
+    RLA_ABSOLUTE_X_0x3F,
+    RLA_ABSOLUTE_Y_0x3B,
+    register_rla_instructions,
+)
+from mos6502.instructions.illegal._sre import (  # noqa: F401
+    SRE_ZEROPAGE_0x47,
+    SRE_ZEROPAGE_X_0x57,
+    SRE_INDEXED_INDIRECT_X_0x43,
+    SRE_INDIRECT_INDEXED_Y_0x53,
+    SRE_ABSOLUTE_0x4F,
+    SRE_ABSOLUTE_X_0x5F,
+    SRE_ABSOLUTE_Y_0x5B,
+    register_sre_instructions,
+)
+from mos6502.instructions.illegal._rra import (  # noqa: F401
+    RRA_ZEROPAGE_0x67,
+    RRA_ZEROPAGE_X_0x77,
+    RRA_INDEXED_INDIRECT_X_0x63,
+    RRA_INDIRECT_INDEXED_Y_0x73,
+    RRA_ABSOLUTE_0x6F,
+    RRA_ABSOLUTE_X_0x7F,
+    RRA_ABSOLUTE_Y_0x7B,
+    register_rra_instructions,
+)
+from mos6502.instructions.illegal._anc import (  # noqa: F401
+    ANC_IMMEDIATE_0x0B,
+    ANC_IMMEDIATE_0x2B,
+    register_anc_instructions,
+)
+from mos6502.instructions.illegal._alr import (  # noqa: F401
+    ALR_IMMEDIATE_0x4B,
+    register_alr_instructions,
+)
+from mos6502.instructions.illegal._arr import (  # noqa: F401
+    ARR_IMMEDIATE_0x6B,
+    register_arr_instructions,
+)
+from mos6502.instructions.illegal._sbx import (  # noqa: F401
+    SBX_IMMEDIATE_0xCB,
+    register_sbx_instructions,
+)
+from mos6502.instructions.illegal._las import (  # noqa: F401
+    LAS_ABSOLUTE_Y_0xBB,
+    register_las_instructions,
+)
 from mos6502.instructions.load._lda import (  # noqa: F401
     LDA_IMMEDIATE_0xA9,
     LDA_ZEROPAGE_0xA5,
@@ -391,6 +472,76 @@ __all__ = [
     'SAX_INDEXED_INDIRECT_X_0x83',
     'SAX_ABSOLUTE_0x8F',
 
+    # Illegal: DCP
+    'DCP_ZEROPAGE_0xC7',
+    'DCP_ZEROPAGE_X_0xD7',
+    'DCP_INDEXED_INDIRECT_X_0xC3',
+    'DCP_INDIRECT_INDEXED_Y_0xD3',
+    'DCP_ABSOLUTE_0xCF',
+    'DCP_ABSOLUTE_X_0xDF',
+    'DCP_ABSOLUTE_Y_0xDB',
+
+    # Illegal: ISC
+    'ISC_ZEROPAGE_0xE7',
+    'ISC_ZEROPAGE_X_0xF7',
+    'ISC_INDEXED_INDIRECT_X_0xE3',
+    'ISC_INDIRECT_INDEXED_Y_0xF3',
+    'ISC_ABSOLUTE_0xEF',
+    'ISC_ABSOLUTE_X_0xFF',
+    'ISC_ABSOLUTE_Y_0xFB',
+
+    # Illegal: SLO
+    'SLO_ZEROPAGE_0x07',
+    'SLO_ZEROPAGE_X_0x17',
+    'SLO_INDEXED_INDIRECT_X_0x03',
+    'SLO_INDIRECT_INDEXED_Y_0x13',
+    'SLO_ABSOLUTE_0x0F',
+    'SLO_ABSOLUTE_X_0x1F',
+    'SLO_ABSOLUTE_Y_0x1B',
+
+    # Illegal: RLA
+    'RLA_ZEROPAGE_0x27',
+    'RLA_ZEROPAGE_X_0x37',
+    'RLA_INDEXED_INDIRECT_X_0x23',
+    'RLA_INDIRECT_INDEXED_Y_0x33',
+    'RLA_ABSOLUTE_0x2F',
+    'RLA_ABSOLUTE_X_0x3F',
+    'RLA_ABSOLUTE_Y_0x3B',
+
+    # Illegal: SRE
+    'SRE_ZEROPAGE_0x47',
+    'SRE_ZEROPAGE_X_0x57',
+    'SRE_INDEXED_INDIRECT_X_0x43',
+    'SRE_INDIRECT_INDEXED_Y_0x53',
+    'SRE_ABSOLUTE_0x4F',
+    'SRE_ABSOLUTE_X_0x5F',
+    'SRE_ABSOLUTE_Y_0x5B',
+
+    # Illegal: RRA
+    'RRA_ZEROPAGE_0x67',
+    'RRA_ZEROPAGE_X_0x77',
+    'RRA_INDEXED_INDIRECT_X_0x63',
+    'RRA_INDIRECT_INDEXED_Y_0x73',
+    'RRA_ABSOLUTE_0x6F',
+    'RRA_ABSOLUTE_X_0x7F',
+    'RRA_ABSOLUTE_Y_0x7B',
+
+    # Illegal: ANC
+    'ANC_IMMEDIATE_0x0B',
+    'ANC_IMMEDIATE_0x2B',
+
+    # Illegal: ALR
+    'ALR_IMMEDIATE_0x4B',
+
+    # Illegal: ARR
+    'ARR_IMMEDIATE_0x6B',
+
+    # Illegal: SBX
+    'SBX_IMMEDIATE_0xCB',
+
+    # Illegal: LAS
+    'LAS_ABSOLUTE_Y_0xBB',
+
     # LSR
     'LSR_ACCUMULATOR_0x4A',
     'LSR_ZEROPAGE_0x46',
@@ -525,6 +676,17 @@ register_rts_instructions(InstructionSet, InstructionSet.map)
 # Illegal instructions
 register_lax_instructions(InstructionSet, InstructionSet.map)
 register_sax_instructions(InstructionSet, InstructionSet.map)
+register_dcp_instructions(InstructionSet, InstructionSet.map)
+register_isc_instructions(InstructionSet, InstructionSet.map)
+register_slo_instructions(InstructionSet, InstructionSet.map)
+register_rla_instructions(InstructionSet, InstructionSet.map)
+register_sre_instructions(InstructionSet, InstructionSet.map)
+register_rra_instructions(InstructionSet, InstructionSet.map)
+register_anc_instructions(InstructionSet, InstructionSet.map)
+register_alr_instructions(InstructionSet, InstructionSet.map)
+register_arr_instructions(InstructionSet, InstructionSet.map)
+register_sbx_instructions(InstructionSet, InstructionSet.map)
+register_las_instructions(InstructionSet, InstructionSet.map)
 # register_all_arithmetic_instructions(InstructionSet, InstructionSet.map)  # MIGRATED to adc/sbc/inc/dec packages
 # register_all_branch_instructions(InstructionSet, InstructionSet.map)  # MIGRATED to individual branch packages
 # register_all_compare_instructions(InstructionSet, InstructionSet.map)  # MIGRATED to cmp/cpx/cpy packages

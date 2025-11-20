@@ -26,6 +26,17 @@ def rts_implied_0x60(cpu: MOS6502CPU) -> None:
         cpu: The CPU instance to operate on
     """
     cpu.log.info("i")
+    # RTS takes 6 cycles total:
+    # 1. Opcode fetch (already done by execute())
+    # 2. Read and increment stack pointer (1 cycle)
     cpu.spend_cpu_cycles(cost=1)
-    cpu.PC = cpu.read_word(address=cpu.S + 1)
+    # 3-4. Read return address from stack (2 cycles, done by read_word())
+    # RTS pops the return address minus 1 from the stack and adds 1 to get the actual return address
+    # JSR pushes PC-1, so RTS must add 1 back
+    return_address = cpu.read_word(address=cpu.S + 1) + 1
     cpu.S += 2
+    # 5. Increment PC (1 cycle)
+    cpu.spend_cpu_cycles(cost=1)
+    # 6. Final PC increment (1 cycle)
+    cpu.spend_cpu_cycles(cost=1)
+    cpu.PC = return_address

@@ -41,10 +41,10 @@ def test_cpu_instruction_RTS_IMPLIED_0x60(cpu: CPU) -> None:  # noqa: N802
     # Now place RTS at the subroutine location
     cpu.ram[0x4243] = instructions.RTS_IMPLIED_0x60
 
-    # when: Execute only RTS (4 cycles based on log)
+    # when: Execute only RTS (6 cycles per 6502 spec)
     with contextlib.suppress(errors.CPUCycleExhaustionError):
-        cpu.execute(cycles=4)
+        cpu.execute(cycles=6)
 
     # then: RTS should return to address after JSR (0xFFFF)
     assert cpu.PC == 0xFFFF
-    assert cpu.cycles_executed == 4
+    assert cpu.cycles_executed == 6
