@@ -22,6 +22,16 @@ if TYPE_CHECKING:
 
 INFINITE_CYCLES: Literal[4294967295] = 0xFFFFFFFF
 
+# Bit masks for byte operations
+BYTE_BIT_0_MASK: int = 0x01  # Bit 0 mask
+BYTE_BIT_1_MASK: int = 0x02  # Bit 1 mask
+BYTE_BIT_2_MASK: int = 0x04  # Bit 2 mask
+BYTE_BIT_3_MASK: int = 0x08  # Bit 3 mask
+BYTE_BIT_4_MASK: int = 0x10  # Bit 4 mask
+BYTE_BIT_5_MASK: int = 0x20  # Bit 5 mask
+BYTE_BIT_6_MASK: int = 0x40  # Bit 6 mask
+BYTE_BIT_7_MASK: int = 0x80  # Bit 7 mask
+
 
 # https://skilldrick.github.io/easy6502/
 # https://masswerk.at/6502/6502_instruction_set.html
@@ -1098,6 +1108,39 @@ class MOS6502CPU(flags.ProcessorStatusFlagsInterface):
                     self.log.info("i")
 
                 # ''' Execute BIT '''
+                case instructions.BIT_ZEROPAGE_0x24:
+                    # Bit Test - AND A with memory, set flags but don't store result
+                    address: int = self.fetch_zeropage_mode_address(offset_register_name=None)
+                    value: int = int(self.read_byte(address=address))
+
+                    # Z flag set based on A AND memory
+                    result: int = self.A & value
+                    self.flags[flags.Z] = 1 if result == 0 else 0
+
+                    # N flag = bit 7 of memory
+                    self.flags[flags.N] = 1 if (value & BYTE_BIT_7_MASK) else 0
+
+                    # V flag = bit 6 of memory
+                    self.flags[flags.V] = 1 if (value & BYTE_BIT_6_MASK) else 0
+
+                    self.log.info("i")
+
+                case instructions.BIT_ABSOLUTE_0x2C:
+                    # Bit Test - AND A with memory, set flags but don't store result
+                    address: int = self.fetch_absolute_mode_address(offset_register_name=None)
+                    value: int = int(self.read_byte(address=address))
+
+                    # Z flag set based on A AND memory
+                    result: int = self.A & value
+                    self.flags[flags.Z] = 1 if result == 0 else 0
+
+                    # N flag = bit 7 of memory
+                    self.flags[flags.N] = 1 if (value & BYTE_BIT_7_MASK) else 0
+
+                    # V flag = bit 6 of memory
+                    self.flags[flags.V] = 1 if (value & BYTE_BIT_6_MASK) else 0
+
+                    self.log.info("i")
 
                 # ''' Execute BMI '''
                 case instructions.BMI_RELATIVE_0x30:
