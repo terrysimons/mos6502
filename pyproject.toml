@@ -6,7 +6,6 @@ authors = ["Terry Simons <terry.simons@gmail.com>"]
 
 [tool.poetry.dependencies]
 python = ">=3.14,<4.0"
-textual = "*"
 bitarray = "*"
 
 
