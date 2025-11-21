@@ -622,14 +622,14 @@ class C64:
                             # disassemble_instruction returns: "78        SEI  ; implied"
                             # We want the whole thing as-is (hex bytes, mnemonic, addressing mode)
                             inst_display = inst_str.strip()
-                        except Exception:
-                            # Fallback: just show opcode bytes
+                        except (KeyError, ValueError, IndexError):
+                            # Fallback: just show opcode bytes if disassembly fails
                             try:
                                 b0 = self.cpu.ram[pc]
                                 b1 = self.cpu.ram[pc+1]
                                 b2 = self.cpu.ram[pc+2]
                                 inst_display = f"{b0:02X} {b1:02X} {b2:02X}  ???"
-                            except:
+                            except IndexError:
                                 inst_display = "???"
 
                         status = (f"Cycles: {self.cpu.cycles_executed:,} | "
@@ -672,14 +672,14 @@ class C64:
         except KeyboardInterrupt:
             log.info("\nExecution interrupted by user")
             log.info(f"PC=${self.cpu.PC:04X}, Cycles={self.cpu.cycles_executed}")
-        except Exception as e:
+        except (errors.CPUCycleExhaustionError, errors.InvalidOpcodeError, RuntimeError) as e:
             log.exception(f"Execution error at PC=${self.cpu.PC:04X}")
             # Show context around error
             try:
                 pc_val = int(self.cpu.PC)
                 self.show_disassembly(max(0, pc_val - 10), num_instructions=20)
                 self.dump_memory(max(0, pc_val - 16), min(0xFFFF, pc_val + 16))
-            except Exception as display_err:
+            except (IndexError, KeyError, ValueError):
                 log.exception("Could not display context")
             raise
         finally:
