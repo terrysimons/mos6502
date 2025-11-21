@@ -13,8 +13,9 @@ log.setLevel(logging.DEBUG)
 def test_cpu_instruction_BRK_IMPLIED_0x00(cpu: CPU) -> None:  # noqa: N802
     """Test BRK instruction behavior.
 
+    BRK is a 2-byte instruction (opcode + signature byte).
     BRK should:
-    1. Push PC+2 to stack (high byte first, then low byte)
+    1. Push PC+2 to stack (high byte first, then low byte) - skips signature byte
     2. Push status register with B flag set to stack
     3. Set I (interrupt disable) flag
     4. Raise CPUBreakError exception
@@ -44,13 +45,13 @@ def test_cpu_instruction_BRK_IMPLIED_0x00(cpu: CPU) -> None:  # noqa: N802
     assert cpu.S == initial_sp - 3, \
         f"Stack pointer should be {initial_sp - 3}, got {cpu.S}"
 
-    # 2. Verify PC+1 was pushed to stack
+    # 2. Verify PC+2 was pushed to stack (skipping signature byte)
     # write_word(S-1) writes: lowbyte at S-1, highbyte at S
     # So: lowbyte at 0x1FE, highbyte at 0x1FF
     pushed_pc_low = cpu.ram[initial_sp - 1]
     pushed_pc_high = cpu.ram[initial_sp]
     pushed_pc = (pushed_pc_high << 8) | pushed_pc_low
-    expected_pushed_pc = initial_pc + 1  # PC+1 because we're at the opcode
+    expected_pushed_pc = initial_pc + 2  # PC+2 to skip signature byte
     assert pushed_pc == expected_pushed_pc, \
         f"Pushed PC should be 0x{expected_pushed_pc:04X}, got 0x{pushed_pc:04X}"
 
@@ -78,23 +79,19 @@ def test_cpu_instruction_BRK_IMPLIED_0x00(cpu: CPU) -> None:  # noqa: N802
 
 
 def test_cpu_instruction_BRK_IMPLIED_0x00_raises_exception(cpu: CPU) -> None:  # noqa: N802
-    """Test that BRK raises CPUBreakError exception."""
-    # given:
-
+    """Test that BRK jumps to IRQ handler vector."""
+    # given: Set up IRQ vector to point to a handler at $1234
+    cpu.ram[0xFFFE] = 0x34  # IRQ vector low byte
+    cpu.ram[0xFFFF] = 0x12  # IRQ vector high byte
     cpu.ram[0xFFFC] = instructions.BRK_IMPLIED_0x00
     cpu.ram[0xFFFD] = 0x00
 
-    # when/then:
-    exception_raised = False
-    try:
-        with contextlib.suppress(errors.CPUCycleExhaustionError):
-            cpu.execute(cycles=7)
-    except errors.CPUBreakError as e:
-        exception_raised = True
-        assert "BRK instruction executed" in str(e)
-        assert "PC=0x" in str(e)
+    # when: Execute BRK
+    with contextlib.suppress(errors.CPUCycleExhaustionError):
+        cpu.execute(cycles=7)
 
-    assert exception_raised, "BRK should raise CPUBreakError"
+    # then: PC should be at IRQ handler
+    assert cpu.PC == 0x1234, f"BRK should jump to IRQ vector at 0x1234, got 0x{cpu.PC:04X}"
 
 
 def test_cpu_instruction_BRK_IMPLIED_0x00_with_all_flags_clear(cpu: CPU) -> None:  # noqa: N802

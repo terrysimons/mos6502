@@ -1290,8 +1290,8 @@ class MOS6502CPU(flags.ProcessorStatusFlagsInterface):
         -------
             None
         """
-        self.log.info(f"PC -> 0x{self._registers.PC:04X}")
         self._registers.PC = Word(PC)
+        self.log.info(f"PC -> 0x{self._registers.PC:04X}")
 
     @property
     def S(self: Self) -> Word:  # noqa: N802
@@ -1322,8 +1322,8 @@ class MOS6502CPU(flags.ProcessorStatusFlagsInterface):
         -------
             None
         """
-        self.log.info(f"S -> 0x{self._registers.S:02X}")
         self._registers.S = Word(S & 511)
+        self.log.info(f"S -> 0x{self._registers.S & 0xFF:02X}")
 
     @property
     def A(self: Self) -> Byte:  # noqa: N802
@@ -1350,8 +1350,8 @@ class MOS6502CPU(flags.ProcessorStatusFlagsInterface):
         -------
             None
         """
-        self.log.info(f"A -> 0x{self._registers.A:02X}")
         self._registers.A = A
+        self.log.info(f"A -> 0x{self._registers.A:02X}")
 
     @property
     def X(self: Self) -> Byte:  # noqa: N802
@@ -1378,8 +1378,8 @@ class MOS6502CPU(flags.ProcessorStatusFlagsInterface):
         -------
             None
         """
-        self.log.info(f"X -> 0x{self._registers.X:02X}")
         self._registers.X = X
+        self.log.info(f"X -> 0x{self._registers.X:02X}")
 
     @property
     def Y(self: Self) -> Byte:  # noqa: N802
@@ -1406,8 +1406,8 @@ class MOS6502CPU(flags.ProcessorStatusFlagsInterface):
         -------
             None
         """
-        self.log.info(f"Y -> 0x{self._registers.Y:02X}")
         self._registers.Y = Y
+        self.log.info(f"Y -> 0x{self._registers.Y:02X}")
 
     def __str__(self: Self) -> str:
         """Return the CPU status."""

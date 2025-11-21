@@ -364,9 +364,12 @@ class Word(MemoryUnit):
 
         Arguments:
         ---------
-            value: a value between -32767 and 65535
+            value: a value between -32767 and 65535 (automatically masked to 16 bits)
             endianness: 'big' or 'little' (default: mos6502.memory.ENDIANNESS)
         """
+        # Mask to 16 bits to handle address wrapping (6502 behavior)
+        if isinstance(value, int):
+            value = value & 0xFFFF
         super().__init__(value=value, endianness=endianness)
 
     @property
@@ -391,15 +394,23 @@ class RAM(MutableSequence):
         self.initialize()
 
     def initialize(self: Self) -> None:
-        """Initialize the zeropage, stack, and heap to 0x00."""
+        """Initialize the zeropage, stack, and heap to 0xFF (typical power-on state)."""
+        # Real 6502 RAM contains unpredictable values on power-up
+        # Using 0xFF avoids accidental BRK (0x00) execution
+
+        # If there's a memory handler (e.g., C64 banking), skip initialization
+        # to preserve any ROM data that was written before the handler was installed
+        if self.memory_handler is not None:
+            return
+
         self.zeropage: list[Byte] = [
-            Byte(endianness=self.endianness),
+            Byte(value=0xFF, endianness=self.endianness),
         ] * 256
         self.stack: list[Byte] = [
-            Byte(endianness=self.endianness),
+            Byte(value=0xFF, endianness=self.endianness),
         ] * 256
         self.heap: list[Byte] = [
-            Byte(endianness=self.endianness),
+            Byte(value=0xFF, endianness=self.endianness),
         ] * (0x10000 - len(self.zeropage) - len(self.stack))
 
     def __repr__(self: Self) -> str:

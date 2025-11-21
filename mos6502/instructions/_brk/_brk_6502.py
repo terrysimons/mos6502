@@ -32,11 +32,23 @@ def brk_implied_0x00(cpu: MOS6502CPU) -> None:
     from mos6502.memory import Byte
 
     # BRK pushes PC+2, then SR (with B flag set), then sets I flag
-    # Total: 7 cycles (1 for fetch + 2 for write_word + 1 for write_byte + 3 for overhead)
-    # BRK is documented as pushing PC+2, but after fetch_byte(), PC is already +1
-    # So we push PC (current value, which is already original PC+1)
-    cpu.write_word(address=cpu.S - 1, data=cpu.PC)
-    cpu.S -= 2
+    # Total: 7 cycles (1 for fetch + 3 for stack pushes + 3 for IRQ vector read/jump)
+    # BRK is a 2-byte instruction (opcode + signature byte)
+    # After fetch_byte(), PC points to the signature byte
+    # We need to push PC+1 to skip the signature byte (making it PC+2 from original PC)
+
+    # Calculate return address (PC+1 to skip signature byte)
+    return_addr = cpu.PC + 1
+    pc_high = (return_addr >> 8) & 0xFF
+    pc_low = return_addr & 0xFF
+
+    # Push PC high byte first (6502 pushes high byte before low byte)
+    cpu.write_byte(address=cpu.S, data=pc_high)
+    cpu.S -= 1
+
+    # Push PC low byte
+    cpu.write_byte(address=cpu.S, data=pc_low)
+    cpu.S -= 1
 
     # Push status register with B flag set
     # Create a copy of flags with B flag set
@@ -48,15 +60,12 @@ def brk_implied_0x00(cpu: MOS6502CPU) -> None:
     cpu.I = flags.ProcessorStatusFlags.I[flags.I]
 
     # Load PC from IRQ vector at 0xFFFE/0xFFFF
-    # (In a real system, this would jump to the interrupt handler)
-    # For our emulator, we'll raise an exception instead
-    # We've spent 4 cycles so far (1 fetch + 2 write_word + 1 write_byte)
-    # Need 3 more to total 7
-    cpu.spend_cpu_cycles(cost=3)
+    # Read the IRQ vector (2 cycles)
+    irq_vector = cpu.peek_word(0xFFFE)
+    cpu.spend_cpu_cycles(cost=2)
+
+    # Jump to IRQ handler (1 cycle)
+    cpu.PC = irq_vector
+    cpu.spend_cpu_cycles(cost=1)
 
     cpu.log.info("i")
-
-    # Raise exception to signal BRK was executed
-    from mos6502 import errors
-
-    raise errors.CPUBreakError(f"BRK instruction executed at PC=0x{cpu.PC - 1:04X}")
