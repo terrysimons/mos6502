@@ -22,7 +22,7 @@ TYA_IMPLIED_0x98 = InstructionOpcode(
 def add_tya_to_instruction_set_enum(instruction_set_class) -> None:
     """Add TYA instruction to the InstructionSet enum dynamically."""
     class PseudoEnumMember(int):
-        def __new__(cls, value, name):
+        def __new__(cls, value, name) -> "InstructionSet":
             obj = int.__new__(cls, value)
             obj._name = name
             obj._value_ = value

@@ -25,7 +25,7 @@ def add_cld_to_instruction_set_enum(instruction_set_class) -> None:
     # We can't create a true enum member after class definition, but we can
     # create an object that behaves like one for lookup purposes
     class PseudoEnumMember(int):
-        def __new__(cls, value, name):
+        def __new__(cls, value, name) -> "InstructionSet":
             obj = int.__new__(cls, value)
             obj._name = name
             obj._value_ = value

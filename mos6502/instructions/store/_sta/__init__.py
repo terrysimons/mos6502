@@ -63,7 +63,7 @@ STA_INDIRECT_INDEXED_Y_0x91 = InstructionOpcode(
 def add_sta_to_instruction_set_enum(instruction_set_class) -> None:
     """Add STA instructions to the InstructionSet enum dynamically."""
     class PseudoEnumMember(int):
-        def __new__(cls, value, name):
+        def __new__(cls, value, name) -> "InstructionSet":
             obj = int.__new__(cls, value)
             obj._name = name
             obj._value_ = value

@@ -20,7 +20,7 @@ BNE_RELATIVE_0xD0 = InstructionOpcode(
 def add_bne_to_instruction_set_enum(instruction_set_class) -> None:
     """Add BNE instructions to the InstructionSet enum dynamically."""
     class PseudoEnumMember(int):
-        def __new__(cls, value, name):
+        def __new__(cls, value, name) -> "InstructionSet":
             obj = int.__new__(cls, value)
             obj._name = name
             obj._value_ = value

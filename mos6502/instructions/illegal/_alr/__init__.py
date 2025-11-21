@@ -27,7 +27,7 @@ ALR_IMMEDIATE_0x4B = InstructionOpcode(0x4B, "mos6502.instructions.illegal._alr"
 def add_alr_to_instruction_set_enum(instruction_set_class) -> None:
     """Add ALR instruction to the InstructionSet enum dynamically."""
     class PseudoEnumMember(int):
-        def __new__(cls, value, name):
+        def __new__(cls, value, name) -> "InstructionSet":
             obj = int.__new__(cls, value)
             obj._name = name
             obj._value_ = value

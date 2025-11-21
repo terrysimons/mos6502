@@ -30,7 +30,7 @@ RLA_ABSOLUTE_Y_0x3B = InstructionOpcode(0x3B, "mos6502.instructions.illegal._rla
 def add_rla_to_instruction_set_enum(instruction_set_class) -> None:
     """Add RLA instructions to the InstructionSet enum dynamically."""
     class PseudoEnumMember(int):
-        def __new__(cls, value, name):
+        def __new__(cls, value, name) -> "InstructionSet":
             obj = int.__new__(cls, value)
             obj._name = name
             obj._value_ = value

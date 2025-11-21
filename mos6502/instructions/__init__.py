@@ -21,7 +21,7 @@ class InstructionOpcode(int):
         )
     """
 
-    def __new__(cls, value: int, package: str, function: str):
+    def __new__(cls, value: int, package: str, function: str) -> "InstructionSet":
         """Create instruction opcode with metadata.
 
         Arguments:

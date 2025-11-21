@@ -28,7 +28,7 @@ ARR_IMMEDIATE_0x6B = InstructionOpcode(0x6B, "mos6502.instructions.illegal._arr"
 def add_arr_to_instruction_set_enum(instruction_set_class) -> None:
     """Add ARR instruction to the InstructionSet enum dynamically."""
     class PseudoEnumMember(int):
-        def __new__(cls, value, name):
+        def __new__(cls, value, name) -> "InstructionSet":
             obj = int.__new__(cls, value)
             obj._name = name
             obj._value_ = value

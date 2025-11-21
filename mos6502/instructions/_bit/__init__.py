@@ -33,7 +33,7 @@ BIT_ABSOLUTE_0x2C = InstructionOpcode(
 def add_bit_to_instruction_set_enum(instruction_set_class) -> None:
     """Add BIT instructions to the InstructionSet enum dynamically."""
     class PseudoEnumMember(int):
-        def __new__(cls, value, name):
+        def __new__(cls, value, name) -> "InstructionSet":
             obj = int.__new__(cls, value)
             obj._name = name
             obj._value_ = value

@@ -30,7 +30,7 @@ SRE_ABSOLUTE_Y_0x5B = InstructionOpcode(0x5B, "mos6502.instructions.illegal._sre
 def add_sre_to_instruction_set_enum(instruction_set_class) -> None:
     """Add SRE instructions to the InstructionSet enum dynamically."""
     class PseudoEnumMember(int):
-        def __new__(cls, value, name):
+        def __new__(cls, value, name) -> "InstructionSet":
             obj = int.__new__(cls, value)
             obj._name = name
             obj._value_ = value

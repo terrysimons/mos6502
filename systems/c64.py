@@ -76,7 +76,7 @@ class C64:
     RESET_VECTOR_ADDR = 0xFFFC
 
     class CIA1:
-        def __init__(self):
+        def __init__(self) -> None:
             # 16 registers, mirrored through $DC00–$DC0F
             self.regs = [0x00] * 16
 
@@ -114,7 +114,7 @@ class C64:
             return 0xFF
 
     class CIA2:
-        def __init__(self):
+        def __init__(self) -> None:
             self.regs = [0x00] * 16
 
         def read(self, addr) -> int:
@@ -131,7 +131,7 @@ class C64:
             self.regs[reg] = value
 
     class C64VIC:
-        def __init__(self, char_rom, cpu):
+        def __init__(self, char_rom, cpu) -> None:
             self.log = logging.getLogger("c64.vic")
             self.regs = [0] * 0x40
             self.char_rom = char_rom
@@ -241,7 +241,7 @@ class C64:
 
 
     class C64Memory:
-        def __init__(self, ram, *, basic_rom, kernal_rom, char_rom, cia1, cia2, vic):
+        def __init__(self, ram, *, basic_rom, kernal_rom, char_rom, cia1, cia2, vic) -> None:
             # Store references to actual RAM storage for direct access (avoids delegation loop)
             self.ram_zeropage = ram.zeropage
             self.ram_stack = ram.stack
@@ -366,7 +366,7 @@ class C64:
             self._write_ram_direct(addr, value & 0xFF)
 
 
-    def __init__(self, rom_dir: Path = Path("./roms")):
+    def __init__(self, rom_dir: Path = Path("./roms")) -> None:
         """Initialize the C64 emulator.
 
         Arguments:
