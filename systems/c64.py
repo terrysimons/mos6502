@@ -597,10 +597,31 @@ class C64:
             stop_display = threading.Event()
 
             def display_cycles() -> None:
-                """Display cycle count and CPU state on a single updating line."""
+                """Display cycle count, CPU state, and C64 screen."""
+                screen_start = 0x0400
+                cols = 40
+                rows = 25
+
                 while not stop_display.is_set():
                     if is_tty:
-                        # Use \r to return to start of line and overwrite
+                        # Clear screen and move cursor to top
+                        _sys.stdout.write("\033[2J\033[H")
+
+                        # Render C64 screen (40x25 characters)
+                        _sys.stdout.write("=" * 42 + "\n")
+                        _sys.stdout.write(" C64 SCREEN\n")
+                        _sys.stdout.write("=" * 42 + "\n")
+
+                        for row in range(rows):
+                            line = ""
+                            for col in range(cols):
+                                addr = screen_start + (row * cols) + col
+                                petscii = int(self.cpu.ram[addr])
+                                line += self.petscii_to_ascii(petscii)
+                            _sys.stdout.write(line + "\n")
+
+                        _sys.stdout.write("=" * 42 + "\n")
+
                         # Get flag values
                         flags = f"{'N' if self.cpu.N else 'n'}"
                         flags += f"{'V' if self.cpu.V else 'v'}"
@@ -628,8 +649,6 @@ class C64:
                         # Disassemble current instruction
                         try:
                             inst_str = self.disassemble_instruction(pc)
-                            # disassemble_instruction returns: "78        SEI  ; implied"
-                            # We want the whole thing as-is (hex bytes, mnemonic, addressing mode)
                             inst_display = inst_str.strip()
                         except (KeyError, ValueError, IndexError):
                             # Fallback: just show opcode bytes if disassembly fails
@@ -641,11 +660,12 @@ class C64:
                             except IndexError:
                                 inst_display = "???"
 
+                        # Status line at bottom
                         status = (f"Cycles: {self.cpu.cycles_executed:,} | "
                                 f"PC=${self.cpu.PC:04X}[{region}] {inst_display:20s} | "
                                 f"A=${self.cpu.A:02X} X=${self.cpu.X:02X} "
-                                f"Y=${self.cpu.Y:02X} S=${self.cpu.S & 0xFF:02X} P={flags}    ")
-                        _sys.stdout.write(f"\r{status}")
+                                f"Y=${self.cpu.Y:02X} S=${self.cpu.S & 0xFF:02X} P={flags}")
+                        _sys.stdout.write(status + "\n")
                         _sys.stdout.flush()
                     time.sleep(0.1)  # Update 10 times per second
 
