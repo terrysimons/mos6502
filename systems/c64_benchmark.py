@@ -21,7 +21,7 @@ def benchmark_c64(rom_dir: str, max_cycles: int) -> tuple[float, int]:
     Returns:
         (elapsed_seconds, cycles_executed)
     """
-    c64 = C64(rom_dir=rom_dir, display_mode="none")
+    c64 = C64(rom_dir=rom_dir, display_mode="headless")
     c64.cpu.reset()  # Clear RAM
     c64.load_roms()  # Load ROMs and initialize PC from reset vector
 

@@ -267,16 +267,6 @@ class C64:
             total_lines = self.cpu.cycles_executed // self.cycles_per_line
             new_raster = total_lines % self.raster_lines
 
-            # Debug: detect if update is being called excessively
-            if not hasattr(self, "_update_count"):
-                self._update_count = 0
-                self._last_cycles = 0
-            self._update_count += 1
-            if self._update_count % 100000 == 0:
-                cycles_diff = self.cpu.cycles_executed - self._last_cycles
-                self.log.warning(f"VIC update() called {self._update_count:,} times, cycles_diff={cycles_diff}")
-                self._last_cycles = self.cpu.cycles_executed
-
             # Check if we should trigger raster IRQ on raster line match
             if new_raster != self.current_raster:
                 raster_compare = self.regs[0x12] | ((self.regs[0x11] & 0x80) << 1)
@@ -547,7 +537,7 @@ class C64:
 
         Arguments:
             rom_dir: Directory containing ROM files (basic, kernal, char)
-            display_mode: Display mode (terminal, pygame, none)
+            display_mode: Display mode (terminal, pygame, headless)
             scale: Pygame window scaling factor
         """
         self.rom_dir = Path(rom_dir)
@@ -845,6 +835,97 @@ class C64:
 
         self.last_pc_region = region
 
+    def trigger_irq(self) -> None:
+        """Trigger a hardware IRQ on the CPU.
+
+        This simulates pulling the IRQ pin low on the 6502. If interrupts are enabled
+        (I flag is clear), the CPU will:
+        1. Finish current instruction
+        2. Push PC and status to stack
+        3. Set I flag
+        4. Jump to IRQ vector at $FFFE/$FFFF
+        """
+        # Only trigger if interrupts are enabled (I flag clear)
+        if self.cpu.I:
+            return
+
+        # Update VIC state before IRQ (updates raster counter)
+        self.vic.update()
+
+        # For now, always set VIC raster IRQ flag to simulate 60Hz interrupt
+        # The KERNAL IRQ handler will acknowledge this and handle keyboard scanning
+        self.vic.irq_flags |= 0x01  # Set raster IRQ flag
+
+        # Push PC and status onto stack (like BRK but without B flag set)
+        # Push PC high byte
+        self.cpu.write_byte(address=self.cpu.S, data=(self.cpu.PC >> 8) & 0xFF)
+        self.cpu.S = (self.cpu.S - 1) & 0x1FF
+
+        # Push PC low byte
+        self.cpu.write_byte(address=self.cpu.S, data=self.cpu.PC & 0xFF)
+        self.cpu.S = (self.cpu.S - 1) & 0x1FF
+
+        # Push status register (with B flag clear for hardware IRQ)
+        status = self.cpu._flags.value & ~0x10  # Clear B flag
+        self.cpu.write_byte(address=self.cpu.S, data=status)
+        self.cpu.S = (self.cpu.S - 1) & 0x1FF
+
+        # Set I flag to disable further interrupts
+        self.cpu.I = 1
+
+        # Jump to IRQ vector
+        irq_vector = self.cpu.peek_word(0xFFFE)
+        self.cpu.PC = irq_vector
+
+        # Account for IRQ overhead cycles (7 cycles total)
+        self.cpu.tick(7)
+
+        log.debug(f"IRQ triggered: jumping to ${irq_vector:04X}")
+
+    def execute_with_irqs(self, max_cycles: int = INFINITE_CYCLES) -> None:
+        """Execute CPU with periodic IRQ injection.
+
+        This runs the CPU in chunks, checking for and injecting IRQs between chunks.
+        IRQs are triggered at approximately 60Hz (every ~16,500 cycles for NTSC).
+        """
+        cycles_per_frame = self.vic.cycles_per_frame  # ~16,569 for NTSC
+        next_irq_cycle = cycles_per_frame
+
+        log.info(f"Starting execute_with_irqs: max_cycles={max_cycles}, cycles_per_frame={cycles_per_frame}")
+
+        iteration = 0
+        while self.cpu.cycles_executed < max_cycles:
+            # Calculate cycles until next IRQ
+            cycles_executed = self.cpu.cycles_executed
+            cycles_until_irq = next_irq_cycle - cycles_executed
+
+            # Run CPU until next IRQ or a reasonable chunk size
+            cycles_to_run = min(cycles_until_irq, 10000)
+            if cycles_to_run <= 0:
+                cycles_to_run = 100  # Minimum chunk
+
+            iteration += 1
+            if iteration <= 10 or iteration % 100 == 0:
+                log.info(f"Iteration {iteration}: cycles_executed={cycles_executed}, cycles_to_run={cycles_to_run}, next_irq={next_irq_cycle}")
+
+            # Run CPU for this chunk
+            try:
+                self.cpu.execute(cycles=cycles_to_run)
+            except errors.CPUCycleExhaustionError:
+                # Normal - we exhausted the chunk, continue to next chunk
+                pass
+            except Exception as e:
+                log.error(f"Exception in execute(): {e}")
+                raise
+
+            # Check if it's time for an IRQ
+            if self.cpu.cycles_executed >= next_irq_cycle:
+                log.info(f"Triggering IRQ at cycle {self.cpu.cycles_executed}")
+                self.trigger_irq()
+                next_irq_cycle += cycles_per_frame
+
+        log.info(f"execute_with_irqs completed: {self.cpu.cycles_executed} cycles")
+
     def run(self, max_cycles: int = INFINITE_CYCLES) -> None:
         """Run the C64 emulator.
 
@@ -874,7 +955,7 @@ class C64:
                 def cpu_thread() -> None:
                     nonlocal cpu_error
                     try:
-                        self.cpu.execute(cycles=max_cycles)
+                        self.execute_with_irqs(max_cycles=max_cycles)
                     except Exception as e:
                         cpu_error = e
                     finally:
@@ -912,23 +993,23 @@ class C64:
                 def display_cycles() -> None:
                     """Display cycle count, CPU state, and C64 screen."""
                     while not stop_display.is_set():
+                        # Check PC region for all modes (enables debug logging when entering BASIC)
+                        self._check_pc_region()
                         if self.display_mode == "terminal" and is_tty:
                             self._render_terminal()
-                        # "none" mode: do nothing
+                        # "headless" mode: just checks PC region
                         time.sleep(0.1)  # Update 10 times per second
 
-                # Start the display thread
-                if self.display_mode != "none":
-                    display_thread = threading.Thread(target=display_cycles, daemon=True)
-                    display_thread.start()
+                # Start the display thread for all modes (including headless for PC region checking)
+                display_thread = threading.Thread(target=display_cycles, daemon=True)
+                display_thread.start()
 
                 try:
-                    self.cpu.execute(cycles=max_cycles)
+                    self.execute_with_irqs(max_cycles=max_cycles)
                 finally:
                     # Stop the display thread
-                    if self.display_mode != "none":
-                        stop_display.set()
-                        display_thread.join(timeout=0.5)
+                    stop_display.set()
+                    display_thread.join(timeout=0.5)
 
         except errors.CPUCycleExhaustionError as e:
             log.info(f"CPU execution completed: {e}")
@@ -948,9 +1029,8 @@ class C64:
                 log.exception("Could not display context")
             raise
         finally:
-            # Only show screen if display mode is not "none"
-            if self.display_mode != "none":
-                self.show_screen()
+            # Always show screen buffer on termination
+            self.show_screen()
 
     def dump_memory(self, start: int, end: int, bytes_per_line: int = 16) -> None:
         """Dump memory contents for debugging.
@@ -1497,9 +1577,9 @@ def main() -> int | None:
     parser.add_argument(
         "--display",
         type=str,
-        choices=["terminal", "pygame", "none"],
+        choices=["terminal", "pygame", "headless"],
         default="terminal",
-        help="Display mode: terminal (default), pygame (graphical), or none (headless)",
+        help="Display mode: terminal (default), pygame (graphical), or headless (no display)",
     )
     parser.add_argument(
         "--scale",
@@ -1525,8 +1605,7 @@ def main() -> int | None:
         logging.getLogger("mos6502").setLevel(logging.CRITICAL)
         # Also disable flag logging during KERNAL boot
         logging.getLogger("mos6502.cpu.flags").setLevel(logging.CRITICAL)
-        if args.display == "pygame":
-            log.info("Pygame mode: CPU logging will enable when BASIC ROM is entered")
+        log.info("CPU logging will enable when BASIC ROM is entered")
 
         # Then load ROMs (after RAM is cleared)
         # This creates the VIC which is needed for pygame initialization
@@ -1569,7 +1648,7 @@ def main() -> int | None:
                 c64.dump_memory(args.dump_mem[0], args.dump_mem[1])
 
         # Run
-        c64.run(max_cycles=0xFFFFFFFF)
+        c64.run(max_cycles=args.max_cycles)
 
         # Dump final state
         c64.dump_registers()
