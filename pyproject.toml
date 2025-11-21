@@ -113,6 +113,7 @@ extend-ignore = [
     "EM102", # Exception must not use an f-string literal, assign to variable first
     "I001", # Import block is un-sorted or un-formatted
     "D417", # D417 Missing argument description in the docstring:
+    "PLC0415", # Import should be at top-level (intentional for circular import avoidance)
 ]
 
 fixable=[
