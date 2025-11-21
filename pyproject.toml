@@ -103,6 +103,7 @@ ignore = [
     "G004", # Logging statement uses f-string
     "N999", # Invalid module name:
     "TRY003", # Avoid specifying long messages outside the exception class
+    "T201", # print() is intentional - used for emulator output (screen, disassembly, memory dumps)
 ]
 extend-ignore = [
     "ARG001", # Unused function argument:
