@@ -222,10 +222,10 @@ class MemoryUnit:
                 int_rvalue: int = int.from_bytes(rvalue.tobytes(), byteorder=self.endianness)
             elif isinstance(rvalue, int):
                 int_rvalue = rvalue
-            else:
-                return int_lvalue & int_rvalue
         except (AttributeError, TypeError, ValueError) as e:
             raise TypeError(f"Cannot perform bitwise AND on types {type(self)} and {type(rvalue)}") from e
+        else:
+            return int_lvalue & int_rvalue
 
     def __lshift__(self: Self, rvalue: int | bitarray.bitarray) -> bitarray.bitarray:
         """

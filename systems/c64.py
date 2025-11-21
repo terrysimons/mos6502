@@ -899,6 +899,7 @@ class C64:
 
         Returns:
             Formatted disassembly string for the instruction
+
         """
         from mos6502 import instructions
 
@@ -966,7 +967,7 @@ class C64:
 
 
 def main() -> int | None:
-    """Main entry point for C64 emulator."""
+    """Run the C64 emulator CLI."""
     import argparse
 
     parser = argparse.ArgumentParser(description="Commodore 64 Emulator")
