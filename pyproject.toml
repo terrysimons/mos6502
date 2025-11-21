@@ -35,7 +35,6 @@ select = [
 ]
 extend-select = [
     "W",
-    "C90",
     "I",
     "N",
     "UP",
@@ -118,6 +117,7 @@ extend-ignore = [
     "I001", # Import block is un-sorted or un-formatted
     "D417", # D417 Missing argument description in the docstring:
     "PLC0415", # Import should be at top-level (intentional for circular import avoidance)
+    "C901", # Function is too complex - Complexity inherent to emulation (I/O, display, CLI, disassembly)
 ]
 
 fixable=[

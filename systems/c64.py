@@ -280,6 +280,25 @@ class C64:
             elif addr <= 65535:
                 self.ram_heap[addr - 512] = Byte(value=int2ba(value, length=8, endian="little"), endianness="little")
 
+        def _read_io_area(self, addr: int) -> int:
+            """Read from I/O area ($D000-$DFFF)."""
+            # VIC registers
+            if C64.VIC_START <= addr <= C64.VIC_END:
+                return self.vic.read(addr)
+            # SID registers
+            if C64.SID_START <= addr <= C64.SID_END:
+                return 0xFF  # SID stub
+            # Color RAM
+            if C64.COLOR_RAM_START <= addr <= C64.COLOR_RAM_END:
+                return self.ram_color[addr - C64.COLOR_RAM_START] | 0xF0
+            # CIA1
+            if C64.CIA1_START <= addr <= C64.CIA1_END:
+                return self.cia1.read(addr)
+            # CIA2
+            if C64.CIA2_START <= addr <= C64.CIA2_END:
+                return self.cia2.read(addr)
+            return 0xFF
+
         def read(self, addr) -> int:
             # CPU internal port
             if addr == 0x0000: return self.ddr
@@ -303,27 +322,34 @@ class C64:
             # I/O or CHAR ROM
             if C64.CHAR_ROM_START <= addr <= C64.CHAR_ROM_END:
                 if io_enabled:
-                    # VIC registers
-                    if C64.VIC_START <= addr <= C64.VIC_END:
-                        return self.vic.read(addr)
-                    # SID registers
-                    if C64.SID_START <= addr <= C64.SID_END:
-                        return 0xFF  # SID stub
-                    # Color RAM
-                    if C64.COLOR_RAM_START <= addr <= C64.COLOR_RAM_END:
-                        return self.ram_color[addr - C64.COLOR_RAM_START] | 0xF0
-                    # CIA1
-                    if C64.CIA1_START <= addr <= C64.CIA1_END:
-                        return self.cia1.read(addr)
-                    # CIA2
-                    if C64.CIA2_START <= addr <= C64.CIA2_END:
-                        return self.cia2.read(addr)
-                    return 0xFF
+                    return self._read_io_area(addr)
                 else:
                     return self.char[addr - C64.CHAR_ROM_START]
 
             # RAM fallback
             return self._read_ram_direct(addr)
+
+        def _write_io_area(self, addr: int, value: int) -> None:
+            """Write to I/O area ($D000-$DFFF)."""
+            # VIC registers
+            if 0xD000 <= addr <= 0xD3FF:
+                self.vic.write(addr, value)
+                return
+            # SID registers (stub)
+            if 0xD400 <= addr <= 0xD7FF:
+                return  # Ignore writes to SID
+            # Color RAM
+            if 0xD800 <= addr <= 0xDBFF:
+                self.ram_color[addr - 0xD800] = value & 0x0F  # Only 4 bits
+                return
+            # CIA1
+            if 0xDC00 <= addr <= 0xDCFF:
+                self.cia1.write(addr, value)
+                return
+            # CIA2
+            if 0xDD00 <= addr <= 0xDDFF:
+                self.cia2.write(addr, value)
+                return
 
         def write(self, addr, value) -> None:
             """Write to C64 memory with banking logic."""
@@ -340,25 +366,8 @@ class C64:
 
             # I/O area
             if C64.CHAR_ROM_START <= addr <= C64.CHAR_ROM_END and io_enabled:
-                # VIC registers
-                if 0xD000 <= addr <= 0xD3FF:
-                    self.vic.write(addr, value)
-                    return
-                # SID registers (stub)
-                if 0xD400 <= addr <= 0xD7FF:
-                    return  # Ignore writes to SID
-                # Color RAM
-                if 0xD800 <= addr <= 0xDBFF:
-                    self.ram_color[addr - 0xD800] = value & 0x0F  # Only 4 bits
-                    return
-                # CIA1
-                if 0xDC00 <= addr <= 0xDCFF:
-                    self.cia1.write(addr, value)
-                    return
-                # CIA2
-                if 0xDD00 <= addr <= 0xDDFF:
-                    self.cia2.write(addr, value)
-                    return
+                self._write_io_area(addr, value)
+                return
 
             # Can't write to ROM areas (BASIC/KERNAL/CHAR)
             # But we can write to underlying RAM which may be visible later
