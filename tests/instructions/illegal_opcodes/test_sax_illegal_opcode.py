@@ -25,7 +25,7 @@ from mos6502 import errors, instructions
 class TestSAXNMOS:
     """Test SAX instruction on NMOS variants (6502, 6502A, 6502C)."""
 
-    def test_sax_zeropage_stores_a_and_x(self, nmos_cpu):
+    def test_sax_zeropage_stores_a_and_x(self, nmos_cpu) -> None:
         """Test SAX zero page stores A & X to memory."""
         nmos_cpu.reset()
         nmos_cpu.A = 0xFF
@@ -47,7 +47,7 @@ class TestSAXNMOS:
         assert nmos_cpu.N == 0
         assert nmos_cpu.cycles_executed == 3
 
-    def test_sax_stores_zero(self, nmos_cpu):
+    def test_sax_stores_zero(self, nmos_cpu) -> None:
         """Test SAX stores zero when A & X = 0."""
         nmos_cpu.reset()
         nmos_cpu.A = 0xF0
@@ -64,7 +64,7 @@ class TestSAXNMOS:
         # Verify Z flag is NOT set (SAX doesn't affect flags)
         assert nmos_cpu.Z == 0
 
-    def test_sax_all_bits_set(self, nmos_cpu):
+    def test_sax_all_bits_set(self, nmos_cpu) -> None:
         """Test SAX with all bits set."""
         nmos_cpu.reset()
         nmos_cpu.A = 0xFF
@@ -79,7 +79,7 @@ class TestSAXNMOS:
         # Verify A & X (0xFF & 0xFF = 0xFF) stored to memory
         assert nmos_cpu.ram[0x30] == 0xFF
 
-    def test_sax_zeropage_y(self, nmos_cpu):
+    def test_sax_zeropage_y(self, nmos_cpu) -> None:
         """Test SAX zero page,Y with offset."""
         nmos_cpu.reset()
         nmos_cpu.A = 0xAA
@@ -96,7 +96,7 @@ class TestSAXNMOS:
         assert nmos_cpu.ram[0x15] == 0x00
         assert nmos_cpu.cycles_executed == 4
 
-    def test_sax_absolute(self, nmos_cpu):
+    def test_sax_absolute(self, nmos_cpu) -> None:
         """Test SAX absolute addressing."""
         nmos_cpu.reset()
         nmos_cpu.A = 0xF0
@@ -117,7 +117,7 @@ class TestSAXNMOS:
 class TestSAXCMOS:
     """Test SAX instruction on CMOS variant (65C02) - acts as NOP."""
 
-    def test_sax_acts_as_nop(self, cmos_cpu):
+    def test_sax_acts_as_nop(self, cmos_cpu) -> None:
         """Test SAX acts as NOP on CMOS (65C02)."""
         cmos_cpu.reset()
         cmos_cpu.A = 0xFF

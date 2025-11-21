@@ -21,7 +21,7 @@ from mos6502 import errors, instructions
 class TestANCNMOS:
     """Test ANC instruction on NMOS variants (6502, 6502A, 6502C)."""
 
-    def test_anc_and_operation(self, nmos_cpu):
+    def test_anc_and_operation(self, nmos_cpu) -> None:
         """Test ANC performs AND operation."""
         nmos_cpu.reset()
         nmos_cpu.A = 0xF0
@@ -40,7 +40,7 @@ class TestANCNMOS:
         # C should match N (both 0)
         assert nmos_cpu.C == 0
 
-    def test_anc_sets_carry_when_negative(self, nmos_cpu):
+    def test_anc_sets_carry_when_negative(self, nmos_cpu) -> None:
         """Test ANC sets carry to match negative flag."""
         nmos_cpu.reset()
         nmos_cpu.A = 0xFF
@@ -59,7 +59,7 @@ class TestANCNMOS:
         # C should match N (both 1)
         assert nmos_cpu.C == 1
 
-    def test_anc_duplicate_opcode(self, nmos_cpu):
+    def test_anc_duplicate_opcode(self, nmos_cpu) -> None:
         """Test ANC duplicate opcode $2B works identically."""
         nmos_cpu.reset()
         nmos_cpu.A = 0xAA
@@ -79,7 +79,7 @@ class TestANCNMOS:
 class TestALRNMOS:
     """Test ALR instruction on NMOS variants (6502, 6502A, 6502C)."""
 
-    def test_alr_and_then_shift(self, nmos_cpu):
+    def test_alr_and_then_shift(self, nmos_cpu) -> None:
         """Test ALR performs AND then LSR."""
         nmos_cpu.reset()
         nmos_cpu.A = 0xFF
@@ -96,7 +96,7 @@ class TestALRNMOS:
         assert nmos_cpu.N == 0  # Always 0 after LSR
         assert nmos_cpu.C == 1  # Bit 0 of 0x0F was 1
 
-    def test_alr_sets_carry(self, nmos_cpu):
+    def test_alr_sets_carry(self, nmos_cpu) -> None:
         """Test ALR sets carry from bit 0 of AND result."""
         nmos_cpu.reset()
         nmos_cpu.A = 0xAA
@@ -112,7 +112,7 @@ class TestALRNMOS:
         assert nmos_cpu.Z == 1
         assert nmos_cpu.C == 0  # Bit 0 of 0x00 was 0
 
-    def test_alr_result_zero(self, nmos_cpu):
+    def test_alr_result_zero(self, nmos_cpu) -> None:
         """Test ALR sets zero flag when result is zero."""
         nmos_cpu.reset()
         nmos_cpu.A = 0x01
@@ -132,7 +132,7 @@ class TestALRNMOS:
 class TestARRNMOS:
     """Test ARR instruction on NMOS variants (6502, 6502A, 6502C)."""
 
-    def test_arr_and_then_rotate(self, nmos_cpu):
+    def test_arr_and_then_rotate(self, nmos_cpu) -> None:
         """Test ARR performs AND then ROR."""
         nmos_cpu.reset()
         nmos_cpu.A = 0x7F
@@ -149,7 +149,7 @@ class TestARRNMOS:
         assert nmos_cpu.Z == 0
         assert nmos_cpu.N == 1
 
-    def test_arr_special_carry_flag(self, nmos_cpu):
+    def test_arr_special_carry_flag(self, nmos_cpu) -> None:
         """Test ARR sets carry from bit 6 of result."""
         nmos_cpu.reset()
         nmos_cpu.A = 0xFF
@@ -166,7 +166,7 @@ class TestARRNMOS:
         # C is set from bit 6 of result (0x7F = 01111111, bit 6 = 1)
         assert nmos_cpu.C == 1
 
-    def test_arr_special_overflow_flag(self, nmos_cpu):
+    def test_arr_special_overflow_flag(self, nmos_cpu) -> None:
         """Test ARR sets overflow from bit 6 XOR bit 5."""
         nmos_cpu.reset()
         nmos_cpu.A = 0xFF
@@ -183,7 +183,7 @@ class TestARRNMOS:
         # bit 6 = 1, bit 5 = 1, V = 1 XOR 1 = 0
         assert nmos_cpu.V == 0
 
-    def test_arr_overflow_set(self, nmos_cpu):
+    def test_arr_overflow_set(self, nmos_cpu) -> None:
         """Test ARR sets overflow when bit 6 XOR bit 5 = 1."""
         nmos_cpu.reset()
         nmos_cpu.A = 0xFF
@@ -204,7 +204,7 @@ class TestARRNMOS:
 class TestSBXNMOS:
     """Test SBX instruction on NMOS variants (6502, 6502A, 6502C)."""
 
-    def test_sbx_basic_subtract(self, nmos_cpu):
+    def test_sbx_basic_subtract(self, nmos_cpu) -> None:
         """Test SBX performs (A & X) - immediate."""
         nmos_cpu.reset()
         nmos_cpu.A = 0xFF
@@ -222,7 +222,7 @@ class TestSBXNMOS:
         assert nmos_cpu.N == 1
         assert nmos_cpu.C == 1  # No borrow (result >= 0)
 
-    def test_sbx_with_borrow(self, nmos_cpu):
+    def test_sbx_with_borrow(self, nmos_cpu) -> None:
         """Test SBX clears carry when result is negative."""
         nmos_cpu.reset()
         nmos_cpu.A = 0x0F
@@ -238,7 +238,7 @@ class TestSBXNMOS:
         assert nmos_cpu.X == 0x10
         assert nmos_cpu.C == 0  # Borrow occurred
 
-    def test_sbx_zero_result(self, nmos_cpu):
+    def test_sbx_zero_result(self, nmos_cpu) -> None:
         """Test SBX sets zero flag when result is zero."""
         nmos_cpu.reset()
         nmos_cpu.A = 0xFF
@@ -256,7 +256,7 @@ class TestSBXNMOS:
         assert nmos_cpu.N == 0
         assert nmos_cpu.C == 1  # No borrow
 
-    def test_sbx_and_operation(self, nmos_cpu):
+    def test_sbx_and_operation(self, nmos_cpu) -> None:
         """Test SBX properly ANDs A with X before subtraction."""
         nmos_cpu.reset()
         nmos_cpu.A = 0xAA  # 10101010
@@ -276,7 +276,7 @@ class TestSBXNMOS:
 class TestImmediateCMOS:
     """Test immediate mode illegal instructions on CMOS variant (65C02) - act as NOPs."""
 
-    def test_anc_acts_as_nop(self, cmos_cpu):
+    def test_anc_acts_as_nop(self, cmos_cpu) -> None:
         """Test ANC acts as NOP on CMOS."""
         cmos_cpu.reset()
         cmos_cpu.A = 0xF0
@@ -291,7 +291,7 @@ class TestImmediateCMOS:
         assert cmos_cpu.A == 0xF0
         assert cmos_cpu.C == 0
 
-    def test_alr_acts_as_nop(self, cmos_cpu):
+    def test_alr_acts_as_nop(self, cmos_cpu) -> None:
         """Test ALR acts as NOP on CMOS."""
         cmos_cpu.reset()
         cmos_cpu.A = 0xFF
@@ -304,7 +304,7 @@ class TestImmediateCMOS:
 
         assert cmos_cpu.A == 0xFF
 
-    def test_arr_acts_as_nop(self, cmos_cpu):
+    def test_arr_acts_as_nop(self, cmos_cpu) -> None:
         """Test ARR acts as NOP on CMOS."""
         cmos_cpu.reset()
         cmos_cpu.A = 0x7F
@@ -319,7 +319,7 @@ class TestImmediateCMOS:
         assert cmos_cpu.A == 0x7F
         assert cmos_cpu.C == 1
 
-    def test_sbx_acts_as_nop(self, cmos_cpu):
+    def test_sbx_acts_as_nop(self, cmos_cpu) -> None:
         """Test SBX acts as NOP on CMOS."""
         cmos_cpu.reset()
         cmos_cpu.A = 0xFF

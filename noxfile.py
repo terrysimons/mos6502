@@ -6,7 +6,7 @@ from nox_poetry import session
 nox.options.sessions = ["test"]
 
 @session
-def test(session):
+def test(session) -> None:
     session.run("ruff", "check","mos6502", "tests", "systems", external=True)
     session.run("pytest", "tests", "systems", external=True)
 

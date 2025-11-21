@@ -5,7 +5,7 @@ import pytest
 from mos6502 import instructions
 
 
-def test_all_opcodes_in_lookup_are_in_map():
+def test_all_opcodes_in_lookup_are_in_map() -> None:
     """Verify every opcode in OPCODE_LOOKUP is also in InstructionSet.map."""
     missing_from_map = []
 
@@ -23,7 +23,7 @@ def test_all_opcodes_in_lookup_are_in_map():
         pytest.fail(error_msg)
 
 
-def test_all_opcodes_in_map_are_in_lookup():
+def test_all_opcodes_in_map_are_in_lookup() -> None:
     """Verify every opcode in InstructionSet.map is also in OPCODE_LOOKUP."""
     missing_from_lookup = []
 
@@ -40,7 +40,7 @@ def test_all_opcodes_in_map_are_in_lookup():
         pytest.fail(error_msg)
 
 
-def test_opcode_metadata_consistency():
+def test_opcode_metadata_consistency() -> None:
     """Verify opcodes have consistent metadata between OPCODE_LOOKUP and InstructionSet.map."""
     inconsistent = []
 
@@ -68,7 +68,7 @@ def test_opcode_metadata_consistency():
         pytest.fail(error_msg)
 
 
-def test_all_256_opcodes_accounted_for():
+def test_all_256_opcodes_accounted_for() -> None:
     """Verify all 256 possible opcodes (0x00-0xFF) are either registered or documented as unimplemented."""
     registered = set(instructions.OPCODE_LOOKUP.keys())
 
@@ -96,7 +96,7 @@ def test_all_256_opcodes_accounted_for():
         )
 
 
-def test_critical_instructions_registered():
+def test_critical_instructions_registered() -> None:
     """Verify critical instructions used in tests and real programs are registered."""
     # These are commonly used instructions that should definitely be registered
     critical_opcodes = {

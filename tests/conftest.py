@@ -28,7 +28,7 @@ CMOS_CPU_VARIANTS = [
 
 
 @pytest.fixture(params=ALL_CPU_VARIANTS)
-def cpu_variant(request):
+def cpu_variant(request) -> str:
     """Fixture that provides each CPU variant.
 
     Tests using this fixture will automatically run for all CPU variants.
@@ -37,7 +37,7 @@ def cpu_variant(request):
 
 
 @pytest.fixture(params=NMOS_CPU_VARIANTS)
-def nmos_cpu_variant(request):
+def nmos_cpu_variant(request) -> str:
     """Fixture that provides only NMOS CPU variants.
 
     Use this for tests that should only run on NMOS variants.
@@ -46,7 +46,7 @@ def nmos_cpu_variant(request):
 
 
 @pytest.fixture(params=CMOS_CPU_VARIANTS)
-def cmos_cpu_variant(request):
+def cmos_cpu_variant(request) -> str:
     """Fixture that provides only CMOS CPU variants.
 
     Use this for tests that should only run on CMOS variants.
@@ -55,7 +55,7 @@ def cmos_cpu_variant(request):
 
 
 @pytest.fixture
-def cpu(cpu_variant):
+def cpu(cpu_variant) -> CPU:
     """Fixture that provides a fresh CPU instance for each variant.
 
     The CPU is already reset and ready to use.
@@ -66,7 +66,7 @@ def cpu(cpu_variant):
 
 
 @pytest.fixture
-def nmos_cpu(nmos_cpu_variant):
+def nmos_cpu(nmos_cpu_variant) -> CPU:
     """Fixture that provides a fresh NMOS CPU instance for each NMOS variant.
 
     The CPU is already reset and ready to use.
@@ -77,7 +77,7 @@ def nmos_cpu(nmos_cpu_variant):
 
 
 @pytest.fixture
-def cmos_cpu(cmos_cpu_variant):
+def cmos_cpu(cmos_cpu_variant) -> CPU:
     """Fixture that provides a fresh CMOS CPU instance for each CMOS variant.
 
     The CPU is already reset and ready to use.

@@ -29,7 +29,7 @@ from mos6502 import errors, instructions
 class TestSRENMOS:
     """Test SRE instruction on NMOS variants (6502, 6502A, 6502C)."""
 
-    def test_sre_zeropage_shifts_and_eors(self, nmos_cpu):
+    def test_sre_zeropage_shifts_and_eors(self, nmos_cpu) -> None:
         """Test SRE zero page shifts memory right and EORs with A."""
         nmos_cpu.reset()
         nmos_cpu.A = 0x0F
@@ -51,7 +51,7 @@ class TestSRENMOS:
         assert nmos_cpu.N == 0  # Result bit 7 is clear
         assert nmos_cpu.cycles_executed == 5
 
-    def test_sre_sets_carry(self, nmos_cpu):
+    def test_sre_sets_carry(self, nmos_cpu) -> None:
         """Test SRE sets carry when bit 0 of original value is set."""
         nmos_cpu.reset()
         nmos_cpu.A = 0x00
@@ -72,7 +72,7 @@ class TestSRENMOS:
         assert nmos_cpu.N == 0
         assert nmos_cpu.Z == 0
 
-    def test_sre_sets_zero_flag(self, nmos_cpu):
+    def test_sre_sets_zero_flag(self, nmos_cpu) -> None:
         """Test SRE sets zero flag when result is zero."""
         nmos_cpu.reset()
         nmos_cpu.A = 0x00
@@ -93,7 +93,7 @@ class TestSRENMOS:
         assert nmos_cpu.N == 0
         assert nmos_cpu.C == 0
 
-    def test_sre_eor_operation(self, nmos_cpu):
+    def test_sre_eor_operation(self, nmos_cpu) -> None:
         """Test SRE EOR operation combines properly."""
         nmos_cpu.reset()
         nmos_cpu.A = 0xF0  # 11110000
@@ -112,7 +112,7 @@ class TestSRENMOS:
         assert nmos_cpu.N == 1  # Bit 7 set
         assert nmos_cpu.Z == 0
 
-    def test_sre_shift_wraps(self, nmos_cpu):
+    def test_sre_shift_wraps(self, nmos_cpu) -> None:
         """Test SRE shift operation wraps at 8 bits."""
         nmos_cpu.reset()
         nmos_cpu.A = 0x00
@@ -130,7 +130,7 @@ class TestSRENMOS:
         assert nmos_cpu.C == 1  # Bit 0 was set
         assert nmos_cpu.N == 0
 
-    def test_sre_sets_negative_flag(self, nmos_cpu):
+    def test_sre_sets_negative_flag(self, nmos_cpu) -> None:
         """Test SRE sets negative flag when result has bit 7 set."""
         nmos_cpu.reset()
         nmos_cpu.A = 0xFF
@@ -150,7 +150,7 @@ class TestSRENMOS:
         assert nmos_cpu.Z == 0
         assert nmos_cpu.C == 0
 
-    def test_sre_zeropage_x(self, nmos_cpu):
+    def test_sre_zeropage_x(self, nmos_cpu) -> None:
         """Test SRE zero page,X with offset."""
         nmos_cpu.reset()
         nmos_cpu.A = 0x01
@@ -169,7 +169,7 @@ class TestSRENMOS:
         assert nmos_cpu.A == 0x05
         assert nmos_cpu.cycles_executed == 6
 
-    def test_sre_absolute(self, nmos_cpu):
+    def test_sre_absolute(self, nmos_cpu) -> None:
         """Test SRE absolute addressing."""
         nmos_cpu.reset()
         nmos_cpu.A = 0x11
@@ -188,7 +188,7 @@ class TestSRENMOS:
         assert nmos_cpu.A == 0x33
         assert nmos_cpu.cycles_executed == 6
 
-    def test_sre_absolute_x(self, nmos_cpu):
+    def test_sre_absolute_x(self, nmos_cpu) -> None:
         """Test SRE absolute,X addressing."""
         nmos_cpu.reset()
         nmos_cpu.A = 0x0A
@@ -208,7 +208,7 @@ class TestSRENMOS:
         assert nmos_cpu.A == 0x0F
         assert nmos_cpu.cycles_executed == 7
 
-    def test_sre_absolute_y(self, nmos_cpu):
+    def test_sre_absolute_y(self, nmos_cpu) -> None:
         """Test SRE absolute,Y addressing."""
         nmos_cpu.reset()
         nmos_cpu.A = 0x20
@@ -229,7 +229,7 @@ class TestSRENMOS:
         assert nmos_cpu.Z == 1  # Result is zero
         assert nmos_cpu.cycles_executed == 7
 
-    def test_sre_indexed_indirect_x(self, nmos_cpu):
+    def test_sre_indexed_indirect_x(self, nmos_cpu) -> None:
         """Test SRE (indirect,X) addressing."""
         nmos_cpu.reset()
         nmos_cpu.A = 0xFF
@@ -252,7 +252,7 @@ class TestSRENMOS:
         assert nmos_cpu.A == 0xFD
         assert nmos_cpu.cycles_executed == 8
 
-    def test_sre_indirect_indexed_y(self, nmos_cpu):
+    def test_sre_indirect_indexed_y(self, nmos_cpu) -> None:
         """Test SRE (indirect),Y addressing."""
         nmos_cpu.reset()
         nmos_cpu.A = 0xAA
@@ -279,7 +279,7 @@ class TestSRENMOS:
 class TestSRECMOS:
     """Test SRE instruction on CMOS variant (65C02) - acts as NOP."""
 
-    def test_sre_acts_as_nop(self, cmos_cpu):
+    def test_sre_acts_as_nop(self, cmos_cpu) -> None:
         """Test SRE acts as NOP on CMOS (65C02)."""
         cmos_cpu.reset()
         cmos_cpu.A = 0x0F

@@ -31,7 +31,7 @@ from mos6502 import errors, instructions
 class TestLAXNMOS:
     """Test LAX instruction on NMOS variants (6502, 6502A, 6502C)."""
 
-    def test_lax_zeropage_loads_value_into_both_registers(self, nmos_cpu):
+    def test_lax_zeropage_loads_value_into_both_registers(self, nmos_cpu) -> None:
         """Test LAX zero page loads memory into both A and X."""
         nmos_cpu.reset()
         nmos_cpu.ram[0x10] = 0x42
@@ -48,7 +48,7 @@ class TestLAXNMOS:
         assert nmos_cpu.N == 0
         assert nmos_cpu.cycles_executed == 3
 
-    def test_lax_sets_zero_flag(self, nmos_cpu):
+    def test_lax_sets_zero_flag(self, nmos_cpu) -> None:
         """Test LAX sets zero flag when loading zero value."""
         nmos_cpu.reset()
         nmos_cpu.ram[0x20] = 0x00
@@ -64,7 +64,7 @@ class TestLAXNMOS:
         assert nmos_cpu.Z == 1
         assert nmos_cpu.cycles_executed == 3
 
-    def test_lax_sets_negative_flag(self, nmos_cpu):
+    def test_lax_sets_negative_flag(self, nmos_cpu) -> None:
         """Test LAX sets negative flag when bit 7 is set."""
         nmos_cpu.reset()
         nmos_cpu.ram[0x30] = 0xFF
@@ -80,7 +80,7 @@ class TestLAXNMOS:
         assert nmos_cpu.N == 1
         assert nmos_cpu.cycles_executed == 3
 
-    def test_lax_absolute(self, nmos_cpu):
+    def test_lax_absolute(self, nmos_cpu) -> None:
         """Test LAX absolute addressing."""
         nmos_cpu.reset()
         nmos_cpu.ram[0x4567] = 0x77
@@ -96,7 +96,7 @@ class TestLAXNMOS:
         assert nmos_cpu.X == 0x77
         assert nmos_cpu.cycles_executed == 4
 
-    def test_lax_zeropage_y(self, nmos_cpu):
+    def test_lax_zeropage_y(self, nmos_cpu) -> None:
         """Test LAX zero page,Y with offset."""
         nmos_cpu.reset()
         nmos_cpu.Y = 0x05
@@ -116,7 +116,7 @@ class TestLAXNMOS:
 class TestLAXCMOS:
     """Test LAX instruction on CMOS variant (65C02) - acts as NOP."""
 
-    def test_lax_acts_as_nop(self, cmos_cpu):
+    def test_lax_acts_as_nop(self, cmos_cpu) -> None:
         """Test LAX acts as NOP on CMOS (65C02)."""
         cmos_cpu.reset()
         cmos_cpu.A = 0x11

@@ -12,14 +12,14 @@ NOP_WITH_METADATA = InstructionOpcode(0xEA, "mos6502.instructions.nop", "nop_imp
 NOP_PLAIN = 0xEA
 
 
-def test_opcode_value_equality():
+def test_opcode_value_equality() -> None:
     """Test that InstructionOpcode equals its numeric value."""
     assert NOP_WITH_METADATA == 0xEA
     assert NOP_WITH_METADATA == NOP_PLAIN
     assert 0xEA == NOP_WITH_METADATA
 
 
-def test_opcode_case_matching():
+def test_opcode_case_matching() -> None:
     """Test that InstructionOpcode works in match/case statements."""
     value = NOP_WITH_METADATA
 
@@ -32,7 +32,7 @@ def test_opcode_case_matching():
     assert result == "matched"
 
 
-def test_opcode_dict_key():
+def test_opcode_dict_key() -> None:
     """Test that InstructionOpcode works as dictionary key."""
     instruction_map = {}
     instruction_map[NOP_WITH_METADATA] = {"name": "NOP"}
@@ -43,7 +43,7 @@ def test_opcode_dict_key():
     assert instruction_map[NOP_PLAIN] == {"name": "NOP"}
 
 
-def test_opcode_ram_write():
+def test_opcode_ram_write() -> None:
     """Test that InstructionOpcode can be written to RAM."""
     ram = RAM()
     ram[0x1000] = NOP_WITH_METADATA
@@ -52,24 +52,24 @@ def test_opcode_ram_write():
     assert ram[0x1000] == 0xEA
 
 
-def test_opcode_byte_conversion():
+def test_opcode_byte_conversion() -> None:
     """Test that InstructionOpcode works with Byte."""
     byte_value = Byte(NOP_WITH_METADATA)
     assert int(byte_value) == 0xEA
 
 
-def test_opcode_string_formatting():
+def test_opcode_string_formatting() -> None:
     """Test that InstructionOpcode formats like an int."""
     assert f"{NOP_WITH_METADATA:02X}" == "EA"
     assert f"{NOP_WITH_METADATA}" == "234"
 
 
-def test_opcode_isinstance():
+def test_opcode_isinstance() -> None:
     """Test that InstructionOpcode is still an int."""
     assert isinstance(NOP_WITH_METADATA, int)
 
 
-def test_opcode_has_metadata():
+def test_opcode_has_metadata() -> None:
     """Test that InstructionOpcode carries metadata."""
     assert hasattr(NOP_WITH_METADATA, "package")
     assert hasattr(NOP_WITH_METADATA, "function")
@@ -77,7 +77,7 @@ def test_opcode_has_metadata():
     assert NOP_WITH_METADATA.function == "nop_implied_0xea"  # type: ignore
 
 
-def test_opcode_arithmetic_loses_metadata():
+def test_opcode_arithmetic_loses_metadata() -> None:
     """Test that arithmetic operations return plain int."""
     result = NOP_WITH_METADATA + 1
     assert result == 0xEB
@@ -86,7 +86,7 @@ def test_opcode_arithmetic_loses_metadata():
     assert not hasattr(result, "package")
 
 
-def test_opcode_with_cpu():
+def test_opcode_with_cpu() -> None:
     """Test that InstructionOpcode works with CPU execution."""
     cpu = CPU()
     cpu.reset()
@@ -104,7 +104,7 @@ def test_opcode_with_cpu():
     assert cpu.cycles_executed == 2
 
 
-def test_opcode_comparison_operators():
+def test_opcode_comparison_operators() -> None:
     """Test comparison operators work correctly."""
     assert NOP_WITH_METADATA == 0xEA
     assert NOP_WITH_METADATA != 0xEB
@@ -114,7 +114,7 @@ def test_opcode_comparison_operators():
     assert NOP_WITH_METADATA >= 0xEA
 
 
-def test_opcode_hash():
+def test_opcode_hash() -> None:
     """Test that InstructionOpcode hashes like its value."""
     # Same hash as plain int
     assert hash(NOP_WITH_METADATA) == hash(0xEA)

@@ -29,7 +29,7 @@ from mos6502 import errors, instructions
 class TestDCPNMOS:
     """Test DCP instruction on NMOS variants (6502, 6502A, 6502C)."""
 
-    def test_dcp_zeropage_decrements_and_compares(self, nmos_cpu):
+    def test_dcp_zeropage_decrements_and_compares(self, nmos_cpu) -> None:
         """Test DCP zero page decrements memory and compares with A."""
         nmos_cpu.reset()
         nmos_cpu.A = 0x50
@@ -51,7 +51,7 @@ class TestDCPNMOS:
         assert nmos_cpu.N == 0  # Positive result
         assert nmos_cpu.cycles_executed == 5
 
-    def test_dcp_sets_carry_when_a_greater(self, nmos_cpu):
+    def test_dcp_sets_carry_when_a_greater(self, nmos_cpu) -> None:
         """Test DCP sets carry flag when A > decremented memory."""
         nmos_cpu.reset()
         nmos_cpu.A = 0x80
@@ -70,7 +70,7 @@ class TestDCPNMOS:
         assert nmos_cpu.C == 1  # No borrow (A >= M)
         assert nmos_cpu.N == 0  # Result bit 7 clear: (0x80 - 0x4F) & 0xFF = 0x31
 
-    def test_dcp_clears_carry_when_a_less(self, nmos_cpu):
+    def test_dcp_clears_carry_when_a_less(self, nmos_cpu) -> None:
         """Test DCP clears carry flag when A < decremented memory."""
         nmos_cpu.reset()
         nmos_cpu.A = 0x30
@@ -89,7 +89,7 @@ class TestDCPNMOS:
         assert nmos_cpu.C == 0  # Borrow needed (A < M)
         assert nmos_cpu.N == 1  # Result bit 7 set: (0x30 - 0x50) & 0xFF = 0xE0
 
-    def test_dcp_sets_negative_flag(self, nmos_cpu):
+    def test_dcp_sets_negative_flag(self, nmos_cpu) -> None:
         """Test DCP sets negative flag when result bit 7 is set."""
         nmos_cpu.reset()
         nmos_cpu.A = 0x10
@@ -108,7 +108,7 @@ class TestDCPNMOS:
         assert nmos_cpu.Z == 0  # Not equal
         assert nmos_cpu.C == 0  # Borrow needed
 
-    def test_dcp_wrap_around_zero(self, nmos_cpu):
+    def test_dcp_wrap_around_zero(self, nmos_cpu) -> None:
         """Test DCP wraps 0x00 to 0xFF during decrement."""
         nmos_cpu.reset()
         nmos_cpu.A = 0xFF
@@ -127,7 +127,7 @@ class TestDCPNMOS:
         assert nmos_cpu.C == 1  # No borrow
         assert nmos_cpu.N == 0  # Result is zero
 
-    def test_dcp_zeropage_x(self, nmos_cpu):
+    def test_dcp_zeropage_x(self, nmos_cpu) -> None:
         """Test DCP zero page,X with offset."""
         nmos_cpu.reset()
         nmos_cpu.A = 0x42
@@ -147,7 +147,7 @@ class TestDCPNMOS:
         assert nmos_cpu.C == 1
         assert nmos_cpu.cycles_executed == 6
 
-    def test_dcp_absolute(self, nmos_cpu):
+    def test_dcp_absolute(self, nmos_cpu) -> None:
         """Test DCP absolute addressing."""
         nmos_cpu.reset()
         nmos_cpu.A = 0x20
@@ -168,7 +168,7 @@ class TestDCPNMOS:
         assert nmos_cpu.N == 1  # (0x20 - 0x2F) & 0xFF = 0xF1
         assert nmos_cpu.cycles_executed == 6
 
-    def test_dcp_absolute_x(self, nmos_cpu):
+    def test_dcp_absolute_x(self, nmos_cpu) -> None:
         """Test DCP absolute,X addressing."""
         nmos_cpu.reset()
         nmos_cpu.A = 0x50
@@ -187,7 +187,7 @@ class TestDCPNMOS:
         assert nmos_cpu.Z == 1
         assert nmos_cpu.cycles_executed == 7
 
-    def test_dcp_absolute_y(self, nmos_cpu):
+    def test_dcp_absolute_y(self, nmos_cpu) -> None:
         """Test DCP absolute,Y addressing."""
         nmos_cpu.reset()
         nmos_cpu.A = 0x60
@@ -206,7 +206,7 @@ class TestDCPNMOS:
         assert nmos_cpu.Z == 1
         assert nmos_cpu.cycles_executed == 7
 
-    def test_dcp_indexed_indirect_x(self, nmos_cpu):
+    def test_dcp_indexed_indirect_x(self, nmos_cpu) -> None:
         """Test DCP (indirect,X) addressing."""
         nmos_cpu.reset()
         nmos_cpu.A = 0x70
@@ -228,7 +228,7 @@ class TestDCPNMOS:
         assert nmos_cpu.Z == 1
         assert nmos_cpu.cycles_executed == 8
 
-    def test_dcp_indirect_indexed_y(self, nmos_cpu):
+    def test_dcp_indirect_indexed_y(self, nmos_cpu) -> None:
         """Test DCP (indirect),Y addressing."""
         nmos_cpu.reset()
         nmos_cpu.A = 0x80
@@ -254,7 +254,7 @@ class TestDCPNMOS:
 class TestDCPCMOS:
     """Test DCP instruction on CMOS variant (65C02) - acts as NOP."""
 
-    def test_dcp_acts_as_nop(self, cmos_cpu):
+    def test_dcp_acts_as_nop(self, cmos_cpu) -> None:
         """Test DCP acts as NOP on CMOS (65C02)."""
         cmos_cpu.reset()
         cmos_cpu.A = 0x50

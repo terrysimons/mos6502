@@ -2,6 +2,7 @@
 import contextlib
 import copy
 import logging
+from collections.abc import Generator
 
 import mos6502
 from mos6502 import CPU, errors, flags, instructions
@@ -12,7 +13,7 @@ log.setLevel(logging.DEBUG)
 
 
 @contextlib.contextmanager
-def suppress_illegal_instruction_logs():
+def suppress_illegal_instruction_logs() -> Generator[None, None, None]:
     """Temporarily disable ERROR logs for illegal instruction detection."""
     logger = logging.getLogger("mos6502.cpu")
     original_level = logger.level

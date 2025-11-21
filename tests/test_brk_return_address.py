@@ -10,7 +10,7 @@ from mos6502 import CPU, errors
 
 
 @pytest.fixture(params=["6502", "6502A", "6502C", "65C02"])
-def cpu(request):
+def cpu(request) -> CPU:
     """Create a CPU with the specified variant."""
     cpu_variant = request.param
     cpu_instance = CPU(cpu_variant=cpu_variant)
@@ -18,7 +18,7 @@ def cpu(request):
     return cpu_instance
 
 
-def test_brk_pushes_pc_plus_2(cpu):
+def test_brk_pushes_pc_plus_2(cpu) -> None:
     """Test that BRK pushes PC+2 to the stack.
 
     BRK is a 2-byte instruction: opcode (0x00) + signature byte.
@@ -50,7 +50,7 @@ def test_brk_pushes_pc_plus_2(cpu):
     assert cpu.PC == 0x1002, f"Expected PC=0x1002 after BRK+RTI, got 0x{cpu.PC:04X}"
 
 
-def test_brk_return_address_on_stack(cpu):
+def test_brk_return_address_on_stack(cpu) -> None:
     """Test that BRK pushes the correct return address onto the stack."""
     # Set up IRQ vector
     cpu.ram[0xFFFE] = 0x00
@@ -88,7 +88,7 @@ def test_brk_return_address_on_stack(cpu):
     assert pushed_pc == 0x5002, f"Expected return address 0x5002 on stack, got 0x{pushed_pc:04X}"
 
 
-def test_multiple_brk_rti_cycles(cpu):
+def test_multiple_brk_rti_cycles(cpu) -> None:
     """Test multiple BRK/RTI cycles to ensure address handling is consistent."""
     # Set up IRQ vector to RTI handler
     cpu.ram[0xFFFE] = 0x00

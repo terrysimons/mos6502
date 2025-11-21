@@ -9,7 +9,7 @@ import pytest
 from mos6502.memory import Word
 
 
-def test_word_wraps_at_64k():
+def test_word_wraps_at_64k() -> None:
     """Test that Word wraps addresses above 0xFFFF to 16 bits."""
     # 0x10000 should wrap to 0x0000
     word = Word(0x10000)
@@ -24,7 +24,7 @@ def test_word_wraps_at_64k():
     assert word.value == 0xFFFF, f"Expected 0xFFFF, got 0x{word.value:04X}"
 
 
-def test_word_handles_large_overflow():
+def test_word_handles_large_overflow() -> None:
     """Test Word with large overflow values."""
     # 65776 (from the bug report) = 0x100F0 should wrap to 0x00F0
     word = Word(65776)
@@ -35,7 +35,7 @@ def test_word_handles_large_overflow():
     assert word.value == 0x00FE, f"Expected 0x00FE, got 0x{word.value:04X}"
 
 
-def test_word_handles_indexed_addressing_overflow():
+def test_word_handles_indexed_addressing_overflow() -> None:
     """Test Word wrapping in indexed addressing mode scenarios.
 
     This simulates what happens when an absolute address + index
@@ -50,7 +50,7 @@ def test_word_handles_indexed_addressing_overflow():
         f"Expected wrapped address 0x00F0, got 0x{effective_addr.value:04X}"
 
 
-def test_word_preserves_valid_addresses():
+def test_word_preserves_valid_addresses() -> None:
     """Test that Word doesn't modify valid 16-bit addresses."""
     test_addresses = [0x0000, 0x0001, 0x1000, 0x8000, 0xFFFF, 0xFFFE]
 
@@ -60,7 +60,7 @@ def test_word_preserves_valid_addresses():
             f"Expected address 0x{addr:04X} to be preserved, got 0x{word.value:04X}"
 
 
-def test_word_wraps_negative_overflow():
+def test_word_wraps_negative_overflow() -> None:
     """Test that negative values are handled correctly."""
     # -1 should become 0xFFFF
     word = Word(-1)
@@ -71,7 +71,7 @@ def test_word_wraps_negative_overflow():
     assert word.value == 0xFF00, f"Expected 0xFF00 for -256, got 0x{word.value:04X}"
 
 
-def test_word_arithmetic_with_wrapping():
+def test_word_arithmetic_with_wrapping() -> None:
     """Test that Word arithmetic wraps correctly."""
     # Create a word at the boundary
     word = Word(0xFFF0)
@@ -82,7 +82,7 @@ def test_word_arithmetic_with_wrapping():
         f"Expected 0x0010 from 0xFFF0 + 0x20, got 0x{result.value:04X}"
 
 
-def test_word_pc_increment_at_boundary():
+def test_word_pc_increment_at_boundary() -> None:
     """Test PC increment wrapping at 64KB boundary.
 
     This simulates what happens when PC wraps around, though in
@@ -97,7 +97,7 @@ def test_word_pc_increment_at_boundary():
         f"Expected PC to wrap to 0x0000, got 0x{pc_next.value:04X}"
 
 
-def test_word_stack_pointer_page_wrapping():
+def test_word_stack_pointer_page_wrapping() -> None:
     """Test stack pointer calculations don't overflow Word.
 
     Stack is at $0100-$01FF, and SP is the low byte.

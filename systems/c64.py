@@ -83,7 +83,7 @@ class C64:
             # Keyboard matrix all released (1 = released)
             self.keyboard_matrix = [0xFF] * 8
 
-        def read(self, addr):
+        def read(self, addr) -> int:
             reg = addr & 0x0F
 
             # Port A ($DC00) — keyboard matrix read
@@ -103,7 +103,7 @@ class C64:
             # Return stored register contents
             return self.regs[reg]
 
-        def write(self, addr, value):
+        def write(self, addr, value) -> None:
             reg = addr & 0x0F
             self.regs[reg] = value
 
@@ -117,7 +117,7 @@ class C64:
         def __init__(self):
             self.regs = [0x00] * 16
 
-        def read(self, addr):
+        def read(self, addr) -> int:
             reg = addr & 0x0F
 
             if reg == 0x0D:
@@ -126,7 +126,7 @@ class C64:
 
             return 0xFF  # CIA2 usually floats high where unused
 
-        def write(self, addr, value):
+        def write(self, addr, value) -> None:
             reg = addr & 0x0F
             self.regs[reg] = value
 
@@ -158,7 +158,7 @@ class C64:
 
             self.log.info("VIC-II initialized (NTSC: 263 lines, 63 cycles/line)")
 
-        def update(self):
+        def update(self) -> None:
             """Update VIC state based on CPU cycles. Should be called periodically."""
             # Calculate raster line based on total CPU cycles
             total_lines = self.cpu.cycles_executed // self.cycles_per_line
@@ -183,7 +183,7 @@ class C64:
 
             self.current_raster = new_raster
 
-        def read(self, addr):
+        def read(self, addr) -> int:
             reg = addr & 0x3F
 
             # $D012: Raster line register (read current raster position)
@@ -202,7 +202,7 @@ class C64:
 
             return self.regs[reg]
 
-        def write(self, addr, val):
+        def write(self, addr, val) -> None:
             reg = addr & 0x3F
             self.regs[reg] = val
 
@@ -221,7 +221,7 @@ class C64:
             if reg == 0x1A:
                 self.irq_enabled = val & 0x0F
 
-        def render_text(self, surface, ram, color_ram):
+        def render_text(self, surface, ram, color_ram) -> None:
             screen_base = 0x0400  # default
             for row in range(25):
                 for col in range(40):
@@ -280,7 +280,7 @@ class C64:
             elif addr <= 65535:
                 self.ram_heap[addr - 512] = Byte(value=int2ba(value, length=8, endian="little"), endianness="little")
 
-        def read(self, addr):
+        def read(self, addr) -> int:
             # CPU internal port
             if addr == 0x0000: return self.ddr
             if addr == 0x0001:
@@ -325,7 +325,7 @@ class C64:
             # RAM fallback
             return self._read_ram_direct(addr)
 
-        def write(self, addr, value):
+        def write(self, addr, value) -> None:
             """Write to C64 memory with banking logic."""
             # CPU internal port
             if addr == 0x0000:
@@ -425,7 +425,7 @@ class C64:
         log.info(f"Loaded {description} ROM: {rom_path} ({len(rom_data)} bytes)")
         return rom_data
 
-    def load_roms(self):
+    def load_roms(self) -> None:
         """Load all C64 ROM files into memory."""
         # Try common ROM filenames
         basic_names = ["basic", "basic.rom", "basic.901226-01.bin"]
@@ -552,7 +552,7 @@ class C64:
 
         return load_address
 
-    def reset(self):
+    def reset(self) -> None:
         """Reset the C64 (CPU reset)."""
         log.info("Resetting C64...")
 
@@ -565,7 +565,7 @@ class C64:
         # Set PC to reset vector (property setter will log new value)
         self.cpu.PC = reset_vector
 
-    def run(self, max_cycles: int = INFINITE_CYCLES):
+    def run(self, max_cycles: int = INFINITE_CYCLES) -> None:
         """Run the C64 emulator.
 
         Arguments:
@@ -685,7 +685,7 @@ class C64:
         finally:
             self.show_screen()
 
-    def dump_memory(self, start: int, end: int, bytes_per_line: int = 16):
+    def dump_memory(self, start: int, end: int, bytes_per_line: int = 16) -> None:
         """Dump memory contents for debugging.
 
         Arguments:
@@ -709,7 +709,7 @@ class C64:
                     print("   ", end="")
             print()
 
-    def dump_registers(self):
+    def dump_registers(self) -> None:
         """Dump CPU register state."""
         print(f"\nCPU Registers:")
         print(f"  PC: ${self.cpu.PC:04X}")
@@ -810,7 +810,7 @@ class C64:
 
         return lines
 
-    def show_disassembly(self, address: int, num_instructions: int = 10):
+    def show_disassembly(self, address: int, num_instructions: int = 10) -> None:
         """Display disassembly at address."""
         print(f"\nDisassembly at ${address:04X}:")
         print("-" * 60)
@@ -854,7 +854,7 @@ class C64:
         # Default: show as '.' for unprintable
         return "."
 
-    def show_screen(self):
+    def show_screen(self) -> None:
         """Display the C64 screen (40x25 characters from screen RAM at $0400)."""
         screen_start = 0x0400
         screen_end = 0x07E7
@@ -956,7 +956,7 @@ class C64:
             return f"{hex_str}  {mnemonic}{operand_str}  ; {mode}"
 
 
-def main():
+def main() -> int | None:
     """Main entry point for C64 emulator."""
     import argparse
 

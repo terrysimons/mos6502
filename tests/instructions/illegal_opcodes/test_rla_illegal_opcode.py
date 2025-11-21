@@ -29,7 +29,7 @@ from mos6502 import errors, instructions
 class TestRLANMOS:
     """Test RLA instruction on NMOS variants (6502, 6502A, 6502C)."""
 
-    def test_rla_zeropage_rotates_and_ands(self, nmos_cpu):
+    def test_rla_zeropage_rotates_and_ands(self, nmos_cpu) -> None:
         """Test RLA zero page rotates memory left and ANDs with A."""
         nmos_cpu.reset()
         nmos_cpu.A = 0x0F
@@ -52,7 +52,7 @@ class TestRLANMOS:
         assert nmos_cpu.N == 0  # Result bit 7 is clear
         assert nmos_cpu.cycles_executed == 5
 
-    def test_rla_with_carry_in(self, nmos_cpu):
+    def test_rla_with_carry_in(self, nmos_cpu) -> None:
         """Test RLA rotates carry into bit 0."""
         nmos_cpu.reset()
         nmos_cpu.A = 0xFF
@@ -73,7 +73,7 @@ class TestRLANMOS:
         assert nmos_cpu.N == 0
         assert nmos_cpu.Z == 0
 
-    def test_rla_sets_carry(self, nmos_cpu):
+    def test_rla_sets_carry(self, nmos_cpu) -> None:
         """Test RLA sets carry when bit 7 of original value is set."""
         nmos_cpu.reset()
         nmos_cpu.A = 0xFF
@@ -95,7 +95,7 @@ class TestRLANMOS:
         assert nmos_cpu.N == 0
         assert nmos_cpu.Z == 0
 
-    def test_rla_sets_zero_flag(self, nmos_cpu):
+    def test_rla_sets_zero_flag(self, nmos_cpu) -> None:
         """Test RLA sets zero flag when result is zero."""
         nmos_cpu.reset()
         nmos_cpu.A = 0x00
@@ -117,7 +117,7 @@ class TestRLANMOS:
         assert nmos_cpu.N == 0
         assert nmos_cpu.C == 0
 
-    def test_rla_and_operation(self, nmos_cpu):
+    def test_rla_and_operation(self, nmos_cpu) -> None:
         """Test RLA AND operation combines properly."""
         nmos_cpu.reset()
         nmos_cpu.A = 0xF0  # 11110000
@@ -138,7 +138,7 @@ class TestRLANMOS:
         assert nmos_cpu.Z == 0
         assert nmos_cpu.C == 0
 
-    def test_rla_rotate_with_carry_in_and_out(self, nmos_cpu):
+    def test_rla_rotate_with_carry_in_and_out(self, nmos_cpu) -> None:
         """Test RLA rotate with both carry in and carry out."""
         nmos_cpu.reset()
         nmos_cpu.A = 0xFF
@@ -159,7 +159,7 @@ class TestRLANMOS:
         assert nmos_cpu.N == 0
         assert nmos_cpu.Z == 0
 
-    def test_rla_zeropage_x(self, nmos_cpu):
+    def test_rla_zeropage_x(self, nmos_cpu) -> None:
         """Test RLA zero page,X with offset."""
         nmos_cpu.reset()
         nmos_cpu.A = 0xFF
@@ -179,7 +179,7 @@ class TestRLANMOS:
         assert nmos_cpu.A == 0x08
         assert nmos_cpu.cycles_executed == 6
 
-    def test_rla_absolute(self, nmos_cpu):
+    def test_rla_absolute(self, nmos_cpu) -> None:
         """Test RLA absolute addressing."""
         nmos_cpu.reset()
         nmos_cpu.A = 0xF0
@@ -199,7 +199,7 @@ class TestRLANMOS:
         assert nmos_cpu.A == 0x60
         assert nmos_cpu.cycles_executed == 6
 
-    def test_rla_absolute_x(self, nmos_cpu):
+    def test_rla_absolute_x(self, nmos_cpu) -> None:
         """Test RLA absolute,X addressing."""
         nmos_cpu.reset()
         nmos_cpu.A = 0xFF
@@ -220,7 +220,7 @@ class TestRLANMOS:
         assert nmos_cpu.A == 0x05
         assert nmos_cpu.cycles_executed == 7
 
-    def test_rla_absolute_y(self, nmos_cpu):
+    def test_rla_absolute_y(self, nmos_cpu) -> None:
         """Test RLA absolute,Y addressing."""
         nmos_cpu.reset()
         nmos_cpu.A = 0x0F
@@ -241,7 +241,7 @@ class TestRLANMOS:
         assert nmos_cpu.A == 0x08
         assert nmos_cpu.cycles_executed == 7
 
-    def test_rla_indexed_indirect_x(self, nmos_cpu):
+    def test_rla_indexed_indirect_x(self, nmos_cpu) -> None:
         """Test RLA (indirect,X) addressing."""
         nmos_cpu.reset()
         nmos_cpu.A = 0xFF
@@ -265,7 +265,7 @@ class TestRLANMOS:
         assert nmos_cpu.A == 0x22
         assert nmos_cpu.cycles_executed == 8
 
-    def test_rla_indirect_indexed_y(self, nmos_cpu):
+    def test_rla_indirect_indexed_y(self, nmos_cpu) -> None:
         """Test RLA (indirect),Y addressing."""
         nmos_cpu.reset()
         nmos_cpu.A = 0xAA
@@ -293,7 +293,7 @@ class TestRLANMOS:
 class TestRLACMOS:
     """Test RLA instruction on CMOS variant (65C02) - acts as NOP."""
 
-    def test_rla_acts_as_nop(self, cmos_cpu):
+    def test_rla_acts_as_nop(self, cmos_cpu) -> None:
         """Test RLA acts as NOP on CMOS (65C02)."""
         cmos_cpu.reset()
         cmos_cpu.A = 0x0F

@@ -29,7 +29,7 @@ from mos6502 import errors, instructions
 class TestRRANMOS:
     """Test RRA instruction on NMOS variants (6502, 6502A, 6502C)."""
 
-    def test_rra_zeropage_rotates_and_adds(self, nmos_cpu):
+    def test_rra_zeropage_rotates_and_adds(self, nmos_cpu) -> None:
         """Test RRA zero page rotates memory right and adds to A."""
         nmos_cpu.reset()
         nmos_cpu.A = 0x10
@@ -53,7 +53,7 @@ class TestRRANMOS:
         assert nmos_cpu.V == 0  # No overflow
         assert nmos_cpu.cycles_executed == 5
 
-    def test_rra_with_carry_in_rotation(self, nmos_cpu):
+    def test_rra_with_carry_in_rotation(self, nmos_cpu) -> None:
         """Test RRA rotates carry into bit 7."""
         nmos_cpu.reset()
         nmos_cpu.A = 0x00
@@ -74,7 +74,7 @@ class TestRRANMOS:
         assert nmos_cpu.N == 1  # Result is negative
         assert nmos_cpu.Z == 0
 
-    def test_rra_sets_carry_from_rotation(self, nmos_cpu):
+    def test_rra_sets_carry_from_rotation(self, nmos_cpu) -> None:
         """Test RRA sets carry when bit 0 of original value is set."""
         nmos_cpu.reset()
         nmos_cpu.A = 0x00
@@ -95,7 +95,7 @@ class TestRRANMOS:
         assert nmos_cpu.C == 0
         assert nmos_cpu.Z == 0
 
-    def test_rra_sets_carry_from_addition(self, nmos_cpu):
+    def test_rra_sets_carry_from_addition(self, nmos_cpu) -> None:
         """Test RRA sets carry when addition overflows."""
         nmos_cpu.reset()
         nmos_cpu.A = 0xFF
@@ -116,7 +116,7 @@ class TestRRANMOS:
         assert nmos_cpu.N == 0
         assert nmos_cpu.Z == 0
 
-    def test_rra_sets_zero_flag(self, nmos_cpu):
+    def test_rra_sets_zero_flag(self, nmos_cpu) -> None:
         """Test RRA sets zero flag when result is zero."""
         nmos_cpu.reset()
         nmos_cpu.A = 0x00
@@ -138,7 +138,7 @@ class TestRRANMOS:
         assert nmos_cpu.N == 0
         assert nmos_cpu.C == 0
 
-    def test_rra_sets_overflow_flag(self, nmos_cpu):
+    def test_rra_sets_overflow_flag(self, nmos_cpu) -> None:
         """Test RRA sets overflow flag correctly."""
         nmos_cpu.reset()
         nmos_cpu.A = 0x50  # +80 in signed
@@ -160,7 +160,7 @@ class TestRRANMOS:
         assert nmos_cpu.N == 1
         assert nmos_cpu.C == 0
 
-    def test_rra_complex_example(self, nmos_cpu):
+    def test_rra_complex_example(self, nmos_cpu) -> None:
         """Test RRA with carry in, carry out from rotation, and addition."""
         nmos_cpu.reset()
         nmos_cpu.A = 0x05
@@ -180,7 +180,7 @@ class TestRRANMOS:
         assert nmos_cpu.C == 0  # No carry from addition
         assert nmos_cpu.N == 1  # Bit 7 set
 
-    def test_rra_zeropage_x(self, nmos_cpu):
+    def test_rra_zeropage_x(self, nmos_cpu) -> None:
         """Test RRA zero page,X with offset."""
         nmos_cpu.reset()
         nmos_cpu.A = 0x01
@@ -200,7 +200,7 @@ class TestRRANMOS:
         assert nmos_cpu.A == 0x05
         assert nmos_cpu.cycles_executed == 6
 
-    def test_rra_absolute(self, nmos_cpu):
+    def test_rra_absolute(self, nmos_cpu) -> None:
         """Test RRA absolute addressing."""
         nmos_cpu.reset()
         nmos_cpu.A = 0x10
@@ -220,7 +220,7 @@ class TestRRANMOS:
         assert nmos_cpu.A == 0x20
         assert nmos_cpu.cycles_executed == 6
 
-    def test_rra_absolute_x(self, nmos_cpu):
+    def test_rra_absolute_x(self, nmos_cpu) -> None:
         """Test RRA absolute,X addressing."""
         nmos_cpu.reset()
         nmos_cpu.A = 0x0A
@@ -241,7 +241,7 @@ class TestRRANMOS:
         assert nmos_cpu.A == 0x14
         assert nmos_cpu.cycles_executed == 7
 
-    def test_rra_absolute_y(self, nmos_cpu):
+    def test_rra_absolute_y(self, nmos_cpu) -> None:
         """Test RRA absolute,Y addressing."""
         nmos_cpu.reset()
         nmos_cpu.A = 0x20
@@ -262,7 +262,7 @@ class TestRRANMOS:
         assert nmos_cpu.A == 0x40
         assert nmos_cpu.cycles_executed == 7
 
-    def test_rra_indexed_indirect_x(self, nmos_cpu):
+    def test_rra_indexed_indirect_x(self, nmos_cpu) -> None:
         """Test RRA (indirect,X) addressing."""
         nmos_cpu.reset()
         nmos_cpu.A = 0xFF
@@ -287,7 +287,7 @@ class TestRRANMOS:
         assert nmos_cpu.C == 1  # Carry from addition
         assert nmos_cpu.cycles_executed == 8
 
-    def test_rra_indirect_indexed_y(self, nmos_cpu):
+    def test_rra_indirect_indexed_y(self, nmos_cpu) -> None:
         """Test RRA (indirect),Y addressing."""
         nmos_cpu.reset()
         nmos_cpu.A = 0x10
@@ -315,7 +315,7 @@ class TestRRANMOS:
 class TestRRACMOS:
     """Test RRA instruction on CMOS variant (65C02) - acts as NOP."""
 
-    def test_rra_acts_as_nop(self, cmos_cpu):
+    def test_rra_acts_as_nop(self, cmos_cpu) -> None:
         """Test RRA acts as NOP on CMOS (65C02)."""
         cmos_cpu.reset()
         cmos_cpu.A = 0x10

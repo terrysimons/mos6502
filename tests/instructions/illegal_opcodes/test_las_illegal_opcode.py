@@ -24,7 +24,7 @@ from mos6502 import errors, instructions
 class TestLASNMOS:
     """Test LAS instruction on NMOS variants (6502, 6502A, 6502C)."""
 
-    def test_las_loads_and_result(self, nmos_cpu):
+    def test_las_loads_and_result(self, nmos_cpu) -> None:
         """Test LAS loads (M & S) into A, X, and S."""
         nmos_cpu.reset()
         nmos_cpu.S = 0xFF
@@ -45,7 +45,7 @@ class TestLASNMOS:
         assert nmos_cpu.Z == 0
         assert nmos_cpu.N == 1
 
-    def test_las_with_partial_and(self, nmos_cpu):
+    def test_las_with_partial_and(self, nmos_cpu) -> None:
         """Test LAS with partial AND result."""
         nmos_cpu.reset()
         nmos_cpu.S = 0x0F
@@ -64,7 +64,7 @@ class TestLASNMOS:
         assert nmos_cpu.X == 0x0F
         assert nmos_cpu.S == 0x0F
 
-    def test_las_sets_zero_flag(self, nmos_cpu):
+    def test_las_sets_zero_flag(self, nmos_cpu) -> None:
         """Test LAS sets zero flag when result is zero."""
         nmos_cpu.reset()
         nmos_cpu.S = 0x00
@@ -89,7 +89,7 @@ class TestLASNMOS:
 class TestLASCMOS:
     """Test LAS instruction on CMOS variant (65C02) - acts as NOP."""
 
-    def test_las_acts_as_nop(self, cmos_cpu):
+    def test_las_acts_as_nop(self, cmos_cpu) -> None:
         """Test LAS acts as NOP on CMOS (65C02)."""
         cmos_cpu.reset()
         cmos_cpu.A = 0x11
