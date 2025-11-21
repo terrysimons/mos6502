@@ -673,14 +673,14 @@ class C64:
             log.info("\nExecution interrupted by user")
             log.info(f"PC=${self.cpu.PC:04X}, Cycles={self.cpu.cycles_executed}")
         except Exception as e:
-            log.error(f"Execution error at PC=${self.cpu.PC:04X}: {e}")
+            log.exception(f"Execution error at PC=${self.cpu.PC:04X}: {e}")
             # Show context around error
             try:
                 pc_val = int(self.cpu.PC)
                 self.show_disassembly(max(0, pc_val - 10), num_instructions=20)
                 self.dump_memory(max(0, pc_val - 16), min(0xFFFF, pc_val + 16))
             except Exception as display_err:
-                log.error(f"Could not display context: {display_err}")
+                log.exception(f"Could not display context: {display_err}")
             raise
         finally:
             self.show_screen()
@@ -1086,10 +1086,10 @@ def main() -> int | None:
         return 0
 
     except Exception as e:
-        log.error(f"Error: {e}")
         if args.verbose:
-            import traceback
-            traceback.print_exc()
+            log.exception(f"Error: {e}")
+        else:
+            log.error(f"Error: {e}")  # noqa: TRY400
         return 1
 
 
