@@ -4,6 +4,7 @@ import logging
 
 import mos6502
 from mos6502 import CPU, errors, flags, instructions
+from mos6502.flags import FlagsRegister
 from mos6502.memory import Byte
 
 log = logging.getLogger("mos6502")
@@ -74,3 +75,31 @@ def test_cpu_instruction_RTI_IMPLIED_0x40_stack_pointer(cpu: CPU) -> None:  # no
     # then: Stack pointer should be restored
     assert cpu.S == initial_sp  # Stack fully popped
     assert cpu.PC == 0x1234
+
+
+def test_cpu_instruction_RTI_preserves_FlagsRegister_type(cpu: CPU) -> None:  # noqa: N802
+    """Test that RTI maintains the FlagsRegister type, not replacing it with plain Byte."""
+    # given:
+    # Push PC (0x8000)
+    cpu.ram[cpu.S] = 0x80
+    cpu.ram[cpu.S - 1] = 0x00
+    cpu.S -= 2
+
+    # Push status
+    cpu.ram[cpu.S] = 0xF0
+    cpu.S -= 1
+
+    cpu.ram[0xFFFC] = instructions.RTI_IMPLIED_0x40
+
+    # Verify we start with a FlagsRegister
+    assert isinstance(cpu._flags, FlagsRegister), "CPU should start with FlagsRegister"
+
+    # when:
+    with contextlib.suppress(errors.CPUCycleExhaustionError):
+        cpu.execute(cycles=6)
+
+    # then:
+    assert isinstance(cpu._flags, FlagsRegister), \
+        "RTI must preserve FlagsRegister type for flag logging to work"
+    assert cpu.flags.value == 0xF0
+    assert cpu.PC == 0x8000

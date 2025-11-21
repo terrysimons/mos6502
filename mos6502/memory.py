@@ -127,17 +127,26 @@ class MemoryUnit:
     """ Math Operators"""
     def __add__(self: Self, rvalue: int | bitarray.bitarray) -> bitarray.bitarray:
         """Add an integer or bitarray to a MemoryUnit."""
+        # Early return for adding 0 - saves cycles
+        if isinstance(rvalue, int) and rvalue == 0:
+            return type(self)(self.value, endianness=self.endianness)
+
         result: MemoryUnit = None
 
         local_rvalue = rvalue
-        self.log.debug(f"Adding {rvalue} to {self._value}")
 
         # MemoryUnit is the base class for Byte/Word so this
         # gives us a bit of a speedup
         if isinstance(rvalue, MemoryUnit):
             local_rvalue: int = rvalue.value
+            # Early return for adding 0
+            if local_rvalue == 0:
+                return type(self)(self.value, endianness=self.endianness)
         elif isinstance(rvalue, bitarray.bitarray):
             local_rvalue: int = ba2int(local_rvalue)
+            # Early return for adding 0
+            if local_rvalue == 0:
+                return type(self)(self.value, endianness=self.endianness)
 
         # If we're adding data to a word and it causes a carry
         # we need to account for the CPU cycles.
@@ -182,17 +191,27 @@ class MemoryUnit:
 
     def __sub__(self: Self, rvalue: int | bitarray.bitarray) -> bitarray.bitarray:
         """Subtract an integer or bitarray from a MemoryUnit."""
+        # Early return for subtracting 0 - saves cycles
+        if isinstance(rvalue, int) and rvalue == 0:
+            return type(self)(self.value, endianness=self.endianness)
+
         if isinstance(rvalue, type(self)):
+            # Early return for subtracting 0
+            if rvalue.value == 0:
+                return type(self)(self.value, endianness=self.endianness)
             return type(self)(
                 value=int2ba(
-                    ba2int(self.value) - ba2int(rvalue.value),
+                    ba2int(self._value) - ba2int(rvalue._value),  # noqa: SLF001
                 ),
                 endianness=self.endianness,
             )
 
-        return int2ba(
-            ba2int(self.value) - rvalue,
-            endian=self.endianness,
+        return type(self)(
+            value=int2ba(
+                ba2int(self._value) - rvalue,
+                endian=self.endianness,
+            ),
+            endianness=self.endianness,
         )
 
     """ Bitwise Operators """

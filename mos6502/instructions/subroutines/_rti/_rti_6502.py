@@ -25,11 +25,11 @@ def rti_implied_0x40(cpu: MOS6502CPU) -> None:
     ---------
         cpu: The CPU instance to operate on
     """
-    from mos6502.memory import Byte
+    from mos6502.flags import FlagsRegister
 
     # Pull status register from stack
     cpu.S += 1
-    cpu._flags = Byte(cpu.read_byte(address=cpu.S))
+    cpu._flags = FlagsRegister(cpu.read_byte(address=cpu.S))
 
     # Pull PC from stack
     cpu.S += 1

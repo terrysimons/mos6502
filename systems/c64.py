@@ -80,38 +80,116 @@ class C64:
             # 16 registers, mirrored through $DC00–$DC0F
             self.regs = [0x00] * 16
 
-            # Keyboard matrix all released (1 = released)
+            # Keyboard matrix: 8 rows x 8 columns
+            # keyboard_matrix[row] = byte where each bit is a column
+            # 0 = key pressed (active low), 1 = key released
             self.keyboard_matrix = [0xFF] * 8
+
+            # Port values
+            self.port_a = 0xFF  # Columns (input)
+            self.port_b = 0xFF  # Rows (output)
+
+            # Data Direction Registers
+            # 0 = input, 1 = output
+            self.ddr_a = 0x00   # Port A typically all inputs (columns)
+            self.ddr_b = 0xFF   # Port B typically all outputs (rows)
 
         def read(self, addr) -> int:
             reg = addr & 0x0F
 
-            # Port A ($DC00) — keyboard matrix read
+            # Port A ($DC00) — keyboard matrix columns (read)
             if reg == 0x00:
                 return self._read_keyboard_port()
 
-            # Port B ($DC01) — joystick + keyboard rows
+            # Port B ($DC01) — keyboard matrix rows (read back what was written)
             if reg == 0x01:
-                return 0xFF  # no joystick pressed
+                # Return port B value (KERNAL can read back what it wrote)
+                # Also includes joystick bits if we implement that
+                return self.port_b
 
-            # CIA will return 0xFF for most unimplemented registers
-            # or stored timer values if necessary
+            # Port A DDR ($DC02)
+            if reg == 0x02:
+                return self.ddr_a
+
+            # Port B DDR ($DC03)
+            if reg == 0x03:
+                return self.ddr_b
+
+            # Interrupt Control Register (ICR) ($DC0D)
             if reg == 0x0D:
-                # Interrupt Control Register (ICR)
                 return 0x00  # no interrupts pending
 
-            # Return stored register contents
+            # Return stored register contents for other registers
             return self.regs[reg]
 
         def write(self, addr, value) -> None:
             reg = addr & 0x0F
             self.regs[reg] = value
 
+            # Port A ($DC00) — usually not written for keyboard, but store it
+            if reg == 0x00:
+                self.port_a = value
+
+            # Port B ($DC01) — keyboard row selection (KERNAL writes here)
+            if reg == 0x01:
+                self.port_b = value
+
+            # Port A DDR ($DC02)
+            if reg == 0x02:
+                self.ddr_a = value
+
+            # Port B DDR ($DC03)
+            if reg == 0x03:
+                self.ddr_b = value
+
         def _read_keyboard_port(self) -> int:
-            # The C64 keyboard is an 8x8 matrix.
-            # KERNAL polls port A with each row selected on port B.
-            # Returning 0xFF emulates “no keys pressed.”
-            return 0xFF
+            """Read keyboard matrix columns based on selected rows.
+
+            The C64 keyboard is an 8x8 matrix:
+            - KERNAL writes to Port B ($DC01) to select row(s) - active low
+            - KERNAL reads from Port A ($DC00) to get column states - active low
+            - 0 = pressed, 1 = released
+
+            The KERNAL typically scans one row at a time by setting one bit low.
+            But it can also scan multiple rows simultaneously (all bits low = scan all rows).
+            """
+            # Port B contains the row selection (active low)
+            # Each bit low = scan that row
+            selected_rows = ~self.port_b & 0xFF
+
+            # Start with all columns high (no keys)
+            result = 0xFF
+
+            # Check each row
+            for row in range(8):
+                if selected_rows & (1 << row):
+                    # This row is selected, AND its columns into result
+                    # If any key in this row is pressed (bit=0), it will pull the result low
+                    result &= self.keyboard_matrix[row]
+
+            return result
+
+        def press_key(self, row: int, col: int) -> None:
+            """Press a key at the given matrix position.
+
+            Args:
+                row: Row index (0-7)
+                col: Column index (0-7)
+            """
+            if 0 <= row < 8 and 0 <= col < 8:
+                # Clear the bit (active low = pressed)
+                self.keyboard_matrix[row] &= ~(1 << col)
+
+        def release_key(self, row: int, col: int) -> None:
+            """Release a key at the given matrix position.
+
+            Args:
+                row: Row index (0-7)
+                col: Column index (0-7)
+            """
+            if 0 <= row < 8 and 0 <= col < 8:
+                # Set the bit (active low = released)
+                self.keyboard_matrix[row] |= (1 << col)
 
     class CIA2:
         def __init__(self) -> None:
@@ -495,6 +573,10 @@ class C64:
         self.pygame_surface = None
         self.pygame_available = False
 
+        # Debug logging control
+        self.basic_logging_enabled = False
+        self.last_pc_region = None
+
         # self.memory = C64.C64Memory(self.cpu.ram, self.basic_rom, self.kernal_rom, self.char_rom)
         # self.cpu.memory = self.memory
 
@@ -601,6 +683,12 @@ class C64:
         self.cpu.ram.memory_handler = self.memory
 
         log.info("All ROMs loaded into memory")
+
+        # Set PC from reset vector so C64 is ready to run
+        reset_vector = self.cpu.peek_word(self.RESET_VECTOR_ADDR)
+        log.info(f"Reset vector at ${self.RESET_VECTOR_ADDR:04X}: ${reset_vector:04X}")
+        self.cpu.PC = reset_vector
+        log.info(f"PC initialized to ${self.cpu.PC:04X}")
 
     def init_pygame_display(self) -> bool:
         """Initialize pygame display.
@@ -709,6 +797,54 @@ class C64:
         # Set PC to reset vector (property setter will log new value)
         self.cpu.PC = reset_vector
 
+    def get_pc_region(self) -> str:
+        """Determine which memory region PC is currently in.
+
+        Takes memory banking into account (via $0001 port).
+
+        Returns:
+            String describing the region: "RAM", "BASIC", "KERNAL", "I/O", "CHAR", or "???"
+        """
+        pc = self.cpu.PC
+        port = self.memory.port
+
+        if pc < self.BASIC_ROM_START:
+            return "RAM"
+        elif self.BASIC_ROM_START <= pc <= self.BASIC_ROM_END:
+            # BASIC ROM only visible if bit 0 of port is set
+            return "BASIC" if (port & 0x01) else "RAM"
+        elif self.CHAR_ROM_START <= pc <= self.CHAR_ROM_END:
+            # I/O vs CHAR vs RAM depends on bits in port
+            if port & 0x04:
+                return "I/O"
+            elif (port & 0x03) == 0x01:
+                return "CHAR"
+            else:
+                return "RAM"
+        elif self.KERNAL_ROM_START <= pc <= self.KERNAL_ROM_END:
+            # KERNAL ROM only visible if bit 1 of port is set
+            return "KERNAL" if (port & 0x02) else "RAM"
+        else:
+            return "???"
+
+    def _check_pc_region(self) -> None:
+        """Monitor PC and enable detailed logging when entering BASIC ROM."""
+        region = self.get_pc_region()
+
+        # Enable logging when entering BASIC for the first time
+        if region == "BASIC" and not self.basic_logging_enabled:
+            self.basic_logging_enabled = True
+            logging.getLogger("mos6502").setLevel(logging.DEBUG)
+            logging.getLogger("mos6502.cpu").setLevel(logging.DEBUG)
+            logging.getLogger("mos6502.cpu.flags").setLevel(logging.DEBUG)
+            logging.getLogger("mos6502.memory").setLevel(logging.DEBUG)
+            logging.getLogger("mos6502.memory.RAM").setLevel(logging.DEBUG)
+            logging.getLogger("mos6502.memory.Byte").setLevel(logging.DEBUG)
+            logging.getLogger("mos6502.memory.Word").setLevel(logging.DEBUG)
+            log.info(f"*** ENTERING BASIC ROM at ${self.cpu.PC:04X} - Enabling detailed CPU logging ***")
+
+        self.last_pc_region = region
+
     def run(self, max_cycles: int = INFINITE_CYCLES) -> None:
         """Run the C64 emulator.
 
@@ -801,7 +937,7 @@ class C64:
         except KeyboardInterrupt:
             log.info("\nExecution interrupted by user")
             log.info(f"PC=${self.cpu.PC:04X}, Cycles={self.cpu.cycles_executed}")
-        except (errors.CPUCycleExhaustionError, errors.InvalidOpcodeError, RuntimeError) as e:
+        except (errors.CPUCycleExhaustionError, errors.IllegalCPUInstructionError, RuntimeError) as e:
             log.exception(f"Execution error at PC=${self.cpu.PC:04X}")
             # Show context around error
             try:
@@ -812,7 +948,9 @@ class C64:
                 log.exception("Could not display context")
             raise
         finally:
-            self.show_screen()
+            # Only show screen if display mode is not "none"
+            if self.display_mode != "none":
+                self.show_screen()
 
     def dump_memory(self, start: int, end: int, bytes_per_line: int = 16) -> None:
         """Dump memory contents for debugging.
@@ -1037,29 +1175,13 @@ class C64:
 
         _sys.stdout.write("=" * 42 + "\n")
 
-        # Get flag values
-        flags = f"{'N' if self.cpu.N else 'n'}"
-        flags += f"{'V' if self.cpu.V else 'v'}"
-        flags += "-"  # Unused flag
-        flags += f"{'B' if self.cpu.B else 'b'}"
-        flags += f"{'D' if self.cpu.D else 'd'}"
-        flags += f"{'I' if self.cpu.I else 'i'}"
-        flags += f"{'Z' if self.cpu.Z else 'z'}"
-        flags += f"{'C' if self.cpu.C else 'c'}"
+        # Get flag values using shared formatter
+        from mos6502.flags import format_flags
+        flags = format_flags(self.cpu._flags.value)
 
         # Determine what's mapped at PC
         pc = self.cpu.PC
-        port = self.memory.port
-        if pc < C64.BASIC_ROM_START:
-            region = "RAM"
-        elif C64.BASIC_ROM_START <= pc <= C64.BASIC_ROM_END:
-            region = "BASIC" if (port & 0x01) else "RAM"
-        elif C64.CHAR_ROM_START <= pc <= C64.CHAR_ROM_END:
-            region = "I/O" if (port & 0x04) else ("CHAR" if (port & 0x03) == 0x01 else "RAM")
-        elif C64.KERNAL_ROM_START <= pc <= C64.KERNAL_ROM_END:
-            region = "KERNAL" if (port & 0x02) else "RAM"
-        else:
-            region = "???"
+        region = self.get_pc_region()
 
         # Disassemble current instruction
         try:
@@ -1083,6 +1205,106 @@ class C64:
         _sys.stdout.write(status + "\n")
         _sys.stdout.flush()
 
+    def _handle_pygame_keyboard(self, event, pygame) -> None:
+        """Handle pygame keyboard events and update CIA1 keyboard matrix.
+
+        Args:
+            event: Pygame event
+            pygame: Pygame module
+        """
+        # C64 keyboard matrix mapping: (row, col)
+        # Reference: https://www.c64-wiki.com/wiki/Keyboard
+        key_map = {
+            # Row 0
+            pygame.K_BACKSPACE: (0, 0),  # DEL/INST
+            pygame.K_RETURN: (0, 1),     # RETURN
+            pygame.K_RIGHT: (0, 2),      # CRSR →
+            pygame.K_F7: (0, 3),         # F7
+            pygame.K_F1: (0, 4),         # F1
+            pygame.K_F3: (0, 5),         # F3
+            pygame.K_F5: (0, 6),         # F5
+            pygame.K_DOWN: (0, 7),       # CRSR ↓
+
+            # Row 1
+            pygame.K_3: (1, 0),
+            pygame.K_w: (1, 1),
+            pygame.K_a: (1, 2),
+            pygame.K_4: (1, 3),
+            pygame.K_z: (1, 4),
+            pygame.K_s: (1, 5),
+            pygame.K_e: (1, 6),
+            pygame.K_LSHIFT: (1, 7),     # Left SHIFT
+
+            # Row 2
+            pygame.K_5: (2, 0),
+            pygame.K_r: (2, 1),
+            pygame.K_d: (2, 2),
+            pygame.K_6: (2, 3),
+            pygame.K_c: (2, 4),
+            pygame.K_f: (2, 5),
+            pygame.K_t: (2, 6),
+            pygame.K_x: (2, 7),
+
+            # Row 3
+            pygame.K_7: (3, 0),
+            pygame.K_y: (3, 1),
+            pygame.K_g: (3, 2),
+            pygame.K_8: (3, 3),
+            pygame.K_b: (3, 4),
+            pygame.K_h: (3, 5),
+            pygame.K_u: (3, 6),
+            pygame.K_v: (3, 7),
+
+            # Row 4
+            pygame.K_9: (4, 0),
+            pygame.K_i: (4, 1),
+            pygame.K_j: (4, 2),
+            pygame.K_0: (4, 3),
+            pygame.K_m: (4, 4),
+            pygame.K_k: (4, 5),
+            pygame.K_o: (4, 6),
+            pygame.K_n: (4, 7),
+
+            # Row 5
+            pygame.K_PLUS: (5, 0),       # +
+            pygame.K_p: (5, 1),
+            pygame.K_l: (5, 2),
+            pygame.K_MINUS: (5, 3),      # -
+            pygame.K_PERIOD: (5, 4),     # .
+            pygame.K_COLON: (5, 5),      # :
+            pygame.K_AT: (5, 6),         # @
+            pygame.K_COMMA: (5, 7),      # ,
+
+            # Row 6
+            # pygame.K_POUND: (6, 0),    # £ (not on US keyboard)
+            pygame.K_ASTERISK: (6, 1),   # *
+            pygame.K_SEMICOLON: (6, 2),  # ;
+            pygame.K_HOME: (6, 3),       # HOME/CLR
+            # pygame.K_CLR: (6, 4),      # CLR (combined with HOME)
+            pygame.K_EQUALS: (6, 5),     # =
+            pygame.K_UP: (6, 6),         # ↑ (up arrow, mapped to up key)
+            pygame.K_SLASH: (6, 7),      # /
+
+            # Row 7
+            pygame.K_1: (7, 0),
+            pygame.K_LEFT: (7, 1),       # ← (CRSR left, using arrow key)
+            pygame.K_LCTRL: (7, 2),      # CTRL
+            pygame.K_2: (7, 3),
+            pygame.K_SPACE: (7, 4),      # SPACE
+            # pygame.K_COMMODORE: (7, 5), # C= (no pygame equivalent)
+            pygame.K_q: (7, 6),
+            pygame.K_ESCAPE: (7, 7),     # RUN/STOP (mapped to ESC)
+        }
+
+        if event.type == pygame.KEYDOWN:
+            if event.key in key_map:
+                row, col = key_map[event.key]
+                self.cia1.press_key(row, col)
+        elif event.type == pygame.KEYUP:
+            if event.key in key_map:
+                row, col = key_map[event.key]
+                self.cia1.release_key(row, col)
+
     def _render_pygame(self) -> None:
         """Render C64 screen to pygame window."""
         if not self.pygame_available or self.pygame_screen is None:
@@ -1091,11 +1313,16 @@ class C64:
         try:
             import pygame
 
-            # Handle pygame events (window close, etc.)
+            # Check if we've entered BASIC ROM (for conditional logging)
+            self._check_pc_region()
+
+            # Handle pygame events (window close, keyboard, etc.)
             for event in pygame.event.get():
                 if event.type == pygame.QUIT:
                     import sys
                     sys.exit(0)
+                elif event.type in (pygame.KEYDOWN, pygame.KEYUP):
+                    self._handle_pygame_keyboard(event, pygame)
 
             # Create memory wrappers for VIC
             class RAMWrapper:
@@ -1293,10 +1520,17 @@ def main() -> int | None:
         # Reset CPU FIRST (this clears RAM)
         c64.cpu.reset()
 
+        # Start with minimal logging - will auto-enable when BASIC ROM is entered
+        # This avoids flooding the console during KERNAL boot
         logging.getLogger("mos6502").setLevel(logging.CRITICAL)
+        # Also disable flag logging during KERNAL boot
+        logging.getLogger("mos6502.cpu.flags").setLevel(logging.CRITICAL)
+        if args.display == "pygame":
+            log.info("Pygame mode: CPU logging will enable when BASIC ROM is entered")
 
         # Then load ROMs (after RAM is cleared)
         # This creates the VIC which is needed for pygame initialization
+        # load_roms() also initializes PC from reset vector
         if not args.no_roms:
             c64.load_roms()
 
@@ -1306,14 +1540,8 @@ def main() -> int | None:
                 log.warning("Pygame initialization failed, falling back to terminal mode")
                 c64.display_mode = "terminal"
 
-        # Set PC after ROMs are loaded
-        if not args.no_roms:
-            # Read reset vector and set PC
-            reset_vector = c64.cpu.peek_word(c64.RESET_VECTOR_ADDR)
-            log.info(f"Reset vector at ${c64.RESET_VECTOR_ADDR:04X}: ${reset_vector:04X}")
-            c64.cpu.PC = reset_vector
-            log.info(f"PC set to ${c64.cpu.PC:04X}")
-        else:
+        # In no-roms mode, log that we're running headless
+        if args.no_roms:
             log.info(f"Running in headless mode (no ROMs)")
 
         # Load program AFTER reset (so it doesn't get cleared)

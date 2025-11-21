@@ -79,7 +79,8 @@ class MOS6502CPU(flags.ProcessorStatusFlagsInterface):
         memory.ENDIANNESS = self.endianness
 
         self._registers: Registers = registers.Registers(endianness=self.endianness)
-        self._flags: Byte = Byte()
+        from mos6502.flags import FlagsRegister
+        self._flags: FlagsRegister = FlagsRegister()
         self.ram: RAM = RAM(endianness=self.endianness)
         self.cycles = 0
         self.cycles_executed: Literal[0] = 0
@@ -1246,7 +1247,6 @@ class MOS6502CPU(flags.ProcessorStatusFlagsInterface):
         -------
             Byte()
         """
-        self.log.debug(f"Flags -> 0x{self._flags:02X}")
         return self._flags
 
     @flags.setter

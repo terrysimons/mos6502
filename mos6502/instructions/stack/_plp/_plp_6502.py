@@ -25,11 +25,11 @@ def plp_implied_0x28(cpu: MOS6502CPU) -> None:
     ---------
         cpu: The CPU instance to operate on
     """
-    from mos6502.memory import Byte
+    from mos6502.flags import FlagsRegister
 
     cpu.S += 1
     status_byte: int = cpu.read_byte(address=cpu.S)
-    # Restore all flags from stack by replacing the entire Byte
-    cpu._flags = Byte(status_byte)
+    # Restore all flags from stack - must use FlagsRegister to preserve logging
+    cpu._flags = FlagsRegister(status_byte)
     cpu.log.info("i")
     cpu.spend_cpu_cycles(2)

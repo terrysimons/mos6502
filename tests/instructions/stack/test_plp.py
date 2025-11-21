@@ -5,6 +5,7 @@ import logging
 
 import mos6502
 from mos6502 import CPU, errors, flags, instructions
+from mos6502.flags import FlagsRegister
 
 log = logging.getLogger("mos6502")
 log.setLevel(logging.DEBUG)
@@ -94,3 +95,23 @@ def test_cpu_instruction_PLP_IMPLIED_0x28_with_php(cpu: CPU) -> None:  # noqa: N
     assert cpu.flags[flags.C] == 1
     assert cpu.flags[flags.Z] == 1
     assert cpu.flags[flags.N] == 1
+
+
+def test_cpu_instruction_PLP_preserves_FlagsRegister_type(cpu: CPU) -> None:  # noqa: N802
+    """Test that PLP maintains the FlagsRegister type, not replacing it with plain Byte."""
+    # given:
+    cpu.ram[cpu.S] = 0xF0
+    cpu.S -= 1
+    cpu.ram[0xFFFC] = instructions.PLP_IMPLIED_0x28
+
+    # Verify we start with a FlagsRegister
+    assert isinstance(cpu._flags, FlagsRegister), "CPU should start with FlagsRegister"
+
+    # when:
+    with contextlib.suppress(errors.CPUCycleExhaustionError):
+        cpu.execute(cycles=4)
+
+    # then:
+    assert isinstance(cpu._flags, FlagsRegister), \
+        "PLP must preserve FlagsRegister type for flag logging to work"
+    assert cpu.flags.value == 0xF0

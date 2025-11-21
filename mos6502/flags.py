@@ -1,10 +1,16 @@
 #!/usr/bin/env python3
 """Flags for the mos6502 CPU."""
 
+import logging
 from typing import Self
 
 import bitarray
 from bitarray.util import int2ba
+
+from mos6502.memory import Byte
+
+# Dedicated logger for flag modifications
+flag_logger = logging.getLogger("mos6502.cpu.flags")
 
 # Bit index into flags bitarray
 C: int = 0x07
@@ -15,6 +21,79 @@ B: int = 0x03
 _: int = 0x02
 V: int = 0x01
 N: int = 0x00
+
+# Flag names for logging
+FLAG_NAMES = {
+    0x00: "N",
+    0x01: "V",
+    0x02: "_",
+    0x03: "B",
+    0x04: "D",
+    0x05: "I",
+    0x06: "Z",
+    0x07: "C",
+}
+
+
+def format_flags(flags_value: int) -> str:
+    """Format flags register as NV-BDIZC string (uppercase=set, lowercase=clear).
+
+    Args:
+    ----
+        flags_value: The flags register value (0x00-0xFF)
+
+    Returns:
+    -------
+        Formatted string like "Nv-Bdizc" or "NV-BDIZC"
+
+    """
+    # Extract individual flag bits from flags_value
+    n_bit = (flags_value >> N) & 1
+    v_bit = (flags_value >> V) & 1
+    b_bit = (flags_value >> B) & 1
+    d_bit = (flags_value >> D) & 1
+    i_bit = (flags_value >> I) & 1
+    z_bit = (flags_value >> Z) & 1
+    c_bit = (flags_value >> C) & 1
+
+    return (
+        f"{'N' if n_bit else 'n'}"
+        f"{'V' if v_bit else 'v'}"
+        "-"  # Unused flag
+        f"{'B' if b_bit else 'b'}"
+        f"{'D' if d_bit else 'd'}"
+        f"{'I' if i_bit else 'i'}"
+        f"{'Z' if z_bit else 'z'}"
+        f"{'C' if c_bit else 'c'}"
+    )
+
+
+class FlagsRegister(Byte):
+    """A Byte that logs all individual flag bit modifications."""
+
+    def __init__(self: Self, value: int = 0, endianness: str = "little") -> None:
+        """Initialize FlagsRegister with tracking for change detection."""
+        super().__init__(value, endianness)
+        self._last_logged_value: int = value
+
+    def __setitem__(self: Self, index: int, value: int) -> None:
+        """Set a flag bit, but only if it's different. Log only on change."""
+        # Get current value of this bit
+        old_bit_value = int(self._value[index])
+        new_bit_value = int(value) if isinstance(value, int) else int(value._value[index])  # noqa: SLF001
+
+        # Early return if no change - saves cycles!
+        if old_bit_value == new_bit_value:
+            return
+
+        # Call parent to actually set the value
+        super().__setitem__(index, value)
+
+        # Only log if the overall flags value changed since last log
+        # This prevents logging the same value multiple times
+        if self.value != self._last_logged_value:
+            flag_logger.info(f"⎿ {format_flags(self.value)} (0x{self.value:02X})")
+            self._last_logged_value = self.value
 
 
 class ProcessorStatusFlags:

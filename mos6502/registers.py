@@ -10,8 +10,8 @@ import mos6502
 import mos6502.memory
 from mos6502.memory import Byte, Word
 
-ZERO_BYTE: Byte = Byte(0x00)
-ZERO_WORD: Word = Word(0x00)
+ZERO_BYTE: int = 0x00
+ZERO_WORD: int = 0x00
 class Registers:
     """The mos6502 register set."""
 
@@ -39,18 +39,19 @@ class Registers:
         super().__init__()
         self.endianness = endianness
 
-        # We recast the values here with <Byte|Word>.value to ensure proper
-        # endianness
-        self._PC: Word = Word(value=PC.value, endianness=self.endianness)
+        # Accept either int or Byte/Word objects for parameters
+        # If already a Byte/Word, use it directly (with correct endianness)
+        # If an int, wrap it in Byte/Word
+        self._PC: Word = Word(value=PC, endianness=self.endianness)
 
         # S is 8-bit in hardware, but it is convenient to be 16-bit here.
         #
         # Only holds an offset of 255 values starting at 0x100 - 0x1FF
         # We mask the value with 0xFF as a @property.
-        self._S: Word = Word(S.value, endianness=self.endianness)
-        self._A: Byte = Byte(A.value, endianness=self.endianness)
-        self._X: Byte = Byte(X.value, endianness=self.endianness)
-        self._Y: Byte = Byte(Y.value, endianness=self.endianness)
+        self._S: Word = Word(S, endianness=self.endianness)
+        self._A: Byte = Byte(A, endianness=self.endianness)
+        self._X: Byte = Byte(X, endianness=self.endianness)
+        self._Y: Byte = Byte(Y, endianness=self.endianness)
 
     @property
     def PC(self: Self) -> int:  # noqa: N802
