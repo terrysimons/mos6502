@@ -120,13 +120,13 @@ def add_isc_to_instruction_set_enum(instruction_set_class) -> None:
 
     # Add each ISC variant to the enum
     for opcode_name, opcode_value in [
-        ('ISC_ZEROPAGE_0xE7', ISC_ZEROPAGE_0xE7),
-        ('ISC_ZEROPAGE_X_0xF7', ISC_ZEROPAGE_X_0xF7),
-        ('ISC_INDEXED_INDIRECT_X_0xE3', ISC_INDEXED_INDIRECT_X_0xE3),
-        ('ISC_INDIRECT_INDEXED_Y_0xF3', ISC_INDIRECT_INDEXED_Y_0xF3),
-        ('ISC_ABSOLUTE_0xEF', ISC_ABSOLUTE_0xEF),
-        ('ISC_ABSOLUTE_X_0xFF', ISC_ABSOLUTE_X_0xFF),
-        ('ISC_ABSOLUTE_Y_0xFB', ISC_ABSOLUTE_Y_0xFB),
+        ("ISC_ZEROPAGE_0xE7", ISC_ZEROPAGE_0xE7),
+        ("ISC_ZEROPAGE_X_0xF7", ISC_ZEROPAGE_X_0xF7),
+        ("ISC_INDEXED_INDIRECT_X_0xE3", ISC_INDEXED_INDIRECT_X_0xE3),
+        ("ISC_INDIRECT_INDEXED_Y_0xF3", ISC_INDIRECT_INDEXED_Y_0xF3),
+        ("ISC_ABSOLUTE_0xEF", ISC_ABSOLUTE_0xEF),
+        ("ISC_ABSOLUTE_X_0xFF", ISC_ABSOLUTE_X_0xFF),
+        ("ISC_ABSOLUTE_Y_0xFB", ISC_ABSOLUTE_Y_0xFB),
     ]:
         member = PseudoEnumMember(opcode_value, opcode_name)
         instruction_set_class._value2member_map_[opcode_value] = member
@@ -211,12 +211,12 @@ def register_isc_instructions(instruction_set_class, instruction_map: dict) -> N
 
 
 __all__ = [
-    'ISC_ZEROPAGE_0xE7',
-    'ISC_ZEROPAGE_X_0xF7',
-    'ISC_INDEXED_INDIRECT_X_0xE3',
-    'ISC_INDIRECT_INDEXED_Y_0xF3',
-    'ISC_ABSOLUTE_0xEF',
-    'ISC_ABSOLUTE_X_0xFF',
-    'ISC_ABSOLUTE_Y_0xFB',
-    'register_isc_instructions',
+    "ISC_ZEROPAGE_0xE7",
+    "ISC_ZEROPAGE_X_0xF7",
+    "ISC_INDEXED_INDIRECT_X_0xE3",
+    "ISC_INDIRECT_INDEXED_Y_0xF3",
+    "ISC_ABSOLUTE_0xEF",
+    "ISC_ABSOLUTE_X_0xFF",
+    "ISC_ABSOLUTE_Y_0xFB",
+    "register_isc_instructions",
 ]

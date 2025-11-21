@@ -85,14 +85,14 @@ def add_ora_to_instruction_set_enum(instruction_set_class) -> None:
             return self._value_
 
     for value, name in [
-        (ORA_IMMEDIATE_0x09, 'ORA_IMMEDIATE_0x09'),
-        (ORA_ZEROPAGE_0x05, 'ORA_ZEROPAGE_0x05'),
-        (ORA_ZEROPAGE_X_0x15, 'ORA_ZEROPAGE_X_0x15'),
-        (ORA_ABSOLUTE_0x0D, 'ORA_ABSOLUTE_0x0D'),
-        (ORA_ABSOLUTE_X_0x1D, 'ORA_ABSOLUTE_X_0x1D'),
-        (ORA_ABSOLUTE_Y_0x19, 'ORA_ABSOLUTE_Y_0x19'),
-        (ORA_INDEXED_INDIRECT_X_0x01, 'ORA_INDEXED_INDIRECT_X_0x01'),
-        (ORA_INDIRECT_INDEXED_Y_0x11, 'ORA_INDIRECT_INDEXED_Y_0x11'),
+        (ORA_IMMEDIATE_0x09, "ORA_IMMEDIATE_0x09"),
+        (ORA_ZEROPAGE_0x05, "ORA_ZEROPAGE_0x05"),
+        (ORA_ZEROPAGE_X_0x15, "ORA_ZEROPAGE_X_0x15"),
+        (ORA_ABSOLUTE_0x0D, "ORA_ABSOLUTE_0x0D"),
+        (ORA_ABSOLUTE_X_0x1D, "ORA_ABSOLUTE_X_0x1D"),
+        (ORA_ABSOLUTE_Y_0x19, "ORA_ABSOLUTE_Y_0x19"),
+        (ORA_INDEXED_INDIRECT_X_0x01, "ORA_INDEXED_INDIRECT_X_0x01"),
+        (ORA_INDIRECT_INDEXED_Y_0x11, "ORA_INDIRECT_INDEXED_Y_0x11"),
     ]:
         member = PseudoEnumMember(value, name)
         instruction_set_class._value2member_map_[value] = member
@@ -183,13 +183,13 @@ def register_ora_instructions(instruction_set_class, instruction_map: dict) -> N
 
 
 __all__ = [
-    'ORA_IMMEDIATE_0x09',
-    'ORA_ZEROPAGE_0x05',
-    'ORA_ZEROPAGE_X_0x15',
-    'ORA_ABSOLUTE_0x0D',
-    'ORA_ABSOLUTE_X_0x1D',
-    'ORA_ABSOLUTE_Y_0x19',
-    'ORA_INDEXED_INDIRECT_X_0x01',
-    'ORA_INDIRECT_INDEXED_Y_0x11',
-    'register_ora_instructions',
+    "ORA_IMMEDIATE_0x09",
+    "ORA_ZEROPAGE_0x05",
+    "ORA_ZEROPAGE_X_0x15",
+    "ORA_ABSOLUTE_0x0D",
+    "ORA_ABSOLUTE_X_0x1D",
+    "ORA_ABSOLUTE_Y_0x19",
+    "ORA_INDEXED_INDIRECT_X_0x01",
+    "ORA_INDIRECT_INDEXED_Y_0x11",
+    "register_ora_instructions",
 ]

@@ -85,14 +85,14 @@ def add_and_to_instruction_set_enum(instruction_set_class) -> None:
             return self._value_
 
     for value, name in [
-        (AND_IMMEDIATE_0x29, 'AND_IMMEDIATE_0x29'),
-        (AND_ZEROPAGE_0x25, 'AND_ZEROPAGE_0x25'),
-        (AND_ZEROPAGE_X_0x35, 'AND_ZEROPAGE_X_0x35'),
-        (AND_ABSOLUTE_0x2D, 'AND_ABSOLUTE_0x2D'),
-        (AND_ABSOLUTE_X_0x3D, 'AND_ABSOLUTE_X_0x3D'),
-        (AND_ABSOLUTE_Y_0x39, 'AND_ABSOLUTE_Y_0x39'),
-        (AND_INDEXED_INDIRECT_X_0x21, 'AND_INDEXED_INDIRECT_X_0x21'),
-        (AND_INDIRECT_INDEXED_Y_0x31, 'AND_INDIRECT_INDEXED_Y_0x31'),
+        (AND_IMMEDIATE_0x29, "AND_IMMEDIATE_0x29"),
+        (AND_ZEROPAGE_0x25, "AND_ZEROPAGE_0x25"),
+        (AND_ZEROPAGE_X_0x35, "AND_ZEROPAGE_X_0x35"),
+        (AND_ABSOLUTE_0x2D, "AND_ABSOLUTE_0x2D"),
+        (AND_ABSOLUTE_X_0x3D, "AND_ABSOLUTE_X_0x3D"),
+        (AND_ABSOLUTE_Y_0x39, "AND_ABSOLUTE_Y_0x39"),
+        (AND_INDEXED_INDIRECT_X_0x21, "AND_INDEXED_INDIRECT_X_0x21"),
+        (AND_INDIRECT_INDEXED_Y_0x31, "AND_INDIRECT_INDEXED_Y_0x31"),
     ]:
         member = PseudoEnumMember(value, name)
         instruction_set_class._value2member_map_[value] = member
@@ -183,13 +183,13 @@ def register_and_instructions(instruction_set_class, instruction_map: dict) -> N
 
 
 __all__ = [
-    'AND_IMMEDIATE_0x29',
-    'AND_ZEROPAGE_0x25',
-    'AND_ZEROPAGE_X_0x35',
-    'AND_ABSOLUTE_0x2D',
-    'AND_ABSOLUTE_X_0x3D',
-    'AND_ABSOLUTE_Y_0x39',
-    'AND_INDEXED_INDIRECT_X_0x21',
-    'AND_INDIRECT_INDEXED_Y_0x31',
-    'register_and_instructions',
+    "AND_IMMEDIATE_0x29",
+    "AND_ZEROPAGE_0x25",
+    "AND_ZEROPAGE_X_0x35",
+    "AND_ABSOLUTE_0x2D",
+    "AND_ABSOLUTE_X_0x3D",
+    "AND_ABSOLUTE_Y_0x39",
+    "AND_INDEXED_INDIRECT_X_0x21",
+    "AND_INDIRECT_INDEXED_Y_0x31",
+    "register_and_instructions",
 ]

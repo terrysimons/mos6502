@@ -85,14 +85,14 @@ def add_sbc_to_instruction_set_enum(instruction_set_class) -> None:
             return self._value_
 
     for value, name in [
-        (SBC_IMMEDIATE_0xE9, 'SBC_IMMEDIATE_0xE9'),
-        (SBC_ZEROPAGE_0xE5, 'SBC_ZEROPAGE_0xE5'),
-        (SBC_ZEROPAGE_X_0xF5, 'SBC_ZEROPAGE_X_0xF5'),
-        (SBC_ABSOLUTE_0xED, 'SBC_ABSOLUTE_0xED'),
-        (SBC_ABSOLUTE_X_0xFD, 'SBC_ABSOLUTE_X_0xFD'),
-        (SBC_ABSOLUTE_Y_0xF9, 'SBC_ABSOLUTE_Y_0xF9'),
-        (SBC_INDEXED_INDIRECT_X_0xE1, 'SBC_INDEXED_INDIRECT_X_0xE1'),
-        (SBC_INDIRECT_INDEXED_Y_0xF1, 'SBC_INDIRECT_INDEXED_Y_0xF1'),
+        (SBC_IMMEDIATE_0xE9, "SBC_IMMEDIATE_0xE9"),
+        (SBC_ZEROPAGE_0xE5, "SBC_ZEROPAGE_0xE5"),
+        (SBC_ZEROPAGE_X_0xF5, "SBC_ZEROPAGE_X_0xF5"),
+        (SBC_ABSOLUTE_0xED, "SBC_ABSOLUTE_0xED"),
+        (SBC_ABSOLUTE_X_0xFD, "SBC_ABSOLUTE_X_0xFD"),
+        (SBC_ABSOLUTE_Y_0xF9, "SBC_ABSOLUTE_Y_0xF9"),
+        (SBC_INDEXED_INDIRECT_X_0xE1, "SBC_INDEXED_INDIRECT_X_0xE1"),
+        (SBC_INDIRECT_INDEXED_Y_0xF1, "SBC_INDIRECT_INDEXED_Y_0xF1"),
     ]:
         member = PseudoEnumMember(value, name)
         instruction_set_class._value2member_map_[value] = member
@@ -185,13 +185,13 @@ def register_sbc_instructions(instruction_set_class, instruction_map: dict) -> N
 
 
 __all__ = [
-    'SBC_IMMEDIATE_0xE9',
-    'SBC_ZEROPAGE_0xE5',
-    'SBC_ZEROPAGE_X_0xF5',
-    'SBC_ABSOLUTE_0xED',
-    'SBC_ABSOLUTE_X_0xFD',
-    'SBC_ABSOLUTE_Y_0xF9',
-    'SBC_INDEXED_INDIRECT_X_0xE1',
-    'SBC_INDIRECT_INDEXED_Y_0xF1',
-    'register_sbc_instructions',
+    "SBC_IMMEDIATE_0xE9",
+    "SBC_ZEROPAGE_0xE5",
+    "SBC_ZEROPAGE_X_0xF5",
+    "SBC_ABSOLUTE_0xED",
+    "SBC_ABSOLUTE_X_0xFD",
+    "SBC_ABSOLUTE_Y_0xF9",
+    "SBC_INDEXED_INDIRECT_X_0xE1",
+    "SBC_INDIRECT_INDEXED_Y_0xF1",
+    "register_sbc_instructions",
 ]

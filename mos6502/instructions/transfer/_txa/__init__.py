@@ -36,9 +36,9 @@ def add_txa_to_instruction_set_enum(instruction_set_class) -> None:
         def value(self):
             return self._value_
 
-    txa_member = PseudoEnumMember(TXA_IMPLIED_0x8A, 'TXA_IMPLIED_0x8A')
+    txa_member = PseudoEnumMember(TXA_IMPLIED_0x8A, "TXA_IMPLIED_0x8A")
     instruction_set_class._value2member_map_[TXA_IMPLIED_0x8A] = txa_member
-    setattr(instruction_set_class, 'TXA_IMPLIED_0x8A', TXA_IMPLIED_0x8A)
+    setattr(instruction_set_class, "TXA_IMPLIED_0x8A", TXA_IMPLIED_0x8A)
 
 
 def register_txa_instructions(instruction_set_class, instruction_map: dict) -> None:
@@ -58,4 +58,4 @@ def register_txa_instructions(instruction_set_class, instruction_map: dict) -> N
     }
 
 
-__all__ = ['TXA_IMPLIED_0x8A', 'register_txa_instructions']
+__all__ = ["TXA_IMPLIED_0x8A", "register_txa_instructions"]

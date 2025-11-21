@@ -35,9 +35,9 @@ def add_plp_to_instruction_set_enum(instruction_set_class) -> None:
         def value(self):
             return self._value_
 
-    plp_member = PseudoEnumMember(PLP_IMPLIED_0x28, 'PLP_IMPLIED_0x28')
+    plp_member = PseudoEnumMember(PLP_IMPLIED_0x28, "PLP_IMPLIED_0x28")
     instruction_set_class._value2member_map_[PLP_IMPLIED_0x28] = plp_member
-    setattr(instruction_set_class, 'PLP_IMPLIED_0x28', PLP_IMPLIED_0x28)
+    setattr(instruction_set_class, "PLP_IMPLIED_0x28", PLP_IMPLIED_0x28)
 
 
 def register_plp_instructions(instruction_set_class, instruction_map: dict) -> None:
@@ -56,4 +56,4 @@ def register_plp_instructions(instruction_set_class, instruction_map: dict) -> N
     }
 
 
-__all__ = ['PLP_IMPLIED_0x28', 'register_plp_instructions']
+__all__ = ["PLP_IMPLIED_0x28", "register_plp_instructions"]

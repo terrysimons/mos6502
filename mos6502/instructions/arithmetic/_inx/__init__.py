@@ -36,9 +36,9 @@ def add_inx_to_instruction_set_enum(instruction_set_class) -> None:
         def value(self):
             return self._value_
 
-    inx_member = PseudoEnumMember(INX_IMPLIED_0xE8, 'INX_IMPLIED_0xE8')
+    inx_member = PseudoEnumMember(INX_IMPLIED_0xE8, "INX_IMPLIED_0xE8")
     instruction_set_class._value2member_map_[INX_IMPLIED_0xE8] = inx_member
-    setattr(instruction_set_class, 'INX_IMPLIED_0xE8', INX_IMPLIED_0xE8)
+    setattr(instruction_set_class, "INX_IMPLIED_0xE8", INX_IMPLIED_0xE8)
 
 
 def register_inx_instructions(instruction_set_class, instruction_map: dict) -> None:
@@ -58,4 +58,4 @@ def register_inx_instructions(instruction_set_class, instruction_map: dict) -> N
     }
 
 
-__all__ = ['INX_IMPLIED_0xE8', 'register_inx_instructions']
+__all__ = ["INX_IMPLIED_0xE8", "register_inx_instructions"]

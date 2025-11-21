@@ -126,13 +126,13 @@ def add_lax_to_instruction_set_enum(instruction_set_class) -> None:
 
     # Add each LAX variant to the enum
     for opcode_name, opcode_value in [
-        ('LAX_ZEROPAGE_0xA7', LAX_ZEROPAGE_0xA7),
-        ('LAX_ZEROPAGE_Y_0xB7', LAX_ZEROPAGE_Y_0xB7),
-        ('LAX_INDEXED_INDIRECT_X_0xA3', LAX_INDEXED_INDIRECT_X_0xA3),
-        ('LAX_INDIRECT_INDEXED_Y_0xB3', LAX_INDIRECT_INDEXED_Y_0xB3),
-        ('LAX_ABSOLUTE_0xAF', LAX_ABSOLUTE_0xAF),
-        ('LAX_ABSOLUTE_Y_0xBF', LAX_ABSOLUTE_Y_0xBF),
-        ('LAX_IMMEDIATE_0xAB', LAX_IMMEDIATE_0xAB),
+        ("LAX_ZEROPAGE_0xA7", LAX_ZEROPAGE_0xA7),
+        ("LAX_ZEROPAGE_Y_0xB7", LAX_ZEROPAGE_Y_0xB7),
+        ("LAX_INDEXED_INDIRECT_X_0xA3", LAX_INDEXED_INDIRECT_X_0xA3),
+        ("LAX_INDIRECT_INDEXED_Y_0xB3", LAX_INDIRECT_INDEXED_Y_0xB3),
+        ("LAX_ABSOLUTE_0xAF", LAX_ABSOLUTE_0xAF),
+        ("LAX_ABSOLUTE_Y_0xBF", LAX_ABSOLUTE_Y_0xBF),
+        ("LAX_IMMEDIATE_0xAB", LAX_IMMEDIATE_0xAB),
     ]:
         member = PseudoEnumMember(opcode_value, opcode_name)
         instruction_set_class._value2member_map_[opcode_value] = member
@@ -215,12 +215,12 @@ def register_lax_instructions(instruction_set_class, instruction_map: dict) -> N
 
 
 __all__ = [
-    'LAX_ZEROPAGE_0xA7',
-    'LAX_ZEROPAGE_Y_0xB7',
-    'LAX_INDEXED_INDIRECT_X_0xA3',
-    'LAX_INDIRECT_INDEXED_Y_0xB3',
-    'LAX_ABSOLUTE_0xAF',
-    'LAX_ABSOLUTE_Y_0xBF',
-    'LAX_IMMEDIATE_0xAB',
-    'register_lax_instructions',
+    "LAX_ZEROPAGE_0xA7",
+    "LAX_ZEROPAGE_Y_0xB7",
+    "LAX_INDEXED_INDIRECT_X_0xA3",
+    "LAX_INDIRECT_INDEXED_Y_0xB3",
+    "LAX_ABSOLUTE_0xAF",
+    "LAX_ABSOLUTE_Y_0xBF",
+    "LAX_IMMEDIATE_0xAB",
+    "register_lax_instructions",
 ]

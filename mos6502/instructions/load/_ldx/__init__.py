@@ -66,11 +66,11 @@ def add_ldx_to_instruction_set_enum(instruction_set_class) -> None:
             return self._value_
 
     for value, name in [
-        (LDX_IMMEDIATE_0xA2, 'LDX_IMMEDIATE_0xA2'),
-        (LDX_ZEROPAGE_0xA6, 'LDX_ZEROPAGE_0xA6'),
-        (LDX_ZEROPAGE_Y_0xB6, 'LDX_ZEROPAGE_Y_0xB6'),
-        (LDX_ABSOLUTE_0xAE, 'LDX_ABSOLUTE_0xAE'),
-        (LDX_ABSOLUTE_Y_0xBE, 'LDX_ABSOLUTE_Y_0xBE'),
+        (LDX_IMMEDIATE_0xA2, "LDX_IMMEDIATE_0xA2"),
+        (LDX_ZEROPAGE_0xA6, "LDX_ZEROPAGE_0xA6"),
+        (LDX_ZEROPAGE_Y_0xB6, "LDX_ZEROPAGE_Y_0xB6"),
+        (LDX_ABSOLUTE_0xAE, "LDX_ABSOLUTE_0xAE"),
+        (LDX_ABSOLUTE_Y_0xBE, "LDX_ABSOLUTE_Y_0xBE"),
     ]:
         member = PseudoEnumMember(value, name)
         instruction_set_class._value2member_map_[value] = member
@@ -132,10 +132,10 @@ def register_ldx_instructions(instruction_set_class, instruction_map: dict) -> N
 
 
 __all__ = [
-    'LDX_IMMEDIATE_0xA2',
-    'LDX_ZEROPAGE_0xA6',
-    'LDX_ZEROPAGE_Y_0xB6',
-    'LDX_ABSOLUTE_0xAE',
-    'LDX_ABSOLUTE_Y_0xBE',
-    'register_ldx_instructions',
+    "LDX_IMMEDIATE_0xA2",
+    "LDX_ZEROPAGE_0xA6",
+    "LDX_ZEROPAGE_Y_0xB6",
+    "LDX_ABSOLUTE_0xAE",
+    "LDX_ABSOLUTE_Y_0xBE",
+    "register_ldx_instructions",
 ]

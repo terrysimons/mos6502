@@ -66,11 +66,11 @@ def add_ldy_to_instruction_set_enum(instruction_set_class) -> None:
             return self._value_
 
     for value, name in [
-        (LDY_IMMEDIATE_0xA0, 'LDY_IMMEDIATE_0xA0'),
-        (LDY_ZEROPAGE_0xA4, 'LDY_ZEROPAGE_0xA4'),
-        (LDY_ZEROPAGE_X_0xB4, 'LDY_ZEROPAGE_X_0xB4'),
-        (LDY_ABSOLUTE_0xAC, 'LDY_ABSOLUTE_0xAC'),
-        (LDY_ABSOLUTE_X_0xBC, 'LDY_ABSOLUTE_X_0xBC'),
+        (LDY_IMMEDIATE_0xA0, "LDY_IMMEDIATE_0xA0"),
+        (LDY_ZEROPAGE_0xA4, "LDY_ZEROPAGE_0xA4"),
+        (LDY_ZEROPAGE_X_0xB4, "LDY_ZEROPAGE_X_0xB4"),
+        (LDY_ABSOLUTE_0xAC, "LDY_ABSOLUTE_0xAC"),
+        (LDY_ABSOLUTE_X_0xBC, "LDY_ABSOLUTE_X_0xBC"),
     ]:
         member = PseudoEnumMember(value, name)
         instruction_set_class._value2member_map_[value] = member
@@ -132,10 +132,10 @@ def register_ldy_instructions(instruction_set_class, instruction_map: dict) -> N
 
 
 __all__ = [
-    'LDY_IMMEDIATE_0xA0',
-    'LDY_ZEROPAGE_0xA4',
-    'LDY_ZEROPAGE_X_0xB4',
-    'LDY_ABSOLUTE_0xAC',
-    'LDY_ABSOLUTE_X_0xBC',
-    'register_ldy_instructions',
+    "LDY_IMMEDIATE_0xA0",
+    "LDY_ZEROPAGE_0xA4",
+    "LDY_ZEROPAGE_X_0xB4",
+    "LDY_ABSOLUTE_0xAC",
+    "LDY_ABSOLUTE_X_0xBC",
+    "register_ldy_instructions",
 ]

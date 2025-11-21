@@ -66,11 +66,11 @@ def add_ror_to_instruction_set_enum(instruction_set_class) -> None:
             return self._value_
 
     for value, name in [
-        (ROR_ACCUMULATOR_0x6A, 'ROR_ACCUMULATOR_0x6A'),
-        (ROR_ZEROPAGE_0x66, 'ROR_ZEROPAGE_0x66'),
-        (ROR_ZEROPAGE_X_0x76, 'ROR_ZEROPAGE_X_0x76'),
-        (ROR_ABSOLUTE_0x6E, 'ROR_ABSOLUTE_0x6E'),
-        (ROR_ABSOLUTE_X_0x7E, 'ROR_ABSOLUTE_X_0x7E'),
+        (ROR_ACCUMULATOR_0x6A, "ROR_ACCUMULATOR_0x6A"),
+        (ROR_ZEROPAGE_0x66, "ROR_ZEROPAGE_0x66"),
+        (ROR_ZEROPAGE_X_0x76, "ROR_ZEROPAGE_X_0x76"),
+        (ROR_ABSOLUTE_0x6E, "ROR_ABSOLUTE_0x6E"),
+        (ROR_ABSOLUTE_X_0x7E, "ROR_ABSOLUTE_X_0x7E"),
     ]:
         member = PseudoEnumMember(value, name)
         instruction_set_class._value2member_map_[value] = member
@@ -135,10 +135,10 @@ def register_ror_instructions(instruction_set_class, instruction_map: dict) -> N
 
 
 __all__ = [
-    'ROR_ACCUMULATOR_0x6A',
-    'ROR_ZEROPAGE_0x66',
-    'ROR_ZEROPAGE_X_0x76',
-    'ROR_ABSOLUTE_0x6E',
-    'ROR_ABSOLUTE_X_0x7E',
-    'register_ror_instructions',
+    "ROR_ACCUMULATOR_0x6A",
+    "ROR_ZEROPAGE_0x66",
+    "ROR_ZEROPAGE_X_0x76",
+    "ROR_ABSOLUTE_0x6E",
+    "ROR_ABSOLUTE_X_0x7E",
+    "register_ror_instructions",
 ]

@@ -16,7 +16,7 @@ def test_all_opcodes_in_lookup_are_in_map():
     if missing_from_map:
         error_msg = "The following opcodes are in OPCODE_LOOKUP but missing from InstructionSet.map:\n"
         for opcode, obj in missing_from_map:
-            func_name = getattr(obj, 'function', 'unknown')
+            func_name = getattr(obj, "function", "unknown")
             error_msg += f"  0x{opcode:02X}: {func_name}\n"
         error_msg += "\nThis means instruction metadata (bytes, cycles, assembler) is missing."
         error_msg += "\nFix: Ensure the instruction's register_*_instructions() function is called in instructions/__init__.py"
@@ -52,11 +52,11 @@ def test_opcode_metadata_consistency():
         map_entry = instructions.InstructionSet.map[opcode]
 
         # Verify opcode values match
-        if hasattr(opcode_obj, 'value') and opcode_obj.value != opcode:
+        if hasattr(opcode_obj, "value") and opcode_obj.value != opcode:
             inconsistent.append((opcode, "opcode value mismatch"))
 
         # Verify the map entry has required fields
-        required_fields = ['bytes', 'cycles', 'assembler']
+        required_fields = ["bytes", "cycles", "assembler"]
         for field in required_fields:
             if field not in map_entry:
                 inconsistent.append((opcode, f"missing '{field}' in map entry"))

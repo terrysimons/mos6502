@@ -41,9 +41,9 @@ def add_alr_to_instruction_set_enum(instruction_set_class) -> None:
         def value(self):
             return self._value_
 
-    member = PseudoEnumMember(ALR_IMMEDIATE_0x4B, 'ALR_IMMEDIATE_0x4B')
+    member = PseudoEnumMember(ALR_IMMEDIATE_0x4B, "ALR_IMMEDIATE_0x4B")
     instruction_set_class._value2member_map_[ALR_IMMEDIATE_0x4B] = member
-    setattr(instruction_set_class, 'ALR_IMMEDIATE_0x4B', ALR_IMMEDIATE_0x4B)
+    setattr(instruction_set_class, "ALR_IMMEDIATE_0x4B", ALR_IMMEDIATE_0x4B)
 
 
 def register_alr_instructions(instruction_set_class, instruction_map: dict) -> None:
@@ -58,4 +58,4 @@ def register_alr_instructions(instruction_set_class, instruction_map: dict) -> N
     instruction_map[ALR_IMMEDIATE_0x4B] = {"addressing": "immediate", "assembler": "ALR #{oper}", "opc": ALR_IMMEDIATE_0x4B, "bytes": "2", "cycles": "2", "flags": alr_can_modify_flags}
 
 
-__all__ = ['ALR_IMMEDIATE_0x4B', 'register_alr_instructions']
+__all__ = ["ALR_IMMEDIATE_0x4B", "register_alr_instructions"]

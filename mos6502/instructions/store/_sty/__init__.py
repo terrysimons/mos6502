@@ -50,9 +50,9 @@ def add_sty_to_instruction_set_enum(instruction_set_class) -> None:
             return self._value_
 
     for value, name in [
-        (STY_ZEROPAGE_0x84, 'STY_ZEROPAGE_0x84'),
-        (STY_ZEROPAGE_X_0x94, 'STY_ZEROPAGE_X_0x94'),
-        (STY_ABSOLUTE_0x8C, 'STY_ABSOLUTE_0x8C'),
+        (STY_ZEROPAGE_0x84, "STY_ZEROPAGE_0x84"),
+        (STY_ZEROPAGE_X_0x94, "STY_ZEROPAGE_X_0x94"),
+        (STY_ABSOLUTE_0x8C, "STY_ABSOLUTE_0x8C"),
     ]:
         member = PseudoEnumMember(value, name)
         instruction_set_class._value2member_map_[value] = member
@@ -96,8 +96,8 @@ def register_sty_instructions(instruction_set_class, instruction_map: dict) -> N
 
 
 __all__ = [
-    'STY_ZEROPAGE_0x84',
-    'STY_ZEROPAGE_X_0x94',
-    'STY_ABSOLUTE_0x8C',
-    'register_sty_instructions',
+    "STY_ZEROPAGE_0x84",
+    "STY_ZEROPAGE_X_0x94",
+    "STY_ABSOLUTE_0x8C",
+    "register_sty_instructions",
 ]

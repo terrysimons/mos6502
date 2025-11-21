@@ -2,7 +2,7 @@
 """Load instructions for the MOS 6502 CPU."""
 
 # Import from individual load instruction modules
-from mos6502.instructions.load._lda import (  # noqa: F401
+from mos6502.instructions.load._lda import (
     LDA_ABSOLUTE_0xAD,
     LDA_ABSOLUTE_X_0xBD,
     LDA_ABSOLUTE_Y_0xB9,
@@ -13,7 +13,7 @@ from mos6502.instructions.load._lda import (  # noqa: F401
     LDA_ZEROPAGE_X_0xB5,
     register_lda_instructions,
 )
-from mos6502.instructions.load._ldx import (  # noqa: F401
+from mos6502.instructions.load._ldx import (
     LDX_ABSOLUTE_0xAE,
     LDX_ABSOLUTE_Y_0xBE,
     LDX_IMMEDIATE_0xA2,
@@ -21,7 +21,7 @@ from mos6502.instructions.load._ldx import (  # noqa: F401
     LDX_ZEROPAGE_Y_0xB6,
     register_ldx_instructions,
 )
-from mos6502.instructions.load._ldy import (  # noqa: F401
+from mos6502.instructions.load._ldy import (
     LDY_ABSOLUTE_0xAC,
     LDY_ABSOLUTE_X_0xBC,
     LDY_IMMEDIATE_0xA0,
@@ -32,29 +32,29 @@ from mos6502.instructions.load._ldy import (  # noqa: F401
 
 __all__ = [
     # LDA
-    'LDA_IMMEDIATE_0xA9',
-    'LDA_ZEROPAGE_0xA5',
-    'LDA_ZEROPAGE_X_0xB5',
-    'LDA_ABSOLUTE_0xAD',
-    'LDA_ABSOLUTE_X_0xBD',
-    'LDA_ABSOLUTE_Y_0xB9',
-    'LDA_INDEXED_INDIRECT_X_0xA1',
-    'LDA_INDIRECT_INDEXED_Y_0xB1',
-    'register_lda_instructions',
+    "LDA_IMMEDIATE_0xA9",
+    "LDA_ZEROPAGE_0xA5",
+    "LDA_ZEROPAGE_X_0xB5",
+    "LDA_ABSOLUTE_0xAD",
+    "LDA_ABSOLUTE_X_0xBD",
+    "LDA_ABSOLUTE_Y_0xB9",
+    "LDA_INDEXED_INDIRECT_X_0xA1",
+    "LDA_INDIRECT_INDEXED_Y_0xB1",
+    "register_lda_instructions",
     # LDX
-    'LDX_IMMEDIATE_0xA2',
-    'LDX_ZEROPAGE_0xA6',
-    'LDX_ZEROPAGE_Y_0xB6',
-    'LDX_ABSOLUTE_0xAE',
-    'LDX_ABSOLUTE_Y_0xBE',
-    'register_ldx_instructions',
+    "LDX_IMMEDIATE_0xA2",
+    "LDX_ZEROPAGE_0xA6",
+    "LDX_ZEROPAGE_Y_0xB6",
+    "LDX_ABSOLUTE_0xAE",
+    "LDX_ABSOLUTE_Y_0xBE",
+    "register_ldx_instructions",
     # LDY
-    'LDY_IMMEDIATE_0xA0',
-    'LDY_ZEROPAGE_0xA4',
-    'LDY_ZEROPAGE_X_0xB4',
-    'LDY_ABSOLUTE_0xAC',
-    'LDY_ABSOLUTE_X_0xBC',
-    'register_ldy_instructions',
+    "LDY_IMMEDIATE_0xA0",
+    "LDY_ZEROPAGE_0xA4",
+    "LDY_ZEROPAGE_X_0xB4",
+    "LDY_ABSOLUTE_0xAC",
+    "LDY_ABSOLUTE_X_0xBC",
+    "register_ldy_instructions",
 ]
 
 

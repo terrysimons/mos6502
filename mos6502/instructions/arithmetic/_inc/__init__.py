@@ -57,10 +57,10 @@ def add_inc_to_instruction_set_enum(instruction_set_class) -> None:
             return self._value_
 
     for value, name in [
-        (INC_ZEROPAGE_0xE6, 'INC_ZEROPAGE_0xE6'),
-        (INC_ZEROPAGE_X_0xF6, 'INC_ZEROPAGE_X_0xF6'),
-        (INC_ABSOLUTE_0xEE, 'INC_ABSOLUTE_0xEE'),
-        (INC_ABSOLUTE_X_0xFE, 'INC_ABSOLUTE_X_0xFE'),
+        (INC_ZEROPAGE_0xE6, "INC_ZEROPAGE_0xE6"),
+        (INC_ZEROPAGE_X_0xF6, "INC_ZEROPAGE_X_0xF6"),
+        (INC_ABSOLUTE_0xEE, "INC_ABSOLUTE_0xEE"),
+        (INC_ABSOLUTE_X_0xFE, "INC_ABSOLUTE_X_0xFE"),
     ]:
         member = PseudoEnumMember(value, name)
         instruction_set_class._value2member_map_[value] = member
@@ -115,9 +115,9 @@ def register_inc_instructions(instruction_set_class, instruction_map: dict) -> N
 
 
 __all__ = [
-    'INC_ZEROPAGE_0xE6',
-    'INC_ZEROPAGE_X_0xF6',
-    'INC_ABSOLUTE_0xEE',
-    'INC_ABSOLUTE_X_0xFE',
-    'register_inc_instructions',
+    "INC_ZEROPAGE_0xE6",
+    "INC_ZEROPAGE_X_0xF6",
+    "INC_ABSOLUTE_0xEE",
+    "INC_ABSOLUTE_X_0xFE",
+    "register_inc_instructions",
 ]

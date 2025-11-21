@@ -1101,7 +1101,7 @@ class MOS6502CPU(flags.ProcessorStatusFlagsInterface):
 
         return result, carry_out, overflow, binary_result
 
-    def execute(self: Self, cycles: int = 1) -> int:  # noqa: C901, PLR0915
+    def execute(self: Self, cycles: int = 1) -> int:  # noqa: C901
         """
         Fetch and execute a CPU instruction.
 
@@ -1191,7 +1191,7 @@ class MOS6502CPU(flags.ProcessorStatusFlagsInterface):
 
             # This automatically invokes the correct opcode handler based on the configured CPU variant.
             # Legal instructions have metadata (package/function), illegal ones don't
-            if hasattr(instruction, 'package') and hasattr(instruction, 'function'):
+            if hasattr(instruction, "package") and hasattr(instruction, "function"):
                 with self.instruction_variant(instruction) as execute_instruction_variant:
                     execute_instruction_variant()
             else:

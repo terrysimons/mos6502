@@ -85,14 +85,14 @@ def add_cmp_to_instruction_set_enum(instruction_set_class) -> None:
             return self._value_
 
     for value, name in [
-        (CMP_IMMEDIATE_0xC9, 'CMP_IMMEDIATE_0xC9'),
-        (CMP_ZEROPAGE_0xC5, 'CMP_ZEROPAGE_0xC5'),
-        (CMP_ZEROPAGE_X_0xD5, 'CMP_ZEROPAGE_X_0xD5'),
-        (CMP_ABSOLUTE_0xCD, 'CMP_ABSOLUTE_0xCD'),
-        (CMP_ABSOLUTE_X_0xDD, 'CMP_ABSOLUTE_X_0xDD'),
-        (CMP_ABSOLUTE_Y_0xD9, 'CMP_ABSOLUTE_Y_0xD9'),
-        (CMP_INDEXED_INDIRECT_X_0xC1, 'CMP_INDEXED_INDIRECT_X_0xC1'),
-        (CMP_INDIRECT_INDEXED_Y_0xD1, 'CMP_INDIRECT_INDEXED_Y_0xD1'),
+        (CMP_IMMEDIATE_0xC9, "CMP_IMMEDIATE_0xC9"),
+        (CMP_ZEROPAGE_0xC5, "CMP_ZEROPAGE_0xC5"),
+        (CMP_ZEROPAGE_X_0xD5, "CMP_ZEROPAGE_X_0xD5"),
+        (CMP_ABSOLUTE_0xCD, "CMP_ABSOLUTE_0xCD"),
+        (CMP_ABSOLUTE_X_0xDD, "CMP_ABSOLUTE_X_0xDD"),
+        (CMP_ABSOLUTE_Y_0xD9, "CMP_ABSOLUTE_Y_0xD9"),
+        (CMP_INDEXED_INDIRECT_X_0xC1, "CMP_INDEXED_INDIRECT_X_0xC1"),
+        (CMP_INDIRECT_INDEXED_Y_0xD1, "CMP_INDIRECT_INDEXED_Y_0xD1"),
     ]:
         member = PseudoEnumMember(value, name)
         instruction_set_class._value2member_map_[value] = member
@@ -184,13 +184,13 @@ def register_cmp_instructions(instruction_set_class, instruction_map: dict) -> N
 
 
 __all__ = [
-    'CMP_IMMEDIATE_0xC9',
-    'CMP_ZEROPAGE_0xC5',
-    'CMP_ZEROPAGE_X_0xD5',
-    'CMP_ABSOLUTE_0xCD',
-    'CMP_ABSOLUTE_X_0xDD',
-    'CMP_ABSOLUTE_Y_0xD9',
-    'CMP_INDEXED_INDIRECT_X_0xC1',
-    'CMP_INDIRECT_INDEXED_Y_0xD1',
-    'register_cmp_instructions',
+    "CMP_IMMEDIATE_0xC9",
+    "CMP_ZEROPAGE_0xC5",
+    "CMP_ZEROPAGE_X_0xD5",
+    "CMP_ABSOLUTE_0xCD",
+    "CMP_ABSOLUTE_X_0xDD",
+    "CMP_ABSOLUTE_Y_0xD9",
+    "CMP_INDEXED_INDIRECT_X_0xC1",
+    "CMP_INDIRECT_INDEXED_Y_0xD1",
+    "register_cmp_instructions",
 ]

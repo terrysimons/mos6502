@@ -34,9 +34,9 @@ def add_bpl_to_instruction_set_enum(instruction_set_class) -> None:
         def value(self):
             return self._value_
 
-    member = PseudoEnumMember(BPL_RELATIVE_0x10, 'BPL_RELATIVE_0x10')
+    member = PseudoEnumMember(BPL_RELATIVE_0x10, "BPL_RELATIVE_0x10")
     instruction_set_class._value2member_map_[BPL_RELATIVE_0x10] = member
-    setattr(instruction_set_class, 'BPL_RELATIVE_0x10', BPL_RELATIVE_0x10)
+    setattr(instruction_set_class, "BPL_RELATIVE_0x10", BPL_RELATIVE_0x10)
 
 
 def register_bpl_instructions(instruction_set_class, instruction_map: dict) -> None:
@@ -54,4 +54,4 @@ def register_bpl_instructions(instruction_set_class, instruction_map: dict) -> N
     }
 
 
-__all__ = ['BPL_RELATIVE_0x10', 'register_bpl_instructions']
+__all__ = ["BPL_RELATIVE_0x10", "register_bpl_instructions"]

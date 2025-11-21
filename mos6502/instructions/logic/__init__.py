@@ -2,7 +2,7 @@
 """Logic instructions for the MOS 6502 CPU."""
 
 # Import from individual logic instruction modules
-from mos6502.instructions.logic._and import (  # noqa: F401
+from mos6502.instructions.logic._and import (
     AND_ABSOLUTE_0x2D,
     AND_ABSOLUTE_X_0x3D,
     AND_ABSOLUTE_Y_0x39,
@@ -13,7 +13,7 @@ from mos6502.instructions.logic._and import (  # noqa: F401
     AND_ZEROPAGE_X_0x35,
     register_and_instructions,
 )
-from mos6502.instructions.logic._eor import (  # noqa: F401
+from mos6502.instructions.logic._eor import (
     EOR_ABSOLUTE_0x4D,
     EOR_ABSOLUTE_X_0x5D,
     EOR_ABSOLUTE_Y_0x59,
@@ -24,7 +24,7 @@ from mos6502.instructions.logic._eor import (  # noqa: F401
     EOR_ZEROPAGE_X_0x55,
     register_eor_instructions,
 )
-from mos6502.instructions.logic._ora import (  # noqa: F401
+from mos6502.instructions.logic._ora import (
     ORA_ABSOLUTE_0x0D,
     ORA_ABSOLUTE_X_0x1D,
     ORA_ABSOLUTE_Y_0x19,
@@ -38,35 +38,35 @@ from mos6502.instructions.logic._ora import (  # noqa: F401
 
 __all__ = [
     # AND
-    'AND_IMMEDIATE_0x29',
-    'AND_ZEROPAGE_0x25',
-    'AND_ZEROPAGE_X_0x35',
-    'AND_ABSOLUTE_0x2D',
-    'AND_ABSOLUTE_X_0x3D',
-    'AND_ABSOLUTE_Y_0x39',
-    'AND_INDEXED_INDIRECT_X_0x21',
-    'AND_INDIRECT_INDEXED_Y_0x31',
-    'register_and_instructions',
+    "AND_IMMEDIATE_0x29",
+    "AND_ZEROPAGE_0x25",
+    "AND_ZEROPAGE_X_0x35",
+    "AND_ABSOLUTE_0x2D",
+    "AND_ABSOLUTE_X_0x3D",
+    "AND_ABSOLUTE_Y_0x39",
+    "AND_INDEXED_INDIRECT_X_0x21",
+    "AND_INDIRECT_INDEXED_Y_0x31",
+    "register_and_instructions",
     # EOR
-    'EOR_IMMEDIATE_0x49',
-    'EOR_ZEROPAGE_0x45',
-    'EOR_ZEROPAGE_X_0x55',
-    'EOR_ABSOLUTE_0x4D',
-    'EOR_ABSOLUTE_X_0x5D',
-    'EOR_ABSOLUTE_Y_0x59',
-    'EOR_INDEXED_INDIRECT_X_0x41',
-    'EOR_INDIRECT_INDEXED_Y_0x51',
-    'register_eor_instructions',
+    "EOR_IMMEDIATE_0x49",
+    "EOR_ZEROPAGE_0x45",
+    "EOR_ZEROPAGE_X_0x55",
+    "EOR_ABSOLUTE_0x4D",
+    "EOR_ABSOLUTE_X_0x5D",
+    "EOR_ABSOLUTE_Y_0x59",
+    "EOR_INDEXED_INDIRECT_X_0x41",
+    "EOR_INDIRECT_INDEXED_Y_0x51",
+    "register_eor_instructions",
     # ORA
-    'ORA_IMMEDIATE_0x09',
-    'ORA_ZEROPAGE_0x05',
-    'ORA_ZEROPAGE_X_0x15',
-    'ORA_ABSOLUTE_0x0D',
-    'ORA_ABSOLUTE_X_0x1D',
-    'ORA_ABSOLUTE_Y_0x19',
-    'ORA_INDEXED_INDIRECT_X_0x01',
-    'ORA_INDIRECT_INDEXED_Y_0x11',
-    'register_ora_instructions',
+    "ORA_IMMEDIATE_0x09",
+    "ORA_ZEROPAGE_0x05",
+    "ORA_ZEROPAGE_X_0x15",
+    "ORA_ABSOLUTE_0x0D",
+    "ORA_ABSOLUTE_X_0x1D",
+    "ORA_ABSOLUTE_Y_0x19",
+    "ORA_INDEXED_INDIRECT_X_0x01",
+    "ORA_INDIRECT_INDEXED_Y_0x11",
+    "register_ora_instructions",
 ]
 
 

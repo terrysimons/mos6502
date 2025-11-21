@@ -39,9 +39,9 @@ def add_clv_to_instruction_set_enum(instruction_set_class) -> None:
         def value(self):
             return self._value_
 
-    clv_member = PseudoEnumMember(CLV_IMPLIED_0xB8, 'CLV_IMPLIED_0xB8')
+    clv_member = PseudoEnumMember(CLV_IMPLIED_0xB8, "CLV_IMPLIED_0xB8")
     instruction_set_class._value2member_map_[CLV_IMPLIED_0xB8] = clv_member
-    setattr(instruction_set_class, 'CLV_IMPLIED_0xB8', CLV_IMPLIED_0xB8)
+    setattr(instruction_set_class, "CLV_IMPLIED_0xB8", CLV_IMPLIED_0xB8)
 
 
 def register_clv_instructions(instruction_set_class, instruction_map: dict) -> None:
@@ -62,4 +62,4 @@ def register_clv_instructions(instruction_set_class, instruction_map: dict) -> N
     }
 
 
-__all__ = ['CLV_IMPLIED_0xB8', 'register_clv_instructions']
+__all__ = ["CLV_IMPLIED_0xB8", "register_clv_instructions"]

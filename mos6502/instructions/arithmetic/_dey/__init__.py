@@ -36,9 +36,9 @@ def add_dey_to_instruction_set_enum(instruction_set_class) -> None:
         def value(self):
             return self._value_
 
-    dey_member = PseudoEnumMember(DEY_IMPLIED_0x88, 'DEY_IMPLIED_0x88')
+    dey_member = PseudoEnumMember(DEY_IMPLIED_0x88, "DEY_IMPLIED_0x88")
     instruction_set_class._value2member_map_[DEY_IMPLIED_0x88] = dey_member
-    setattr(instruction_set_class, 'DEY_IMPLIED_0x88', DEY_IMPLIED_0x88)
+    setattr(instruction_set_class, "DEY_IMPLIED_0x88", DEY_IMPLIED_0x88)
 
 
 def register_dey_instructions(instruction_set_class, instruction_map: dict) -> None:
@@ -58,4 +58,4 @@ def register_dey_instructions(instruction_set_class, instruction_map: dict) -> N
     }
 
 
-__all__ = ['DEY_IMPLIED_0x88', 'register_dey_instructions']
+__all__ = ["DEY_IMPLIED_0x88", "register_dey_instructions"]

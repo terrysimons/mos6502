@@ -476,7 +476,7 @@ class RAM(MutableSequence):
                     endianness=self.endianness,
                 )
             else:
-                raise errors.InvalidMemoryLocationError(  # noqa: TRY301
+                raise errors.InvalidMemoryLocationError(
                     f"Invalid memory location: {index} should be between 0 and "
                     f"{len(self.zeropage) + len(self.stack) + len(self.heap) - 1}",
                 )

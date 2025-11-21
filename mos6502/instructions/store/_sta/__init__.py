@@ -78,13 +78,13 @@ def add_sta_to_instruction_set_enum(instruction_set_class) -> None:
             return self._value_
 
     for value, name in [
-        (STA_ZEROPAGE_0x85, 'STA_ZEROPAGE_0x85'),
-        (STA_ZEROPAGE_X_0x95, 'STA_ZEROPAGE_X_0x95'),
-        (STA_ABSOLUTE_0x8D, 'STA_ABSOLUTE_0x8D'),
-        (STA_ABSOLUTE_X_0x9D, 'STA_ABSOLUTE_X_0x9D'),
-        (STA_ABSOLUTE_Y_0x99, 'STA_ABSOLUTE_Y_0x99'),
-        (STA_INDEXED_INDIRECT_X_0x81, 'STA_INDEXED_INDIRECT_X_0x81'),
-        (STA_INDIRECT_INDEXED_Y_0x91, 'STA_INDIRECT_INDEXED_Y_0x91'),
+        (STA_ZEROPAGE_0x85, "STA_ZEROPAGE_0x85"),
+        (STA_ZEROPAGE_X_0x95, "STA_ZEROPAGE_X_0x95"),
+        (STA_ABSOLUTE_0x8D, "STA_ABSOLUTE_0x8D"),
+        (STA_ABSOLUTE_X_0x9D, "STA_ABSOLUTE_X_0x9D"),
+        (STA_ABSOLUTE_Y_0x99, "STA_ABSOLUTE_Y_0x99"),
+        (STA_INDEXED_INDIRECT_X_0x81, "STA_INDEXED_INDIRECT_X_0x81"),
+        (STA_INDIRECT_INDEXED_Y_0x91, "STA_INDIRECT_INDEXED_Y_0x91"),
     ]:
         member = PseudoEnumMember(value, name)
         instruction_set_class._value2member_map_[value] = member
@@ -164,12 +164,12 @@ def register_sta_instructions(instruction_set_class, instruction_map: dict) -> N
 
 
 __all__ = [
-    'STA_ZEROPAGE_0x85',
-    'STA_ZEROPAGE_X_0x95',
-    'STA_ABSOLUTE_0x8D',
-    'STA_ABSOLUTE_X_0x9D',
-    'STA_ABSOLUTE_Y_0x99',
-    'STA_INDEXED_INDIRECT_X_0x81',
-    'STA_INDIRECT_INDEXED_Y_0x91',
-    'register_sta_instructions',
+    "STA_ZEROPAGE_0x85",
+    "STA_ZEROPAGE_X_0x95",
+    "STA_ABSOLUTE_0x8D",
+    "STA_ABSOLUTE_X_0x9D",
+    "STA_ABSOLUTE_Y_0x99",
+    "STA_INDEXED_INDIRECT_X_0x81",
+    "STA_INDIRECT_INDEXED_Y_0x91",
+    "register_sta_instructions",
 ]

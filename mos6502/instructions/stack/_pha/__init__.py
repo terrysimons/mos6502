@@ -35,9 +35,9 @@ def add_pha_to_instruction_set_enum(instruction_set_class) -> None:
         def value(self):
             return self._value_
 
-    pha_member = PseudoEnumMember(PHA_IMPLIED_0x48, 'PHA_IMPLIED_0x48')
+    pha_member = PseudoEnumMember(PHA_IMPLIED_0x48, "PHA_IMPLIED_0x48")
     instruction_set_class._value2member_map_[PHA_IMPLIED_0x48] = pha_member
-    setattr(instruction_set_class, 'PHA_IMPLIED_0x48', PHA_IMPLIED_0x48)
+    setattr(instruction_set_class, "PHA_IMPLIED_0x48", PHA_IMPLIED_0x48)
 
 
 def register_pha_instructions(instruction_set_class, instruction_map: dict) -> None:
@@ -56,4 +56,4 @@ def register_pha_instructions(instruction_set_class, instruction_map: dict) -> N
     }
 
 
-__all__ = ['PHA_IMPLIED_0x48', 'register_pha_instructions']
+__all__ = ["PHA_IMPLIED_0x48", "register_pha_instructions"]

@@ -87,14 +87,14 @@ def add_lda_to_instruction_set_enum(instruction_set_class) -> None:
             return self._value_
 
     for value, name in [
-        (LDA_IMMEDIATE_0xA9, 'LDA_IMMEDIATE_0xA9'),
-        (LDA_ZEROPAGE_0xA5, 'LDA_ZEROPAGE_0xA5'),
-        (LDA_ZEROPAGE_X_0xB5, 'LDA_ZEROPAGE_X_0xB5'),
-        (LDA_ABSOLUTE_0xAD, 'LDA_ABSOLUTE_0xAD'),
-        (LDA_ABSOLUTE_X_0xBD, 'LDA_ABSOLUTE_X_0xBD'),
-        (LDA_ABSOLUTE_Y_0xB9, 'LDA_ABSOLUTE_Y_0xB9'),
-        (LDA_INDEXED_INDIRECT_X_0xA1, 'LDA_INDEXED_INDIRECT_X_0xA1'),
-        (LDA_INDIRECT_INDEXED_Y_0xB1, 'LDA_INDIRECT_INDEXED_Y_0xB1'),
+        (LDA_IMMEDIATE_0xA9, "LDA_IMMEDIATE_0xA9"),
+        (LDA_ZEROPAGE_0xA5, "LDA_ZEROPAGE_0xA5"),
+        (LDA_ZEROPAGE_X_0xB5, "LDA_ZEROPAGE_X_0xB5"),
+        (LDA_ABSOLUTE_0xAD, "LDA_ABSOLUTE_0xAD"),
+        (LDA_ABSOLUTE_X_0xBD, "LDA_ABSOLUTE_X_0xBD"),
+        (LDA_ABSOLUTE_Y_0xB9, "LDA_ABSOLUTE_Y_0xB9"),
+        (LDA_INDEXED_INDIRECT_X_0xA1, "LDA_INDEXED_INDIRECT_X_0xA1"),
+        (LDA_INDIRECT_INDEXED_Y_0xB1, "LDA_INDIRECT_INDEXED_Y_0xB1"),
     ]:
         member = PseudoEnumMember(value, name)
         instruction_set_class._value2member_map_[value] = member
@@ -183,13 +183,13 @@ def register_lda_instructions(instruction_set_class, instruction_map: dict) -> N
 
 
 __all__ = [
-    'LDA_IMMEDIATE_0xA9',
-    'LDA_ZEROPAGE_0xA5',
-    'LDA_ZEROPAGE_X_0xB5',
-    'LDA_ABSOLUTE_0xAD',
-    'LDA_ABSOLUTE_X_0xBD',
-    'LDA_ABSOLUTE_Y_0xB9',
-    'LDA_INDEXED_INDIRECT_X_0xA1',
-    'LDA_INDIRECT_INDEXED_Y_0xB1',
-    'register_lda_instructions',
+    "LDA_IMMEDIATE_0xA9",
+    "LDA_ZEROPAGE_0xA5",
+    "LDA_ZEROPAGE_X_0xB5",
+    "LDA_ABSOLUTE_0xAD",
+    "LDA_ABSOLUTE_X_0xBD",
+    "LDA_ABSOLUTE_Y_0xB9",
+    "LDA_INDEXED_INDIRECT_X_0xA1",
+    "LDA_INDIRECT_INDEXED_Y_0xB1",
+    "register_lda_instructions",
 ]

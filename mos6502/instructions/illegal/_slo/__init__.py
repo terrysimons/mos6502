@@ -118,13 +118,13 @@ def add_slo_to_instruction_set_enum(instruction_set_class) -> None:
 
     # Add each SLO variant to the enum
     for opcode_name, opcode_value in [
-        ('SLO_ZEROPAGE_0x07', SLO_ZEROPAGE_0x07),
-        ('SLO_ZEROPAGE_X_0x17', SLO_ZEROPAGE_X_0x17),
-        ('SLO_INDEXED_INDIRECT_X_0x03', SLO_INDEXED_INDIRECT_X_0x03),
-        ('SLO_INDIRECT_INDEXED_Y_0x13', SLO_INDIRECT_INDEXED_Y_0x13),
-        ('SLO_ABSOLUTE_0x0F', SLO_ABSOLUTE_0x0F),
-        ('SLO_ABSOLUTE_X_0x1F', SLO_ABSOLUTE_X_0x1F),
-        ('SLO_ABSOLUTE_Y_0x1B', SLO_ABSOLUTE_Y_0x1B),
+        ("SLO_ZEROPAGE_0x07", SLO_ZEROPAGE_0x07),
+        ("SLO_ZEROPAGE_X_0x17", SLO_ZEROPAGE_X_0x17),
+        ("SLO_INDEXED_INDIRECT_X_0x03", SLO_INDEXED_INDIRECT_X_0x03),
+        ("SLO_INDIRECT_INDEXED_Y_0x13", SLO_INDIRECT_INDEXED_Y_0x13),
+        ("SLO_ABSOLUTE_0x0F", SLO_ABSOLUTE_0x0F),
+        ("SLO_ABSOLUTE_X_0x1F", SLO_ABSOLUTE_X_0x1F),
+        ("SLO_ABSOLUTE_Y_0x1B", SLO_ABSOLUTE_Y_0x1B),
     ]:
         member = PseudoEnumMember(opcode_value, opcode_name)
         instruction_set_class._value2member_map_[opcode_value] = member
@@ -208,12 +208,12 @@ def register_slo_instructions(instruction_set_class, instruction_map: dict) -> N
 
 
 __all__ = [
-    'SLO_ZEROPAGE_0x07',
-    'SLO_ZEROPAGE_X_0x17',
-    'SLO_INDEXED_INDIRECT_X_0x03',
-    'SLO_INDIRECT_INDEXED_Y_0x13',
-    'SLO_ABSOLUTE_0x0F',
-    'SLO_ABSOLUTE_X_0x1F',
-    'SLO_ABSOLUTE_Y_0x1B',
-    'register_slo_instructions',
+    "SLO_ZEROPAGE_0x07",
+    "SLO_ZEROPAGE_X_0x17",
+    "SLO_INDEXED_INDIRECT_X_0x03",
+    "SLO_INDIRECT_INDEXED_Y_0x13",
+    "SLO_ABSOLUTE_0x0F",
+    "SLO_ABSOLUTE_X_0x1F",
+    "SLO_ABSOLUTE_Y_0x1B",
+    "register_slo_instructions",
 ]

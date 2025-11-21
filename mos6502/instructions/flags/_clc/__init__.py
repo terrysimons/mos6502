@@ -39,9 +39,9 @@ def add_clc_to_instruction_set_enum(instruction_set_class) -> None:
         def value(self):
             return self._value_
 
-    clc_member = PseudoEnumMember(CLC_IMPLIED_0x18, 'CLC_IMPLIED_0x18')
+    clc_member = PseudoEnumMember(CLC_IMPLIED_0x18, "CLC_IMPLIED_0x18")
     instruction_set_class._value2member_map_[CLC_IMPLIED_0x18] = clc_member
-    setattr(instruction_set_class, 'CLC_IMPLIED_0x18', CLC_IMPLIED_0x18)
+    setattr(instruction_set_class, "CLC_IMPLIED_0x18", CLC_IMPLIED_0x18)
 
 
 def register_clc_instructions(instruction_set_class, instruction_map: dict) -> None:
@@ -62,4 +62,4 @@ def register_clc_instructions(instruction_set_class, instruction_map: dict) -> N
     }
 
 
-__all__ = ['CLC_IMPLIED_0x18', 'register_clc_instructions']
+__all__ = ["CLC_IMPLIED_0x18", "register_clc_instructions"]

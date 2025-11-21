@@ -87,8 +87,6 @@ extend-select = [
     "N803", # Argument name `XX` should be lowercase
     "SLF001", # Private member accessed:
     "ANN206", # Missing return type annotation for classmethod
-    "ANN102", # Missing type annotation for `cls` in classmethod
-    "ANN101", # Missing type annotation for `self` in method
     "ANN204", # Missing return type annotation for special method
     "TRY301", # Abstract `raise` to an inner function
     "PLR0913", # Too many arguments to function call (7/5)

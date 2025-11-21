@@ -40,9 +40,9 @@ def add_nop_to_instruction_set_enum(instruction_set_class) -> None:
         def value(self):
             return self._value_
 
-    nop_member = PseudoEnumMember(NOP_IMPLIED_0xEA, 'NOP_IMPLIED_0xEA')
+    nop_member = PseudoEnumMember(NOP_IMPLIED_0xEA, "NOP_IMPLIED_0xEA")
     instruction_set_class._value2member_map_[NOP_IMPLIED_0xEA] = nop_member
-    setattr(instruction_set_class, 'NOP_IMPLIED_0xEA', NOP_IMPLIED_0xEA)
+    setattr(instruction_set_class, "NOP_IMPLIED_0xEA", NOP_IMPLIED_0xEA)
 
 
 def register_nop_instructions(instruction_set_class, instruction_map: dict) -> None:
@@ -62,4 +62,4 @@ def register_nop_instructions(instruction_set_class, instruction_map: dict) -> N
     }
 
 
-__all__ = ['NOP_IMPLIED_0xEA', 'register_nop_instructions']
+__all__ = ["NOP_IMPLIED_0xEA", "register_nop_instructions"]

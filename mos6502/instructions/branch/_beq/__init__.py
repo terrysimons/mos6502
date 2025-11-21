@@ -34,9 +34,9 @@ def add_beq_to_instruction_set_enum(instruction_set_class) -> None:
         def value(self):
             return self._value_
 
-    member = PseudoEnumMember(BEQ_RELATIVE_0xF0, 'BEQ_RELATIVE_0xF0')
+    member = PseudoEnumMember(BEQ_RELATIVE_0xF0, "BEQ_RELATIVE_0xF0")
     instruction_set_class._value2member_map_[BEQ_RELATIVE_0xF0] = member
-    setattr(instruction_set_class, 'BEQ_RELATIVE_0xF0', BEQ_RELATIVE_0xF0)
+    setattr(instruction_set_class, "BEQ_RELATIVE_0xF0", BEQ_RELATIVE_0xF0)
 
 
 def register_beq_instructions(instruction_set_class, instruction_map: dict) -> None:
@@ -54,4 +54,4 @@ def register_beq_instructions(instruction_set_class, instruction_map: dict) -> N
     }
 
 
-__all__ = ['BEQ_RELATIVE_0xF0', 'register_beq_instructions']
+__all__ = ["BEQ_RELATIVE_0xF0", "register_beq_instructions"]

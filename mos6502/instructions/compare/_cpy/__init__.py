@@ -50,9 +50,9 @@ def add_cpy_to_instruction_set_enum(instruction_set_class) -> None:
             return self._value_
 
     for value, name in [
-        (CPY_IMMEDIATE_0xC0, 'CPY_IMMEDIATE_0xC0'),
-        (CPY_ZEROPAGE_0xC4, 'CPY_ZEROPAGE_0xC4'),
-        (CPY_ABSOLUTE_0xCC, 'CPY_ABSOLUTE_0xCC'),
+        (CPY_IMMEDIATE_0xC0, "CPY_IMMEDIATE_0xC0"),
+        (CPY_ZEROPAGE_0xC4, "CPY_ZEROPAGE_0xC4"),
+        (CPY_ABSOLUTE_0xCC, "CPY_ABSOLUTE_0xCC"),
     ]:
         member = PseudoEnumMember(value, name)
         instruction_set_class._value2member_map_[value] = member
@@ -99,8 +99,8 @@ def register_cpy_instructions(instruction_set_class, instruction_map: dict) -> N
 
 
 __all__ = [
-    'CPY_IMMEDIATE_0xC0',
-    'CPY_ZEROPAGE_0xC4',
-    'CPY_ABSOLUTE_0xCC',
-    'register_cpy_instructions',
+    "CPY_IMMEDIATE_0xC0",
+    "CPY_ZEROPAGE_0xC4",
+    "CPY_ABSOLUTE_0xCC",
+    "register_cpy_instructions",
 ]

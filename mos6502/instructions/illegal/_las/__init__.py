@@ -41,9 +41,9 @@ def add_las_to_instruction_set_enum(instruction_set_class) -> None:
         def value(self):
             return self._value_
 
-    member = PseudoEnumMember(LAS_ABSOLUTE_Y_0xBB, 'LAS_ABSOLUTE_Y_0xBB')
+    member = PseudoEnumMember(LAS_ABSOLUTE_Y_0xBB, "LAS_ABSOLUTE_Y_0xBB")
     instruction_set_class._value2member_map_[LAS_ABSOLUTE_Y_0xBB] = member
-    setattr(instruction_set_class, 'LAS_ABSOLUTE_Y_0xBB', LAS_ABSOLUTE_Y_0xBB)
+    setattr(instruction_set_class, "LAS_ABSOLUTE_Y_0xBB", LAS_ABSOLUTE_Y_0xBB)
 
 
 def register_las_instructions(instruction_set_class, instruction_map: dict) -> None:
@@ -57,4 +57,4 @@ def register_las_instructions(instruction_set_class, instruction_map: dict) -> N
     instruction_map[LAS_ABSOLUTE_Y_0xBB] = {"addressing": "absolute,Y", "assembler": "LAS {oper},Y", "opc": LAS_ABSOLUTE_Y_0xBB, "bytes": "3", "cycles": "4*", "flags": las_can_modify_flags}
 
 
-__all__ = ['LAS_ABSOLUTE_Y_0xBB', 'register_las_instructions']
+__all__ = ["LAS_ABSOLUTE_Y_0xBB", "register_las_instructions"]

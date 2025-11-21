@@ -39,9 +39,9 @@ def add_sec_to_instruction_set_enum(instruction_set_class) -> None:
         def value(self):
             return self._value_
 
-    sec_member = PseudoEnumMember(SEC_IMPLIED_0x38, 'SEC_IMPLIED_0x38')
+    sec_member = PseudoEnumMember(SEC_IMPLIED_0x38, "SEC_IMPLIED_0x38")
     instruction_set_class._value2member_map_[SEC_IMPLIED_0x38] = sec_member
-    setattr(instruction_set_class, 'SEC_IMPLIED_0x38', SEC_IMPLIED_0x38)
+    setattr(instruction_set_class, "SEC_IMPLIED_0x38", SEC_IMPLIED_0x38)
 
 
 def register_sec_instructions(instruction_set_class, instruction_map: dict) -> None:
@@ -62,4 +62,4 @@ def register_sec_instructions(instruction_set_class, instruction_map: dict) -> N
     }
 
 
-__all__ = ['SEC_IMPLIED_0x38', 'register_sec_instructions']
+__all__ = ["SEC_IMPLIED_0x38", "register_sec_instructions"]

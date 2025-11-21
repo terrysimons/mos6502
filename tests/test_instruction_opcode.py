@@ -71,8 +71,8 @@ def test_opcode_isinstance():
 
 def test_opcode_has_metadata():
     """Test that InstructionOpcode carries metadata."""
-    assert hasattr(NOP_WITH_METADATA, 'package')
-    assert hasattr(NOP_WITH_METADATA, 'function')
+    assert hasattr(NOP_WITH_METADATA, "package")
+    assert hasattr(NOP_WITH_METADATA, "function")
     assert NOP_WITH_METADATA.package == "mos6502.instructions.nop"  # type: ignore
     assert NOP_WITH_METADATA.function == "nop_implied_0xea"  # type: ignore
 
@@ -83,7 +83,7 @@ def test_opcode_arithmetic_loses_metadata():
     assert result == 0xEB
     assert isinstance(result, int)
     # Metadata is lost (this is expected behavior)
-    assert not hasattr(result, 'package')
+    assert not hasattr(result, "package")
 
 
 def test_opcode_with_cpu():

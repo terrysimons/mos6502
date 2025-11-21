@@ -45,13 +45,13 @@ def add_sre_to_instruction_set_enum(instruction_set_class) -> None:
             return self._value_
 
     for opcode_name, opcode_value in [
-        ('SRE_ZEROPAGE_0x47', SRE_ZEROPAGE_0x47),
-        ('SRE_ZEROPAGE_X_0x57', SRE_ZEROPAGE_X_0x57),
-        ('SRE_INDEXED_INDIRECT_X_0x43', SRE_INDEXED_INDIRECT_X_0x43),
-        ('SRE_INDIRECT_INDEXED_Y_0x53', SRE_INDIRECT_INDEXED_Y_0x53),
-        ('SRE_ABSOLUTE_0x4F', SRE_ABSOLUTE_0x4F),
-        ('SRE_ABSOLUTE_X_0x5F', SRE_ABSOLUTE_X_0x5F),
-        ('SRE_ABSOLUTE_Y_0x5B', SRE_ABSOLUTE_Y_0x5B),
+        ("SRE_ZEROPAGE_0x47", SRE_ZEROPAGE_0x47),
+        ("SRE_ZEROPAGE_X_0x57", SRE_ZEROPAGE_X_0x57),
+        ("SRE_INDEXED_INDIRECT_X_0x43", SRE_INDEXED_INDIRECT_X_0x43),
+        ("SRE_INDIRECT_INDEXED_Y_0x53", SRE_INDIRECT_INDEXED_Y_0x53),
+        ("SRE_ABSOLUTE_0x4F", SRE_ABSOLUTE_0x4F),
+        ("SRE_ABSOLUTE_X_0x5F", SRE_ABSOLUTE_X_0x5F),
+        ("SRE_ABSOLUTE_Y_0x5B", SRE_ABSOLUTE_Y_0x5B),
     ]:
         member = PseudoEnumMember(opcode_value, opcode_name)
         instruction_set_class._value2member_map_[opcode_value] = member
@@ -76,4 +76,4 @@ def register_sre_instructions(instruction_set_class, instruction_map: dict) -> N
     instruction_map[SRE_ABSOLUTE_Y_0x5B] = {"addressing": "absolute,Y", "assembler": "SRE {oper},Y", "opc": SRE_ABSOLUTE_Y_0x5B, "bytes": "3", "cycles": "7", "flags": sre_can_modify_flags}
 
 
-__all__ = ['SRE_ZEROPAGE_0x47', 'SRE_ZEROPAGE_X_0x57', 'SRE_INDEXED_INDIRECT_X_0x43', 'SRE_INDIRECT_INDEXED_Y_0x53', 'SRE_ABSOLUTE_0x4F', 'SRE_ABSOLUTE_X_0x5F', 'SRE_ABSOLUTE_Y_0x5B', 'register_sre_instructions']
+__all__ = ["SRE_ZEROPAGE_0x47", "SRE_ZEROPAGE_X_0x57", "SRE_INDEXED_INDIRECT_X_0x43", "SRE_INDIRECT_INDEXED_Y_0x53", "SRE_ABSOLUTE_0x4F", "SRE_ABSOLUTE_X_0x5F", "SRE_ABSOLUTE_Y_0x5B", "register_sre_instructions"]

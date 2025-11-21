@@ -36,9 +36,9 @@ def add_tay_to_instruction_set_enum(instruction_set_class) -> None:
         def value(self):
             return self._value_
 
-    tay_member = PseudoEnumMember(TAY_IMPLIED_0xA8, 'TAY_IMPLIED_0xA8')
+    tay_member = PseudoEnumMember(TAY_IMPLIED_0xA8, "TAY_IMPLIED_0xA8")
     instruction_set_class._value2member_map_[TAY_IMPLIED_0xA8] = tay_member
-    setattr(instruction_set_class, 'TAY_IMPLIED_0xA8', TAY_IMPLIED_0xA8)
+    setattr(instruction_set_class, "TAY_IMPLIED_0xA8", TAY_IMPLIED_0xA8)
 
 
 def register_tay_instructions(instruction_set_class, instruction_map: dict) -> None:
@@ -58,4 +58,4 @@ def register_tay_instructions(instruction_set_class, instruction_map: dict) -> N
     }
 
 
-__all__ = ['TAY_IMPLIED_0xA8', 'register_tay_instructions']
+__all__ = ["TAY_IMPLIED_0xA8", "register_tay_instructions"]

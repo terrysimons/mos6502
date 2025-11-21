@@ -35,9 +35,9 @@ def add_bcc_to_instruction_set_enum(instruction_set_class) -> None:
         def value(self):
             return self._value_
 
-    member = PseudoEnumMember(BCC_RELATIVE_0x90, 'BCC_RELATIVE_0x90')
+    member = PseudoEnumMember(BCC_RELATIVE_0x90, "BCC_RELATIVE_0x90")
     instruction_set_class._value2member_map_[BCC_RELATIVE_0x90] = member
-    setattr(instruction_set_class, 'BCC_RELATIVE_0x90', BCC_RELATIVE_0x90)
+    setattr(instruction_set_class, "BCC_RELATIVE_0x90", BCC_RELATIVE_0x90)
 
 
 def register_bcc_instructions(instruction_set_class, instruction_map: dict) -> None:
@@ -57,6 +57,6 @@ def register_bcc_instructions(instruction_set_class, instruction_map: dict) -> N
 
 
 __all__ = [
-    'BCC_RELATIVE_0x90',
-    'register_bcc_instructions',
+    "BCC_RELATIVE_0x90",
+    "register_bcc_instructions",
 ]

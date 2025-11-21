@@ -42,9 +42,9 @@ def add_arr_to_instruction_set_enum(instruction_set_class) -> None:
         def value(self):
             return self._value_
 
-    member = PseudoEnumMember(ARR_IMMEDIATE_0x6B, 'ARR_IMMEDIATE_0x6B')
+    member = PseudoEnumMember(ARR_IMMEDIATE_0x6B, "ARR_IMMEDIATE_0x6B")
     instruction_set_class._value2member_map_[ARR_IMMEDIATE_0x6B] = member
-    setattr(instruction_set_class, 'ARR_IMMEDIATE_0x6B', ARR_IMMEDIATE_0x6B)
+    setattr(instruction_set_class, "ARR_IMMEDIATE_0x6B", ARR_IMMEDIATE_0x6B)
 
 
 def register_arr_instructions(instruction_set_class, instruction_map: dict) -> None:
@@ -60,4 +60,4 @@ def register_arr_instructions(instruction_set_class, instruction_map: dict) -> N
     instruction_map[ARR_IMMEDIATE_0x6B] = {"addressing": "immediate", "assembler": "ARR #{oper}", "opc": ARR_IMMEDIATE_0x6B, "bytes": "2", "cycles": "2", "flags": arr_can_modify_flags}
 
 
-__all__ = ['ARR_IMMEDIATE_0x6B', 'register_arr_instructions']
+__all__ = ["ARR_IMMEDIATE_0x6B", "register_arr_instructions"]

@@ -117,13 +117,13 @@ def add_dcp_to_instruction_set_enum(instruction_set_class) -> None:
 
     # Add each DCP variant to the enum
     for opcode_name, opcode_value in [
-        ('DCP_ZEROPAGE_0xC7', DCP_ZEROPAGE_0xC7),
-        ('DCP_ZEROPAGE_X_0xD7', DCP_ZEROPAGE_X_0xD7),
-        ('DCP_INDEXED_INDIRECT_X_0xC3', DCP_INDEXED_INDIRECT_X_0xC3),
-        ('DCP_INDIRECT_INDEXED_Y_0xD3', DCP_INDIRECT_INDEXED_Y_0xD3),
-        ('DCP_ABSOLUTE_0xCF', DCP_ABSOLUTE_0xCF),
-        ('DCP_ABSOLUTE_X_0xDF', DCP_ABSOLUTE_X_0xDF),
-        ('DCP_ABSOLUTE_Y_0xDB', DCP_ABSOLUTE_Y_0xDB),
+        ("DCP_ZEROPAGE_0xC7", DCP_ZEROPAGE_0xC7),
+        ("DCP_ZEROPAGE_X_0xD7", DCP_ZEROPAGE_X_0xD7),
+        ("DCP_INDEXED_INDIRECT_X_0xC3", DCP_INDEXED_INDIRECT_X_0xC3),
+        ("DCP_INDIRECT_INDEXED_Y_0xD3", DCP_INDIRECT_INDEXED_Y_0xD3),
+        ("DCP_ABSOLUTE_0xCF", DCP_ABSOLUTE_0xCF),
+        ("DCP_ABSOLUTE_X_0xDF", DCP_ABSOLUTE_X_0xDF),
+        ("DCP_ABSOLUTE_Y_0xDB", DCP_ABSOLUTE_Y_0xDB),
     ]:
         member = PseudoEnumMember(opcode_value, opcode_name)
         instruction_set_class._value2member_map_[opcode_value] = member
@@ -207,12 +207,12 @@ def register_dcp_instructions(instruction_set_class, instruction_map: dict) -> N
 
 
 __all__ = [
-    'DCP_ZEROPAGE_0xC7',
-    'DCP_ZEROPAGE_X_0xD7',
-    'DCP_INDEXED_INDIRECT_X_0xC3',
-    'DCP_INDIRECT_INDEXED_Y_0xD3',
-    'DCP_ABSOLUTE_0xCF',
-    'DCP_ABSOLUTE_X_0xDF',
-    'DCP_ABSOLUTE_Y_0xDB',
-    'register_dcp_instructions',
+    "DCP_ZEROPAGE_0xC7",
+    "DCP_ZEROPAGE_X_0xD7",
+    "DCP_INDEXED_INDIRECT_X_0xC3",
+    "DCP_INDIRECT_INDEXED_Y_0xD3",
+    "DCP_ABSOLUTE_0xCF",
+    "DCP_ABSOLUTE_X_0xDF",
+    "DCP_ABSOLUTE_Y_0xDB",
+    "register_dcp_instructions",
 ]

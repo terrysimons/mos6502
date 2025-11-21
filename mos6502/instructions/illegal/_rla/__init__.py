@@ -45,13 +45,13 @@ def add_rla_to_instruction_set_enum(instruction_set_class) -> None:
             return self._value_
 
     for opcode_name, opcode_value in [
-        ('RLA_ZEROPAGE_0x27', RLA_ZEROPAGE_0x27),
-        ('RLA_ZEROPAGE_X_0x37', RLA_ZEROPAGE_X_0x37),
-        ('RLA_INDEXED_INDIRECT_X_0x23', RLA_INDEXED_INDIRECT_X_0x23),
-        ('RLA_INDIRECT_INDEXED_Y_0x33', RLA_INDIRECT_INDEXED_Y_0x33),
-        ('RLA_ABSOLUTE_0x2F', RLA_ABSOLUTE_0x2F),
-        ('RLA_ABSOLUTE_X_0x3F', RLA_ABSOLUTE_X_0x3F),
-        ('RLA_ABSOLUTE_Y_0x3B', RLA_ABSOLUTE_Y_0x3B),
+        ("RLA_ZEROPAGE_0x27", RLA_ZEROPAGE_0x27),
+        ("RLA_ZEROPAGE_X_0x37", RLA_ZEROPAGE_X_0x37),
+        ("RLA_INDEXED_INDIRECT_X_0x23", RLA_INDEXED_INDIRECT_X_0x23),
+        ("RLA_INDIRECT_INDEXED_Y_0x33", RLA_INDIRECT_INDEXED_Y_0x33),
+        ("RLA_ABSOLUTE_0x2F", RLA_ABSOLUTE_0x2F),
+        ("RLA_ABSOLUTE_X_0x3F", RLA_ABSOLUTE_X_0x3F),
+        ("RLA_ABSOLUTE_Y_0x3B", RLA_ABSOLUTE_Y_0x3B),
     ]:
         member = PseudoEnumMember(opcode_value, opcode_name)
         instruction_set_class._value2member_map_[opcode_value] = member
@@ -76,4 +76,4 @@ def register_rla_instructions(instruction_set_class, instruction_map: dict) -> N
     instruction_map[RLA_ABSOLUTE_Y_0x3B] = {"addressing": "absolute,Y", "assembler": "RLA {oper},Y", "opc": RLA_ABSOLUTE_Y_0x3B, "bytes": "3", "cycles": "7", "flags": rla_can_modify_flags}
 
 
-__all__ = ['RLA_ZEROPAGE_0x27', 'RLA_ZEROPAGE_X_0x37', 'RLA_INDEXED_INDIRECT_X_0x23', 'RLA_INDIRECT_INDEXED_Y_0x33', 'RLA_ABSOLUTE_0x2F', 'RLA_ABSOLUTE_X_0x3F', 'RLA_ABSOLUTE_Y_0x3B', 'register_rla_instructions']
+__all__ = ["RLA_ZEROPAGE_0x27", "RLA_ZEROPAGE_X_0x37", "RLA_INDEXED_INDIRECT_X_0x23", "RLA_INDIRECT_INDEXED_Y_0x33", "RLA_ABSOLUTE_0x2F", "RLA_ABSOLUTE_X_0x3F", "RLA_ABSOLUTE_Y_0x3B", "register_rla_instructions"]

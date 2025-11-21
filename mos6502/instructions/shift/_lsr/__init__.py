@@ -66,11 +66,11 @@ def add_lsr_to_instruction_set_enum(instruction_set_class) -> None:
             return self._value_
 
     for value, name in [
-        (LSR_ACCUMULATOR_0x4A, 'LSR_ACCUMULATOR_0x4A'),
-        (LSR_ZEROPAGE_0x46, 'LSR_ZEROPAGE_0x46'),
-        (LSR_ZEROPAGE_X_0x56, 'LSR_ZEROPAGE_X_0x56'),
-        (LSR_ABSOLUTE_0x4E, 'LSR_ABSOLUTE_0x4E'),
-        (LSR_ABSOLUTE_X_0x5E, 'LSR_ABSOLUTE_X_0x5E'),
+        (LSR_ACCUMULATOR_0x4A, "LSR_ACCUMULATOR_0x4A"),
+        (LSR_ZEROPAGE_0x46, "LSR_ZEROPAGE_0x46"),
+        (LSR_ZEROPAGE_X_0x56, "LSR_ZEROPAGE_X_0x56"),
+        (LSR_ABSOLUTE_0x4E, "LSR_ABSOLUTE_0x4E"),
+        (LSR_ABSOLUTE_X_0x5E, "LSR_ABSOLUTE_X_0x5E"),
     ]:
         member = PseudoEnumMember(value, name)
         instruction_set_class._value2member_map_[value] = member
@@ -135,10 +135,10 @@ def register_lsr_instructions(instruction_set_class, instruction_map: dict) -> N
 
 
 __all__ = [
-    'LSR_ACCUMULATOR_0x4A',
-    'LSR_ZEROPAGE_0x46',
-    'LSR_ZEROPAGE_X_0x56',
-    'LSR_ABSOLUTE_0x4E',
-    'LSR_ABSOLUTE_X_0x5E',
-    'register_lsr_instructions',
+    "LSR_ACCUMULATOR_0x4A",
+    "LSR_ZEROPAGE_0x46",
+    "LSR_ZEROPAGE_X_0x56",
+    "LSR_ABSOLUTE_0x4E",
+    "LSR_ABSOLUTE_X_0x5E",
+    "register_lsr_instructions",
 ]

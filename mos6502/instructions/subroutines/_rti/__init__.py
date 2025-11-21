@@ -35,9 +35,9 @@ def add_rti_to_instruction_set_enum(instruction_set_class) -> None:
         def value(self):
             return self._value_
 
-    rti_member = PseudoEnumMember(RTI_IMPLIED_0x40, 'RTI_IMPLIED_0x40')
+    rti_member = PseudoEnumMember(RTI_IMPLIED_0x40, "RTI_IMPLIED_0x40")
     instruction_set_class._value2member_map_[RTI_IMPLIED_0x40] = rti_member
-    setattr(instruction_set_class, 'RTI_IMPLIED_0x40', RTI_IMPLIED_0x40)
+    setattr(instruction_set_class, "RTI_IMPLIED_0x40", RTI_IMPLIED_0x40)
 
 
 def register_rti_instructions(instruction_set_class, instruction_map: dict) -> None:
@@ -56,4 +56,4 @@ def register_rti_instructions(instruction_set_class, instruction_map: dict) -> N
     }
 
 
-__all__ = ['RTI_IMPLIED_0x40', 'register_rti_instructions']
+__all__ = ["RTI_IMPLIED_0x40", "register_rti_instructions"]

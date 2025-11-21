@@ -36,9 +36,9 @@ def add_tsx_to_instruction_set_enum(instruction_set_class) -> None:
         def value(self):
             return self._value_
 
-    tsx_member = PseudoEnumMember(TSX_IMPLIED_0xBA, 'TSX_IMPLIED_0xBA')
+    tsx_member = PseudoEnumMember(TSX_IMPLIED_0xBA, "TSX_IMPLIED_0xBA")
     instruction_set_class._value2member_map_[TSX_IMPLIED_0xBA] = tsx_member
-    setattr(instruction_set_class, 'TSX_IMPLIED_0xBA', TSX_IMPLIED_0xBA)
+    setattr(instruction_set_class, "TSX_IMPLIED_0xBA", TSX_IMPLIED_0xBA)
 
 
 def register_tsx_instructions(instruction_set_class, instruction_map: dict) -> None:
@@ -58,4 +58,4 @@ def register_tsx_instructions(instruction_set_class, instruction_map: dict) -> N
     }
 
 
-__all__ = ['TSX_IMPLIED_0xBA', 'register_tsx_instructions']
+__all__ = ["TSX_IMPLIED_0xBA", "register_tsx_instructions"]

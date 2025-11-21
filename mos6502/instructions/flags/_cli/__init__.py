@@ -39,9 +39,9 @@ def add_cli_to_instruction_set_enum(instruction_set_class) -> None:
         def value(self):
             return self._value_
 
-    cli_member = PseudoEnumMember(CLI_IMPLIED_0x58, 'CLI_IMPLIED_0x58')
+    cli_member = PseudoEnumMember(CLI_IMPLIED_0x58, "CLI_IMPLIED_0x58")
     instruction_set_class._value2member_map_[CLI_IMPLIED_0x58] = cli_member
-    setattr(instruction_set_class, 'CLI_IMPLIED_0x58', CLI_IMPLIED_0x58)
+    setattr(instruction_set_class, "CLI_IMPLIED_0x58", CLI_IMPLIED_0x58)
 
 
 def register_cli_instructions(instruction_set_class, instruction_map: dict) -> None:
@@ -62,4 +62,4 @@ def register_cli_instructions(instruction_set_class, instruction_map: dict) -> N
     }
 
 
-__all__ = ['CLI_IMPLIED_0x58', 'register_cli_instructions']
+__all__ = ["CLI_IMPLIED_0x58", "register_cli_instructions"]

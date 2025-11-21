@@ -36,9 +36,9 @@ def add_dex_to_instruction_set_enum(instruction_set_class) -> None:
         def value(self):
             return self._value_
 
-    dex_member = PseudoEnumMember(DEX_IMPLIED_0xCA, 'DEX_IMPLIED_0xCA')
+    dex_member = PseudoEnumMember(DEX_IMPLIED_0xCA, "DEX_IMPLIED_0xCA")
     instruction_set_class._value2member_map_[DEX_IMPLIED_0xCA] = dex_member
-    setattr(instruction_set_class, 'DEX_IMPLIED_0xCA', DEX_IMPLIED_0xCA)
+    setattr(instruction_set_class, "DEX_IMPLIED_0xCA", DEX_IMPLIED_0xCA)
 
 
 def register_dex_instructions(instruction_set_class, instruction_map: dict) -> None:
@@ -58,4 +58,4 @@ def register_dex_instructions(instruction_set_class, instruction_map: dict) -> N
     }
 
 
-__all__ = ['DEX_IMPLIED_0xCA', 'register_dex_instructions']
+__all__ = ["DEX_IMPLIED_0xCA", "register_dex_instructions"]

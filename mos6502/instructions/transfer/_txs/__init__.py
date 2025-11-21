@@ -35,9 +35,9 @@ def add_txs_to_instruction_set_enum(instruction_set_class) -> None:
         def value(self):
             return self._value_
 
-    txs_member = PseudoEnumMember(TXS_IMPLIED_0x9A, 'TXS_IMPLIED_0x9A')
+    txs_member = PseudoEnumMember(TXS_IMPLIED_0x9A, "TXS_IMPLIED_0x9A")
     instruction_set_class._value2member_map_[TXS_IMPLIED_0x9A] = txs_member
-    setattr(instruction_set_class, 'TXS_IMPLIED_0x9A', TXS_IMPLIED_0x9A)
+    setattr(instruction_set_class, "TXS_IMPLIED_0x9A", TXS_IMPLIED_0x9A)
 
 
 def register_txs_instructions(instruction_set_class, instruction_map: dict) -> None:
@@ -56,4 +56,4 @@ def register_txs_instructions(instruction_set_class, instruction_map: dict) -> N
     }
 
 
-__all__ = ['TXS_IMPLIED_0x9A', 'register_txs_instructions']
+__all__ = ["TXS_IMPLIED_0x9A", "register_txs_instructions"]

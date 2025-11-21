@@ -57,10 +57,10 @@ def add_dec_to_instruction_set_enum(instruction_set_class) -> None:
             return self._value_
 
     for value, name in [
-        (DEC_ZEROPAGE_0xC6, 'DEC_ZEROPAGE_0xC6'),
-        (DEC_ZEROPAGE_X_0xD6, 'DEC_ZEROPAGE_X_0xD6'),
-        (DEC_ABSOLUTE_0xCE, 'DEC_ABSOLUTE_0xCE'),
-        (DEC_ABSOLUTE_X_0xDE, 'DEC_ABSOLUTE_X_0xDE'),
+        (DEC_ZEROPAGE_0xC6, "DEC_ZEROPAGE_0xC6"),
+        (DEC_ZEROPAGE_X_0xD6, "DEC_ZEROPAGE_X_0xD6"),
+        (DEC_ABSOLUTE_0xCE, "DEC_ABSOLUTE_0xCE"),
+        (DEC_ABSOLUTE_X_0xDE, "DEC_ABSOLUTE_X_0xDE"),
     ]:
         member = PseudoEnumMember(value, name)
         instruction_set_class._value2member_map_[value] = member
@@ -115,9 +115,9 @@ def register_dec_instructions(instruction_set_class, instruction_map: dict) -> N
 
 
 __all__ = [
-    'DEC_ZEROPAGE_0xC6',
-    'DEC_ZEROPAGE_X_0xD6',
-    'DEC_ABSOLUTE_0xCE',
-    'DEC_ABSOLUTE_X_0xDE',
-    'register_dec_instructions',
+    "DEC_ZEROPAGE_0xC6",
+    "DEC_ZEROPAGE_X_0xD6",
+    "DEC_ABSOLUTE_0xCE",
+    "DEC_ABSOLUTE_X_0xDE",
+    "register_dec_instructions",
 ]

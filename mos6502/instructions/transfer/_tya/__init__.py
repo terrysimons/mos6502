@@ -36,9 +36,9 @@ def add_tya_to_instruction_set_enum(instruction_set_class) -> None:
         def value(self):
             return self._value_
 
-    tya_member = PseudoEnumMember(TYA_IMPLIED_0x98, 'TYA_IMPLIED_0x98')
+    tya_member = PseudoEnumMember(TYA_IMPLIED_0x98, "TYA_IMPLIED_0x98")
     instruction_set_class._value2member_map_[TYA_IMPLIED_0x98] = tya_member
-    setattr(instruction_set_class, 'TYA_IMPLIED_0x98', TYA_IMPLIED_0x98)
+    setattr(instruction_set_class, "TYA_IMPLIED_0x98", TYA_IMPLIED_0x98)
 
 
 def register_tya_instructions(instruction_set_class, instruction_map: dict) -> None:
@@ -58,4 +58,4 @@ def register_tya_instructions(instruction_set_class, instruction_map: dict) -> N
     }
 
 
-__all__ = ['TYA_IMPLIED_0x98', 'register_tya_instructions']
+__all__ = ["TYA_IMPLIED_0x98", "register_tya_instructions"]

@@ -85,14 +85,14 @@ def add_adc_to_instruction_set_enum(instruction_set_class) -> None:
             return self._value_
 
     for value, name in [
-        (ADC_IMMEDIATE_0x69, 'ADC_IMMEDIATE_0x69'),
-        (ADC_ZEROPAGE_0x65, 'ADC_ZEROPAGE_0x65'),
-        (ADC_ZEROPAGE_X_0x75, 'ADC_ZEROPAGE_X_0x75'),
-        (ADC_ABSOLUTE_0x6D, 'ADC_ABSOLUTE_0x6D'),
-        (ADC_ABSOLUTE_X_0x7D, 'ADC_ABSOLUTE_X_0x7D'),
-        (ADC_ABSOLUTE_Y_0x79, 'ADC_ABSOLUTE_Y_0x79'),
-        (ADC_INDEXED_INDIRECT_X_0x61, 'ADC_INDEXED_INDIRECT_X_0x61'),
-        (ADC_INDIRECT_INDEXED_Y_0x71, 'ADC_INDIRECT_INDEXED_Y_0x71'),
+        (ADC_IMMEDIATE_0x69, "ADC_IMMEDIATE_0x69"),
+        (ADC_ZEROPAGE_0x65, "ADC_ZEROPAGE_0x65"),
+        (ADC_ZEROPAGE_X_0x75, "ADC_ZEROPAGE_X_0x75"),
+        (ADC_ABSOLUTE_0x6D, "ADC_ABSOLUTE_0x6D"),
+        (ADC_ABSOLUTE_X_0x7D, "ADC_ABSOLUTE_X_0x7D"),
+        (ADC_ABSOLUTE_Y_0x79, "ADC_ABSOLUTE_Y_0x79"),
+        (ADC_INDEXED_INDIRECT_X_0x61, "ADC_INDEXED_INDIRECT_X_0x61"),
+        (ADC_INDIRECT_INDEXED_Y_0x71, "ADC_INDIRECT_INDEXED_Y_0x71"),
     ]:
         member = PseudoEnumMember(value, name)
         instruction_set_class._value2member_map_[value] = member
@@ -185,13 +185,13 @@ def register_adc_instructions(instruction_set_class, instruction_map: dict) -> N
 
 
 __all__ = [
-    'ADC_IMMEDIATE_0x69',
-    'ADC_ZEROPAGE_0x65',
-    'ADC_ZEROPAGE_X_0x75',
-    'ADC_ABSOLUTE_0x6D',
-    'ADC_ABSOLUTE_X_0x7D',
-    'ADC_ABSOLUTE_Y_0x79',
-    'ADC_INDEXED_INDIRECT_X_0x61',
-    'ADC_INDIRECT_INDEXED_Y_0x71',
-    'register_adc_instructions',
+    "ADC_IMMEDIATE_0x69",
+    "ADC_ZEROPAGE_0x65",
+    "ADC_ZEROPAGE_X_0x75",
+    "ADC_ABSOLUTE_0x6D",
+    "ADC_ABSOLUTE_X_0x7D",
+    "ADC_ABSOLUTE_Y_0x79",
+    "ADC_INDEXED_INDIRECT_X_0x61",
+    "ADC_INDIRECT_INDEXED_Y_0x71",
+    "register_adc_instructions",
 ]

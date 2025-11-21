@@ -9,7 +9,7 @@ import pytest
 from mos6502 import CPU, errors
 
 
-@pytest.fixture(params=['6502', '6502A', '6502C', '65C02'])
+@pytest.fixture(params=["6502", "6502A", "6502C", "65C02"])
 def cpu(request):
     """Create a CPU with the specified variant."""
     cpu_variant = request.param

@@ -2,26 +2,26 @@
 """Transfer instructions for the MOS 6502 CPU."""
 
 # Import from individual transfer instruction modules
-from mos6502.instructions.transfer._tax import TAX_IMPLIED_0xAA, register_tax_instructions  # noqa: F401
-from mos6502.instructions.transfer._tay import TAY_IMPLIED_0xA8, register_tay_instructions  # noqa: F401
-from mos6502.instructions.transfer._tsx import TSX_IMPLIED_0xBA, register_tsx_instructions  # noqa: F401
-from mos6502.instructions.transfer._txa import TXA_IMPLIED_0x8A, register_txa_instructions  # noqa: F401
-from mos6502.instructions.transfer._txs import TXS_IMPLIED_0x9A, register_txs_instructions  # noqa: F401
-from mos6502.instructions.transfer._tya import TYA_IMPLIED_0x98, register_tya_instructions  # noqa: F401
+from mos6502.instructions.transfer._tax import TAX_IMPLIED_0xAA, register_tax_instructions
+from mos6502.instructions.transfer._tay import TAY_IMPLIED_0xA8, register_tay_instructions
+from mos6502.instructions.transfer._tsx import TSX_IMPLIED_0xBA, register_tsx_instructions
+from mos6502.instructions.transfer._txa import TXA_IMPLIED_0x8A, register_txa_instructions
+from mos6502.instructions.transfer._txs import TXS_IMPLIED_0x9A, register_txs_instructions
+from mos6502.instructions.transfer._tya import TYA_IMPLIED_0x98, register_tya_instructions
 
 __all__ = [
-    'TAX_IMPLIED_0xAA',
-    'register_tax_instructions',
-    'TAY_IMPLIED_0xA8',
-    'register_tay_instructions',
-    'TSX_IMPLIED_0xBA',
-    'register_tsx_instructions',
-    'TXA_IMPLIED_0x8A',
-    'register_txa_instructions',
-    'TXS_IMPLIED_0x9A',
-    'register_txs_instructions',
-    'TYA_IMPLIED_0x98',
-    'register_tya_instructions',
+    "TAX_IMPLIED_0xAA",
+    "register_tax_instructions",
+    "TAY_IMPLIED_0xA8",
+    "register_tay_instructions",
+    "TSX_IMPLIED_0xBA",
+    "register_tsx_instructions",
+    "TXA_IMPLIED_0x8A",
+    "register_txa_instructions",
+    "TXS_IMPLIED_0x9A",
+    "register_txs_instructions",
+    "TYA_IMPLIED_0x98",
+    "register_tya_instructions",
 ]
 
 

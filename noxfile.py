@@ -7,8 +7,8 @@ nox.options.sessions = ["test"]
 
 @session
 def test(session):
-    session.run("ruff", "mos6502", "tests", external=True)
-    session.run("pytest", external=True)
+    session.run("ruff", "check","mos6502", "tests", "systems", external=True)
+    session.run("pytest", "tests", "systems", external=True)
 
 @session
 def release(session: nox.Session) -> None:

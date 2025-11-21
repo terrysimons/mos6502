@@ -36,9 +36,9 @@ def add_iny_to_instruction_set_enum(instruction_set_class) -> None:
         def value(self):
             return self._value_
 
-    iny_member = PseudoEnumMember(INY_IMPLIED_0xC8, 'INY_IMPLIED_0xC8')
+    iny_member = PseudoEnumMember(INY_IMPLIED_0xC8, "INY_IMPLIED_0xC8")
     instruction_set_class._value2member_map_[INY_IMPLIED_0xC8] = iny_member
-    setattr(instruction_set_class, 'INY_IMPLIED_0xC8', INY_IMPLIED_0xC8)
+    setattr(instruction_set_class, "INY_IMPLIED_0xC8", INY_IMPLIED_0xC8)
 
 
 def register_iny_instructions(instruction_set_class, instruction_map: dict) -> None:
@@ -58,4 +58,4 @@ def register_iny_instructions(instruction_set_class, instruction_map: dict) -> N
     }
 
 
-__all__ = ['INY_IMPLIED_0xC8', 'register_iny_instructions']
+__all__ = ["INY_IMPLIED_0xC8", "register_iny_instructions"]

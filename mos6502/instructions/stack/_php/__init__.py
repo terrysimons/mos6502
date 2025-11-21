@@ -35,9 +35,9 @@ def add_php_to_instruction_set_enum(instruction_set_class) -> None:
         def value(self):
             return self._value_
 
-    php_member = PseudoEnumMember(PHP_IMPLIED_0x08, 'PHP_IMPLIED_0x08')
+    php_member = PseudoEnumMember(PHP_IMPLIED_0x08, "PHP_IMPLIED_0x08")
     instruction_set_class._value2member_map_[PHP_IMPLIED_0x08] = php_member
-    setattr(instruction_set_class, 'PHP_IMPLIED_0x08', PHP_IMPLIED_0x08)
+    setattr(instruction_set_class, "PHP_IMPLIED_0x08", PHP_IMPLIED_0x08)
 
 
 def register_php_instructions(instruction_set_class, instruction_map: dict) -> None:
@@ -56,4 +56,4 @@ def register_php_instructions(instruction_set_class, instruction_map: dict) -> N
     }
 
 
-__all__ = ['PHP_IMPLIED_0x08', 'register_php_instructions']
+__all__ = ["PHP_IMPLIED_0x08", "register_php_instructions"]

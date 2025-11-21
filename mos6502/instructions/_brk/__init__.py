@@ -49,9 +49,9 @@ def add_brk_to_instruction_set_enum(instruction_set_class) -> None:
         def value(self):
             return self._value_
 
-    brk_member = PseudoEnumMember(BRK_IMPLIED_0x00, 'BRK_IMPLIED_0x00')
+    brk_member = PseudoEnumMember(BRK_IMPLIED_0x00, "BRK_IMPLIED_0x00")
     instruction_set_class._value2member_map_[BRK_IMPLIED_0x00] = brk_member
-    setattr(instruction_set_class, 'BRK_IMPLIED_0x00', BRK_IMPLIED_0x00)
+    setattr(instruction_set_class, "BRK_IMPLIED_0x00", BRK_IMPLIED_0x00)
 
 
 def register_brk_instructions(instruction_set_class, instruction_map: dict) -> None:
@@ -70,4 +70,4 @@ def register_brk_instructions(instruction_set_class, instruction_map: dict) -> N
     }
 
 
-__all__ = ['BRK_IMPLIED_0x00', 'register_brk_instructions']
+__all__ = ["BRK_IMPLIED_0x00", "register_brk_instructions"]

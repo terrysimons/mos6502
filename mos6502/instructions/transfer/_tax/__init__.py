@@ -39,9 +39,9 @@ def add_tax_to_instruction_set_enum(instruction_set_class) -> None:
         def value(self):
             return self._value_
 
-    tax_member = PseudoEnumMember(TAX_IMPLIED_0xAA, 'TAX_IMPLIED_0xAA')
+    tax_member = PseudoEnumMember(TAX_IMPLIED_0xAA, "TAX_IMPLIED_0xAA")
     instruction_set_class._value2member_map_[TAX_IMPLIED_0xAA] = tax_member
-    setattr(instruction_set_class, 'TAX_IMPLIED_0xAA', TAX_IMPLIED_0xAA)
+    setattr(instruction_set_class, "TAX_IMPLIED_0xAA", TAX_IMPLIED_0xAA)
 
 
 def register_tax_instructions(instruction_set_class, instruction_map: dict) -> None:
@@ -63,4 +63,4 @@ def register_tax_instructions(instruction_set_class, instruction_map: dict) -> N
     }
 
 
-__all__ = ['TAX_IMPLIED_0xAA', 'register_tax_instructions']
+__all__ = ["TAX_IMPLIED_0xAA", "register_tax_instructions"]

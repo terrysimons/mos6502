@@ -37,9 +37,9 @@ def add_jsr_to_instruction_set_enum(instruction_set_class) -> None:
         def value(self):
             return self._value_
 
-    jsr_member = PseudoEnumMember(JSR_ABSOLUTE_0x20, 'JSR_ABSOLUTE_0x20')
+    jsr_member = PseudoEnumMember(JSR_ABSOLUTE_0x20, "JSR_ABSOLUTE_0x20")
     instruction_set_class._value2member_map_[JSR_ABSOLUTE_0x20] = jsr_member
-    setattr(instruction_set_class, 'JSR_ABSOLUTE_0x20', JSR_ABSOLUTE_0x20)
+    setattr(instruction_set_class, "JSR_ABSOLUTE_0x20", JSR_ABSOLUTE_0x20)
 
 
 def register_jsr_instructions(instruction_set_class, instruction_map: dict) -> None:
@@ -57,4 +57,4 @@ def register_jsr_instructions(instruction_set_class, instruction_map: dict) -> N
     }
 
 
-__all__ = ['JSR_ABSOLUTE_0x20', 'register_jsr_instructions']
+__all__ = ["JSR_ABSOLUTE_0x20", "register_jsr_instructions"]

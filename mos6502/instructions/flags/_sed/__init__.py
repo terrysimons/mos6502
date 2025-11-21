@@ -39,9 +39,9 @@ def add_sed_to_instruction_set_enum(instruction_set_class) -> None:
         def value(self):
             return self._value_
 
-    sed_member = PseudoEnumMember(SED_IMPLIED_0xF8, 'SED_IMPLIED_0xF8')
+    sed_member = PseudoEnumMember(SED_IMPLIED_0xF8, "SED_IMPLIED_0xF8")
     instruction_set_class._value2member_map_[SED_IMPLIED_0xF8] = sed_member
-    setattr(instruction_set_class, 'SED_IMPLIED_0xF8', SED_IMPLIED_0xF8)
+    setattr(instruction_set_class, "SED_IMPLIED_0xF8", SED_IMPLIED_0xF8)
 
 
 def register_sed_instructions(instruction_set_class, instruction_map: dict) -> None:
@@ -62,4 +62,4 @@ def register_sed_instructions(instruction_set_class, instruction_map: dict) -> N
     }
 
 
-__all__ = ['SED_IMPLIED_0xF8', 'register_sed_instructions']
+__all__ = ["SED_IMPLIED_0xF8", "register_sed_instructions"]

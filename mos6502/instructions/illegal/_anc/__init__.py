@@ -44,8 +44,8 @@ def add_anc_to_instruction_set_enum(instruction_set_class) -> None:
             return self._value_
 
     for opcode_name, opcode_value in [
-        ('ANC_IMMEDIATE_0x0B', ANC_IMMEDIATE_0x0B),
-        ('ANC_IMMEDIATE_0x2B', ANC_IMMEDIATE_0x2B),
+        ("ANC_IMMEDIATE_0x0B", ANC_IMMEDIATE_0x0B),
+        ("ANC_IMMEDIATE_0x2B", ANC_IMMEDIATE_0x2B),
     ]:
         member = PseudoEnumMember(opcode_value, opcode_name)
         instruction_set_class._value2member_map_[opcode_value] = member
@@ -65,4 +65,4 @@ def register_anc_instructions(instruction_set_class, instruction_map: dict) -> N
     instruction_map[ANC_IMMEDIATE_0x2B] = {"addressing": "immediate", "assembler": "ANC #{oper}", "opc": ANC_IMMEDIATE_0x2B, "bytes": "2", "cycles": "2", "flags": anc_can_modify_flags}
 
 
-__all__ = ['ANC_IMMEDIATE_0x0B', 'ANC_IMMEDIATE_0x2B', 'register_anc_instructions']
+__all__ = ["ANC_IMMEDIATE_0x0B", "ANC_IMMEDIATE_0x2B", "register_anc_instructions"]

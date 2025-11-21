@@ -66,11 +66,11 @@ def add_asl_to_instruction_set_enum(instruction_set_class) -> None:
             return self._value_
 
     for value, name in [
-        (ASL_ACCUMULATOR_0x0A, 'ASL_ACCUMULATOR_0x0A'),
-        (ASL_ZEROPAGE_0x06, 'ASL_ZEROPAGE_0x06'),
-        (ASL_ZEROPAGE_X_0x16, 'ASL_ZEROPAGE_X_0x16'),
-        (ASL_ABSOLUTE_0x0E, 'ASL_ABSOLUTE_0x0E'),
-        (ASL_ABSOLUTE_X_0x1E, 'ASL_ABSOLUTE_X_0x1E'),
+        (ASL_ACCUMULATOR_0x0A, "ASL_ACCUMULATOR_0x0A"),
+        (ASL_ZEROPAGE_0x06, "ASL_ZEROPAGE_0x06"),
+        (ASL_ZEROPAGE_X_0x16, "ASL_ZEROPAGE_X_0x16"),
+        (ASL_ABSOLUTE_0x0E, "ASL_ABSOLUTE_0x0E"),
+        (ASL_ABSOLUTE_X_0x1E, "ASL_ABSOLUTE_X_0x1E"),
     ]:
         member = PseudoEnumMember(value, name)
         instruction_set_class._value2member_map_[value] = member
@@ -135,10 +135,10 @@ def register_asl_instructions(instruction_set_class, instruction_map: dict) -> N
 
 
 __all__ = [
-    'ASL_ACCUMULATOR_0x0A',
-    'ASL_ZEROPAGE_0x06',
-    'ASL_ZEROPAGE_X_0x16',
-    'ASL_ABSOLUTE_0x0E',
-    'ASL_ABSOLUTE_X_0x1E',
-    'register_asl_instructions',
+    "ASL_ACCUMULATOR_0x0A",
+    "ASL_ZEROPAGE_0x06",
+    "ASL_ZEROPAGE_X_0x16",
+    "ASL_ABSOLUTE_0x0E",
+    "ASL_ABSOLUTE_X_0x1E",
+    "register_asl_instructions",
 ]

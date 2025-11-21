@@ -36,9 +36,9 @@ def add_pla_to_instruction_set_enum(instruction_set_class) -> None:
         def value(self):
             return self._value_
 
-    pla_member = PseudoEnumMember(PLA_IMPLIED_0x68, 'PLA_IMPLIED_0x68')
+    pla_member = PseudoEnumMember(PLA_IMPLIED_0x68, "PLA_IMPLIED_0x68")
     instruction_set_class._value2member_map_[PLA_IMPLIED_0x68] = pla_member
-    setattr(instruction_set_class, 'PLA_IMPLIED_0x68', PLA_IMPLIED_0x68)
+    setattr(instruction_set_class, "PLA_IMPLIED_0x68", PLA_IMPLIED_0x68)
 
 
 def register_pla_instructions(instruction_set_class, instruction_map: dict) -> None:
@@ -58,4 +58,4 @@ def register_pla_instructions(instruction_set_class, instruction_map: dict) -> N
     }
 
 
-__all__ = ['PLA_IMPLIED_0x68', 'register_pla_instructions']
+__all__ = ["PLA_IMPLIED_0x68", "register_pla_instructions"]

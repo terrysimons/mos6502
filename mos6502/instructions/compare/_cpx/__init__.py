@@ -50,9 +50,9 @@ def add_cpx_to_instruction_set_enum(instruction_set_class) -> None:
             return self._value_
 
     for value, name in [
-        (CPX_IMMEDIATE_0xE0, 'CPX_IMMEDIATE_0xE0'),
-        (CPX_ZEROPAGE_0xE4, 'CPX_ZEROPAGE_0xE4'),
-        (CPX_ABSOLUTE_0xEC, 'CPX_ABSOLUTE_0xEC'),
+        (CPX_IMMEDIATE_0xE0, "CPX_IMMEDIATE_0xE0"),
+        (CPX_ZEROPAGE_0xE4, "CPX_ZEROPAGE_0xE4"),
+        (CPX_ABSOLUTE_0xEC, "CPX_ABSOLUTE_0xEC"),
     ]:
         member = PseudoEnumMember(value, name)
         instruction_set_class._value2member_map_[value] = member
@@ -99,8 +99,8 @@ def register_cpx_instructions(instruction_set_class, instruction_map: dict) -> N
 
 
 __all__ = [
-    'CPX_IMMEDIATE_0xE0',
-    'CPX_ZEROPAGE_0xE4',
-    'CPX_ABSOLUTE_0xEC',
-    'register_cpx_instructions',
+    "CPX_IMMEDIATE_0xE0",
+    "CPX_ZEROPAGE_0xE4",
+    "CPX_ABSOLUTE_0xEC",
+    "register_cpx_instructions",
 ]
