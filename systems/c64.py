@@ -107,7 +107,7 @@ class C64:
             reg = addr & 0x0F
             self.regs[reg] = value
 
-        def _read_keyboard_port(self):
+        def _read_keyboard_port(self) -> int:
             # The C64 keyboard is an 8x8 matrix.
             # KERNAL polls port A with each row selected on port B.
             # Returning 0xFF emulates “no keys pressed.”
@@ -260,7 +260,7 @@ class C64:
             self.ddr = 0x00  # $0000
             self.port = 0x37  # $0001 default value
 
-        def _read_ram_direct(self, addr):
+        def _read_ram_direct(self, addr) -> int:
             """Read directly from RAM storage without delegation."""
             if 0 <= addr < 256:
                 return self.ram_zeropage[addr].value
@@ -270,7 +270,7 @@ class C64:
                 return self.ram_heap[addr - 512].value
             return 0
 
-        def _write_ram_direct(self, addr, value):
+        def _write_ram_direct(self, addr, value) -> None:
             """Write directly to RAM storage without delegation."""
             from mos6502.memory import Byte, int2ba
             if 0 <= addr < 256:
@@ -495,7 +495,7 @@ class C64:
 
         log.info("All ROMs loaded into memory")
 
-    def _write_rom_to_memory(self, start_addr: int, rom_data: bytes):
+    def _write_rom_to_memory(self, start_addr: int, rom_data: bytes) -> None:
         """Write ROM data to CPU memory.
 
         Arguments:
@@ -587,7 +587,7 @@ class C64:
             # Flag to stop the display thread
             stop_display = threading.Event()
 
-            def display_cycles():
+            def display_cycles() -> None:
                 """Display cycle count and CPU state on a single updating line."""
                 while not stop_display.is_set():
                     if is_tty:

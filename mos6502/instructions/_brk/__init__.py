@@ -42,11 +42,11 @@ def add_brk_to_instruction_set_enum(instruction_set_class) -> None:
             return obj
 
         @property
-        def name(self):
+        def name(self) -> str:
             return self._name
 
         @property
-        def value(self):
+        def value(self) -> int:
             return self._value_
 
     brk_member = PseudoEnumMember(BRK_IMPLIED_0x00, "BRK_IMPLIED_0x00")

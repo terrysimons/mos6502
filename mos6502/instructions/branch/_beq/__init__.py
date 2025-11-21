@@ -27,11 +27,11 @@ def add_beq_to_instruction_set_enum(instruction_set_class) -> None:
             return obj
 
         @property
-        def name(self):
+        def name(self) -> str:
             return self._name
 
         @property
-        def value(self):
+        def value(self) -> int:
             return self._value_
 
     member = PseudoEnumMember(BEQ_RELATIVE_0xF0, "BEQ_RELATIVE_0xF0")

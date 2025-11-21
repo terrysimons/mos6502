@@ -29,11 +29,11 @@ def add_pla_to_instruction_set_enum(instruction_set_class) -> None:
             return obj
 
         @property
-        def name(self):
+        def name(self) -> str:
             return self._name
 
         @property
-        def value(self):
+        def value(self) -> int:
             return self._value_
 
     pla_member = PseudoEnumMember(PLA_IMPLIED_0x68, "PLA_IMPLIED_0x68")

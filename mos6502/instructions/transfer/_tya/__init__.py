@@ -29,11 +29,11 @@ def add_tya_to_instruction_set_enum(instruction_set_class) -> None:
             return obj
 
         @property
-        def name(self):
+        def name(self) -> str:
             return self._name
 
         @property
-        def value(self):
+        def value(self) -> int:
             return self._value_
 
     tya_member = PseudoEnumMember(TYA_IMPLIED_0x98, "TYA_IMPLIED_0x98")

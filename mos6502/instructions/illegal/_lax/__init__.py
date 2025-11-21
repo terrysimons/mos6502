@@ -117,11 +117,11 @@ def add_lax_to_instruction_set_enum(instruction_set_class) -> None:
             return obj
 
         @property
-        def name(self):
+        def name(self) -> str:
             return self._name
 
         @property
-        def value(self):
+        def value(self) -> int:
             return self._value_
 
     # Add each LAX variant to the enum

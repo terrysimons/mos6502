@@ -32,11 +32,11 @@ def add_clv_to_instruction_set_enum(instruction_set_class) -> None:
             return obj
 
         @property
-        def name(self):
+        def name(self) -> str:
             return self._name
 
         @property
-        def value(self):
+        def value(self) -> int:
             return self._value_
 
     clv_member = PseudoEnumMember(CLV_IMPLIED_0xB8, "CLV_IMPLIED_0xB8")

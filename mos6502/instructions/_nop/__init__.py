@@ -33,11 +33,11 @@ def add_nop_to_instruction_set_enum(instruction_set_class) -> None:
             return obj
 
         @property
-        def name(self):
+        def name(self) -> str:
             return self._name
 
         @property
-        def value(self):
+        def value(self) -> int:
             return self._value_
 
     nop_member = PseudoEnumMember(NOP_IMPLIED_0xEA, "NOP_IMPLIED_0xEA")

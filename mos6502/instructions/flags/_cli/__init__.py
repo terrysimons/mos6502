@@ -32,11 +32,11 @@ def add_cli_to_instruction_set_enum(instruction_set_class) -> None:
             return obj
 
         @property
-        def name(self):
+        def name(self) -> str:
             return self._name
 
         @property
-        def value(self):
+        def value(self) -> int:
             return self._value_
 
     cli_member = PseudoEnumMember(CLI_IMPLIED_0x58, "CLI_IMPLIED_0x58")
