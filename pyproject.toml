@@ -108,6 +108,7 @@ ignore = [
     "T201", # print() is intentional - used for emulator output (screen, disassembly, memory dumps)
 ]
 extend-ignore = [
+    "ANN001", # Missing type annotation for function argument (437 violations in instruction boilerplate)
     "ARG001", # Unused function argument:
     "PLR0913", # Too many arguments to function call
     "ARG002", # Unused method argument:
