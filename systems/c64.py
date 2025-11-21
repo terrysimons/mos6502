@@ -137,6 +137,31 @@ class C64:
             self.char_rom = char_rom
             self.cpu = cpu
 
+            # Set default VIC register values (C64 power-on state)
+            # $D018: Memory Control - Screen at $0400, Char ROM at $1000
+            # Bits 4-7 = 0001 (screen at 1*$400 = $0400)
+            # Bits 1-3 = 010 (char at 2*$800 = $1000)
+            self.regs[0x18] = 0x14  # 0001 0100 binary
+
+            # $D020: Border color - Default light blue (14)
+            self.regs[0x20] = 0x0E  # Light blue
+
+            # $D021: Background color - Default blue (6)
+            self.regs[0x21] = 0x06  # Blue
+
+            # Display dimensions (hardware characteristics)
+            # Text area: 320x200 (40x25 characters at 8x8 pixels)
+            # Border: 32 pixels on each side (left/right), 35 pixels top/bottom
+            # Total visible area: 384x270
+            self.text_width = 320
+            self.text_height = 200
+            self.border_left = 32
+            self.border_right = 32
+            self.border_top = 35
+            self.border_bottom = 35
+            self.total_width = self.text_width + self.border_left + self.border_right  # 384
+            self.total_height = self.text_height + self.border_top + self.border_bottom  # 270
+
             # NTSC timing: 263 raster lines, 63 cycles per line
             self.raster_lines = 263
             self.cycles_per_line = 63
@@ -206,6 +231,12 @@ class C64:
             reg = addr & 0x3F
             self.regs[reg] = val
 
+            # $D018: Memory control register (screen/char memory location)
+            if reg == 0x18:
+                screen_addr = ((val & 0xF0) >> 4) * 0x0400
+                char_offset = ((val & 0x0E) >> 1) * 0x0800
+                self.log.debug(f"VIC $D018 = ${val:02X}: screen=${screen_addr:04X}, char_offset=${char_offset:04X}")
+
             # $D019: Interrupt flags - writing 1 to a bit CLEARS it (acknowledge)
             if reg == 0x19:
                 # Writing 1 clears the corresponding flag (interrupt latch behavior)
@@ -221,23 +252,81 @@ class C64:
             if reg == 0x1A:
                 self.irq_enabled = val & 0x0F
 
-        def render_text(self, surface, ram, color_ram) -> None:
-            screen_base = 0x0400  # default
+        def render_frame(self, surface, ram, color_ram) -> None:
+            """Render complete VIC-II frame including border and character area.
+
+            This method emulates the VIC-II's display generation:
+            - Fills the entire frame with border color
+            - Renders the 40x25 character text area with proper positioning
+            - Handles all VIC register settings (colors, memory locations, etc.)
+
+            Args:
+                surface: Pygame surface to render to (should be total_width x total_height)
+                ram: Memory accessor for screen RAM
+                color_ram: Memory accessor for color RAM
+            """
+            # Border color from VIC register $D020 (register 0x20)
+            border_color = self.regs[0x20] & 0x0F
+
+            # Fill entire surface with border color (VIC draws border first)
+            surface.fill(COLORS[border_color])
+
+            # VIC register $D018 (Memory Control Register)
+            # Bits 4-7: Screen memory location (Video Matrix Base Address)
+            #   Value * 1024 = screen address (within current 16K VIC bank)
+            #   Default: 0001 = 1 * 1024 = 0x0400
+            # Bits 1-3: Character memory location (Character Dot-Data Base Address)
+            #   Value * 2048 = char ROM offset (within current 16K VIC bank)
+            #   Default: 010 = 2 * 2048 = 0x1000 (but points to ROM, not RAM)
+            mem_control = self.regs[0x18]
+
+            # Screen memory base address
+            screen_base = ((mem_control & 0xF0) >> 4) * 0x0400
+
+            # Character ROM bank selection
+            char_bank_offset = ((mem_control & 0x0E) >> 1) * 0x0800
+            char_bank_offset = char_bank_offset & 0x0FFF  # Mask to 4K
+
+            # Background color from VIC register $D021 (register 0x21)
+            bg_color = self.regs[0x21] & 0x0F
+
+            # Render text area within the border
+            # VIC positions text area at (border_left, border_top)
             for row in range(25):
                 for col in range(40):
                     cell_addr = screen_base + row * 40 + col
                     char_code = ram[cell_addr]
-                    color = color_ram[cell_addr - 0x0400] & 0x0F
+                    color_offset = row * 40 + col
+                    color = color_ram[color_offset] & 0x0F
 
-                    # Each char = 8 bytes in ROM
-                    glyph = self.char_rom[char_code * 8 : char_code * 8 + 8]
+                    # Check for reverse video (character codes 128-255)
+                    reverse = char_code >= 128
+                    if reverse:
+                        char_code = char_code & 0x7F
 
+                    # Get glyph from character ROM
+                    glyph_addr = (char_code * 8) + char_bank_offset
+                    glyph_addr = glyph_addr & 0x0FFF
+                    glyph = self.char_rom[glyph_addr : glyph_addr + 8]
+
+                    # Render character at proper screen position
+                    # VIC places text area offset from top-left by border dimensions
                     for y in range(8):
                         line = glyph[y]
                         for x in range(8):
                             pixel = (line >> (7 - x)) & 1
-                            surface.set_at((col*8 + x, row*8 + y),
-                                        COLORS[color] if pixel else COLORS[0])
+                            # VIC positions pixels: border_offset + character_position
+                            pixel_x = self.border_left + col*8 + x
+                            pixel_y = self.border_top + row*8 + y
+
+                            if reverse:
+                                # Reverse video: swap foreground and background
+                                surface.set_at((pixel_x, pixel_y),
+                                            COLORS[bg_color] if pixel else COLORS[color])
+                            else:
+                                # Normal: foreground on background
+                                surface.set_at((pixel_x, pixel_y),
+                                            COLORS[color] if pixel else COLORS[bg_color])
 
 
     class C64Memory:
@@ -375,13 +464,17 @@ class C64:
             self._write_ram_direct(addr, value & 0xFF)
 
 
-    def __init__(self, rom_dir: Path = Path("./roms")) -> None:
+    def __init__(self, rom_dir: Path = Path("./roms"), display_mode: str = "terminal", scale: int = 2) -> None:
         """Initialize the C64 emulator.
 
         Arguments:
             rom_dir: Directory containing ROM files (basic, kernal, char)
+            display_mode: Display mode (terminal, pygame, none)
+            scale: Pygame window scaling factor
         """
         self.rom_dir = Path(rom_dir)
+        self.display_mode = display_mode
+        self.scale = scale
 
         # Initialize CPU (6510 is essentially a 6502 with I/O ports)
         # We'll use NMOS 6502 as the base
@@ -396,6 +489,11 @@ class C64:
         self.vic: Optional[C64.C64VIC] = None
         self.cia1: Optional[C64.CIA1] = None
         self.cia2: Optional[C64.CIA2] = None
+
+        # Pygame display attributes
+        self.pygame_screen = None
+        self.pygame_surface = None
+        self.pygame_available = False
 
         # self.memory = C64.C64Memory(self.cpu.ram, self.basic_rom, self.kernal_rom, self.char_rom)
         # self.cpu.memory = self.memory
@@ -504,6 +602,43 @@ class C64:
 
         log.info("All ROMs loaded into memory")
 
+    def init_pygame_display(self) -> bool:
+        """Initialize pygame display.
+
+        Returns:
+            True if pygame was successfully initialized, False otherwise
+        """
+        try:
+            import pygame
+            self.pygame_available = True
+        except ImportError:
+            log.error("Pygame not installed. Install with: pip install pygame-ce")
+            return False
+
+        try:
+            pygame.init()
+
+            # Get display dimensions from VIC (hardware characteristics)
+            total_width = self.vic.total_width
+            total_height = self.vic.total_height
+
+            # Create window with scaled dimensions
+            width = total_width * self.scale
+            height = total_height * self.scale
+            self.pygame_screen = pygame.display.set_mode((width, height))
+            pygame.display.set_caption("C64 Emulator")
+
+            # Create the rendering surface (384x270 with border)
+            self.pygame_surface = pygame.Surface((total_width, total_height))
+
+            log.info(f"Pygame display initialized: {width}x{height} (scale={self.scale})")
+            return True
+
+        except Exception as e:
+            log.error(f"Failed to initialize pygame: {e}")
+            self.pygame_available = False
+            return False
+
     def _write_rom_to_memory(self, start_addr: int, rom_data: bytes) -> None:
         """Write ROM data to CPU memory.
 
@@ -593,106 +728,71 @@ class C64:
             # Check if we're in a TTY (terminal) for interactive display
             is_tty = _sys.stdout.isatty()
 
-            # Flag to stop the display thread
-            stop_display = threading.Event()
+            # For pygame mode, run CPU in background thread and pygame in main thread
+            # For other modes, run display in background and CPU in main thread
+            if self.display_mode == "pygame" and self.pygame_available:
+                # Pygame mode: CPU in background, rendering in main thread
+                cpu_done = threading.Event()
+                cpu_error = None
 
-            def display_cycles() -> None:
-                """Display cycle count, CPU state, and C64 screen."""
-                screen_start = 0x0400
-                cols = 40
-                rows = 25
+                def cpu_thread() -> None:
+                    nonlocal cpu_error
+                    try:
+                        self.cpu.execute(cycles=max_cycles)
+                    except Exception as e:
+                        cpu_error = e
+                    finally:
+                        cpu_done.set()
 
-                while not stop_display.is_set():
-                    if is_tty:
-                        # Clear screen and move cursor to top
-                        _sys.stdout.write("\033[2J\033[H")
+                # Start CPU thread
+                cpu_thread_obj = threading.Thread(target=cpu_thread, daemon=True)
+                cpu_thread_obj.start()
 
-                        # Render C64 screen (40x25 characters)
-                        _sys.stdout.write("=" * 42 + "\n")
-                        _sys.stdout.write(" C64 SCREEN\n")
-                        _sys.stdout.write("=" * 42 + "\n")
+                # Main thread handles pygame rendering
+                try:
+                    while not cpu_done.is_set():
+                        self._render_pygame()
+                        time.sleep(0.1)  # Update 10 times per second
+                finally:
+                    cpu_done.set()
+                    cpu_thread_obj.join(timeout=0.5)
 
-                        for row in range(rows):
-                            line = ""
-                            for col in range(cols):
-                                addr = screen_start + (row * cols) + col
-                                petscii = int(self.cpu.ram[addr])
-                                line += self.petscii_to_ascii(petscii)
-                            _sys.stdout.write(line + "\n")
-
-                        _sys.stdout.write("=" * 42 + "\n")
-
-                        # Get flag values
-                        flags = f"{'N' if self.cpu.N else 'n'}"
-                        flags += f"{'V' if self.cpu.V else 'v'}"
-                        flags += "-"  # Unused flag
-                        flags += f"{'B' if self.cpu.B else 'b'}"
-                        flags += f"{'D' if self.cpu.D else 'd'}"
-                        flags += f"{'I' if self.cpu.I else 'i'}"
-                        flags += f"{'Z' if self.cpu.Z else 'z'}"
-                        flags += f"{'C' if self.cpu.C else 'c'}"
-
-                        # Determine what's mapped at PC
-                        pc = self.cpu.PC
-                        port = self.memory.port
-                        if pc < C64.BASIC_ROM_START:
-                            region = "RAM"
-                        elif C64.BASIC_ROM_START <= pc <= C64.BASIC_ROM_END:
-                            region = "BASIC" if (port & 0x01) else "RAM"
-                        elif C64.CHAR_ROM_START <= pc <= C64.CHAR_ROM_END:
-                            region = "I/O" if (port & 0x04) else ("CHAR" if (port & 0x03) == 0x01 else "RAM")
-                        elif C64.KERNAL_ROM_START <= pc <= C64.KERNAL_ROM_END:
-                            region = "KERNAL" if (port & 0x02) else "RAM"
-                        else:
-                            region = "???"
-
-                        # Disassemble current instruction
+                    # Cleanup pygame
+                    if self.pygame_available:
                         try:
-                            inst_str = self.disassemble_instruction(pc)
-                            inst_display = inst_str.strip()
-                        except (KeyError, ValueError, IndexError):
-                            # Fallback: just show opcode bytes if disassembly fails
-                            try:
-                                b0 = self.cpu.ram[pc]
-                                b1 = self.cpu.ram[pc+1]
-                                b2 = self.cpu.ram[pc+2]
-                                inst_display = f"{b0:02X} {b1:02X} {b2:02X}  ???"
-                            except IndexError:
-                                inst_display = "???"
+                            import pygame
+                            pygame.quit()
+                        except Exception:
+                            pass
 
-                        # Status line at bottom
-                        status = (f"Cycles: {self.cpu.cycles_executed:,} | "
-                                f"PC=${self.cpu.PC:04X}[{region}] {inst_display:20s} | "
-                                f"A=${self.cpu.A:02X} X=${self.cpu.X:02X} "
-                                f"Y=${self.cpu.Y:02X} S=${self.cpu.S & 0xFF:02X} P={flags}")
-                        _sys.stdout.write(status + "\n")
-                        _sys.stdout.flush()
-                    time.sleep(0.1)  # Update 10 times per second
+                # Re-raise CPU thread exception if any
+                if cpu_error:
+                    raise cpu_error
 
-            # Start the display thread only if we're in a TTY
-            if is_tty:
-                display_thread = threading.Thread(target=display_cycles, daemon=True)
-                display_thread.start()
+            else:
+                # Terminal or none mode: display in background, CPU in main thread
+                stop_display = threading.Event()
 
-            try:
-                self.cpu.execute(cycles=max_cycles)
-            finally:
-                # Stop the display thread and print final state on new line
-                if is_tty:
-                    stop_display.set()
-                    display_thread.join(timeout=0.5)
-                    # Print final state
-                    flags = f"{'N' if self.cpu.N else 'n'}"
-                    flags += f"{'V' if self.cpu.V else 'v'}"
-                    flags += "-"
-                    flags += f"{'B' if self.cpu.B else 'b'}"
-                    flags += f"{'D' if self.cpu.D else 'd'}"
-                    flags += f"{'I' if self.cpu.I else 'i'}"
-                    flags += f"{'Z' if self.cpu.Z else 'z'}"
-                    flags += f"{'C' if self.cpu.C else 'c'}"
-                    # print(f"\rCycles: {self.cpu.cycles_executed:,} | "
-                    #       f"PC=${self.cpu.PC:04X} A=${self.cpu.A:02X} X=${self.cpu.X:02X} "
-                    #       f"Y=${self.cpu.Y:02X} S=${self.cpu.S & 0xFF:02X} P={flags}")
+                def display_cycles() -> None:
+                    """Display cycle count, CPU state, and C64 screen."""
+                    while not stop_display.is_set():
+                        if self.display_mode == "terminal" and is_tty:
+                            self._render_terminal()
+                        # "none" mode: do nothing
+                        time.sleep(0.1)  # Update 10 times per second
+
+                # Start the display thread
+                if self.display_mode != "none":
+                    display_thread = threading.Thread(target=display_cycles, daemon=True)
+                    display_thread.start()
+
+                try:
+                    self.cpu.execute(cycles=max_cycles)
+                finally:
+                    # Stop the display thread
+                    if self.display_mode != "none":
+                        stop_display.set()
+                        display_thread.join(timeout=0.5)
 
         except errors.CPUCycleExhaustionError as e:
             log.info(f"CPU execution completed: {e}")
@@ -911,6 +1011,125 @@ class C64:
 
         print("=" * 42)
 
+    def _render_terminal(self) -> None:
+        """Render C64 screen to terminal."""
+        import sys as _sys
+
+        screen_start = 0x0400
+        cols = 40
+        rows = 25
+
+        # Clear screen and move cursor to top
+        _sys.stdout.write("\033[2J\033[H")
+
+        # Render C64 screen (40x25 characters)
+        _sys.stdout.write("=" * 42 + "\n")
+        _sys.stdout.write(" C64 SCREEN\n")
+        _sys.stdout.write("=" * 42 + "\n")
+
+        for row in range(rows):
+            line = ""
+            for col in range(cols):
+                addr = screen_start + (row * cols) + col
+                petscii = int(self.cpu.ram[addr])
+                line += self.petscii_to_ascii(petscii)
+            _sys.stdout.write(line + "\n")
+
+        _sys.stdout.write("=" * 42 + "\n")
+
+        # Get flag values
+        flags = f"{'N' if self.cpu.N else 'n'}"
+        flags += f"{'V' if self.cpu.V else 'v'}"
+        flags += "-"  # Unused flag
+        flags += f"{'B' if self.cpu.B else 'b'}"
+        flags += f"{'D' if self.cpu.D else 'd'}"
+        flags += f"{'I' if self.cpu.I else 'i'}"
+        flags += f"{'Z' if self.cpu.Z else 'z'}"
+        flags += f"{'C' if self.cpu.C else 'c'}"
+
+        # Determine what's mapped at PC
+        pc = self.cpu.PC
+        port = self.memory.port
+        if pc < C64.BASIC_ROM_START:
+            region = "RAM"
+        elif C64.BASIC_ROM_START <= pc <= C64.BASIC_ROM_END:
+            region = "BASIC" if (port & 0x01) else "RAM"
+        elif C64.CHAR_ROM_START <= pc <= C64.CHAR_ROM_END:
+            region = "I/O" if (port & 0x04) else ("CHAR" if (port & 0x03) == 0x01 else "RAM")
+        elif C64.KERNAL_ROM_START <= pc <= C64.KERNAL_ROM_END:
+            region = "KERNAL" if (port & 0x02) else "RAM"
+        else:
+            region = "???"
+
+        # Disassemble current instruction
+        try:
+            inst_str = self.disassemble_instruction(pc)
+            inst_display = inst_str.strip()
+        except (KeyError, ValueError, IndexError):
+            # Fallback: just show opcode bytes if disassembly fails
+            try:
+                b0 = self.cpu.ram[pc]
+                b1 = self.cpu.ram[pc+1]
+                b2 = self.cpu.ram[pc+2]
+                inst_display = f"{b0:02X} {b1:02X} {b2:02X}  ???"
+            except IndexError:
+                inst_display = "???"
+
+        # Status line at bottom
+        status = (f"Cycles: {self.cpu.cycles_executed:,} | "
+                f"PC=${self.cpu.PC:04X}[{region}] {inst_display:20s} | "
+                f"A=${self.cpu.A:02X} X=${self.cpu.X:02X} "
+                f"Y=${self.cpu.Y:02X} S=${self.cpu.S & 0xFF:02X} P={flags}")
+        _sys.stdout.write(status + "\n")
+        _sys.stdout.flush()
+
+    def _render_pygame(self) -> None:
+        """Render C64 screen to pygame window."""
+        if not self.pygame_available or self.pygame_screen is None:
+            return
+
+        try:
+            import pygame
+
+            # Handle pygame events (window close, etc.)
+            for event in pygame.event.get():
+                if event.type == pygame.QUIT:
+                    import sys
+                    sys.exit(0)
+
+            # Create memory wrappers for VIC
+            class RAMWrapper:
+                def __init__(self, cpu_ram):
+                    self.cpu_ram = cpu_ram
+
+                def __getitem__(self, index):
+                    return int(self.cpu_ram[index])
+
+            class ColorRAMWrapper:
+                def __init__(self, color_ram):
+                    self.color_ram = color_ram
+
+                def __getitem__(self, index):
+                    return self.color_ram[index] & 0x0F
+
+            ram_wrapper = RAMWrapper(self.cpu.ram)
+            color_wrapper = ColorRAMWrapper(self.memory.ram_color)
+
+            # Let VIC render the complete frame (border + text)
+            # VIC handles all positioning and color logic internally
+            self.vic.render_frame(self.pygame_surface, ram_wrapper, color_wrapper)
+
+            # Scale and blit to screen
+            scaled_surface = pygame.transform.scale(
+                self.pygame_surface,
+                (self.vic.total_width * self.scale, self.vic.total_height * self.scale)
+            )
+            self.pygame_screen.blit(scaled_surface, (0, 0))
+            pygame.display.flip()
+
+        except Exception as e:
+            log.error(f"Error rendering pygame display: {e}")
+
     def disassemble_instruction(self, address: int) -> str:
         """Disassemble a single instruction at the given address.
 
@@ -1048,6 +1267,19 @@ def main() -> int | None:
         action="store_true",
         help="Display screen RAM after execution (40x25 character display)",
     )
+    parser.add_argument(
+        "--display",
+        type=str,
+        choices=["terminal", "pygame", "none"],
+        default="terminal",
+        help="Display mode: terminal (default), pygame (graphical), or none (headless)",
+    )
+    parser.add_argument(
+        "--scale",
+        type=int,
+        default=2,
+        help="Pygame window scaling factor (default: 2 = 640x400)",
+    )
 
     args = parser.parse_args()
 
@@ -1056,7 +1288,7 @@ def main() -> int | None:
 
     try:
         # Initialize C64
-        c64 = C64(rom_dir=args.rom_dir)
+        c64 = C64(rom_dir=args.rom_dir, display_mode=args.display, scale=args.scale)
 
         # Reset CPU FIRST (this clears RAM)
         c64.cpu.reset()
@@ -1064,8 +1296,18 @@ def main() -> int | None:
         logging.getLogger("mos6502").setLevel(logging.CRITICAL)
 
         # Then load ROMs (after RAM is cleared)
+        # This creates the VIC which is needed for pygame initialization
         if not args.no_roms:
             c64.load_roms()
+
+        # Initialize pygame AFTER VIC is created
+        if args.display == "pygame":
+            if not c64.init_pygame_display():
+                log.warning("Pygame initialization failed, falling back to terminal mode")
+                c64.display_mode = "terminal"
+
+        # Set PC after ROMs are loaded
+        if not args.no_roms:
             # Read reset vector and set PC
             reset_vector = c64.cpu.peek_word(c64.RESET_VECTOR_ADDR)
             log.info(f"Reset vector at ${c64.RESET_VECTOR_ADDR:04X}: ${reset_vector:04X}")
