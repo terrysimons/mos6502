@@ -10,9 +10,8 @@ from mos6502 import CPU, CPUVariant, errors
 from mos6502.core import INFINITE_CYCLES
 from mos6502.memory import Byte, Word
 
-logging.basicConfig(level=logging.INFO)
+logging.basicConfig(level=logging.DEBUG)
 log = logging.getLogger("c64")
-
 COLORS = [
     (0x00, 0x00, 0x00),   # 0  Black
     (0xFF, 0xFF, 0xFF),   # 1  White
@@ -76,9 +75,12 @@ class C64:
     RESET_VECTOR_ADDR = 0xFFFC
 
     class CIA1:
-        def __init__(self) -> None:
+        def __init__(self, cpu) -> None:
             # 16 registers, mirrored through $DC00–$DC0F
             self.regs = [0x00] * 16
+
+            # Reference to CPU for IRQ signaling
+            self.cpu = cpu
 
             # Keyboard matrix: 8 rows x 8 columns
             # keyboard_matrix[row] = byte where each bit is a column
@@ -93,6 +95,23 @@ class C64:
             # 0 = input, 1 = output
             self.ddr_a = 0x00   # Port A typically all inputs (columns)
             self.ddr_b = 0xFF   # Port B typically all outputs (rows)
+
+            # Timer A state
+            self.timer_a_counter = 0xFFFF  # 16-bit counter
+            self.timer_a_latch = 0xFFFF    # 16-bit latch (reload value)
+            self.timer_a_running = False
+
+            # Timer B state
+            self.timer_b_counter = 0xFFFF
+            self.timer_b_latch = 0xFFFF
+            self.timer_b_running = False
+
+            # Interrupt state
+            self.icr_data = 0x00      # Interrupt data (which interrupts occurred)
+            self.icr_mask = 0x00      # Interrupt mask (which interrupts are enabled)
+
+            # Track last CPU cycle count for timer updates
+            self.last_cycle_count = 0
 
         def read(self, addr) -> int:
             reg = addr & 0x0F
@@ -115,9 +134,35 @@ class C64:
             if reg == 0x03:
                 return self.ddr_b
 
+            # Timer A Low Byte ($DC04)
+            if reg == 0x04:
+                return self.timer_a_counter & 0xFF
+
+            # Timer A High Byte ($DC05)
+            if reg == 0x05:
+                return (self.timer_a_counter >> 8) & 0xFF
+
+            # Timer B Low Byte ($DC06)
+            if reg == 0x06:
+                return self.timer_b_counter & 0xFF
+
+            # Timer B High Byte ($DC07)
+            if reg == 0x07:
+                return (self.timer_b_counter >> 8) & 0xFF
+
             # Interrupt Control Register (ICR) ($DC0D)
             if reg == 0x0D:
-                return 0x00  # no interrupts pending
+                # Reading ICR clears it and returns current interrupt state
+                result = self.icr_data
+                # Set bit 7 if any enabled interrupt has occurred
+                if result & self.icr_mask:
+                    result |= 0x80
+                # Clear interrupt data after read
+                self.icr_data = 0x00
+                # Clear CPU IRQ if no more interrupts pending
+                if result & 0x80:
+                    self.cpu.irq_pending = False
+                return result
 
             # Return stored register contents for other registers
             return self.regs[reg]
@@ -141,6 +186,95 @@ class C64:
             # Port B DDR ($DC03)
             if reg == 0x03:
                 self.ddr_b = value
+
+            # Timer A Low Byte ($DC04)
+            if reg == 0x04:
+                self.timer_a_latch = (self.timer_a_latch & 0xFF00) | value
+
+            # Timer A High Byte ($DC05)
+            if reg == 0x05:
+                self.timer_a_latch = (self.timer_a_latch & 0x00FF) | (value << 8)
+
+            # Timer B Low Byte ($DC06)
+            if reg == 0x06:
+                self.timer_b_latch = (self.timer_b_latch & 0xFF00) | value
+
+            # Timer B High Byte ($DC07)
+            if reg == 0x07:
+                self.timer_b_latch = (self.timer_b_latch & 0x00FF) | (value << 8)
+
+            # Control Register A ($DC0E)
+            if reg == 0x0E:
+                # Bit 0: Start/Stop Timer A (1=start, 0=stop)
+                self.timer_a_running = bool(value & 0x01)
+                # Bit 4: Force load (1=load latch into counter)
+                if value & 0x10:
+                    self.timer_a_counter = self.timer_a_latch
+                log.info(f"*** CIA1 Timer A Control: ${value:02X}, running={self.timer_a_running}, latch=${self.timer_a_latch:04X} ***")
+
+            # Control Register B ($DC0F)
+            if reg == 0x0F:
+                # Bit 0: Start/Stop Timer B (1=start, 0=stop)
+                self.timer_b_running = bool(value & 0x01)
+                # Bit 4: Force load (1=load latch into counter)
+                if value & 0x10:
+                    self.timer_b_counter = self.timer_b_latch
+                log.info(f"*** CIA1 Timer B Control: ${value:02X}, running={self.timer_b_running}, latch=${self.timer_b_latch:04X} ***")
+
+            # Interrupt Control Register ($DC0D)
+            if reg == 0x0D:
+                # Bit 7: 1=set bits, 0=clear bits in mask
+                if value & 0x80:
+                    # Set mask bits
+                    self.icr_mask |= (value & 0x1F)
+                else:
+                    # Clear mask bits
+                    self.icr_mask &= ~(value & 0x1F)
+                log.info(f"*** CIA1 ICR Mask: ${value:02X}, mask=${self.icr_mask:02X}, Timer A IRQ {'ENABLED' if (self.icr_mask & 0x01) else 'DISABLED'} ***")
+
+        def update(self) -> None:
+            """Update CIA timers based on CPU cycles.
+
+            Called periodically to count down timers and generate interrupts.
+            """
+            # Calculate cycles elapsed since last update
+            cycles_elapsed = self.cpu.cycles_executed - self.last_cycle_count
+            self.last_cycle_count = self.cpu.cycles_executed
+
+            # Update Timer A
+            if self.timer_a_running and cycles_elapsed > 0:
+                # Count down by elapsed cycles
+                if self.timer_a_counter >= cycles_elapsed:
+                    self.timer_a_counter -= cycles_elapsed
+                else:
+                    # Timer underflow
+                    underflows = (cycles_elapsed - self.timer_a_counter) // (self.timer_a_latch + 1) + 1
+                    self.timer_a_counter = self.timer_a_latch - ((cycles_elapsed - self.timer_a_counter - 1) % (self.timer_a_latch + 1))
+
+                    # Trigger Timer A interrupt (bit 0)
+                    self.icr_data |= 0x01
+
+                    # If Timer A interrupts are enabled, signal CPU IRQ
+                    if self.icr_mask & 0x01:
+                        self.cpu.irq_pending = True
+                        log.info(f"*** CIA1 Timer A UNDERFLOW: Triggering IRQ, counter reloaded to ${self.timer_a_counter:04X}, cycles={self.cpu.cycles_executed} ***")
+
+            # Update Timer B (similar logic)
+            if self.timer_b_running and cycles_elapsed > 0:
+                if self.timer_b_counter >= cycles_elapsed:
+                    self.timer_b_counter -= cycles_elapsed
+                else:
+                    # Timer underflow
+                    underflows = (cycles_elapsed - self.timer_b_counter) // (self.timer_b_latch + 1) + 1
+                    self.timer_b_counter = self.timer_b_latch - ((cycles_elapsed - self.timer_b_counter - 1) % (self.timer_b_latch + 1))
+
+                    # Trigger Timer B interrupt (bit 1)
+                    self.icr_data |= 0x02
+
+                    # If Timer B interrupts are enabled, signal CPU IRQ
+                    if self.icr_mask & 0x02:
+                        self.cpu.irq_pending = True
+                        log.info(f"*** CIA1 Timer B UNDERFLOW: Triggering IRQ, counter reloaded to ${self.timer_b_counter:04X}, cycles={self.cpu.cycles_executed} ***")
 
         def _read_keyboard_port(self) -> int:
             """Read keyboard matrix columns based on selected rows.
@@ -262,7 +396,11 @@ class C64:
             self.log.info("VIC-II initialized (NTSC: 263 lines, 63 cycles/line)")
 
         def update(self) -> None:
-            """Update VIC state based on CPU cycles. Should be called periodically."""
+            """Update VIC state based on CPU cycles.
+
+            This is called automatically during register reads to keep raster counter current.
+            Also checks if a raster IRQ should be triggered.
+            """
             # Calculate raster line based on total CPU cycles
             total_lines = self.cpu.cycles_executed // self.cycles_per_line
             new_raster = total_lines % self.raster_lines
@@ -270,9 +408,16 @@ class C64:
             # Check if we should trigger raster IRQ on raster line match
             if new_raster != self.current_raster:
                 raster_compare = self.regs[0x12] | ((self.regs[0x11] & 0x80) << 1)
+                # Debug: Log every time we change raster line and check for match
                 if new_raster == raster_compare:
+                    log.info(f"*** VIC RASTER MATCH: line {new_raster} == compare {raster_compare}, irq_enabled=${self.irq_enabled:02X} (bit 0={'set' if (self.irq_enabled & 0x01) else 'clear'}) ***")
+                if new_raster == raster_compare and (self.irq_enabled & 0x01):
                     # Set raster IRQ flag (bit 0)
                     self.irq_flags |= 0x01
+                    # Signal CPU that IRQ is pending
+                    self.cpu.irq_pending = True
+                    log.info(f"*** VIC TRIGGERING IRQ: raster line {new_raster}, cpu.irq_pending=True, cycles={self.cpu.cycles_executed} ***")
+                    self.log.debug(f"VIC raster IRQ: line {new_raster}, setting cpu.irq_pending=True")
 
             self.current_raster = new_raster
 
@@ -299,6 +444,16 @@ class C64:
             reg = addr & 0x3F
             self.regs[reg] = val
 
+            # $D012: Raster compare register
+            if reg == 0x12:
+                raster_compare = val | ((self.regs[0x11] & 0x80) << 1)
+                log.info(f"*** VIC RASTER COMPARE: $D012 = ${val:02X}, full compare value = {raster_compare} ***")
+
+            # $D011: Control register (also affects raster compare bit 8)
+            if reg == 0x11:
+                raster_compare = self.regs[0x12] | ((val & 0x80) << 1)
+                log.info(f"*** VIC CONTROL: $D011 = ${val:02X}, raster compare = {raster_compare} ***")
+
             # $D018: Memory control register (screen/char memory location)
             if reg == 0x18:
                 screen_addr = ((val & 0xF0) >> 4) * 0x0400
@@ -311,6 +466,11 @@ class C64:
                 was_set = self.irq_flags & 0x0F
                 self.irq_flags &= ~(val & 0x0F)
 
+                # If all IRQ flags are now clear, clear the CPU's pending IRQ
+                if (self.irq_flags & 0x0F) == 0:
+                    self.cpu.irq_pending = False
+                    self.log.debug("VIC IRQ acknowledged, cpu.irq_pending cleared")
+
                 # Log when KERNAL acknowledges the initial IRQ (completion of VIC init)
                 if not self.initialized and was_set and (self.irq_flags & 0x0F) == 0:
                     self.initialized = True
@@ -319,6 +479,7 @@ class C64:
             # $D01A: Interrupt enable register
             if reg == 0x1A:
                 self.irq_enabled = val & 0x0F
+                log.info(f"*** VIC IRQ ENABLE: $D01A = ${val:02X}, irq_enabled=${self.irq_enabled:02X}, raster IRQ {'ENABLED' if (self.irq_enabled & 0x01) else 'DISABLED'} ***")
 
         def render_frame(self, surface, ram, color_ram) -> None:
             """Render complete VIC-II frame including border and character area.
@@ -532,17 +693,19 @@ class C64:
             self._write_ram_direct(addr, value & 0xFF)
 
 
-    def __init__(self, rom_dir: Path = Path("./roms"), display_mode: str = "terminal", scale: int = 2) -> None:
+    def __init__(self, rom_dir: Path = Path("./roms"), display_mode: str = "terminal", scale: int = 2, enable_irq: bool = True) -> None:
         """Initialize the C64 emulator.
 
         Arguments:
             rom_dir: Directory containing ROM files (basic, kernal, char)
             display_mode: Display mode (terminal, pygame, headless)
             scale: Pygame window scaling factor
+            enable_irq: Enable IRQ injection (default: True)
         """
         self.rom_dir = Path(rom_dir)
         self.display_mode = display_mode
         self.scale = scale
+        self.enable_irq = enable_irq
 
         # Initialize CPU (6510 is essentially a 6502 with I/O ports)
         # We'll use NMOS 6502 as the base
@@ -655,7 +818,7 @@ class C64:
 
 
         # Now set up the CIA1 and CIA2 and VIC
-        self.cia1 = C64.CIA1()
+        self.cia1 = C64.CIA1(cpu=self.cpu)
         self.cia2 = C64.CIA2()
         self.vic = C64.C64VIC(char_rom=self.char_rom, cpu=self.cpu)
 
@@ -672,13 +835,22 @@ class C64:
         # Hook up the memory handler so CPU RAM accesses go through C64Memory
         self.cpu.ram.memory_handler = self.memory
 
+        # Set up periodic update callback for both VIC and CIA1
+        # VIC checks cycle count and triggers raster IRQs
+        # CIA1 counts down timers and triggers timer IRQs
+        def update_peripherals():
+            self.vic.update()
+            self.cia1.update()
+
+        self.cpu.periodic_callback = update_peripherals
+        self.cpu.periodic_callback_interval = 63  # Update every raster line (63 cycles/line)
+
         log.info("All ROMs loaded into memory")
 
-        # Set PC from reset vector so C64 is ready to run
-        reset_vector = self.cpu.peek_word(self.RESET_VECTOR_ADDR)
-        log.info(f"Reset vector at ${self.RESET_VECTOR_ADDR:04X}: ${reset_vector:04X}")
-        self.cpu.PC = reset_vector
-        log.info(f"PC initialized to ${self.cpu.PC:04X}")
+        # Note: PC is already set from reset vector by cpu.reset() in main()
+        # The reset() method handles the complete reset sequence including
+        # fetching the vector from $FFFC/$FFFD and setting PC accordingly
+        log.info(f"PC initialized to ${self.cpu.PC:04X} (from reset vector at ${self.RESET_VECTOR_ADDR:04X})")
 
     def init_pygame_display(self) -> bool:
         """Initialize pygame display.
@@ -775,17 +947,21 @@ class C64:
         return load_address
 
     def reset(self) -> None:
-        """Reset the C64 (CPU reset)."""
+        """Reset the C64 (CPU reset).
+
+        The CPU reset() method now handles the complete 6502 reset sequence:
+        - Sets S = 0xFD
+        - Sets P = 0x34 (I flag set, interrupts disabled)
+        - Fetches reset vector from $FFFC/$FFFD
+        - Sets PC to vector value
+        - Consumes 7 cycles
+        """
         log.info("Resetting C64...")
 
+        # CPU reset handles the complete hardware reset sequence
         self.cpu.reset()
 
-        # Read reset vector from KERNAL ROM
-        reset_vector = self.cpu.peek_word(self.RESET_VECTOR_ADDR)
-        log.info(f"Reset vector at ${self.RESET_VECTOR_ADDR:04X}: ${reset_vector:04X}")
-
-        # Set PC to reset vector (property setter will log new value)
-        self.cpu.PC = reset_vector
+        log.info(f"Reset complete: PC=${self.cpu.PC:04X}, S=${self.cpu.S & 0xFF:02X}")
 
     def get_pc_region(self) -> str:
         """Determine which memory region PC is currently in.
@@ -818,113 +994,37 @@ class C64:
             return "???"
 
     def _check_pc_region(self) -> None:
-        """Monitor PC and enable detailed logging when entering BASIC ROM."""
+        """Monitor PC and enable detailed logging when entering BASIC or KERNAL ROM."""
         region = self.get_pc_region()
 
+        # Enable logging when entering KERNAL for the first time (for debugging)
+        # TEMPORARILY DISABLED
+        # if region == "KERNAL" and self.last_pc_region != "KERNAL":
+        #     logging.getLogger("mos6502").setLevel(logging.DEBUG)
+        #     logging.getLogger("mos6502.cpu").setLevel(logging.DEBUG)
+        #     logging.getLogger("mos6502.cpu.flags").setLevel(logging.DEBUG)
+        #     logging.getLogger("mos6502.memory").setLevel(logging.DEBUG)
+        #     logging.getLogger("mos6502.memory.RAM").setLevel(logging.DEBUG)
+        #     logging.getLogger("mos6502.memory.Byte").setLevel(logging.DEBUG)
+        #     logging.getLogger("mos6502.memory.Word").setLevel(logging.DEBUG)
+        #     log.info(f"*** ENTERING KERNAL ROM at ${self.cpu.PC:04X} - Enabling detailed CPU logging ***")
+
         # Enable logging when entering BASIC for the first time
-        if region == "BASIC" and not self.basic_logging_enabled:
-            self.basic_logging_enabled = True
-            logging.getLogger("mos6502").setLevel(logging.DEBUG)
-            logging.getLogger("mos6502.cpu").setLevel(logging.DEBUG)
-            logging.getLogger("mos6502.cpu.flags").setLevel(logging.DEBUG)
-            logging.getLogger("mos6502.memory").setLevel(logging.DEBUG)
-            logging.getLogger("mos6502.memory.RAM").setLevel(logging.DEBUG)
-            logging.getLogger("mos6502.memory.Byte").setLevel(logging.DEBUG)
-            logging.getLogger("mos6502.memory.Word").setLevel(logging.DEBUG)
-            log.info(f"*** ENTERING BASIC ROM at ${self.cpu.PC:04X} - Enabling detailed CPU logging ***")
+        # TEMPORARILY DISABLED
+        # if region == "BASIC" and not self.basic_logging_enabled:
+        #     self.basic_logging_enabled = True
+        #     logging.getLogger("mos6502").setLevel(logging.DEBUG)
+        #     logging.getLogger("mos6502.cpu").setLevel(logging.DEBUG)
+        #     logging.getLogger("mos6502.cpu.flags").setLevel(logging.DEBUG)
+        #     logging.getLogger("mos6502.memory").setLevel(logging.DEBUG)
+        #     logging.getLogger("mos6502.memory.RAM").setLevel(logging.DEBUG)
+        #     logging.getLogger("mos6502.memory.Byte").setLevel(logging.DEBUG)
+        #     logging.getLogger("mos6502.memory.Word").setLevel(logging.DEBUG)
+        #     log.info(f"*** ENTERING BASIC ROM at ${self.cpu.PC:04X} - Enabling detailed CPU logging ***")
 
         self.last_pc_region = region
 
-    def trigger_irq(self) -> None:
-        """Trigger a hardware IRQ on the CPU.
 
-        This simulates pulling the IRQ pin low on the 6502. If interrupts are enabled
-        (I flag is clear), the CPU will:
-        1. Finish current instruction
-        2. Push PC and status to stack
-        3. Set I flag
-        4. Jump to IRQ vector at $FFFE/$FFFF
-        """
-        # Only trigger if interrupts are enabled (I flag clear)
-        if self.cpu.I:
-            return
-
-        # Update VIC state before IRQ (updates raster counter)
-        self.vic.update()
-
-        # For now, always set VIC raster IRQ flag to simulate 60Hz interrupt
-        # The KERNAL IRQ handler will acknowledge this and handle keyboard scanning
-        self.vic.irq_flags |= 0x01  # Set raster IRQ flag
-
-        # Push PC and status onto stack (like BRK but without B flag set)
-        # Push PC high byte
-        self.cpu.write_byte(address=self.cpu.S, data=(self.cpu.PC >> 8) & 0xFF)
-        self.cpu.S = (self.cpu.S - 1) & 0x1FF
-
-        # Push PC low byte
-        self.cpu.write_byte(address=self.cpu.S, data=self.cpu.PC & 0xFF)
-        self.cpu.S = (self.cpu.S - 1) & 0x1FF
-
-        # Push status register (with B flag clear for hardware IRQ)
-        status = self.cpu._flags.value & ~0x10  # Clear B flag
-        self.cpu.write_byte(address=self.cpu.S, data=status)
-        self.cpu.S = (self.cpu.S - 1) & 0x1FF
-
-        # Set I flag to disable further interrupts
-        self.cpu.I = 1
-
-        # Jump to IRQ vector
-        irq_vector = self.cpu.peek_word(0xFFFE)
-        self.cpu.PC = irq_vector
-
-        # Account for IRQ overhead cycles (7 cycles total)
-        self.cpu.tick(7)
-
-        log.debug(f"IRQ triggered: jumping to ${irq_vector:04X}")
-
-    def execute_with_irqs(self, max_cycles: int = INFINITE_CYCLES) -> None:
-        """Execute CPU with periodic IRQ injection.
-
-        This runs the CPU in chunks, checking for and injecting IRQs between chunks.
-        IRQs are triggered at approximately 60Hz (every ~16,500 cycles for NTSC).
-        """
-        cycles_per_frame = self.vic.cycles_per_frame  # ~16,569 for NTSC
-        next_irq_cycle = cycles_per_frame
-
-        log.info(f"Starting execute_with_irqs: max_cycles={max_cycles}, cycles_per_frame={cycles_per_frame}")
-
-        iteration = 0
-        while self.cpu.cycles_executed < max_cycles:
-            # Calculate cycles until next IRQ
-            cycles_executed = self.cpu.cycles_executed
-            cycles_until_irq = next_irq_cycle - cycles_executed
-
-            # Run CPU until next IRQ or a reasonable chunk size
-            cycles_to_run = min(cycles_until_irq, 10000)
-            if cycles_to_run <= 0:
-                cycles_to_run = 100  # Minimum chunk
-
-            iteration += 1
-            if iteration <= 10 or iteration % 100 == 0:
-                log.info(f"Iteration {iteration}: cycles_executed={cycles_executed}, cycles_to_run={cycles_to_run}, next_irq={next_irq_cycle}")
-
-            # Run CPU for this chunk
-            try:
-                self.cpu.execute(cycles=cycles_to_run)
-            except errors.CPUCycleExhaustionError:
-                # Normal - we exhausted the chunk, continue to next chunk
-                pass
-            except Exception as e:
-                log.error(f"Exception in execute(): {e}")
-                raise
-
-            # Check if it's time for an IRQ
-            if self.cpu.cycles_executed >= next_irq_cycle:
-                log.info(f"Triggering IRQ at cycle {self.cpu.cycles_executed}")
-                self.trigger_irq()
-                next_irq_cycle += cycles_per_frame
-
-        log.info(f"execute_with_irqs completed: {self.cpu.cycles_executed} cycles")
 
     def run(self, max_cycles: int = INFINITE_CYCLES) -> None:
         """Run the C64 emulator.
@@ -955,7 +1055,9 @@ class C64:
                 def cpu_thread() -> None:
                     nonlocal cpu_error
                     try:
-                        self.execute_with_irqs(max_cycles=max_cycles)
+                        # IRQs are now handled automatically by the CPU based on irq_pending flag
+                        # No need for separate execute_with_irqs method
+                        self.cpu.execute(cycles=max_cycles)
                     except Exception as e:
                         cpu_error = e
                     finally:
@@ -1005,7 +1107,9 @@ class C64:
                 display_thread.start()
 
                 try:
-                    self.execute_with_irqs(max_cycles=max_cycles)
+                    # IRQs are now handled automatically by the CPU based on irq_pending flag
+                    # No need for separate execute_with_irqs method
+                    self.cpu.execute(cycles=max_cycles)
                 finally:
                     # Stop the display thread
                     stop_display.set()
@@ -1587,6 +1691,11 @@ def main() -> int | None:
         default=2,
         help="Pygame window scaling factor (default: 2 = 640x400)",
     )
+    parser.add_argument(
+        "--no-irq",
+        action="store_true",
+        help="Disable IRQ injection (for debugging; system will hang waiting for IRQs)",
+    )
 
     args = parser.parse_args()
 
@@ -1595,10 +1704,7 @@ def main() -> int | None:
 
     try:
         # Initialize C64
-        c64 = C64(rom_dir=args.rom_dir, display_mode=args.display, scale=args.scale)
-
-        # Reset CPU FIRST (this clears RAM)
-        c64.cpu.reset()
+        c64 = C64(rom_dir=args.rom_dir, display_mode=args.display, scale=args.scale, enable_irq=not args.no_irq)
 
         # Start with minimal logging - will auto-enable when BASIC ROM is entered
         # This avoids flooding the console during KERNAL boot
@@ -1607,11 +1713,20 @@ def main() -> int | None:
         logging.getLogger("mos6502.cpu.flags").setLevel(logging.CRITICAL)
         log.info("CPU logging will enable when BASIC ROM is entered")
 
-        # Then load ROMs (after RAM is cleared)
+        # Load ROMs first (if using C64 ROMs)
         # This creates the VIC which is needed for pygame initialization
-        # load_roms() also initializes PC from reset vector
         if not args.no_roms:
             c64.load_roms()
+
+        # Reset CPU AFTER ROMs are loaded so reset vector can be read correctly
+        # This implements the complete 6502 reset sequence:
+        # - Clears RAM to 0xFF
+        # - Sets S = 0xFD
+        # - Sets P = 0x34 (I=1, interrupts disabled)
+        # - Reads reset vector from $FFFC/$FFFD
+        # - Sets PC to vector value
+        # - Consumes 7 cycles
+        c64.cpu.reset()
 
         # Initialize pygame AFTER VIC is created
         if args.display == "pygame":

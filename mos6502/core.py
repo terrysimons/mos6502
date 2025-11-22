@@ -85,6 +85,16 @@ class MOS6502CPU(flags.ProcessorStatusFlagsInterface):
         self.cycles = 0
         self.cycles_executed: Literal[0] = 0
 
+        # Hardware interrupt request line (IRQ pin)
+        # Set by external hardware (VIC, CIA, etc.) to request an interrupt
+        # Checked by CPU between instructions
+        self.irq_pending: bool = False
+
+        # Optional callback for periodic system updates (e.g., VIC raster counter)
+        # Called every N instructions to allow external hardware to update state
+        self.periodic_callback: callable = None
+        self.periodic_callback_interval: int = 100  # Call every 100 instructions
+
     @property
     def variant(self: Self) -> variants.CPUVariant:
         """Return the CPU variant being emulated."""
@@ -1202,6 +1212,58 @@ class MOS6502CPU(flags.ProcessorStatusFlagsInterface):
                     f"Illegal instruction: 0x{int(instruction):02X}"
                 )
 
+            # Periodically call system update callback (e.g., VIC raster updates)
+            # This allows external hardware to check cycle count and trigger IRQs
+            if self.periodic_callback and (self.cycles_executed % self.periodic_callback_interval == 0):
+                self.periodic_callback()
+
+            # Check for pending hardware IRQ between instructions (after instruction completes)
+            # This is when the real 6502 samples the IRQ line
+            if self.irq_pending and not self.I:
+                self._handle_irq()
+
+    def _handle_irq(self: Self) -> None:
+        """Handle a pending hardware IRQ.
+
+        This implements the 6502 IRQ sequence:
+        1. Push PC (2 bytes) to stack
+        2. Push P (status register) to stack with B flag clear
+        3. Set I flag to disable further interrupts
+        4. Load PC from IRQ vector at $FFFE/$FFFF
+        5. Clear the irq_pending flag
+
+        Total: 7 cycles
+        """
+        # Clear the pending flag first
+        self.irq_pending = False
+
+        # Push PC to stack (high byte first)
+        pc_high = (self.PC >> 8) & 0xFF
+        pc_low = self.PC & 0xFF
+
+        self.ram[self.S] = pc_high
+        self.S -= 1
+        self.spend_cpu_cycles(1)
+
+        self.ram[self.S] = pc_low
+        self.S -= 1
+        self.spend_cpu_cycles(1)
+
+        # Push status register with B flag CLEAR (hardware IRQ, not BRK)
+        status = self._flags.value & ~0x10
+        self.ram[self.S] = status
+        self.S -= 1
+        self.spend_cpu_cycles(1)
+
+        # Set I flag to disable further interrupts
+        self.I = 1
+
+        # Load PC from IRQ vector at $FFFE/$FFFF
+        irq_vector = self.read_word(0xFFFE)
+        self.PC = irq_vector
+
+        self.log.debug(f"IRQ handled: jumping to ${irq_vector:04X}")
+
     def push_pc_to_stack(self: Self) -> None:
         """Push the PC to the stack."""
 
@@ -1211,32 +1273,72 @@ class MOS6502CPU(flags.ProcessorStatusFlagsInterface):
 
         It is necessary to call this method before executing instructions.
 
-        The PC and S need to be set up.
-        This also clears CPU flags and registers and initializes RAM to 0s.
+        This implements the actual 6502 reset sequence:
+        - Cycle 1: Internal operations
+        - Cycle 2-3: Fetch reset vector from $FFFC/$FFFD
+        - Additional cycles for internal setup
+        Total: ~7 cycles consumed
+
+        Hardware behavior (NMOS 6502):
+        - S set to 0xFD
+        - P set to 0x34 (I flag = 1, bit 5 = 1, D = 0)
+        - PC loaded from reset vector at $FFFC/$FFFD
+        - A, X, Y undefined (we zero them for consistency)
         """
         self.log.info("Reset")
-        self.PC: Word = Word(0xFFFC, endianness=self.endianness)
-        self.S: Word = Word(0x01FF, endianness=self.endianness)
 
-        # CPU Status Flags
-        #
-        # Note we use a full byte per status flag
-        # to optimize the operations that occur
-        # on them.  See flags.py
-        self.C: Byte = Byte(0x00, endianness=self.endianness)
-        self.Z: Byte = Byte(0x00, endianness=self.endianness)
-        self.I: Byte = Byte(0x00, endianness=self.endianness)
-        self.D: Byte = Byte(0x00, endianness=self.endianness)
-        self.B: Byte = Byte(0x00, endianness=self.endianness)
-        self.V: Byte = Byte(0x00, endianness=self.endianness)
-        self.N: Byte = Byte(0x00, endianness=self.endianness)
-
-        # 1 Byte Registers
-        self.A: Byte = Byte(0x0, endianness=self.endianness)
-        self.X: Byte = Byte(0x0, endianness=self.endianness)
-        self.Y: Byte = Byte(0x0, endianness=self.endianness)
-
+        # Initialize RAM first (before reading reset vector)
         self.ram.initialize()
+
+        # VARIANT: 6502 - Stack pointer set to 0xFD during reset
+        # VARIANT: 65C02 - Same behavior as 6502
+        # VARIANT: 65C816 - Same behavior as 6502 (8-bit mode)
+        # The stack pointer is stored with 0x0100 offset for convenience
+        self.S: Word = Word(0x01FD, endianness=self.endianness)
+
+        # VARIANT: 6502 - Status register set to 0x34 on reset
+        # VARIANT: 65C02 - Same as 6502 (I=1, bit5=1, D=0)
+        # VARIANT: 65C816 - Same in emulation mode
+        # Bit 5 is always set (unused bit) - handled by FlagsRegister
+        # I flag (bit 2) is set to disable interrupts
+        # D flag (bit 3) is cleared (decimal mode off)
+        # Other flags are undefined/don't care (we zero them)
+        self.C = 0
+        self.Z = 0
+        self.I = 1  # Interrupts disabled
+        self.D = 0  # Decimal mode off
+        self.B = 0
+        self.V = 0
+        self.N = 0
+
+        # 1 Byte Registers - undefined on real hardware, we zero them
+        self.A = 0
+        self.X = 0
+        self.Y = 0
+
+        # VARIANT: 6502 - Reset vector fetch from $FFFC/$FFFD (cycles 2-3)
+        # VARIANT: 65C02 - Same as 6502
+        # VARIANT: 65C816 - Uses $FFFC/$FFFD in emulation mode
+        # Cycle 1: Internal operations (implicit above)
+        # Cycles 2-3: Fetch reset vector
+        reset_vector_addr = 0xFFFC
+
+        # Fetch low byte of reset vector (cycle 2)
+        # Note: We use peek_word which doesn't consume cycles
+        # We'll manually account for the reset sequence cycles below
+        reset_vector = self.peek_word(reset_vector_addr)
+
+        # Set PC to the reset vector value
+        self.PC: Word = Word(reset_vector, endianness=self.endianness)
+
+        # VARIANT: 6502 - Reset sequence consumes 7 cycles total
+        # VARIANT: 65C02 - Same as 6502
+        # VARIANT: 65C816 - Same in emulation mode
+        # Account for reset sequence cycles: 7 total
+        # (internal ops + vector fetch + setup)
+        self.cycles_executed += 7
+
+        self.log.info(f"Reset complete: PC=${self.PC:04X}, S=${self.S & 0xFF:02X}, P=0x34, 7 cycles consumed")
 
     @property
     def flags(self: Self) -> Byte:
