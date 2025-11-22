@@ -116,15 +116,42 @@ class C64:
         def read(self, addr) -> int:
             reg = addr & 0x0F
 
-            # Port A ($DC00) — keyboard matrix columns (read)
-            if reg == 0x00:
-                return self._read_keyboard_port()
+            # Debug: log all port reads
+            if reg == 0x00 or reg == 0x01:
+                log.info(f"*** CIA1 READ reg ${reg:02X} ***")
 
-            # Port B ($DC01) — keyboard matrix rows (read back what was written)
+            # Port A ($DC00) — keyboard matrix row selection (write) / read back
+            if reg == 0x00:
+                # Reading respects DDR: bits set as output (1) return port_a value
+                # bits set as input (0) would return external pins (just return 0xFF for now)
+                result = (self.port_a & self.ddr_a) | (0xFF & ~self.ddr_a)
+                return result
+
+            # Port B ($DC01) — keyboard matrix column sensing (read)
+            # This is where the keyboard magic happens!
             if reg == 0x01:
-                # Return port B value (KERNAL can read back what it wrote)
-                # Also includes joystick bits if we implement that
-                return self.port_b
+                # Start with all bits high (no keys pressed)
+                ext = 0xFF
+
+                # Row pattern is on Port A output lines (active-low: 0 = row selected)
+                row_pattern = self.port_a & self.ddr_a  # Only use output bits from Port A
+
+                # For each row, check if it's selected
+                for row in range(8):
+                    if not (row_pattern & (1 << row)):  # This row is selected (bit=0)
+                        # For each column in this row
+                        for col in range(8):
+                            # Check if key at [row][col] is pressed
+                            # keyboard_matrix[row] is a byte: 0 bit = pressed, 1 bit = released
+                            if not (self.keyboard_matrix[row] & (1 << col)):  # Key is pressed (bit=0)
+                                # Pressed key pulls that column line low
+                                ext &= ~(1 << col)
+
+                # Mix CIA output vs input like for port A
+                result = (self.port_b & self.ddr_b) | (ext & ~self.ddr_b)
+                if result != 0xFF:  # Only log when a key might be detected
+                    log.info(f"*** CIA1 Port B READ: result=${result:02X}, port_a=${self.port_a:02X}, ddr_b=${self.ddr_b:02X} ***")
+                return result & 0xFF
 
             # Port A DDR ($DC02)
             if reg == 0x02:
@@ -157,11 +184,13 @@ class C64:
                 # Set bit 7 if any enabled interrupt has occurred
                 if result & self.icr_mask:
                     result |= 0x80
+                # Log ICR reads
+                log.info(f"*** CIA1 ICR READ: data=${self.icr_data:02X}, result=${result:02X}, clearing ICR but NOT cpu.irq_pending ***")
                 # Clear interrupt data after read
                 self.icr_data = 0x00
-                # Clear CPU IRQ if no more interrupts pending
-                if result & 0x80:
-                    self.cpu.irq_pending = False
+                # NOTE: Do NOT clear cpu.irq_pending here! The CPU's IRQ handling mechanism
+                # should manage irq_pending. The CIA ICR read only acknowledges the CIA's interrupt.
+                # The CPU will clear irq_pending when the IRQ handler is called or when no interrupts remain.
                 return result
 
             # Return stored register contents for other registers
@@ -177,15 +206,20 @@ class C64:
 
             # Port B ($DC01) — keyboard row selection (KERNAL writes here)
             if reg == 0x01:
+                old_port_b = self.port_b
                 self.port_b = value
+                if old_port_b != value:
+                    log.info(f"*** CIA1 Port B (keyboard row select): ${value:02X} ***")
 
             # Port A DDR ($DC02)
             if reg == 0x02:
                 self.ddr_a = value
+                log.info(f"*** CIA1 Port A DDR: ${value:02X} (0=input, 1=output) ***")
 
             # Port B DDR ($DC03)
             if reg == 0x03:
                 self.ddr_b = value
+                log.info(f"*** CIA1 Port B DDR: ${value:02X} (0=input, 1=output) ***")
 
             # Timer A Low Byte ($DC04)
             if reg == 0x04:
@@ -243,6 +277,10 @@ class C64:
 
             # Update Timer A
             if self.timer_a_running and cycles_elapsed > 0:
+                # Log every 1000 cycles to monitor timer countdown
+                if self.cpu.cycles_executed % 10000 < 100:
+                    log.info(f"*** CIA1 Timer A: counter=${self.timer_a_counter:04X}, latch=${self.timer_a_latch:04X}, cycles_elapsed={cycles_elapsed} ***")
+
                 # Count down by elapsed cycles
                 if self.timer_a_counter >= cycles_elapsed:
                     self.timer_a_counter -= cycles_elapsed
@@ -253,11 +291,11 @@ class C64:
 
                     # Trigger Timer A interrupt (bit 0)
                     self.icr_data |= 0x01
+                    # log.info(f"*** CIA1 Timer A UNDERFLOW: Triggering IRQ, counter reloaded to ${self.timer_a_counter:04X}, cycles={self.cpu.cycles_executed} ***")
 
                     # If Timer A interrupts are enabled, signal CPU IRQ
                     if self.icr_mask & 0x01:
                         self.cpu.irq_pending = True
-                        log.info(f"*** CIA1 Timer A UNDERFLOW: Triggering IRQ, counter reloaded to ${self.timer_a_counter:04X}, cycles={self.cpu.cycles_executed} ***")
 
             # Update Timer B (similar logic)
             if self.timer_b_running and cycles_elapsed > 0:
@@ -624,27 +662,32 @@ class C64:
                 # Bits with DDR=0 read as 1
                 return (self.port | (~self.ddr)) & 0xFF
 
-            # Memory banking logic
+            # $0002-$9FFF is ALWAYS RAM (never banked on C64)
+            # This includes zero page, stack, KERNAL/BASIC working storage, and screen RAM
+            if 0x0002 <= addr <= 0x9FFF:
+                return self._read_ram_direct(addr)
+
+            # Memory banking logic (only applies to $A000-$FFFF)
             io_enabled = self.port & 0b00000100
             basic_enabled = self.port & 0b00000001
             kernal_enabled = self.port & 0b00000010
 
-            # BASIC ROM
+            # BASIC ROM ($A000-$BFFF)
             if C64.BASIC_ROM_START <= addr <= C64.BASIC_ROM_END and basic_enabled:
                 return self.basic[addr - C64.BASIC_ROM_START]
 
-            # KERNAL ROM
+            # KERNAL ROM ($E000-$FFFF)
             if C64.KERNAL_ROM_START <= addr <= C64.KERNAL_ROM_END and kernal_enabled:
                 return self.kernal[addr - C64.KERNAL_ROM_START]
 
-            # I/O or CHAR ROM
+            # I/O or CHAR ROM ($D000-$DFFF)
             if C64.CHAR_ROM_START <= addr <= C64.CHAR_ROM_END:
                 if io_enabled:
                     return self._read_io_area(addr)
                 else:
                     return self.char[addr - C64.CHAR_ROM_START]
 
-            # RAM fallback
+            # RAM fallback (for $A000-$FFFF when banking is off)
             return self._read_ram_direct(addr)
 
         def _write_io_area(self, addr: int, value: int) -> None:
@@ -679,17 +722,25 @@ class C64:
                 self.port = value & 0xFF
                 return
 
-            # Memory banking logic
+            # $0002-$9FFF is ALWAYS RAM (never banked on C64)
+            # This includes zero page, stack, KERNAL/BASIC working storage, and screen RAM
+            if 0x0002 <= addr <= 0x9FFF:
+                # Log writes to jiffy clock ($A0-$A2)
+                if 0xA0 <= addr <= 0xA2:
+                    log.info(f"*** JIFFY CLOCK WRITE: addr=${addr:04X}, value=${value:02X} ***")
+                self._write_ram_direct(addr, value & 0xFF)
+                return
+
+            # Memory banking logic (only applies to $A000-$FFFF)
             io_enabled = self.port & 0b00000100
 
-            # I/O area
+            # I/O area ($D000-$DFFF)
             if C64.CHAR_ROM_START <= addr <= C64.CHAR_ROM_END and io_enabled:
                 self._write_io_area(addr, value)
                 return
 
-            # Can't write to ROM areas (BASIC/KERNAL/CHAR)
-            # But we can write to underlying RAM which may be visible later
-            # For simplicity, just write to RAM - banking will handle visibility
+            # Writes to $A000-$FFFF always go to underlying RAM
+            # (Even if ROM/I/O is visible for reads, writes always go to RAM)
             self._write_ram_direct(addr, value & 0xFF)
 
 
@@ -996,6 +1047,22 @@ class C64:
     def _check_pc_region(self) -> None:
         """Monitor PC and enable detailed logging when entering BASIC or KERNAL ROM."""
         region = self.get_pc_region()
+
+        # Track important PC locations
+        pc = self.cpu.PC
+
+        # Log when we reach BASIC input loop at $A7AE
+        if pc == 0xA7AE and not hasattr(self, '_logged_a7ae'):
+            self._logged_a7ae = True
+            log.info(f"*** REACHED BASIC INPUT LOOP at $A7AE ***")
+
+        # Log when stuck at KERNAL idle loop ($E5CF-$E5D2)
+        if 0xE5CF <= pc <= 0xE5D2:
+            if not hasattr(self, '_e5cf_count'):
+                self._e5cf_count = 0
+            self._e5cf_count += 1
+            if self._e5cf_count % 10000 == 0:
+                log.info(f"*** Still in KERNAL idle loop at ${pc:04X} (count={self._e5cf_count}) ***")
 
         # Enable logging when entering KERNAL for the first time (for debugging)
         # TEMPORARILY DISABLED
@@ -1484,10 +1551,14 @@ class C64:
             if event.key in key_map:
                 row, col = key_map[event.key]
                 self.cia1.press_key(row, col)
+                log.info(f"*** KEY PRESSED: pygame key {event.key}, row={row}, col={col} ***")
+            else:
+                log.info(f"*** UNMAPPED KEY PRESSED: pygame key {event.key} ***")
         elif event.type == pygame.KEYUP:
             if event.key in key_map:
                 row, col = key_map[event.key]
                 self.cia1.release_key(row, col)
+                log.info(f"*** KEY RELEASED: pygame key {event.key}, row={row}, col={col} ***")
 
     def _render_pygame(self) -> None:
         """Render C64 screen to pygame window."""
@@ -1709,7 +1780,6 @@ def main() -> int | None:
         # Start with minimal logging - will auto-enable when BASIC ROM is entered
         # This avoids flooding the console during KERNAL boot
         logging.getLogger("mos6502").setLevel(logging.CRITICAL)
-        # Also disable flag logging during KERNAL boot
         logging.getLogger("mos6502.cpu.flags").setLevel(logging.CRITICAL)
         log.info("CPU logging will enable when BASIC ROM is entered")
 

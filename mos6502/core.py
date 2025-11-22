@@ -1260,9 +1260,10 @@ class MOS6502CPU(flags.ProcessorStatusFlagsInterface):
 
         # Load PC from IRQ vector at $FFFE/$FFFF
         irq_vector = self.read_word(0xFFFE)
+        old_pc = self.PC
         self.PC = irq_vector
 
-        self.log.debug(f"IRQ handled: jumping to ${irq_vector:04X}")
+        self.log.info(f"*** IRQ HANDLER CALLED: PC ${old_pc:04X} -> ${irq_vector:04X}, I flag now set ***")
 
     def push_pc_to_stack(self: Self) -> None:
         """Push the PC to the stack."""
