@@ -101,8 +101,8 @@ class C64:
             self.joystick_2 = 0xFF  # All released (bits high)
 
             # Port values
-            self.port_a = 0xFF  # Columns (input)
-            self.port_b = 0xFF  # Rows (output)
+            self.port_a = 0xFF  # Rows (written by KERNAL to select which rows to scan)
+            self.port_b = 0xFF  # Columns (read by KERNAL to get key states)
 
             # Data Direction Registers
             # 0 = input, 1 = output
@@ -129,7 +129,9 @@ class C64:
         def read(self, addr) -> int:
             reg = addr & 0x0F
 
-            # Port A ($DC00) — keyboard matrix row selection (write) / joystick 2 (read)
+            # Port A ($DC00) — keyboard matrix row selection
+            # WRITE: KERNAL writes row selection bits (active low)
+            # READ: Returns row bits, with input rows pulled low if keys pressed
             if reg == 0x00:
                 # Start with all input row bits HIGH (pulled up externally)
                 port_a_ext = 0xFF
@@ -154,7 +156,9 @@ class C64:
                 result = (self.port_a & self.ddr_a) | (ext_combined & ~self.ddr_a)
                 return result
 
-            # Port B ($DC01) — keyboard matrix column sensing (read) / joystick 1 (read)
+            # Port B ($DC01) — keyboard matrix column sensing
+            # READ: KERNAL reads column bits to detect which keys are pressed in selected rows
+            # Each column bit is pulled low (0) if any key in that column is pressed in a selected row
             # This is where the keyboard magic happens!
             if reg == 0x01:
                 # Start with keyboard matrix scan
@@ -288,14 +292,16 @@ class C64:
             reg = addr & 0x0F
             self.regs[reg] = value
 
-            # Port A ($DC00) — keyboard row selection (KERNAL writes here)
+            # Port A ($DC00) — keyboard row selection
+            # KERNAL writes here to select which row(s) to scan (active low)
             if reg == 0x00:
                 old_port_a = self.port_a
                 self.port_a = value
                 if old_port_a != value and DEBUG_CIA:
                     log.info(f"*** CIA1 Port A WRITE (row select): ${value:02X} ***")
 
-            # Port B ($DC01) — keyboard column sensing (stored but typically not written)
+            # Port B ($DC01) — keyboard column sensing
+            # Typically read-only for keyboard, but can be written (value used in output mixing)
             if reg == 0x01:
                 old_port_b = self.port_b
                 self.port_b = value
@@ -412,16 +418,16 @@ class C64:
             """Read keyboard matrix columns based on selected rows.
 
             The C64 keyboard is an 8x8 matrix:
-            - KERNAL writes to Port B ($DC01) to select row(s) - active low
-            - KERNAL reads from Port A ($DC00) to get column states - active low
+            - KERNAL writes to Port A ($DC00) to select row(s) - active low
+            - KERNAL reads from Port B ($DC01) to get column states - active low
             - 0 = pressed, 1 = released
 
             The KERNAL typically scans one row at a time by setting one bit low.
             But it can also scan multiple rows simultaneously (all bits low = scan all rows).
             """
-            # Port B contains the row selection (active low)
+            # Port A contains the row selection (active low)
             # Each bit low = scan that row
-            selected_rows = ~self.port_b & 0xFF
+            selected_rows = ~self.port_a & 0xFF
 
             # Start with all columns high (no keys)
             result = 0xFF
