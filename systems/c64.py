@@ -12,6 +12,12 @@ from mos6502.memory import Byte, Word
 
 logging.basicConfig(level=logging.DEBUG)
 log = logging.getLogger("c64")
+
+# Debug flags - set to False to reduce log verbosity
+DEBUG_CIA = False      # CIA register reads/writes
+DEBUG_VIC = False      # VIC register operations
+DEBUG_JIFFY = False    # Jiffy clock updates
+DEBUG_KEYBOARD = False # Keyboard events
 COLORS = [
     (0x00, 0x00, 0x00),   # 0  Black
     (0xFF, 0xFF, 0xFF),   # 1  White
@@ -195,13 +201,14 @@ class C64:
                                 # Pressed key pulls that column line low
                                 keyboard_ext &= ~(1 << col)
 
-                                # Get key name for this matrix position
-                                key_name = self._get_key_name(row, col)
+                                if DEBUG_KEYBOARD:
+                                    # Get key name for this matrix position
+                                    key_name = self._get_key_name(row, col)
 
-                                if row_is_output:
-                                    log.info(f"*** MATRIX: row={row}, col={col} ({key_name}), matrix[{row}]=${self.keyboard_matrix[row]:02X}, keyboard_ext now=${keyboard_ext:02X} ***")
-                                else:
-                                    log.info(f"*** MATRIX (INPUT ROW): row={row}, col={col} ({key_name}), keyboard_ext now=${keyboard_ext:02X} ***")
+                                    if row_is_output:
+                                        log.info(f"*** MATRIX: row={row}, col={col} ({key_name}), matrix[{row}]=${self.keyboard_matrix[row]:02X}, keyboard_ext now=${keyboard_ext:02X} ***")
+                                    else:
+                                        log.info(f"*** MATRIX (INPUT ROW): row={row}, col={col} ({key_name}), keyboard_ext now=${keyboard_ext:02X} ***")
 
                 # Combine keyboard and joystick 1 inputs (both active low, so AND them)
                 # Joystick 1 only affects bits 0-4 (Up, Down, Left, Right, Fire)
@@ -229,7 +236,8 @@ class C64:
                             cols_detected.append(c)
                     cols_str = ",".join(str(c) for c in cols_detected) if cols_detected else "none"
 
-                    log.info(f"*** CIA1 Port B READ: result=${result:02X}, rows_scanned=[{rows_str}], cols_detected=[{cols_str}], port_a=${self.port_a:02X}, ddr_a=${self.ddr_a:02X}, port_b=${self.port_b:02X}, ddr_b=${self.ddr_b:02X}, keyboard_ext=${keyboard_ext:02X}, joystick_1=${self.joystick_1:02X} ***")
+                    if DEBUG_CIA:
+                        log.info(f"*** CIA1 Port B READ: result=${result:02X}, rows_scanned=[{rows_str}], cols_detected=[{cols_str}], port_a=${self.port_a:02X}, ddr_a=${self.ddr_a:02X}, port_b=${self.port_b:02X}, ddr_b=${self.ddr_b:02X}, keyboard_ext=${keyboard_ext:02X}, joystick_1=${self.joystick_1:02X} ***")
                 return result & 0xFF
 
             # Port A DDR ($DC02)
@@ -264,7 +272,8 @@ class C64:
                 if result & self.icr_mask:
                     result |= 0x80
                 # Log ICR reads
-                log.info(f"*** CIA1 ICR READ: data=${self.icr_data:02X}, result=${result:02X}, clearing ICR but NOT cpu.irq_pending ***")
+                if DEBUG_CIA:
+                    log.info(f"*** CIA1 ICR READ: data=${self.icr_data:02X}, result=${result:02X}, clearing ICR but NOT cpu.irq_pending ***")
                 # Clear interrupt data after read
                 self.icr_data = 0x00
                 # NOTE: Do NOT clear cpu.irq_pending here! The CPU's IRQ handling mechanism
@@ -283,7 +292,7 @@ class C64:
             if reg == 0x00:
                 old_port_a = self.port_a
                 self.port_a = value
-                if old_port_a != value:
+                if old_port_a != value and DEBUG_CIA:
                     log.info(f"*** CIA1 Port A WRITE (row select): ${value:02X} ***")
 
             # Port B ($DC01) — keyboard column sensing (stored but typically not written)
@@ -535,7 +544,8 @@ class C64:
                 old_value = self.keyboard_matrix[row]
                 self.keyboard_matrix[row] &= ~(1 << col)
                 new_value = self.keyboard_matrix[row]
-                log.info(f"*** PRESS_KEY: row={row}, col={col}, matrix[{row}]: ${old_value:02X} -> ${new_value:02X} ***")
+                if DEBUG_KEYBOARD:
+                    log.info(f"*** PRESS_KEY: row={row}, col={col}, matrix[{row}]: ${old_value:02X} -> ${new_value:02X} ***")
 
         def release_key(self, row: int, col: int) -> None:
             """Release a key at the given matrix position.
@@ -573,11 +583,6 @@ class C64:
             self.cpu = cpu
 
             # Set default VIC register values (C64 power-on state)
-            # $D018: Memory Control - Screen at $0400, Char ROM at $1000
-            # Bits 4-7 = 0001 (screen at 1*$400 = $0400)
-            # Bits 1-3 = 010 (char at 2*$800 = $1000)
-            self.regs[0x18] = 0x14  # 0001 0100 binary
-
             # $D020: Border color - Default light blue (14)
             self.regs[0x20] = 0x0E  # Light blue
 
@@ -616,6 +621,13 @@ class C64:
             # Track initialization state
             self.initialized = False
 
+            # Set $D018 as the VERY LAST thing to ensure nothing overwrites it
+            # $D018: Memory Control - Screen at $0400, Char ROM at $1000
+            # Bits 4-7 = 0001 (screen at 1*$400 = $0400)
+            # Bits 1-3 = 010 (char at 2*$800 = $1000)
+            self.regs[0x18] = 0x14  # 0001 0100 binary
+            log.info(f"*** VIC INIT: Set $D018 = ${self.regs[0x18]:02X} (screen=$0400, char=$1000) ***")
+
             self.log.info("VIC-II initialized (NTSC: 263 lines, 63 cycles/line)")
 
         def update(self) -> None:
@@ -652,6 +664,13 @@ class C64:
                 self.update()
                 return self.current_raster & 0xFF
 
+            # $D018: Memory control register - log when read
+            if reg == 0x18:
+                val = self.regs[reg]
+                screen_addr = ((val & 0xF0) >> 4) * 0x0400
+                char_offset = ((val & 0x0E) >> 1) * 0x0800
+                log.info(f"*** VIC $D018 READ: value=${val:02X}, screen=${screen_addr:04X}, char_offset=${char_offset:04X} ***")
+
             # $D019: Interrupt flags (read and acknowledge)
             if reg == 0x19:
                 # Return current flags with bit 7 set if any enabled IRQ is active
@@ -681,7 +700,7 @@ class C64:
             if reg == 0x18:
                 screen_addr = ((val & 0xF0) >> 4) * 0x0400
                 char_offset = ((val & 0x0E) >> 1) * 0x0800
-                self.log.debug(f"VIC $D018 = ${val:02X}: screen=${screen_addr:04X}, char_offset=${char_offset:04X}")
+                log.info(f"*** VIC $D018 WRITE: value=${val:02X}, screen=${screen_addr:04X}, char_offset=${char_offset:04X} ***")
 
             # $D019: Interrupt flags - writing 1 to a bit CLEARS it (acknowledge)
             if reg == 0x19:
@@ -732,8 +751,11 @@ class C64:
             #   Default: 010 = 2 * 2048 = 0x1000 (but points to ROM, not RAM)
             mem_control = self.regs[0x18]
 
-            # Screen memory base address
+            # DEBUG: Log what we're using for rendering
             screen_base = ((mem_control & 0xF0) >> 4) * 0x0400
+            log.info(f"*** VIC RENDER_FRAME: $D018=${mem_control:02X}, screen_base=${screen_base:04X} ***")
+
+            # Screen memory base address (recalculate for clarity)
 
             # Character ROM bank selection
             char_bank_offset = ((mem_control & 0x0E) >> 1) * 0x0800
@@ -911,8 +933,11 @@ class C64:
             # This includes zero page, stack, KERNAL/BASIC working storage, and screen RAM
             if 0x0002 <= addr <= 0x9FFF:
                 # Log writes to jiffy clock ($A0-$A2)
-                if 0xA0 <= addr <= 0xA2:
+                if 0xA0 <= addr <= 0xA2 and DEBUG_JIFFY:
                     log.info(f"*** JIFFY CLOCK WRITE: addr=${addr:04X}, value=${value:02X} ***")
+                # DEBUG: Log first few writes to screen RAM
+                if 0x0400 <= addr <= 0x0410:
+                    log.info(f"*** SCREEN RAM WRITE: addr=${addr:04X}, value=${value:02X} (PETSCII) ***")
                 self._write_ram_direct(addr, value & 0xFF)
                 return
 
@@ -1049,8 +1074,11 @@ class C64:
         self._write_rom_to_memory(self.BASIC_ROM_START, self.basic_rom)
         self._write_rom_to_memory(self.KERNAL_ROM_START, self.kernal_rom)
 
-        if self.char_rom:
-            self._write_rom_to_memory(self.CHAR_ROM_START, self.char_rom)
+        # DON'T write CHAR ROM to CPU RAM at $D000-$DFFF! This overlaps with VIC I/O space.
+        # The char ROM is accessed through the memory read handler when I/O is disabled (bit 2 of $0001).
+        # Writing it here corrupts VIC registers like $D018 during initialization.
+        # if self.char_rom:
+        #     self._write_rom_to_memory(self.CHAR_ROM_START, self.char_rom)
 
 
         # Now set up the CIA1 and CIA2 and VIC
@@ -1713,7 +1741,8 @@ class C64:
             pygame.K_COMMA: (5, 7),      # ,
 
             # Row 6
-            # pygame.K_POUND: (6, 0),    # £ (not on US keyboard)
+            # pygame.K_POUND: (6, 0),    # £ (pound symbol on C64, no direct US keyboard equivalent)
+            pygame.K_QUOTE: (3, 0),      # Map to '7' key - SHIFT+7 produces apostrophe on C64
             pygame.K_ASTERISK: (6, 1),   # *
             pygame.K_SEMICOLON: (6, 2),  # ;
             pygame.K_HOME: (6, 3),       # HOME/CLR
@@ -1727,6 +1756,7 @@ class C64:
             pygame.K_LEFT: (7, 1),       # ← (CRSR left, using arrow key)
             pygame.K_LCTRL: (7, 2),      # CTRL
             pygame.K_2: (7, 3),
+            pygame.K_QUOTEDBL: (7, 3),   # " (double quote) - same as '2' key (SHIFT+2 on C64)
             pygame.K_SPACE: (7, 4),      # SPACE
             # pygame.K_COMMODORE: (7, 5), # C= (no pygame equivalent)
             pygame.K_q: (7, 6),
@@ -1747,16 +1777,41 @@ class C64:
 
             if event.key in key_map:
                 row, col = key_map[event.key]
-                self.cia1.press_key(row, col)
-                petscii_key = self.cia1._get_key_name(row, col)
-                log.info(f"*** KEYDOWN: pygame='{key_name}' (code={event.key}), ASCII='{ascii_char}' (0x{ascii_code:02X}), matrix position=({row},{col}), PETSCII={petscii_key} ***")
+
+                # Special handling for quote keys - also press SHIFT
+                if event.key == pygame.K_QUOTE:
+                    # Press LEFT SHIFT (row 1, col 7) along with the key
+                    self.cia1.press_key(1, 7)  # SHIFT
+                    self.cia1.press_key(row, col)  # '7' key
+                elif event.key == pygame.K_QUOTEDBL:
+                    # Press LEFT SHIFT (row 1, col 7) along with the key
+                    self.cia1.press_key(1, 7)  # SHIFT
+                    self.cia1.press_key(row, col)  # '2' key
+                else:
+                    self.cia1.press_key(row, col)
+
+                if DEBUG_KEYBOARD:
+                    petscii_key = self.cia1._get_key_name(row, col)
+                    log.info(f"*** KEYDOWN: pygame='{key_name}' (code={event.key}), ASCII='{ascii_char}' (0x{ascii_code:02X}), matrix position=({row},{col}), PETSCII={petscii_key} ***")
             else:
-                log.info(f"*** UNMAPPED KEYDOWN: pygame='{key_name}' (code={event.key}), ASCII='{ascii_char}' ***")
+                if DEBUG_KEYBOARD:
+                    log.info(f"*** UNMAPPED KEYDOWN: pygame='{key_name}' (code={event.key}), ASCII='{ascii_char}' ***")
         elif event.type == pygame.KEYUP:
             if event.key in key_map:
                 row, col = key_map[event.key]
-                self.cia1.release_key(row, col)
-                log.info(f"*** KEY RELEASED: pygame key {event.key}, row={row}, col={col} ***")
+
+                # Special handling for quote keys - also release SHIFT
+                if event.key == pygame.K_QUOTE:
+                    self.cia1.release_key(1, 7)  # SHIFT
+                    self.cia1.release_key(row, col)  # '7' key
+                elif event.key == pygame.K_QUOTEDBL:
+                    self.cia1.release_key(1, 7)  # SHIFT
+                    self.cia1.release_key(row, col)  # '2' key
+                else:
+                    self.cia1.release_key(row, col)
+
+                if DEBUG_KEYBOARD:
+                    log.info(f"*** KEY RELEASED: pygame key {event.key}, row={row}, col={col} ***")
 
     def _render_pygame(self) -> None:
         """Render C64 screen to pygame window."""
@@ -1775,7 +1830,8 @@ class C64:
                     import sys
                     sys.exit(0)
                 elif event.type == pygame.KEYDOWN:
-                    log.info(f"*** PYGAME KEYDOWN EVENT: key={event.key} ***")
+                    if DEBUG_KEYBOARD:
+                        log.info(f"*** PYGAME KEYDOWN EVENT: key={event.key} ***")
                     self._handle_pygame_keyboard(event, pygame)
                 elif event.type == pygame.KEYUP:
                     self._handle_pygame_keyboard(event, pygame)
