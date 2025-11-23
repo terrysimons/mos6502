@@ -582,6 +582,23 @@ class C64:
             self.char_rom = char_rom
             self.cpu = cpu
 
+            # $D011: Control register 1
+            # Power-on value = %00011011 = $1B
+            self.regs[0x11] = 0x1B
+
+            # $D012: Raster low byte
+            self.regs[0x12] = 0x00
+
+            # $D015: Sprite enable
+            self.regs[0x15] = 0x00
+
+            # $D016: Control register 2
+            # Power-on value = %00001000 = $08
+            self.regs[0x16] = 0x08
+
+            # $D017: Sprite Y expansion
+            self.regs[0x17] = 0x00
+
             # Set default VIC register values (C64 power-on state)
             # $D020: Border color - Default light blue (14)
             self.regs[0x20] = 0x0E  # Light blue
