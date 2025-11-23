@@ -22,8 +22,8 @@ def benchmark_c64(rom_dir: str, max_cycles: int) -> tuple[float, int]:
         (elapsed_seconds, cycles_executed)
     """
     c64 = C64(rom_dir=rom_dir, display_mode="headless")
-    c64.cpu.reset()  # Clear RAM
-    c64.load_roms()  # Load ROMs and initialize PC from reset vector
+    # ROMs are automatically loaded in C64.__init__()
+    c64.cpu.reset()  # Reset CPU to read reset vector and set PC
 
     start_time = time.perf_counter()
     try:

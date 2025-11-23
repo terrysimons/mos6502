@@ -751,11 +751,8 @@ class C64:
             #   Default: 010 = 2 * 2048 = 0x1000 (but points to ROM, not RAM)
             mem_control = self.regs[0x18]
 
-            # DEBUG: Log what we're using for rendering
+            # Screen memory base address
             screen_base = ((mem_control & 0xF0) >> 4) * 0x0400
-            log.info(f"*** VIC RENDER_FRAME: $D018=${mem_control:02X}, screen_base=${screen_base:04X} ***")
-
-            # Screen memory base address (recalculate for clarity)
 
             # Character ROM bank selection
             char_bank_offset = ((mem_control & 0x0E) >> 1) * 0x0800
@@ -935,9 +932,6 @@ class C64:
                 # Log writes to jiffy clock ($A0-$A2)
                 if 0xA0 <= addr <= 0xA2 and DEBUG_JIFFY:
                     log.info(f"*** JIFFY CLOCK WRITE: addr=${addr:04X}, value=${value:02X} ***")
-                # DEBUG: Log first few writes to screen RAM
-                if 0x0400 <= addr <= 0x0410:
-                    log.info(f"*** SCREEN RAM WRITE: addr=${addr:04X}, value=${value:02X} (PETSCII) ***")
                 self._write_ram_direct(addr, value & 0xFF)
                 return
 
@@ -991,8 +985,9 @@ class C64:
         self.basic_logging_enabled = False
         self.last_pc_region = None
 
-        # self.memory = C64.C64Memory(self.cpu.ram, self.basic_rom, self.kernal_rom, self.char_rom)
-        # self.cpu.memory = self.memory
+        # Load ROMs during initialization
+        # This sets up the memory handler and all peripherals (VIC, CIAs)
+        self.load_roms()
 
     def load_rom(self, filename: str, expected_size: int, description: str) -> bytes:
         """Load a ROM file from the rom directory.
@@ -1070,15 +1065,20 @@ class C64:
         if self.char_rom is None:
             log.warning(f"CHAR ROM not found (optional). Tried: {', '.join(char_names)}")
 
-        # Write ROMs to CPU memory
-        self._write_rom_to_memory(self.BASIC_ROM_START, self.basic_rom)
-        self._write_rom_to_memory(self.KERNAL_ROM_START, self.kernal_rom)
-
-        # DON'T write CHAR ROM to CPU RAM at $D000-$DFFF! This overlaps with VIC I/O space.
-        # The char ROM is accessed through the memory read handler when I/O is disabled (bit 2 of $0001).
-        # Writing it here corrupts VIC registers like $D018 during initialization.
-        # if self.char_rom:
-        #     self._write_rom_to_memory(self.CHAR_ROM_START, self.char_rom)
+        # DON'T write ROMs to CPU RAM! The C64Memory handler reads from ROM arrays directly.
+        # Writing them to RAM would:
+        # 1. Waste memory (duplicate data)
+        # 2. Cause banking issues (RAM vs ROM access)
+        # 3. Corrupt I/O space in case of CHAR ROM ($D000-$DFFF)
+        #
+        # The memory handler (installed at line 1086) provides ROM access via banking logic:
+        # - BASIC ROM at $A000-$BFFF when bit 0 of $0001 is set
+        # - KERNAL ROM at $E000-$FFFF when bit 1 of $0001 is set
+        # - CHAR ROM at $D000-$DFFF when bit 2 of $0001 is clear (I/O disabled)
+        #
+        # self._write_rom_to_memory(self.BASIC_ROM_START, self.basic_rom)
+        # self._write_rom_to_memory(self.KERNAL_ROM_START, self.kernal_rom)
+        # self._write_rom_to_memory(self.CHAR_ROM_START, self.char_rom)
 
 
         # Now set up the CIA1 and CIA2 and VIC
@@ -2040,11 +2040,7 @@ def main() -> int | None:
         logging.getLogger("mos6502.cpu.flags").setLevel(logging.CRITICAL)
         log.info("CPU logging will enable when BASIC ROM is entered")
 
-        # Load ROMs first (if using C64 ROMs)
-        # This creates the VIC which is needed for pygame initialization
-        if not args.no_roms:
-            c64.load_roms()
-
+        # ROMs are automatically loaded in C64.__init__()
         # Reset CPU AFTER ROMs are loaded so reset vector can be read correctly
         # This implements the complete 6502 reset sequence:
         # - Clears RAM to 0xFF
