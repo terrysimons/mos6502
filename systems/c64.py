@@ -87,14 +87,21 @@ class C64:
             # 0 = key pressed (active low), 1 = key released
             self.keyboard_matrix = [0xFF] * 8
 
+            # Joystick state (active low: 0 = pressed, 1 = released)
+            # Port A bits 0-4 (when input): Joystick 2
+            # Port B bits 0-4 (when input): Joystick 1
+            # Bit 0: Up, Bit 1: Down, Bit 2: Left, Bit 3: Right, Bit 4: Fire
+            self.joystick_1 = 0xFF  # All released (bits high)
+            self.joystick_2 = 0xFF  # All released (bits high)
+
             # Port values
             self.port_a = 0xFF  # Columns (input)
             self.port_b = 0xFF  # Rows (output)
 
             # Data Direction Registers
             # 0 = input, 1 = output
-            self.ddr_a = 0x00   # Port A typically all inputs (columns)
-            self.ddr_b = 0xFF   # Port B typically all outputs (rows)
+            self.ddr_a = 0xFF   # Port A all outputs (row selection)
+            self.ddr_b = 0x00   # Port B all inputs (column sensing)
 
             # Timer A state
             self.timer_a_counter = 0xFFFF  # 16-bit counter
@@ -116,41 +123,113 @@ class C64:
         def read(self, addr) -> int:
             reg = addr & 0x0F
 
-            # Debug: log all port reads
-            if reg == 0x00 or reg == 0x01:
-                log.info(f"*** CIA1 READ reg ${reg:02X} ***")
-
-            # Port A ($DC00) — keyboard matrix row selection (write) / read back
+            # Port A ($DC00) — keyboard matrix row selection (write) / joystick 2 (read)
             if reg == 0x00:
-                # Reading respects DDR: bits set as output (1) return port_a value
-                # bits set as input (0) would return external pins (just return 0xFF for now)
-                result = (self.port_a & self.ddr_a) | (0xFF & ~self.ddr_a)
+                # Start with all input row bits HIGH (pulled up externally)
+                port_a_ext = 0xFF
+
+                # For input row bits, check if any keys in that row are pressed
+                # If a key is pressed in an input row, that row bit goes LOW
+                for row in range(8):
+                    row_is_input = not bool(self.ddr_a & (1 << row))
+                    if row_is_input:
+                        # Check if any key in this row is pressed
+                        if self.keyboard_matrix[row] != 0xFF:  # Some key pressed in this row
+                            port_a_ext &= ~(1 << row)  # Pull this row bit LOW
+                            log.info(f"*** PORT A INPUT ROW: row={row} has key pressed, pulling Port A bit {row} LOW, matrix[{row}]=${self.keyboard_matrix[row]:02X} ***")
+
+                # Reading Port A respects DDR:
+                # - Output bits (ddr_a=1): return port_a value (software-controlled)
+                # - Input bits (ddr_a=0): return keyboard/joystick state
+                # For input bits, combine keyboard row detection with joystick 2
+                # Joystick 2 only uses bits 0-4, bits 5-7 are keyboard-only
+                joy2_with_float = (self.joystick_2 & 0x1F) | 0xE0  # Joystick on bits 0-4, bits 5-7 high
+                ext_combined = port_a_ext & joy2_with_float  # Combine keyboard rows and joystick
+                result = (self.port_a & self.ddr_a) | (ext_combined & ~self.ddr_a)
                 return result
 
-            # Port B ($DC01) — keyboard matrix column sensing (read)
+            # Port B ($DC01) — keyboard matrix column sensing (read) / joystick 1 (read)
             # This is where the keyboard magic happens!
             if reg == 0x01:
-                # Start with all bits high (no keys pressed)
-                ext = 0xFF
+                # Start with keyboard matrix scan
+                keyboard_ext = 0xFF
 
-                # Row pattern is on Port A output lines (active-low: 0 = row selected)
-                row_pattern = self.port_a & self.ddr_a  # Only use output bits from Port A
+                # IMPORTANT: The C64 keyboard matrix is electrically bidirectional
+                # Port A bits can be outputs (actively drive row selection) OR inputs (pulled high externally)
+                #
+                # DDRA bits: 1 = OUTPUT (software controlled), 0 = INPUT (pulled HIGH externally by pull-ups)
+                #
+                # When DDRA bit = 1 (OUTPUT):
+                #   - port_a bit = 0: Row driven LOW (actively selects this row)
+                #   - port_a bit = 1: Row driven HIGH (doesn't select this row)
+                #
+                # When DDRA bit = 0 (INPUT):
+                #   - Row is pulled HIGH externally
+                #   - Pressed keys can pull the row LOW through the keyboard matrix
+                #   - The row line "floats" and keys can affect it
+                #
+                # This means ALL rows (both output and input) can have their keys detected!
 
-                # For each row, check if it's selected
+                # For each row, check if it should participate in THIS Port B scan
                 for row in range(8):
-                    if not (row_pattern & (1 << row)):  # This row is selected (bit=0)
+                    row_is_output = bool(self.ddr_a & (1 << row))
+                    row_bit_low = not bool(self.port_a & (1 << row))
+
+                    # CRITICAL FIX for input row detection:
+                    # When Port A bit is LOW for an INPUT row, the KERNAL is trying to "select"
+                    # that row even though it can't actually drive it. We should ONLY scan that
+                    # specific input row, not all input rows!
+                    #
+                    # Row participates in Port B scanning if its Port A bit is LOW, regardless
+                    # of whether it's an output or input. The key insight: the KERNAL writes
+                    # specific bit patterns to Port A to select rows, and we should respect
+                    # that selection even for input rows.
+                    row_selected = row_bit_low  # Participate if Port A bit is LOW
+
+                    if row_selected:
                         # For each column in this row
                         for col in range(8):
                             # Check if key at [row][col] is pressed
                             # keyboard_matrix[row] is a byte: 0 bit = pressed, 1 bit = released
                             if not (self.keyboard_matrix[row] & (1 << col)):  # Key is pressed (bit=0)
                                 # Pressed key pulls that column line low
-                                ext &= ~(1 << col)
+                                keyboard_ext &= ~(1 << col)
 
-                # Mix CIA output vs input like for port A
-                result = (self.port_b & self.ddr_b) | (ext & ~self.ddr_b)
+                                # Get key name for this matrix position
+                                key_name = self._get_key_name(row, col)
+
+                                if row_is_output:
+                                    log.info(f"*** MATRIX: row={row}, col={col} ({key_name}), matrix[{row}]=${self.keyboard_matrix[row]:02X}, keyboard_ext now=${keyboard_ext:02X} ***")
+                                else:
+                                    log.info(f"*** MATRIX (INPUT ROW): row={row}, col={col} ({key_name}), keyboard_ext now=${keyboard_ext:02X} ***")
+
+                # Combine keyboard and joystick 1 inputs (both active low, so AND them)
+                # Joystick 1 only affects bits 0-4 (Up, Down, Left, Right, Fire)
+                # Bits 5-7 are keyboard-only
+                ext = keyboard_ext & (self.joystick_1 | 0xE0)  # Only apply joystick to bits 0-4
+
+                # Mix CIA output vs input:
+                # - Output bits (ddr_b=1): use port_b value AND'd with ext (allows keyboard/joystick to pull low)
+                # - Input bits (ddr_b=0): use ext (keyboard/joystick) value
+                result = (self.port_b & self.ddr_b & ext) | (ext & ~self.ddr_b)
                 if result != 0xFF:  # Only log when a key might be detected
-                    log.info(f"*** CIA1 Port B READ: result=${result:02X}, port_a=${self.port_a:02X}, ddr_b=${self.ddr_b:02X} ***")
+                    # Show which row(s) are being actively scanned (output bits driven low)
+                    rows_scanned = []
+                    for r in range(8):
+                        r_is_output = bool(self.ddr_a & (1 << r))
+                        r_driven_low = not bool(self.port_a & (1 << r))
+                        if r_is_output and r_driven_low:
+                            rows_scanned.append(r)
+                    rows_str = ",".join(str(r) for r in rows_scanned) if rows_scanned else "none"
+
+                    # Show which column bits are low (key detected)
+                    cols_detected = []
+                    for c in range(8):
+                        if not (result & (1 << c)):
+                            cols_detected.append(c)
+                    cols_str = ",".join(str(c) for c in cols_detected) if cols_detected else "none"
+
+                    log.info(f"*** CIA1 Port B READ: result=${result:02X}, rows_scanned=[{rows_str}], cols_detected=[{cols_str}], port_a=${self.port_a:02X}, ddr_a=${self.ddr_a:02X}, port_b=${self.port_b:02X}, ddr_b=${self.ddr_b:02X}, keyboard_ext=${keyboard_ext:02X}, joystick_1=${self.joystick_1:02X} ***")
                 return result & 0xFF
 
             # Port A DDR ($DC02)
@@ -200,21 +279,27 @@ class C64:
             reg = addr & 0x0F
             self.regs[reg] = value
 
-            # Port A ($DC00) — usually not written for keyboard, but store it
+            # Port A ($DC00) — keyboard row selection (KERNAL writes here)
             if reg == 0x00:
+                old_port_a = self.port_a
                 self.port_a = value
+                if old_port_a != value:
+                    log.info(f"*** CIA1 Port A WRITE (row select): ${value:02X} ***")
 
-            # Port B ($DC01) — keyboard row selection (KERNAL writes here)
+            # Port B ($DC01) — keyboard column sensing (stored but typically not written)
             if reg == 0x01:
                 old_port_b = self.port_b
                 self.port_b = value
                 if old_port_b != value:
-                    log.info(f"*** CIA1 Port B (keyboard row select): ${value:02X} ***")
+                    log.info(f"*** CIA1 Port B WRITE: ${value:02X} (unusual - Port B is typically input-only for keyboard) ***")
 
             # Port A DDR ($DC02)
             if reg == 0x02:
+                old_ddr_a = self.ddr_a
                 self.ddr_a = value
-                log.info(f"*** CIA1 Port A DDR: ${value:02X} (0=input, 1=output) ***")
+                log.info(f"*** CIA1 Port A DDR: ${old_ddr_a:02X} -> ${value:02X} (0=input, 1=output) ***")
+                if value != 0xFF:
+                    log.info(f"*** WARNING: Port A DDR != 0xFF, rows {bin(~value & 0xFF)} will not be selectable! ***")
 
             # Port B DDR ($DC03)
             if reg == 0x03:
@@ -279,7 +364,7 @@ class C64:
             if self.timer_a_running and cycles_elapsed > 0:
                 # Log every 1000 cycles to monitor timer countdown
                 if self.cpu.cycles_executed % 10000 < 100:
-                    log.info(f"*** CIA1 Timer A: counter=${self.timer_a_counter:04X}, latch=${self.timer_a_latch:04X}, cycles_elapsed={cycles_elapsed} ***")
+                    pass  # log.info(f"*** CIA1 Timer A: counter=${self.timer_a_counter:04X}, latch=${self.timer_a_latch:04X}, cycles_elapsed={cycles_elapsed} ***")
 
                 # Count down by elapsed cycles
                 if self.timer_a_counter >= cycles_elapsed:
@@ -341,6 +426,103 @@ class C64:
 
             return result
 
+        def _get_key_name(self, row: int, col: int) -> str:
+            """Get the PETSCII key name for a matrix position.
+
+            Args:
+                row: Row index (0-7)
+                col: Column index (0-7)
+
+            Returns:
+                Key name string
+            """
+            # C64 keyboard matrix mapping: (row, col) -> key name
+            # Reference: https://www.c64-wiki.com/wiki/Keyboard
+            key_map = {
+                # Row 0
+                (0, 0): "DEL",
+                (0, 1): "RETURN",
+                (0, 2): "CRSR→",
+                (0, 3): "F7",
+                (0, 4): "F1",
+                (0, 5): "F3",
+                (0, 6): "F5",
+                (0, 7): "CRSR↓",
+
+                # Row 1
+                (1, 0): "3",
+                (1, 1): "W",
+                (1, 2): "A",
+                (1, 3): "4",
+                (1, 4): "Z",
+                (1, 5): "S",
+                (1, 6): "E",
+                (1, 7): "LSHIFT",
+
+                # Row 2
+                (2, 0): "5",
+                (2, 1): "R",
+                (2, 2): "D",
+                (2, 3): "6",
+                (2, 4): "C",
+                (2, 5): "F",
+                (2, 6): "T",
+                (2, 7): "X",
+
+                # Row 3
+                (3, 0): "7",
+                (3, 1): "Y",
+                (3, 2): "G",
+                (3, 3): "8",
+                (3, 4): "B",
+                (3, 5): "H",
+                (3, 6): "U",
+                (3, 7): "V",
+
+                # Row 4
+                (4, 0): "9",
+                (4, 1): "I",
+                (4, 2): "J",
+                (4, 3): "0",
+                (4, 4): "M",
+                (4, 5): "K",
+                (4, 6): "O",
+                (4, 7): "N",
+
+                # Row 5
+                (5, 0): "+",
+                (5, 1): "P",
+                (5, 2): "L",
+                (5, 3): "-",
+                (5, 4): ".",
+                (5, 5): ":",
+                (5, 6): "@",
+                (5, 7): ",",
+
+                # Row 6
+                (6, 0): "£",
+                (6, 1): "*",
+                (6, 2): ";",
+                (6, 3): "HOME",
+                (6, 4): "RSHIFT",
+                (6, 5): "=",
+                (6, 6): "↑",
+                (6, 7): "/",
+
+                # Row 7
+                (7, 0): "1",
+                (7, 1): "←",
+                (7, 2): "CTRL",
+                (7, 3): "2",
+                (7, 4): "SPACE",
+                (7, 5): "C=",
+                (7, 6): "Q",
+                (7, 7): "RUN/STOP",
+            }
+
+            # Simple key name lookup - just return the key label
+            return key_map.get((row, col), f"?({row},{col})?")
+
         def press_key(self, row: int, col: int) -> None:
             """Press a key at the given matrix position.
 
@@ -350,7 +532,10 @@ class C64:
             """
             if 0 <= row < 8 and 0 <= col < 8:
                 # Clear the bit (active low = pressed)
+                old_value = self.keyboard_matrix[row]
                 self.keyboard_matrix[row] &= ~(1 << col)
+                new_value = self.keyboard_matrix[row]
+                log.info(f"*** PRESS_KEY: row={row}, col={col}, matrix[{row}]: ${old_value:02X} -> ${new_value:02X} ***")
 
         def release_key(self, row: int, col: int) -> None:
             """Release a key at the given matrix position.
@@ -1469,6 +1654,7 @@ class C64:
             # Row 0
             pygame.K_BACKSPACE: (0, 0),  # DEL/INST
             pygame.K_RETURN: (0, 1),     # RETURN
+            pygame.K_KP_ENTER: (0, 1),   # RETURN (numeric keypad)
             pygame.K_RIGHT: (0, 2),      # CRSR →
             pygame.K_F7: (0, 3),         # F7
             pygame.K_F1: (0, 4),         # F1
@@ -1548,12 +1734,24 @@ class C64:
         }
 
         if event.type == pygame.KEYDOWN:
+            # Log all key presses with key code and name
+            key_name = pygame.key.name(event.key) if hasattr(pygame.key, 'name') else str(event.key)
+
+            # Try to get ASCII representation
+            try:
+                ascii_char = chr(event.key) if 32 <= event.key < 127 else f"<{event.key}>"
+                ascii_code = event.key
+            except (ValueError, OverflowError):
+                ascii_char = f"<non-printable>"
+                ascii_code = event.key
+
             if event.key in key_map:
                 row, col = key_map[event.key]
                 self.cia1.press_key(row, col)
-                log.info(f"*** KEY PRESSED: pygame key {event.key}, row={row}, col={col} ***")
+                petscii_key = self.cia1._get_key_name(row, col)
+                log.info(f"*** KEYDOWN: pygame='{key_name}' (code={event.key}), ASCII='{ascii_char}' (0x{ascii_code:02X}), matrix position=({row},{col}), PETSCII={petscii_key} ***")
             else:
-                log.info(f"*** UNMAPPED KEY PRESSED: pygame key {event.key} ***")
+                log.info(f"*** UNMAPPED KEYDOWN: pygame='{key_name}' (code={event.key}), ASCII='{ascii_char}' ***")
         elif event.type == pygame.KEYUP:
             if event.key in key_map:
                 row, col = key_map[event.key]
@@ -1576,7 +1774,10 @@ class C64:
                 if event.type == pygame.QUIT:
                     import sys
                     sys.exit(0)
-                elif event.type in (pygame.KEYDOWN, pygame.KEYUP):
+                elif event.type == pygame.KEYDOWN:
+                    log.info(f"*** PYGAME KEYDOWN EVENT: key={event.key} ***")
+                    self._handle_pygame_keyboard(event, pygame)
+                elif event.type == pygame.KEYUP:
                     self._handle_pygame_keyboard(event, pygame)
 
             # Create memory wrappers for VIC
