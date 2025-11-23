@@ -971,12 +971,13 @@ class C64:
             self._write_ram_direct(addr, value & 0xFF)
 
 
-    def __init__(self, rom_dir: Path = Path("./roms"), display_mode: str = "terminal", scale: int = 2, enable_irq: bool = True) -> None:
+    def __init__(self, rom_dir: Path = Path("./roms"), display_mode: str = "pygame", scale: int = 2, enable_irq: bool = True) -> None:
         """Initialize the C64 emulator.
 
         Arguments:
             rom_dir: Directory containing ROM files (basic, kernal, char)
-            display_mode: Display mode (terminal, pygame, headless)
+            display_mode: Display mode (pygame [default], terminal, headless)
+                         If pygame fails to initialize, will automatically fall back to terminal
             scale: Pygame window scaling factor
             enable_irq: Enable IRQ injection (default: True)
         """
@@ -984,6 +985,18 @@ class C64:
         self.display_mode = display_mode
         self.scale = scale
         self.enable_irq = enable_irq
+
+        # If pygame mode requested, try to initialize it and fall back to terminal if it fails
+        if self.display_mode == "pygame":
+            try:
+                import pygame
+                # Test if pygame can actually initialize (might fail on headless systems)
+                pygame.init()
+                pygame.quit()
+            except (ImportError, Exception) as e:
+                log.warning(f"Pygame initialization failed: {e}")
+                log.warning("Falling back to terminal display mode")
+                self.display_mode = "terminal"
 
         # Initialize CPU (6510 is essentially a 6502 with I/O ports)
         # We'll use NMOS 6502 as the base
@@ -2033,8 +2046,8 @@ def main() -> int | None:
         "--display",
         type=str,
         choices=["terminal", "pygame", "headless"],
-        default="terminal",
-        help="Display mode: terminal (default), pygame (graphical), or headless (no display)",
+        default="pygame",
+        help="Display mode: pygame (default, graphical window), terminal (ASCII art), or headless (no display). Automatically falls back to terminal if pygame unavailable.",
     )
     parser.add_argument(
         "--scale",
