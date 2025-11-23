@@ -1143,7 +1143,7 @@ class C64:
             self.cia1.update()
 
         self.cpu.periodic_callback = update_peripherals
-        self.cpu.periodic_callback_interval = 63  # Update every raster line (63 cycles/line)
+        self.cpu.periodic_callback_interval = self.vic.cycles_per_line   # Update every raster line
 
         log.info("All ROMs loaded into memory")
 
