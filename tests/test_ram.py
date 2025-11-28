@@ -118,6 +118,9 @@ def test_ram_read_byte() -> None:
     cpu.cycles = INFINITE_CYCLES
 
     # given:
+    cycles_before = cpu.cycles_executed
+    cpu.PC = 0x0400
+    pc = cpu.PC
     cpu.ram[0x4242] = 0xFF
     cpu.PC = 0x4242
 
@@ -126,7 +129,7 @@ def test_ram_read_byte() -> None:
 
     # then:
     assert data == cpu.ram[0x4242]
-    assert cpu.cycles_executed == 1
+    assert cpu.cycles_executed - cycles_before == 1
 
 def test_ram_fetch_byte() -> None:
     cpu: mos6502.CPU = mos6502.CPU()
@@ -134,6 +137,9 @@ def test_ram_fetch_byte() -> None:
     cpu.reset()
 
     # given:
+    cycles_before = cpu.cycles_executed
+    cpu.PC = 0x0400
+    pc = cpu.PC
     cpu.ram[0x4242] = 0xFF
     cpu.PC = 0x4242
 
@@ -142,7 +148,7 @@ def test_ram_fetch_byte() -> None:
 
     # then:
     assert data == cpu.ram[0x4242]
-    assert cpu.cycles_executed == 1
+    assert cpu.cycles_executed - cycles_before == 1
 
 def test_ram_read_word() -> None:
     cpu: mos6502.CPU = mos6502.CPU()
@@ -150,6 +156,9 @@ def test_ram_read_word() -> None:
     cpu.reset()
 
     # given:
+    cycles_before = cpu.cycles_executed
+    cpu.PC = 0x0400
+    pc = cpu.PC
     cpu.ram[0x4242] = 0xEF
     cpu.ram[0x4243] = 0xBE
     cpu.PC = 0x4242
@@ -159,7 +168,7 @@ def test_ram_read_word() -> None:
 
     # then:
     assert data == Word(0xBEEF, endianness=cpu.endianness)
-    assert cpu.cycles_executed == 2
+    assert cpu.cycles_executed - cycles_before == 2
 
 def test_ram_fetch_word() -> None:
     cpu: mos6502.CPU = mos6502.CPU()
@@ -167,6 +176,9 @@ def test_ram_fetch_word() -> None:
     cpu.reset()
 
     # given:
+    cycles_before = cpu.cycles_executed
+    cpu.PC = 0x0400
+    pc = cpu.PC
     cpu.ram[0x4242] = 0xEF
     cpu.ram[0x4243] = 0xBE
     cpu.PC = 0x4242
@@ -176,7 +188,7 @@ def test_ram_fetch_word() -> None:
 
     # then:
     assert data == Word(0xBEEF, endianness=cpu.endianness)
-    assert cpu.cycles_executed == 2
+    assert cpu.cycles_executed - cycles_before == 2
 
 def test_ram_write_byte() -> None:
     cpu: mos6502.CPU = mos6502.CPU()
@@ -184,6 +196,9 @@ def test_ram_write_byte() -> None:
     cpu.reset()
 
     # given:
+    cycles_before = cpu.cycles_executed
+    cpu.PC = 0x0400
+    pc = cpu.PC
     cpu.ram[0x4242] = 0x00
 
     # when:
@@ -191,7 +206,7 @@ def test_ram_write_byte() -> None:
 
     # then:
     assert cpu.ram[0x4242] == 0xFF
-    assert cpu.cycles_executed == 1
+    assert cpu.cycles_executed - cycles_before == 1
 
 def test_ram_write_word() -> None:
     cpu: mos6502.CPU = mos6502.CPU()
@@ -199,6 +214,9 @@ def test_ram_write_word() -> None:
     cpu.reset()
 
     # given:
+    cycles_before = cpu.cycles_executed
+    cpu.PC = 0x0400
+    pc = cpu.PC
     cpu.ram[0x4242] = 0x00
     cpu.ram[0x4243] = 0x00
 
@@ -208,5 +226,5 @@ def test_ram_write_word() -> None:
     # then:
     assert cpu.ram[0x4242] == 0xEF
     assert cpu.ram[0x4243] == 0xBE
-    assert cpu.cycles_executed == 2
+    assert cpu.cycles_executed - cycles_before == 2
 

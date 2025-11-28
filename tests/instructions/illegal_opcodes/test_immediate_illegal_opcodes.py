@@ -24,11 +24,12 @@ class TestANCNMOS:
     def test_anc_and_operation(self, nmos_cpu) -> None:
         """Test ANC performs AND operation."""
         nmos_cpu.reset()
+        nmos_cpu.PC = 0x0400
         nmos_cpu.A = 0xF0
         nmos_cpu.C = 0
 
-        nmos_cpu.ram[0xFFFC] = instructions.ANC_IMMEDIATE_0x0B
-        nmos_cpu.ram[0xFFFD] = 0x0F
+        nmos_cpu.ram[nmos_cpu.PC] = instructions.ANC_IMMEDIATE_0x0B
+        nmos_cpu.ram[nmos_cpu.PC + 1] = 0x0F
 
         with contextlib.suppress(errors.CPUCycleExhaustionError):
             nmos_cpu.execute(cycles=2)
@@ -43,11 +44,12 @@ class TestANCNMOS:
     def test_anc_sets_carry_when_negative(self, nmos_cpu) -> None:
         """Test ANC sets carry to match negative flag."""
         nmos_cpu.reset()
+        nmos_cpu.PC = 0x0400
         nmos_cpu.A = 0xFF
         nmos_cpu.C = 0
 
-        nmos_cpu.ram[0xFFFC] = instructions.ANC_IMMEDIATE_0x0B
-        nmos_cpu.ram[0xFFFD] = 0x80
+        nmos_cpu.ram[nmos_cpu.PC] = instructions.ANC_IMMEDIATE_0x0B
+        nmos_cpu.ram[nmos_cpu.PC + 1] = 0x80
 
         with contextlib.suppress(errors.CPUCycleExhaustionError):
             nmos_cpu.execute(cycles=2)
@@ -62,11 +64,12 @@ class TestANCNMOS:
     def test_anc_duplicate_opcode(self, nmos_cpu) -> None:
         """Test ANC duplicate opcode $2B works identically."""
         nmos_cpu.reset()
+        nmos_cpu.PC = 0x0400
         nmos_cpu.A = 0xAA
         nmos_cpu.C = 0
 
-        nmos_cpu.ram[0xFFFC] = instructions.ANC_IMMEDIATE_0x2B
-        nmos_cpu.ram[0xFFFD] = 0x55
+        nmos_cpu.ram[nmos_cpu.PC] = instructions.ANC_IMMEDIATE_0x2B
+        nmos_cpu.ram[nmos_cpu.PC + 1] = 0x55
 
         with contextlib.suppress(errors.CPUCycleExhaustionError):
             nmos_cpu.execute(cycles=2)
@@ -82,10 +85,11 @@ class TestALRNMOS:
     def test_alr_and_then_shift(self, nmos_cpu) -> None:
         """Test ALR performs AND then LSR."""
         nmos_cpu.reset()
+        nmos_cpu.PC = 0x0400
         nmos_cpu.A = 0xFF
 
-        nmos_cpu.ram[0xFFFC] = instructions.ALR_IMMEDIATE_0x4B
-        nmos_cpu.ram[0xFFFD] = 0x0F
+        nmos_cpu.ram[nmos_cpu.PC] = instructions.ALR_IMMEDIATE_0x4B
+        nmos_cpu.ram[nmos_cpu.PC + 1] = 0x0F
 
         with contextlib.suppress(errors.CPUCycleExhaustionError):
             nmos_cpu.execute(cycles=2)
@@ -99,10 +103,11 @@ class TestALRNMOS:
     def test_alr_sets_carry(self, nmos_cpu) -> None:
         """Test ALR sets carry from bit 0 of AND result."""
         nmos_cpu.reset()
+        nmos_cpu.PC = 0x0400
         nmos_cpu.A = 0xAA
 
-        nmos_cpu.ram[0xFFFC] = instructions.ALR_IMMEDIATE_0x4B
-        nmos_cpu.ram[0xFFFD] = 0x55
+        nmos_cpu.ram[nmos_cpu.PC] = instructions.ALR_IMMEDIATE_0x4B
+        nmos_cpu.ram[nmos_cpu.PC + 1] = 0x55
 
         with contextlib.suppress(errors.CPUCycleExhaustionError):
             nmos_cpu.execute(cycles=2)
@@ -115,10 +120,11 @@ class TestALRNMOS:
     def test_alr_result_zero(self, nmos_cpu) -> None:
         """Test ALR sets zero flag when result is zero."""
         nmos_cpu.reset()
+        nmos_cpu.PC = 0x0400
         nmos_cpu.A = 0x01
 
-        nmos_cpu.ram[0xFFFC] = instructions.ALR_IMMEDIATE_0x4B
-        nmos_cpu.ram[0xFFFD] = 0x01
+        nmos_cpu.ram[nmos_cpu.PC] = instructions.ALR_IMMEDIATE_0x4B
+        nmos_cpu.ram[nmos_cpu.PC + 1] = 0x01
 
         with contextlib.suppress(errors.CPUCycleExhaustionError):
             nmos_cpu.execute(cycles=2)
@@ -135,11 +141,12 @@ class TestARRNMOS:
     def test_arr_and_then_rotate(self, nmos_cpu) -> None:
         """Test ARR performs AND then ROR."""
         nmos_cpu.reset()
+        nmos_cpu.PC = 0x0400
         nmos_cpu.A = 0x7F
         nmos_cpu.C = 1
 
-        nmos_cpu.ram[0xFFFC] = instructions.ARR_IMMEDIATE_0x6B
-        nmos_cpu.ram[0xFFFD] = 0xFF
+        nmos_cpu.ram[nmos_cpu.PC] = instructions.ARR_IMMEDIATE_0x6B
+        nmos_cpu.ram[nmos_cpu.PC + 1] = 0xFF
 
         with contextlib.suppress(errors.CPUCycleExhaustionError):
             nmos_cpu.execute(cycles=2)
@@ -152,11 +159,12 @@ class TestARRNMOS:
     def test_arr_special_carry_flag(self, nmos_cpu) -> None:
         """Test ARR sets carry from bit 6 of result."""
         nmos_cpu.reset()
+        nmos_cpu.PC = 0x0400
         nmos_cpu.A = 0xFF
         nmos_cpu.C = 0
 
-        nmos_cpu.ram[0xFFFC] = instructions.ARR_IMMEDIATE_0x6B
-        nmos_cpu.ram[0xFFFD] = 0xFF
+        nmos_cpu.ram[nmos_cpu.PC] = instructions.ARR_IMMEDIATE_0x6B
+        nmos_cpu.ram[nmos_cpu.PC + 1] = 0xFF
 
         with contextlib.suppress(errors.CPUCycleExhaustionError):
             nmos_cpu.execute(cycles=2)
@@ -169,11 +177,12 @@ class TestARRNMOS:
     def test_arr_special_overflow_flag(self, nmos_cpu) -> None:
         """Test ARR sets overflow from bit 6 XOR bit 5."""
         nmos_cpu.reset()
+        nmos_cpu.PC = 0x0400
         nmos_cpu.A = 0xFF
         nmos_cpu.C = 0
 
-        nmos_cpu.ram[0xFFFC] = instructions.ARR_IMMEDIATE_0x6B
-        nmos_cpu.ram[0xFFFD] = 0xC0  # 11000000
+        nmos_cpu.ram[nmos_cpu.PC] = instructions.ARR_IMMEDIATE_0x6B
+        nmos_cpu.ram[nmos_cpu.PC + 1] = 0xC0  # 11000000
 
         with contextlib.suppress(errors.CPUCycleExhaustionError):
             nmos_cpu.execute(cycles=2)
@@ -186,11 +195,12 @@ class TestARRNMOS:
     def test_arr_overflow_set(self, nmos_cpu) -> None:
         """Test ARR sets overflow when bit 6 XOR bit 5 = 1."""
         nmos_cpu.reset()
+        nmos_cpu.PC = 0x0400
         nmos_cpu.A = 0xFF
         nmos_cpu.C = 1
 
-        nmos_cpu.ram[0xFFFC] = instructions.ARR_IMMEDIATE_0x6B
-        nmos_cpu.ram[0xFFFD] = 0x40  # 01000000
+        nmos_cpu.ram[nmos_cpu.PC] = instructions.ARR_IMMEDIATE_0x6B
+        nmos_cpu.ram[nmos_cpu.PC + 1] = 0x40  # 01000000
 
         with contextlib.suppress(errors.CPUCycleExhaustionError):
             nmos_cpu.execute(cycles=2)
@@ -207,11 +217,12 @@ class TestSBXNMOS:
     def test_sbx_basic_subtract(self, nmos_cpu) -> None:
         """Test SBX performs (A & X) - immediate."""
         nmos_cpu.reset()
+        nmos_cpu.PC = 0x0400
         nmos_cpu.A = 0xFF
         nmos_cpu.X = 0xFF
 
-        nmos_cpu.ram[0xFFFC] = instructions.SBX_IMMEDIATE_0xCB
-        nmos_cpu.ram[0xFFFD] = 0x0F
+        nmos_cpu.ram[nmos_cpu.PC] = instructions.SBX_IMMEDIATE_0xCB
+        nmos_cpu.ram[nmos_cpu.PC + 1] = 0x0F
 
         with contextlib.suppress(errors.CPUCycleExhaustionError):
             nmos_cpu.execute(cycles=2)
@@ -225,11 +236,12 @@ class TestSBXNMOS:
     def test_sbx_with_borrow(self, nmos_cpu) -> None:
         """Test SBX clears carry when result is negative."""
         nmos_cpu.reset()
+        nmos_cpu.PC = 0x0400
         nmos_cpu.A = 0x0F
         nmos_cpu.X = 0x0F
 
-        nmos_cpu.ram[0xFFFC] = instructions.SBX_IMMEDIATE_0xCB
-        nmos_cpu.ram[0xFFFD] = 0xFF
+        nmos_cpu.ram[nmos_cpu.PC] = instructions.SBX_IMMEDIATE_0xCB
+        nmos_cpu.ram[nmos_cpu.PC + 1] = 0xFF
 
         with contextlib.suppress(errors.CPUCycleExhaustionError):
             nmos_cpu.execute(cycles=2)
@@ -241,11 +253,12 @@ class TestSBXNMOS:
     def test_sbx_zero_result(self, nmos_cpu) -> None:
         """Test SBX sets zero flag when result is zero."""
         nmos_cpu.reset()
+        nmos_cpu.PC = 0x0400
         nmos_cpu.A = 0xFF
         nmos_cpu.X = 0xFF
 
-        nmos_cpu.ram[0xFFFC] = instructions.SBX_IMMEDIATE_0xCB
-        nmos_cpu.ram[0xFFFD] = 0xFF
+        nmos_cpu.ram[nmos_cpu.PC] = instructions.SBX_IMMEDIATE_0xCB
+        nmos_cpu.ram[nmos_cpu.PC + 1] = 0xFF
 
         with contextlib.suppress(errors.CPUCycleExhaustionError):
             nmos_cpu.execute(cycles=2)
@@ -259,11 +272,12 @@ class TestSBXNMOS:
     def test_sbx_and_operation(self, nmos_cpu) -> None:
         """Test SBX properly ANDs A with X before subtraction."""
         nmos_cpu.reset()
+        nmos_cpu.PC = 0x0400
         nmos_cpu.A = 0xAA  # 10101010
         nmos_cpu.X = 0x55  # 01010101
 
-        nmos_cpu.ram[0xFFFC] = instructions.SBX_IMMEDIATE_0xCB
-        nmos_cpu.ram[0xFFFD] = 0x00
+        nmos_cpu.ram[nmos_cpu.PC] = instructions.SBX_IMMEDIATE_0xCB
+        nmos_cpu.ram[nmos_cpu.PC + 1] = 0x00
 
         with contextlib.suppress(errors.CPUCycleExhaustionError):
             nmos_cpu.execute(cycles=2)
@@ -279,11 +293,12 @@ class TestImmediateCMOS:
     def test_anc_acts_as_nop(self, cmos_cpu) -> None:
         """Test ANC acts as NOP on CMOS."""
         cmos_cpu.reset()
+        cmos_cpu.PC = 0x0400
         cmos_cpu.A = 0xF0
         cmos_cpu.C = 0
 
-        cmos_cpu.ram[0xFFFC] = instructions.ANC_IMMEDIATE_0x0B
-        cmos_cpu.ram[0xFFFD] = 0x0F
+        cmos_cpu.ram[cmos_cpu.PC] = instructions.ANC_IMMEDIATE_0x0B
+        cmos_cpu.ram[cmos_cpu.PC + 1] = 0x0F
 
         with contextlib.suppress(errors.CPUCycleExhaustionError):
             cmos_cpu.execute(cycles=2)
@@ -294,10 +309,11 @@ class TestImmediateCMOS:
     def test_alr_acts_as_nop(self, cmos_cpu) -> None:
         """Test ALR acts as NOP on CMOS."""
         cmos_cpu.reset()
+        cmos_cpu.PC = 0x0400
         cmos_cpu.A = 0xFF
 
-        cmos_cpu.ram[0xFFFC] = instructions.ALR_IMMEDIATE_0x4B
-        cmos_cpu.ram[0xFFFD] = 0x0F
+        cmos_cpu.ram[cmos_cpu.PC] = instructions.ALR_IMMEDIATE_0x4B
+        cmos_cpu.ram[cmos_cpu.PC + 1] = 0x0F
 
         with contextlib.suppress(errors.CPUCycleExhaustionError):
             cmos_cpu.execute(cycles=2)
@@ -307,11 +323,12 @@ class TestImmediateCMOS:
     def test_arr_acts_as_nop(self, cmos_cpu) -> None:
         """Test ARR acts as NOP on CMOS."""
         cmos_cpu.reset()
+        cmos_cpu.PC = 0x0400
         cmos_cpu.A = 0x7F
         cmos_cpu.C = 1
 
-        cmos_cpu.ram[0xFFFC] = instructions.ARR_IMMEDIATE_0x6B
-        cmos_cpu.ram[0xFFFD] = 0xFF
+        cmos_cpu.ram[cmos_cpu.PC] = instructions.ARR_IMMEDIATE_0x6B
+        cmos_cpu.ram[cmos_cpu.PC + 1] = 0xFF
 
         with contextlib.suppress(errors.CPUCycleExhaustionError):
             cmos_cpu.execute(cycles=2)
@@ -322,11 +339,12 @@ class TestImmediateCMOS:
     def test_sbx_acts_as_nop(self, cmos_cpu) -> None:
         """Test SBX acts as NOP on CMOS."""
         cmos_cpu.reset()
+        cmos_cpu.PC = 0x0400
         cmos_cpu.A = 0xFF
         cmos_cpu.X = 0xFF
 
-        cmos_cpu.ram[0xFFFC] = instructions.SBX_IMMEDIATE_0xCB
-        cmos_cpu.ram[0xFFFD] = 0x0F
+        cmos_cpu.ram[cmos_cpu.PC] = instructions.SBX_IMMEDIATE_0xCB
+        cmos_cpu.ram[cmos_cpu.PC + 1] = 0x0F
 
         with contextlib.suppress(errors.CPUCycleExhaustionError):
             cmos_cpu.execute(cycles=2)

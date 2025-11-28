@@ -22,6 +22,9 @@ def test_cpu_instruction_BRK_IMPLIED_0x00(cpu: CPU) -> None:  # noqa: N802
     5. Take 7 cycles
     """
     # given:
+    cycles_before = cpu.cycles_executed
+    cpu.PC = 0x0400
+    pc = cpu.PC
 
     # Set some flags to verify they're preserved in stack
     cpu.C = flags.ProcessorStatusFlags.C[flags.C]
@@ -33,8 +36,8 @@ def test_cpu_instruction_BRK_IMPLIED_0x00(cpu: CPU) -> None:  # noqa: N802
     initial_sp = cpu.S
     initial_pc = cpu.PC
 
-    cpu.ram[0xFFFC] = instructions.BRK_IMPLIED_0x00
-    cpu.ram[0xFFFD] = 0x00  # Padding byte
+    cpu.ram[pc] = instructions.BRK_IMPLIED_0x00
+    cpu.ram[pc + 1] = 0x00  # Padding byte
 
     # when:
     with contextlib.suppress(errors.CPUCycleExhaustionError, errors.CPUBreakError):
@@ -74,17 +77,22 @@ def test_cpu_instruction_BRK_IMPLIED_0x00(cpu: CPU) -> None:  # noqa: N802
     assert cpu.V, "V flag should be preserved"
 
     # 7. Verify cycles
-    assert cpu.cycles_executed == 7, \
-        f"BRK should take 7 cycles, got {cpu.cycles_executed}"
+    assert cpu.cycles_executed - cycles_before == 7, \
+        f"BRK should take 7 cycles, got {cpu.cycles_executed - cycles_before}"
 
 
 def test_cpu_instruction_BRK_IMPLIED_0x00_raises_exception(cpu: CPU) -> None:  # noqa: N802
     """Test that BRK jumps to IRQ handler vector."""
-    # given: Set up IRQ vector to point to a handler at $1234
+    # given:
+    cycles_before = cpu.cycles_executed
+    cpu.PC = 0x0400
+    pc = cpu.PC
+
+    # Set up IRQ vector to point to a handler at $1234
     cpu.ram[0xFFFE] = 0x34  # IRQ vector low byte
     cpu.ram[0xFFFF] = 0x12  # IRQ vector high byte
-    cpu.ram[0xFFFC] = instructions.BRK_IMPLIED_0x00
-    cpu.ram[0xFFFD] = 0x00
+    cpu.ram[pc] = instructions.BRK_IMPLIED_0x00
+    cpu.ram[pc + 1] = 0x00
 
     # when: Execute BRK
     with contextlib.suppress(errors.CPUCycleExhaustionError):
@@ -97,6 +105,9 @@ def test_cpu_instruction_BRK_IMPLIED_0x00_raises_exception(cpu: CPU) -> None:  #
 def test_cpu_instruction_BRK_IMPLIED_0x00_with_all_flags_clear(cpu: CPU) -> None:  # noqa: N802
     """Test BRK when all flags are initially clear."""
     # given:
+    cycles_before = cpu.cycles_executed
+    cpu.PC = 0x0400
+    pc = cpu.PC
 
     # Clear all flags
     cpu.C = 0
@@ -109,8 +120,8 @@ def test_cpu_instruction_BRK_IMPLIED_0x00_with_all_flags_clear(cpu: CPU) -> None
     initial_sp = cpu.S
     initial_flags = cpu.flags.value
 
-    cpu.ram[0xFFFC] = instructions.BRK_IMPLIED_0x00
-    cpu.ram[0xFFFD] = 0x00
+    cpu.ram[pc] = instructions.BRK_IMPLIED_0x00
+    cpu.ram[pc + 1] = 0x00
 
     # when:
     with contextlib.suppress(errors.CPUCycleExhaustionError, errors.CPUBreakError):

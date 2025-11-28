@@ -20,19 +20,22 @@ def check_noop_flags(expected_cpu: CPU, actual_cpu: CPU) -> None:
 
 def test_cpu_instruction_TXA_IMPLIED_0x8A(cpu: CPU) -> None:  # noqa: N802
     # given:
+    cycles_before = cpu.cycles_executed
+    cpu.PC = 0x0400
+    pc = cpu.PC
     initial_cpu: CPU = copy.deepcopy(cpu)
 
     cpu.X = 0x42
 
-    cpu.ram[0xFFFC] = instructions.TXA_IMPLIED_0x8A
+    cpu.ram[pc] = instructions.TXA_IMPLIED_0x8A
 
     # when:
     with contextlib.suppress(errors.CPUCycleExhaustionError):
         cpu.execute(cycles=2)
 
     # then:
-    assert cpu.PC == 0xFFFD
-    assert cpu.cycles_executed == 2
+    assert cpu.PC == pc + 1
+    assert cpu.cycles_executed - cycles_before == 2
     assert cpu.A == 0x42
     assert cpu.X == 0x42
     assert cpu.flags[flags.Z] == 0
@@ -42,19 +45,22 @@ def test_cpu_instruction_TXA_IMPLIED_0x8A(cpu: CPU) -> None:  # noqa: N802
 
 def test_cpu_instruction_TXA_IMPLIED_0x8A_zero_flag(cpu: CPU) -> None:  # noqa: N802
     # given:
+    cycles_before = cpu.cycles_executed
+    cpu.PC = 0x0400
+    pc = cpu.PC
     initial_cpu: CPU = copy.deepcopy(cpu)
 
     cpu.X = 0x00
 
-    cpu.ram[0xFFFC] = instructions.TXA_IMPLIED_0x8A
+    cpu.ram[pc] = instructions.TXA_IMPLIED_0x8A
 
     # when:
     with contextlib.suppress(errors.CPUCycleExhaustionError):
         cpu.execute(cycles=2)
 
     # then:
-    assert cpu.PC == 0xFFFD
-    assert cpu.cycles_executed == 2
+    assert cpu.PC == pc + 1
+    assert cpu.cycles_executed - cycles_before == 2
     assert cpu.A == 0x00
     assert cpu.flags[flags.Z] == 1
     assert cpu.flags[flags.N] == 0
@@ -63,19 +69,22 @@ def test_cpu_instruction_TXA_IMPLIED_0x8A_zero_flag(cpu: CPU) -> None:  # noqa: 
 
 def test_cpu_instruction_TXA_IMPLIED_0x8A_negative_flag(cpu: CPU) -> None:  # noqa: N802
     # given:
+    cycles_before = cpu.cycles_executed
+    cpu.PC = 0x0400
+    pc = cpu.PC
     initial_cpu: CPU = copy.deepcopy(cpu)
 
     cpu.X = 0x80
 
-    cpu.ram[0xFFFC] = instructions.TXA_IMPLIED_0x8A
+    cpu.ram[pc] = instructions.TXA_IMPLIED_0x8A
 
     # when:
     with contextlib.suppress(errors.CPUCycleExhaustionError):
         cpu.execute(cycles=2)
 
     # then:
-    assert cpu.PC == 0xFFFD
-    assert cpu.cycles_executed == 2
+    assert cpu.PC == pc + 1
+    assert cpu.cycles_executed - cycles_before == 2
     assert cpu.A == 0x80
     assert cpu.flags[flags.Z] == 0
     assert cpu.flags[flags.N] == 1

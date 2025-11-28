@@ -1,8 +1,6 @@
 #!/usr/bin/env python3
 """LDA (Load Accumulator) instruction."""
-from mos6502 import flags
-from mos6502.instructions import InstructionOpcode
-from mos6502.memory import Byte
+from mos6502.instructions import CPUInstruction, InstructionOpcode, register_instructions
 
 # https://masswerk.at/6502/6502_instruction_set.html#LDA
 # Load Accumulator with Memory
@@ -20,166 +18,34 @@ from mos6502.memory import Byte
 # (indirect,X)	LDA (oper,X)	A1	2	6
 # (indirect),Y	LDA (oper),Y	B1	2	5*
 
-LDA_IMMEDIATE_0xA9 = InstructionOpcode(
-    0xA9,
-    "mos6502.instructions.load._lda",
-    "lda_immediate_0xa9"
-)
+_PKG = "mos6502.instructions.load._lda"
 
-LDA_ZEROPAGE_0xA5 = InstructionOpcode(
-    0xA5,
-    "mos6502.instructions.load._lda",
-    "lda_zeropage_0xa5"
-)
+# Instruction definitions using CPUInstruction dataclass
+LDA_INSTRUCTIONS = [
+    CPUInstruction(0xA9, "LDA", "immediate", "LDA #{oper}", 2, 2, "NZ", _PKG, "lda_immediate_0xa9"),
+    CPUInstruction(0xA5, "LDA", "zeropage", "LDA {oper}", 2, 3, "NZ", _PKG, "lda_zeropage_0xa5"),
+    CPUInstruction(0xB5, "LDA", "zeropage,X", "LDA {oper},X", 2, 4, "NZ", _PKG, "lda_zeropage_x_0xb5"),
+    CPUInstruction(0xAD, "LDA", "absolute", "LDA {oper}", 3, 4, "NZ", _PKG, "lda_absolute_0xad"),
+    CPUInstruction(0xBD, "LDA", "absolute,X", "LDA {oper},X", 3, 4, "NZ", _PKG, "lda_absolute_x_0xbd", page_boundary_penalty=True),
+    CPUInstruction(0xB9, "LDA", "absolute,Y", "LDA {oper},Y", 3, 4, "NZ", _PKG, "lda_absolute_y_0xb9", page_boundary_penalty=True),
+    CPUInstruction(0xA1, "LDA", "(indirect,X)", "LDA ({oper},X)", 2, 6, "NZ", _PKG, "lda_indexed_indirect_x_0xa1"),
+    CPUInstruction(0xB1, "LDA", "(indirect),Y", "LDA ({oper}),Y", 2, 5, "NZ", _PKG, "lda_indirect_indexed_y_0xb1", page_boundary_penalty=True),
+]
 
-LDA_ZEROPAGE_X_0xB5 = InstructionOpcode(
-    0xB5,
-    "mos6502.instructions.load._lda",
-    "lda_zeropage_x_0xb5"
-)
-
-LDA_ABSOLUTE_0xAD = InstructionOpcode(
-    0xAD,
-    "mos6502.instructions.load._lda",
-    "lda_absolute_0xad"
-)
-
-LDA_ABSOLUTE_X_0xBD = InstructionOpcode(
-    0xBD,
-    "mos6502.instructions.load._lda",
-    "lda_absolute_x_0xbd"
-)
-
-LDA_ABSOLUTE_Y_0xB9 = InstructionOpcode(
-    0xB9,
-    "mos6502.instructions.load._lda",
-    "lda_absolute_y_0xb9"
-)
-
-LDA_INDEXED_INDIRECT_X_0xA1 = InstructionOpcode(
-    0xA1,
-    "mos6502.instructions.load._lda",
-    "lda_indexed_indirect_x_0xa1"
-)
-
-LDA_INDIRECT_INDEXED_Y_0xB1 = InstructionOpcode(
-    0xB1,
-    "mos6502.instructions.load._lda",
-    "lda_indirect_indexed_y_0xb1"
-)
-
-
-def add_lda_to_instruction_set_enum(instruction_set_class) -> None:
-    """Add LDA instructions to the InstructionSet enum dynamically."""
-    class PseudoEnumMember(int):
-        def __new__(cls, value, name) -> "InstructionSet":
-            obj = int.__new__(cls, value)
-            obj._name = name
-            obj._value_ = value
-            return obj
-
-        @property
-        def name(self) -> str:
-            return self._name
-
-        @property
-        def value(self) -> int:
-            return self._value_
-
-    for value, name in [
-        (LDA_IMMEDIATE_0xA9, "LDA_IMMEDIATE_0xA9"),
-        (LDA_ZEROPAGE_0xA5, "LDA_ZEROPAGE_0xA5"),
-        (LDA_ZEROPAGE_X_0xB5, "LDA_ZEROPAGE_X_0xB5"),
-        (LDA_ABSOLUTE_0xAD, "LDA_ABSOLUTE_0xAD"),
-        (LDA_ABSOLUTE_X_0xBD, "LDA_ABSOLUTE_X_0xBD"),
-        (LDA_ABSOLUTE_Y_0xB9, "LDA_ABSOLUTE_Y_0xB9"),
-        (LDA_INDEXED_INDIRECT_X_0xA1, "LDA_INDEXED_INDIRECT_X_0xA1"),
-        (LDA_INDIRECT_INDEXED_Y_0xB1, "LDA_INDIRECT_INDEXED_Y_0xB1"),
-    ]:
-        member = PseudoEnumMember(value, name)
-        instruction_set_class._value2member_map_[value] = member
-        setattr(instruction_set_class, name, value)
+# InstructionOpcode instances for variant dispatch (backward compatibility)
+LDA_IMMEDIATE_0xA9 = InstructionOpcode(0xA9, _PKG, "lda_immediate_0xa9")
+LDA_ZEROPAGE_0xA5 = InstructionOpcode(0xA5, _PKG, "lda_zeropage_0xa5")
+LDA_ZEROPAGE_X_0xB5 = InstructionOpcode(0xB5, _PKG, "lda_zeropage_x_0xb5")
+LDA_ABSOLUTE_0xAD = InstructionOpcode(0xAD, _PKG, "lda_absolute_0xad")
+LDA_ABSOLUTE_X_0xBD = InstructionOpcode(0xBD, _PKG, "lda_absolute_x_0xbd")
+LDA_ABSOLUTE_Y_0xB9 = InstructionOpcode(0xB9, _PKG, "lda_absolute_y_0xb9")
+LDA_INDEXED_INDIRECT_X_0xA1 = InstructionOpcode(0xA1, _PKG, "lda_indexed_indirect_x_0xa1")
+LDA_INDIRECT_INDEXED_Y_0xB1 = InstructionOpcode(0xB1, _PKG, "lda_indirect_indexed_y_0xb1")
 
 
 def register_lda_instructions(instruction_set_class, instruction_map: dict) -> None:
     """Register LDA instructions in the InstructionSet."""
-    add_lda_to_instruction_set_enum(instruction_set_class)
-
-    lda_can_modify_flags: Byte = Byte()
-    lda_can_modify_flags[flags.N] = True
-    lda_can_modify_flags[flags.Z] = True
-
-    instruction_map[LDA_IMMEDIATE_0xA9] = {
-        "addressing": "immediate",
-        "assembler": "LDA #{oper}",
-        "opc": LDA_IMMEDIATE_0xA9,
-        "bytes": "2",
-        "cycles": "2",
-        "flags": lda_can_modify_flags,
-    }
-
-    instruction_map[LDA_ZEROPAGE_0xA5] = {
-        "addressing": "zeropage",
-        "assembler": "LDA {oper}",
-        "opc": LDA_ZEROPAGE_0xA5,
-        "bytes": "2",
-        "cycles": "3",
-        "flags": lda_can_modify_flags,
-    }
-
-    instruction_map[LDA_ZEROPAGE_X_0xB5] = {
-        "addressing": "zeropage,X",
-        "assembler": "LDA {oper},X",
-        "opc": LDA_ZEROPAGE_X_0xB5,
-        "bytes": "2",
-        "cycles": "4",
-        "flags": lda_can_modify_flags,
-    }
-
-    instruction_map[LDA_ABSOLUTE_0xAD] = {
-        "addressing": "absolute",
-        "assembler": "LDA {oper}",
-        "opc": LDA_ABSOLUTE_0xAD,
-        "bytes": "3",
-        "cycles": "4",
-        "flags": lda_can_modify_flags,
-    }
-
-    instruction_map[LDA_ABSOLUTE_X_0xBD] = {
-        "addressing": "absolute,X",
-        "assembler": "LDA {oper},X",
-        "opc": LDA_ABSOLUTE_X_0xBD,
-        "bytes": "3",
-        "cycles": "4*",
-        "flags": lda_can_modify_flags,
-    }
-
-    instruction_map[LDA_ABSOLUTE_Y_0xB9] = {
-        "addressing": "absolute,Y",
-        "assembler": "LDA {oper},Y",
-        "opc": LDA_ABSOLUTE_Y_0xB9,
-        "bytes": "3",
-        "cycles": "4*",
-        "flags": lda_can_modify_flags,
-    }
-
-    instruction_map[LDA_INDEXED_INDIRECT_X_0xA1] = {
-        "addressing": "(indirect,X)",
-        "assembler": "LDA ({oper},X)",
-        "opc": LDA_INDEXED_INDIRECT_X_0xA1,
-        "bytes": "2",
-        "cycles": "6",
-        "flags": lda_can_modify_flags,
-    }
-
-    instruction_map[LDA_INDIRECT_INDEXED_Y_0xB1] = {
-        "addressing": "(indirect),Y",
-        "assembler": "LDA ({oper}),Y",
-        "opc": LDA_INDIRECT_INDEXED_Y_0xB1,
-        "bytes": "2",
-        "cycles": "5*",
-        "flags": lda_can_modify_flags,
-    }
+    register_instructions(LDA_INSTRUCTIONS, instruction_set_class, instruction_map)
 
 
 __all__ = [

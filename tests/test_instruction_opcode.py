@@ -90,9 +90,12 @@ def test_opcode_with_cpu() -> None:
     """Test that InstructionOpcode works with CPU execution."""
     cpu = CPU()
     cpu.reset()
+    cycles_before = cpu.cycles_executed
+    cpu.PC = 0x0400
+    pc = cpu.PC
 
     # Write NOP instruction to memory
-    cpu.ram[0xFFFC] = NOP_WITH_METADATA
+    cpu.ram[pc] = NOP_WITH_METADATA
 
     # Execute it
     import contextlib
@@ -100,8 +103,8 @@ def test_opcode_with_cpu() -> None:
         cpu.execute(cycles=2)
 
     # Should have executed NOP
-    assert cpu.PC == 0xFFFD
-    assert cpu.cycles_executed == 2
+    assert cpu.PC == pc + 1
+    assert cpu.cycles_executed - cycles_before == 2
 
 
 def test_opcode_comparison_operators() -> None:

@@ -90,8 +90,11 @@ def test_mos6502_I_flag() -> None:  # noqa: N802
     cpu: mos6502.CPU = mos6502.CPU()
     cpu.reset()
 
-    # Test initial state is 0
-    assert (cpu.I & 1) == 0
+    # Test initial state after reset is 1 (I flag is set during reset)
+    assert (cpu.I & 1) == 1
+
+    # Clear it to test other operations
+    cpu.I = 0
 
     # Test flag is set
     cpu.I = 1
@@ -290,7 +293,15 @@ def test_all_flags() -> None:
     cpu: mos6502.CPU = mos6502.CPU()
     cpu.reset()
 
-    assert cpu._flags == flags.ProcessorStatusFlags.SET_ZERO  # noqa: SLF001
+    # After reset, I flag is set, bit 5 always reads as 1, so flags = 0x24 (0b00100100)
+    # Verify by checking individual flags rather than raw value
+    assert cpu.C == 0
+    assert cpu.Z == 0
+    assert cpu.I == 1  # Set during reset
+    assert cpu.D == 0
+    assert cpu.B == 0
+    assert cpu.V == 0
+    assert cpu.N == 0
 
     cpu.C = flags.ProcessorStatusFlags.C[flags.C]
     cpu.Z = flags.ProcessorStatusFlags.Z[flags.Z]

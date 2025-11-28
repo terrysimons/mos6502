@@ -642,18 +642,16 @@ class C64:
             self.text_width = 320
             self.text_height = 200
 
-            # NTSC-style nominal origin (when fine scroll == 0)
-            # These match real VIC-II blanking pretty closely.
-            self.border_left = 24   # pixels from left edge to first text column
-            self.border_top = 42    # pixels from top edge to first text row
-
             # Choose a total frame large enough for borders; keep your 384×270
             self.total_width = 384
             self.total_height = 270
 
-            # Derive remaining border sizes (mainly for information / aesthetics)
-            self.border_right = self.total_width - self.border_left - self.text_width
-            self.border_bottom = self.total_height - self.border_top - self.text_height
+            # Center the text area within the total frame
+            # This gives symmetric borders on all sides
+            self.border_left = (self.total_width - self.text_width) // 2    # 32 pixels
+            self.border_right = self.total_width - self.border_left - self.text_width  # 32 pixels
+            self.border_top = (self.total_height - self.text_height) // 2   # 35 pixels
+            self.border_bottom = self.total_height - self.border_top - self.text_height  # 35 pixels
 
             # NTSC-ish timing (match what you already use elsewhere)
             self.raster_lines = 263

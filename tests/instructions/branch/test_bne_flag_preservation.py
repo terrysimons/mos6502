@@ -21,6 +21,9 @@ def test_cpu_instruction_BNE_preserves_flags_when_branch_taken(cpu: CPU) -> None
     BNE should not modify ANY flags.
     """
     # given:
+    cycles_before = cpu.cycles_executed
+    cpu.PC = 0x0400
+    pc = cpu.PC
     # Set flags to 0x50: N=0, V=1, unused=1, B=0, D=1, I=0, Z=0, C=0
     # (In 6502 bit order: NV-BDIZC = 0101 0000)
     cpu._flags = Byte(0x50)
@@ -32,8 +35,8 @@ def test_cpu_instruction_BNE_preserves_flags_when_branch_taken(cpu: CPU) -> None
     initial_flags = cpu._flags.value
 
     # BNE with offset +10
-    cpu.ram[0xFFFC] = instructions.BNE_RELATIVE_0xD0
-    cpu.ram[0xFFFD] = 0x0A
+    cpu.ram[pc] = instructions.BNE_RELATIVE_0xD0
+    cpu.ram[pc + 1] = 0x0A
 
     # when:
     with contextlib.suppress(errors.CPUCycleExhaustionError):
@@ -49,6 +52,9 @@ def test_cpu_instruction_BNE_preserves_flags_when_branch_taken(cpu: CPU) -> None
 def test_cpu_instruction_BNE_preserves_flags_when_branch_not_taken(cpu: CPU) -> None:  # noqa: N802
     """Test that BNE preserves all flags when branch is not taken (Z=1)."""
     # given:
+    cycles_before = cpu.cycles_executed
+    cpu.PC = 0x0400
+    pc = cpu.PC
     # Set flags to 0x50
     cpu._flags = Byte(0x50)
 
@@ -59,8 +65,8 @@ def test_cpu_instruction_BNE_preserves_flags_when_branch_not_taken(cpu: CPU) -> 
     initial_flags = cpu._flags.value
 
     # BNE with offset +10
-    cpu.ram[0xFFFC] = instructions.BNE_RELATIVE_0xD0
-    cpu.ram[0xFFFD] = 0x0A
+    cpu.ram[pc] = instructions.BNE_RELATIVE_0xD0
+    cpu.ram[pc + 1] = 0x0A
 
     # when:
     with contextlib.suppress(errors.CPUCycleExhaustionError):

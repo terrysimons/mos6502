@@ -20,16 +20,19 @@ def check_noop_flags(expected_cpu: CPU, actual_cpu: CPU) -> None:
 
 def test_cpu_instruction_NOP_IMPLIED_0xEA(cpu: CPU) -> None:  # noqa: N802
     # given:
+    cycles_before = cpu.cycles_executed
+    cpu.PC = 0x0400
+    pc = cpu.PC
     initial_cpu: CPU = copy.deepcopy(cpu)
 
-    cpu.ram[0xFFFC] = instructions.NOP_IMPLIED_0xEA
+    cpu.ram[pc] = instructions.NOP_IMPLIED_0xEA
 
     # when:
     with contextlib.suppress(errors.CPUCycleExhaustionError):
         cpu.execute(cycles=2)
 
     # then:
-    assert cpu.PC == 0xFFFD
-    assert cpu.cycles_executed == 2
+    assert cpu.PC == pc + 1
+    assert cpu.cycles_executed - cycles_before == 2
     check_noop_flags(expected_cpu=initial_cpu, actual_cpu=cpu)
 

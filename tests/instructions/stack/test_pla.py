@@ -21,21 +21,24 @@ def check_noop_flags(expected_cpu: CPU, actual_cpu: CPU) -> None:
 
 def test_cpu_instruction_PLA_IMPLIED_0x68(cpu: CPU) -> None:  # noqa: N802
     # given:
+    cycles_before = cpu.cycles_executed
+    cpu.PC = 0x0400
+    pc = cpu.PC
     initial_cpu: CPU = copy.deepcopy(cpu)
 
     # Push a value onto the stack first
     cpu.ram[cpu.S] = 0x42
     cpu.S -= 1
 
-    cpu.ram[0xFFFC] = instructions.PLA_IMPLIED_0x68
+    cpu.ram[pc] = instructions.PLA_IMPLIED_0x68
 
     # when:
     with contextlib.suppress(errors.CPUCycleExhaustionError):
         cpu.execute(cycles=4)
 
     # then:
-    assert cpu.PC == 0xFFFD
-    assert cpu.cycles_executed == 4  # 1 opcode + 3 for pull
+    assert cpu.PC == pc + 1
+    assert cpu.cycles_executed - cycles_before == 4  # 1 opcode + 3 for pull
     assert cpu.A == 0x42  # Value pulled from stack
     assert cpu.flags[flags.Z] == 0
     assert cpu.flags[flags.N] == 0
@@ -44,21 +47,24 @@ def test_cpu_instruction_PLA_IMPLIED_0x68(cpu: CPU) -> None:  # noqa: N802
 
 def test_cpu_instruction_PLA_IMPLIED_0x68_zero_flag(cpu: CPU) -> None:  # noqa: N802
     # given:
+    cycles_before = cpu.cycles_executed
+    cpu.PC = 0x0400
+    pc = cpu.PC
     initial_cpu: CPU = copy.deepcopy(cpu)
 
     # Push zero onto the stack
     cpu.ram[cpu.S] = 0x00
     cpu.S -= 1
 
-    cpu.ram[0xFFFC] = instructions.PLA_IMPLIED_0x68
+    cpu.ram[pc] = instructions.PLA_IMPLIED_0x68
 
     # when:
     with contextlib.suppress(errors.CPUCycleExhaustionError):
         cpu.execute(cycles=4)
 
     # then:
-    assert cpu.PC == 0xFFFD
-    assert cpu.cycles_executed == 4
+    assert cpu.PC == pc + 1
+    assert cpu.cycles_executed - cycles_before == 4
     assert cpu.A == 0x00
     assert cpu.flags[flags.Z] == 1
     assert cpu.flags[flags.N] == 0
@@ -67,21 +73,24 @@ def test_cpu_instruction_PLA_IMPLIED_0x68_zero_flag(cpu: CPU) -> None:  # noqa: 
 
 def test_cpu_instruction_PLA_IMPLIED_0x68_negative_flag(cpu: CPU) -> None:  # noqa: N802
     # given:
+    cycles_before = cpu.cycles_executed
+    cpu.PC = 0x0400
+    pc = cpu.PC
     initial_cpu: CPU = copy.deepcopy(cpu)
 
     # Push negative value onto the stack
     cpu.ram[cpu.S] = 0x80
     cpu.S -= 1
 
-    cpu.ram[0xFFFC] = instructions.PLA_IMPLIED_0x68
+    cpu.ram[pc] = instructions.PLA_IMPLIED_0x68
 
     # when:
     with contextlib.suppress(errors.CPUCycleExhaustionError):
         cpu.execute(cycles=4)
 
     # then:
-    assert cpu.PC == 0xFFFD
-    assert cpu.cycles_executed == 4
+    assert cpu.PC == pc + 1
+    assert cpu.cycles_executed - cycles_before == 4
     assert cpu.A == 0x80
     assert cpu.flags[flags.Z] == 0
     assert cpu.flags[flags.N] == 1  # 0x80 has bit 7 set
@@ -91,20 +100,23 @@ def test_cpu_instruction_PLA_IMPLIED_0x68_negative_flag(cpu: CPU) -> None:  # no
 def test_cpu_instruction_PLA_IMPLIED_0x68_with_pha(cpu: CPU) -> None:  # noqa: N802
     """Test PLA after PHA - round trip."""
     # given:
+    cycles_before = cpu.cycles_executed
+    cpu.PC = 0x0400
+    pc = cpu.PC
     initial_cpu: CPU = copy.deepcopy(cpu)
 
     cpu.A = 0x55
 
-    cpu.ram[0xFFFC] = instructions.PHA_IMPLIED_0x48
-    cpu.ram[0xFFFD] = instructions.PLA_IMPLIED_0x68
+    cpu.ram[pc] = instructions.PHA_IMPLIED_0x48
+    cpu.ram[pc + 1] = instructions.PLA_IMPLIED_0x68
 
     # when:
     with contextlib.suppress(errors.CPUCycleExhaustionError):
         cpu.execute(cycles=7)
 
     # then:
-    assert cpu.PC == 0xFFFE
-    assert cpu.cycles_executed == 7  # 3 for PHA + 4 for PLA
+    assert cpu.PC == pc + 2
+    assert cpu.cycles_executed - cycles_before == 7  # 3 for PHA + 4 for PLA
     assert cpu.A == 0x55  # Same value pulled back
     check_noop_flags(expected_cpu=initial_cpu, actual_cpu=cpu)
 
@@ -112,21 +124,24 @@ def test_cpu_instruction_PLA_IMPLIED_0x68_with_pha(cpu: CPU) -> None:  # noqa: N
 def test_cpu_instruction_PLA_IMPLIED_0x68_near_stack_bottom(cpu: CPU) -> None:  # noqa: N802
     """Test PLA when pulling from near bottom of stack."""
     # given:
+    cycles_before = cpu.cycles_executed
+    cpu.PC = 0x0400
+    pc = cpu.PC
     initial_cpu: CPU = copy.deepcopy(cpu)
 
     # Set stack pointer to a low value
     cpu.S = 0x101
     cpu.ram[0x0102] = 0xBB  # Value to be pulled
 
-    cpu.ram[0xFFFC] = instructions.PLA_IMPLIED_0x68
+    cpu.ram[pc] = instructions.PLA_IMPLIED_0x68
 
     # when:
     with contextlib.suppress(errors.CPUCycleExhaustionError):
         cpu.execute(cycles=4)
 
     # then:
-    assert cpu.PC == 0xFFFD
-    assert cpu.cycles_executed == 4
+    assert cpu.PC == pc + 1
+    assert cpu.cycles_executed - cycles_before == 4
     assert cpu.A == 0xBB  # Value pulled from 0x0102
     assert cpu.S == 0x102  # Stack pointer incremented
     assert cpu.flags[flags.Z] == 0
@@ -137,6 +152,9 @@ def test_cpu_instruction_PLA_IMPLIED_0x68_near_stack_bottom(cpu: CPU) -> None:  
 def test_cpu_instruction_PLA_IMPLIED_0x68_multiple_pulls(cpu: CPU) -> None:  # noqa: N802
     """Test multiple PLA operations in sequence."""
     # given:
+    cycles_before = cpu.cycles_executed
+    cpu.PC = 0x0400
+    pc = cpu.PC
     initial_cpu: CPU = copy.deepcopy(cpu)
 
     # Set up stack with three values
@@ -145,9 +163,9 @@ def test_cpu_instruction_PLA_IMPLIED_0x68_multiple_pulls(cpu: CPU) -> None:  # n
     cpu.ram[0x01FE] = 0x22  # Second to be pulled
     cpu.ram[0x01FF] = 0x33  # Third to be pulled
 
-    cpu.ram[0xFFFC] = instructions.PLA_IMPLIED_0x68
-    cpu.ram[0xFFFD] = instructions.PLA_IMPLIED_0x68
-    cpu.ram[0xFFFE] = instructions.PLA_IMPLIED_0x68
+    cpu.ram[pc] = instructions.PLA_IMPLIED_0x68
+    cpu.ram[pc + 1] = instructions.PLA_IMPLIED_0x68
+    cpu.ram[pc + 2] = instructions.PLA_IMPLIED_0x68
 
     # when:
     with contextlib.suppress(errors.CPUCycleExhaustionError):

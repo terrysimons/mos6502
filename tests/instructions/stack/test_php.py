@@ -23,6 +23,9 @@ def check_noop_flags(expected_cpu: CPU, actual_cpu: CPU) -> None:
 
 def test_cpu_instruction_PHP_IMPLIED_0x08(cpu: CPU) -> None:  # noqa: N802
     # given:
+    cycles_before = cpu.cycles_executed
+    cpu.PC = 0x0400
+    pc = cpu.PC
     initial_cpu: CPU = copy.deepcopy(cpu)
 
     # Set some flags
@@ -33,15 +36,15 @@ def test_cpu_instruction_PHP_IMPLIED_0x08(cpu: CPU) -> None:  # noqa: N802
     initial_sp: int = cpu.S
     initial_flags: int = cpu.flags.value
 
-    cpu.ram[0xFFFC] = instructions.PHP_IMPLIED_0x08
+    cpu.ram[pc] = instructions.PHP_IMPLIED_0x08
 
     # when:
     with contextlib.suppress(errors.CPUCycleExhaustionError):
         cpu.execute(cycles=3)
 
     # then:
-    assert cpu.PC == 0xFFFD
-    assert cpu.cycles_executed == 3  # 1 opcode + 2 for push
+    assert cpu.PC == pc + 1
+    assert cpu.cycles_executed - cycles_before == 3  # 1 opcode + 2 for push
     assert cpu.S == initial_sp - 1  # Stack pointer decremented
 
     # PHP pushes status with B flag set (bits 4 and 5 set to 1)
@@ -55,12 +58,15 @@ def test_cpu_instruction_PHP_IMPLIED_0x08(cpu: CPU) -> None:  # noqa: N802
 def test_cpu_instruction_PHP_IMPLIED_0x08_b_flag(cpu: CPU) -> None:  # noqa: N802
     """Test that PHP sets B flag in pushed status."""
     # given:
+    cycles_before = cpu.cycles_executed
+    cpu.PC = 0x0400
+    pc = cpu.PC
 
     # Flags are already 0 after reset
     initial_sp: int = cpu.S
     initial_flags: int = cpu.flags.value
 
-    cpu.ram[0xFFFC] = instructions.PHP_IMPLIED_0x08
+    cpu.ram[pc] = instructions.PHP_IMPLIED_0x08
 
     # when:
     with contextlib.suppress(errors.CPUCycleExhaustionError):

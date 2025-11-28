@@ -27,13 +27,14 @@ class TestLASNMOS:
     def test_las_loads_and_result(self, nmos_cpu) -> None:
         """Test LAS loads (M & S) into A, X, and S."""
         nmos_cpu.reset()
+        nmos_cpu.PC = 0x0400
         nmos_cpu.S = 0xFF
         nmos_cpu.Y = 0x10
         nmos_cpu.ram[0x1234 + 0x10] = 0xAA
 
-        nmos_cpu.ram[0xFFFC] = instructions.LAS_ABSOLUTE_Y_0xBB
-        nmos_cpu.ram[0xFFFD] = 0x34
-        nmos_cpu.ram[0xFFFE] = 0x12
+        nmos_cpu.ram[nmos_cpu.PC] = instructions.LAS_ABSOLUTE_Y_0xBB
+        nmos_cpu.ram[nmos_cpu.PC + 1] = 0x34
+        nmos_cpu.ram[nmos_cpu.PC + 2] = 0x12
 
         with contextlib.suppress(errors.CPUCycleExhaustionError):
             nmos_cpu.execute(cycles=4)
@@ -48,13 +49,14 @@ class TestLASNMOS:
     def test_las_with_partial_and(self, nmos_cpu) -> None:
         """Test LAS with partial AND result."""
         nmos_cpu.reset()
+        nmos_cpu.PC = 0x0400
         nmos_cpu.S = 0x0F
         nmos_cpu.Y = 0x00
         nmos_cpu.ram[0x1000] = 0xFF
 
-        nmos_cpu.ram[0xFFFC] = instructions.LAS_ABSOLUTE_Y_0xBB
-        nmos_cpu.ram[0xFFFD] = 0x00
-        nmos_cpu.ram[0xFFFE] = 0x10
+        nmos_cpu.ram[nmos_cpu.PC] = instructions.LAS_ABSOLUTE_Y_0xBB
+        nmos_cpu.ram[nmos_cpu.PC + 1] = 0x00
+        nmos_cpu.ram[nmos_cpu.PC + 2] = 0x10
 
         with contextlib.suppress(errors.CPUCycleExhaustionError):
             nmos_cpu.execute(cycles=4)
@@ -67,13 +69,14 @@ class TestLASNMOS:
     def test_las_sets_zero_flag(self, nmos_cpu) -> None:
         """Test LAS sets zero flag when result is zero."""
         nmos_cpu.reset()
+        nmos_cpu.PC = 0x0400
         nmos_cpu.S = 0x00
         nmos_cpu.Y = 0x00
         nmos_cpu.ram[0x2000] = 0xFF
 
-        nmos_cpu.ram[0xFFFC] = instructions.LAS_ABSOLUTE_Y_0xBB
-        nmos_cpu.ram[0xFFFD] = 0x00
-        nmos_cpu.ram[0xFFFE] = 0x20
+        nmos_cpu.ram[nmos_cpu.PC] = instructions.LAS_ABSOLUTE_Y_0xBB
+        nmos_cpu.ram[nmos_cpu.PC + 1] = 0x00
+        nmos_cpu.ram[nmos_cpu.PC + 2] = 0x20
 
         with contextlib.suppress(errors.CPUCycleExhaustionError):
             nmos_cpu.execute(cycles=4)
@@ -92,15 +95,16 @@ class TestLASCMOS:
     def test_las_acts_as_nop(self, cmos_cpu) -> None:
         """Test LAS acts as NOP on CMOS (65C02)."""
         cmos_cpu.reset()
+        cmos_cpu.PC = 0x0400
         cmos_cpu.A = 0x11
         cmos_cpu.X = 0x22
         cmos_cpu.S = 0xFF
         cmos_cpu.Y = 0x10
         cmos_cpu.ram[0x1244] = 0xAA
 
-        cmos_cpu.ram[0xFFFC] = instructions.LAS_ABSOLUTE_Y_0xBB
-        cmos_cpu.ram[0xFFFD] = 0x34
-        cmos_cpu.ram[0xFFFE] = 0x12
+        cmos_cpu.ram[cmos_cpu.PC] = instructions.LAS_ABSOLUTE_Y_0xBB
+        cmos_cpu.ram[cmos_cpu.PC + 1] = 0x34
+        cmos_cpu.ram[cmos_cpu.PC + 2] = 0x12
 
         with contextlib.suppress(errors.CPUCycleExhaustionError):
             cmos_cpu.execute(cycles=4)

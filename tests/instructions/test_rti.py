@@ -13,6 +13,9 @@ log.setLevel(logging.DEBUG)
 
 def test_cpu_instruction_RTI_IMPLIED_0x40(cpu: CPU) -> None:  # noqa: N802
     # given:
+    cycles_before = cpu.cycles_executed
+    cpu.PC = 0x0400
+    pc = cpu.PC
 
     # Simulate interrupt state: PC and status pushed on stack
     # (BRK pushes PC first, then status)
@@ -30,7 +33,7 @@ def test_cpu_instruction_RTI_IMPLIED_0x40(cpu: CPU) -> None:  # noqa: N802
     # Clear flags to verify RTI restores them
     cpu._flags = Byte(0x00)
 
-    cpu.ram[0xFFFC] = instructions.RTI_IMPLIED_0x40
+    cpu.ram[pc] = instructions.RTI_IMPLIED_0x40
 
     # when:
     with contextlib.suppress(errors.CPUCycleExhaustionError):
@@ -38,7 +41,7 @@ def test_cpu_instruction_RTI_IMPLIED_0x40(cpu: CPU) -> None:  # noqa: N802
 
     # then:
     assert cpu.PC == 0x8000
-    assert cpu.cycles_executed == 6  # 1 opcode + 1 read status + 2 read PC + 2 overhead
+    assert cpu.cycles_executed - cycles_before == 6  # 1 opcode + 1 read status + 2 read PC + 2 overhead
     assert cpu.flags.value == status_value
     assert cpu.flags[flags.C] == 1
     assert cpu.flags[flags.Z] == 1
@@ -51,6 +54,9 @@ def test_cpu_instruction_RTI_IMPLIED_0x40(cpu: CPU) -> None:  # noqa: N802
 def test_cpu_instruction_RTI_IMPLIED_0x40_stack_pointer(cpu: CPU) -> None:  # noqa: N802
     """Test that RTI correctly adjusts stack pointer."""
     # given:
+    cycles_before = cpu.cycles_executed
+    cpu.PC = 0x0400
+    pc = cpu.PC
 
     initial_sp: int = cpu.S
 
@@ -66,7 +72,7 @@ def test_cpu_instruction_RTI_IMPLIED_0x40_stack_pointer(cpu: CPU) -> None:  # no
 
     stack_after_push: int = cpu.S
 
-    cpu.ram[0xFFFC] = instructions.RTI_IMPLIED_0x40
+    cpu.ram[pc] = instructions.RTI_IMPLIED_0x40
 
     # when:
     with contextlib.suppress(errors.CPUCycleExhaustionError):
@@ -80,6 +86,9 @@ def test_cpu_instruction_RTI_IMPLIED_0x40_stack_pointer(cpu: CPU) -> None:  # no
 def test_cpu_instruction_RTI_preserves_FlagsRegister_type(cpu: CPU) -> None:  # noqa: N802
     """Test that RTI maintains the FlagsRegister type, not replacing it with plain Byte."""
     # given:
+    cycles_before = cpu.cycles_executed
+    cpu.PC = 0x0400
+    pc = cpu.PC
     # Push PC (0x8000)
     cpu.ram[cpu.S] = 0x80
     cpu.ram[cpu.S - 1] = 0x00
@@ -89,7 +98,7 @@ def test_cpu_instruction_RTI_preserves_FlagsRegister_type(cpu: CPU) -> None:  # 
     cpu.ram[cpu.S] = 0xF0
     cpu.S -= 1
 
-    cpu.ram[0xFFFC] = instructions.RTI_IMPLIED_0x40
+    cpu.ram[pc] = instructions.RTI_IMPLIED_0x40
 
     # Verify we start with a FlagsRegister
     assert isinstance(cpu._flags, FlagsRegister), "CPU should start with FlagsRegister"

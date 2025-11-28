@@ -1,9 +1,219 @@
 #!/usr/bin/env python3
 """Instruction set for the mos6502 CPU."""
 import enum
-from typing import NoReturn
+from dataclasses import dataclass
+from typing import Literal, NoReturn, Self
 
 from mos6502.errors import IllegalCPUInstructionError
+
+
+# Addressing mode type alias for documentation and IDE support
+AddressingMode = Literal[
+    "implied",
+    "accumulator",
+    "immediate",
+    "zeropage",
+    "zeropage,X",
+    "zeropage,Y",
+    "absolute",
+    "absolute,X",
+    "absolute,Y",
+    "(indirect,X)",
+    "(indirect),Y",
+    "indirect",
+    "relative",
+]
+
+
+@dataclass(frozen=True, slots=True)
+class CPUInstruction:
+    """Metadata for a 6502 CPU instruction opcode.
+
+    This dataclass provides structured, validated metadata for each instruction,
+    replacing the untyped dictionaries previously used in instruction_map.
+
+    Attributes
+    ----------
+        opcode: The instruction opcode byte (0x00-0xFF)
+        mnemonic: The instruction mnemonic (e.g., "LDA", "STA", "ADC")
+        addressing: The addressing mode used by this opcode variant
+        assembler: Format string for disassembly (e.g., "LDA #{oper}")
+        bytes: Number of bytes this instruction occupies (1-3)
+        base_cycles: Base cycle count for this instruction
+        affected_flags: String of flag letters affected (e.g., "NZ", "NVZC")
+        package: Python package path for variant dispatch
+        function: Function name for variant dispatch
+        page_boundary_penalty: True if crossing page boundary adds a cycle
+
+    """
+
+    opcode: int
+    mnemonic: str
+    addressing: AddressingMode
+    assembler: str
+    bytes: int
+    base_cycles: int
+    affected_flags: str
+    package: str
+    function: str
+    page_boundary_penalty: bool = False
+
+    def __post_init__(self: Self) -> None:
+        """Validate instruction metadata after initialization."""
+        if not 0x00 <= self.opcode <= 0xFF:
+            msg = f"Opcode must be 0x00-0xFF, got: 0x{self.opcode:02X}"
+            raise ValueError(msg)
+
+        if not 1 <= self.bytes <= 3:
+            msg = f"Bytes must be 1-3, got: {self.bytes}"
+            raise ValueError(msg)
+
+        if not 1 <= self.base_cycles <= 8:
+            msg = f"Base cycles must be 1-8, got: {self.base_cycles}"
+            raise ValueError(msg)
+
+        valid_flags = set("NVBDIZC")
+        invalid = set(self.affected_flags) - valid_flags
+        if invalid:
+            msg = f"Invalid flag characters: {invalid}"
+            raise ValueError(msg)
+
+    @property
+    def name(self: Self) -> str:
+        """Generate canonical name like LDA_IMMEDIATE_0xA9."""
+        addr_map = {
+            "implied": "IMPLIED",
+            "accumulator": "ACCUMULATOR",
+            "immediate": "IMMEDIATE",
+            "zeropage": "ZEROPAGE",
+            "zeropage,X": "ZEROPAGE_X",
+            "zeropage,Y": "ZEROPAGE_Y",
+            "absolute": "ABSOLUTE",
+            "absolute,X": "ABSOLUTE_X",
+            "absolute,Y": "ABSOLUTE_Y",
+            "(indirect,X)": "INDEXED_INDIRECT_X",
+            "(indirect),Y": "INDIRECT_INDEXED_Y",
+            "indirect": "INDIRECT",
+            "relative": "RELATIVE",
+        }
+        addr_name = addr_map.get(self.addressing, self.addressing.upper())
+        return f"{self.mnemonic}_{addr_name}_0x{self.opcode:02X}"
+
+    @property
+    def cycles_display(self: Self) -> str:
+        """Return cycles as display string (e.g., '4' or '4*' for page penalty)."""
+        if self.page_boundary_penalty:
+            return f"{self.base_cycles}*"
+        return str(self.base_cycles)
+
+    @property
+    def affects_n(self: Self) -> bool:
+        """True if instruction affects Negative flag."""
+        return "N" in self.affected_flags
+
+    @property
+    def affects_v(self: Self) -> bool:
+        """True if instruction affects Overflow flag."""
+        return "V" in self.affected_flags
+
+    @property
+    def affects_z(self: Self) -> bool:
+        """True if instruction affects Zero flag."""
+        return "Z" in self.affected_flags
+
+    @property
+    def affects_c(self: Self) -> bool:
+        """True if instruction affects Carry flag."""
+        return "C" in self.affected_flags
+
+    @property
+    def affects_i(self: Self) -> bool:
+        """True if instruction affects Interrupt Disable flag."""
+        return "I" in self.affected_flags
+
+    @property
+    def affects_d(self: Self) -> bool:
+        """True if instruction affects Decimal flag."""
+        return "D" in self.affected_flags
+
+    def to_legacy_dict(self: Self) -> dict:
+        """Convert to legacy instruction_map dictionary format."""
+        from mos6502 import flags as flag_bits
+        from mos6502.memory import Byte
+
+        flags_byte = Byte()
+        if self.affects_n:
+            flags_byte[flag_bits.N] = 1
+        if self.affects_v:
+            flags_byte[flag_bits.V] = 1
+        if self.affects_z:
+            flags_byte[flag_bits.Z] = 1
+        if self.affects_c:
+            flags_byte[flag_bits.C] = 1
+        if self.affects_i:
+            flags_byte[flag_bits.I] = 1
+        if self.affects_d:
+            flags_byte[flag_bits.D] = 1
+
+        return {
+            "addressing": self.addressing,
+            "assembler": self.assembler,
+            "opc": self.opcode,
+            "bytes": str(self.bytes),
+            "cycles": self.cycles_display,
+            "flags": flags_byte,
+        }
+
+    def __int__(self: Self) -> int:
+        """Allow using CPUInstruction where an int opcode is expected."""
+        return self.opcode
+
+    def __hash__(self: Self) -> int:
+        """Hash by opcode for use in sets and as dict keys."""
+        return hash(self.opcode)
+
+
+class PseudoEnumMember(int):
+    """Allows dynamic addition of members to IntEnum classes."""
+
+    def __new__(cls, value: int, name: str) -> "PseudoEnumMember":
+        """Create a pseudo-enum member with the given value and name."""
+        obj = int.__new__(cls, value)
+        obj._name = name
+        obj._value_ = value
+        return obj
+
+    @property
+    def name(self: Self) -> str:
+        """Return the member name."""
+        return self._name
+
+    @property
+    def value(self: Self) -> int:
+        """Return the member value."""
+        return self._value_
+
+
+def register_instruction(
+    instruction: CPUInstruction,
+    instruction_set_class: type,
+    instruction_map: dict,
+) -> None:
+    """Register a single instruction in the InstructionSet enum and map."""
+    member = PseudoEnumMember(instruction.opcode, instruction.name)
+    instruction_set_class._value2member_map_[instruction.opcode] = member
+    setattr(instruction_set_class, instruction.name, instruction.opcode)
+    instruction_map[instruction.opcode] = instruction.to_legacy_dict()
+
+
+def register_instructions(
+    instructions: list[CPUInstruction],
+    instruction_set_class: type,
+    instruction_map: dict,
+) -> None:
+    """Register multiple instructions in the InstructionSet enum and map."""
+    for instruction in instructions:
+        register_instruction(instruction, instruction_set_class, instruction_map)
 
 
 class InstructionOpcode(int):
@@ -339,7 +549,12 @@ from mos6502.instructions.transfer import register_all_transfer_instructions
 from mos6502.instructions.transfer import *  # noqa: F403
 
 __all__ = [
-    # Instruction Set
+    # Core classes and helpers
+    "CPUInstruction",
+    "PseudoEnumMember",
+    "register_instruction",
+    "register_instructions",
+    "InstructionOpcode",
     "InstructionSet",
 
     # ADC

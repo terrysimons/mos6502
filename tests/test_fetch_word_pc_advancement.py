@@ -115,6 +115,7 @@ def test_jsr_advances_pc_correctly(cpu: CPU) -> None:
     """
     # given:
     cpu.PC = 0x0800
+    initial_sp = cpu.S
 
     # JSR $1234 at $0800
     cpu.ram[0x0800] = 0x20  # JSR opcode
@@ -131,11 +132,11 @@ def test_jsr_advances_pc_correctly(cpu: CPU) -> None:
     # then: PC should be at subroutine address
     assert cpu.PC == 0x1234, f"Expected PC=0x1234 after JSR, got PC=0x{cpu.PC:04X}"
 
-    # Stack should contain return address (PC after JSR, which is $0803)
-    # JSR pushes PC+1-1 = PC, but PC should have been advanced to $0803
-    # So stack should have $0802 (the byte before $0803)
-    return_addr_high = cpu.ram[0x01FF]
-    return_addr_low = cpu.ram[0x01FE]
+    # Stack should contain return address (PC after JSR - 1, which is $0802)
+    # JSR pushes PC-1 (the address of the last byte of the JSR instruction)
+    # Stack grows downward: high byte at S, low byte at S-1, then S decremented by 2
+    return_addr_high = cpu.ram[initial_sp]
+    return_addr_low = cpu.ram[initial_sp - 1]
     return_addr = (return_addr_high << 8) | return_addr_low
 
     assert return_addr == 0x0802, (

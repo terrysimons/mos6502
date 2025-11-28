@@ -416,6 +416,36 @@ class MOS6502CPU(flags.ProcessorStatusFlagsInterface):
         self.log.debug(f"read_word({memory_section}[0x{address:02x}]): 0x{data:04X} ({data})")
         return Word(data, endianness=self.endianness)
 
+    def read_word_zeropage(self: Self, address: Byte) -> Word:
+        """
+        Read a Word() from zero page at location RAM[address].
+
+        Handles zero page wrap: if address is 0xFF, highbyte comes from 0x00.
+
+        Costs 2 CPU cycles.
+
+        VARIANT: 6502 - Zero page wrap at 0xFF boundary (reads 0xFF and 0x00)
+        VARIANT: 65C02 - Same behavior as 6502
+        VARIANT: 65C816 - Same behavior in emulation mode
+
+        Arguments:
+        ---------
+            address: the zero page address to read from (0x00-0xFF)
+
+        Returns:
+        -------
+            a Word() set to the value located in memory at RAM[address:address+1]
+        """
+        lowbyte: Byte = self.ram[int(address) & 0xFF]
+        self.log.info("r")
+        self.spend_cpu_cycles(cost=1)
+        highbyte: Byte = self.ram[(int(address) + 1) & 0xFF]
+        self.log.info("r")
+        self.spend_cpu_cycles(cost=1)
+        data = (int(highbyte) << 8) + int(lowbyte)
+        self.log.debug(f"read_word(zeropage[0x{address & 0xFF:02x}]): 0x{data:04X} ({data})")
+        return Word(data, endianness=self.endianness)
+
     def peek_word(self: Self, address: Word) -> Word:
         """
         Read a Word() from RAM at location RAM[address].
@@ -677,7 +707,8 @@ class MOS6502CPU(flags.ProcessorStatusFlagsInterface):
         indirect_address: Byte = self.fetch_byte()
         offset_register_value: Byte = self.X
 
-        address: Word = self.read_word(indirect_address + offset_register_value)
+        # Use read_word_zeropage to handle zero page wrap at 0xFF boundary
+        address: Word = self.read_word_zeropage((indirect_address + offset_register_value) & 0xFF)
 
         return address
 
@@ -700,7 +731,8 @@ class MOS6502CPU(flags.ProcessorStatusFlagsInterface):
         indirect_address: Byte = self.fetch_byte()
         offset_register_value: Byte = self.Y
 
-        absolute_address: Word = self.read_word(indirect_address)
+        # Use read_word_zeropage to handle zero page wrap at 0xFF boundary
+        absolute_address: Word = self.read_word_zeropage(indirect_address)
 
         # Note: We add these together this way to ensure
         # an overflow condition

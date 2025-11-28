@@ -61,28 +61,34 @@ def test_nop_dispatch_6502() -> None:
     """Test NOP instruction works with 6502 variant."""
     cpu: mos6502.CPU = mos6502.CPU(cpu_variant="6502")
     cpu.reset()
+    cycles_before = cpu.cycles_executed
+    cpu.PC = 0x0400
+    pc = cpu.PC
 
-    cpu.ram[0xFFFC] = instructions.NOP_IMPLIED_0xEA
+    cpu.ram[pc] = instructions.NOP_IMPLIED_0xEA
 
     with contextlib.suppress(errors.CPUCycleExhaustionError):
         cpu.execute(cycles=2)
 
-    assert cpu.PC == 0xFFFD
-    assert cpu.cycles_executed == 2
+    assert cpu.PC == pc + 1
+    assert cpu.cycles_executed - cycles_before == 2
 
 
 def test_nop_dispatch_65c02() -> None:
     """Test NOP instruction works with 65C02 variant."""
     cpu: mos6502.CPU = mos6502.CPU(cpu_variant="65C02")
     cpu.reset()
+    cycles_before = cpu.cycles_executed
+    cpu.PC = 0x0400
+    pc = cpu.PC
 
-    cpu.ram[0xFFFC] = instructions.NOP_IMPLIED_0xEA
+    cpu.ram[pc] = instructions.NOP_IMPLIED_0xEA
 
     with contextlib.suppress(errors.CPUCycleExhaustionError):
         cpu.execute(cycles=2)
 
-    assert cpu.PC == 0xFFFD
-    assert cpu.cycles_executed == 2
+    assert cpu.PC == pc + 1
+    assert cpu.cycles_executed - cycles_before == 2
 
 
 def test_brk_d_flag_preserved_nmos_6502() -> None:
@@ -95,13 +101,15 @@ def test_brk_d_flag_preserved_nmos_6502() -> None:
 
     cpu: mos6502.CPU = mos6502.CPU(cpu_variant="6502")
     cpu.reset()
+    cpu.PC = 0x0400
+    pc = cpu.PC
 
     # Set D flag before BRK
     cpu.D = flags.ProcessorStatusFlags.D[flags.D]
     assert cpu.D, "D flag should be set initially"
 
-    cpu.ram[0xFFFC] = instructions.BRK_IMPLIED_0x00
-    cpu.ram[0xFFFD] = 0x00
+    cpu.ram[pc] = instructions.BRK_IMPLIED_0x00
+    cpu.ram[pc + 1] = 0x00
 
     with contextlib.suppress(errors.CPUCycleExhaustionError, errors.CPUBreakError):
         cpu.execute(cycles=7)
@@ -122,13 +130,15 @@ def test_brk_d_flag_preserved_nmos_6502a() -> None:
 
     cpu: mos6502.CPU = mos6502.CPU(cpu_variant="6502A")
     cpu.reset()
+    cpu.PC = 0x0400
+    pc = cpu.PC
 
     # Set D flag before BRK
     cpu.D = flags.ProcessorStatusFlags.D[flags.D]
     assert cpu.D, "D flag should be set initially"
 
-    cpu.ram[0xFFFC] = instructions.BRK_IMPLIED_0x00
-    cpu.ram[0xFFFD] = 0x00
+    cpu.ram[pc] = instructions.BRK_IMPLIED_0x00
+    cpu.ram[pc + 1] = 0x00
 
     with contextlib.suppress(errors.CPUCycleExhaustionError, errors.CPUBreakError):
         cpu.execute(cycles=7)
@@ -149,13 +159,15 @@ def test_brk_d_flag_preserved_nmos_6502c() -> None:
 
     cpu: mos6502.CPU = mos6502.CPU(cpu_variant="6502C")
     cpu.reset()
+    cpu.PC = 0x0400
+    pc = cpu.PC
 
     # Set D flag before BRK
     cpu.D = flags.ProcessorStatusFlags.D[flags.D]
     assert cpu.D, "D flag should be set initially"
 
-    cpu.ram[0xFFFC] = instructions.BRK_IMPLIED_0x00
-    cpu.ram[0xFFFD] = 0x00
+    cpu.ram[pc] = instructions.BRK_IMPLIED_0x00
+    cpu.ram[pc + 1] = 0x00
 
     with contextlib.suppress(errors.CPUCycleExhaustionError, errors.CPUBreakError):
         cpu.execute(cycles=7)
@@ -177,13 +189,15 @@ def test_brk_d_flag_cleared_cmos_65c02() -> None:
 
     cpu: mos6502.CPU = mos6502.CPU(cpu_variant="65C02")
     cpu.reset()
+    cpu.PC = 0x0400
+    pc = cpu.PC
 
     # Set D flag before BRK
     cpu.D = flags.ProcessorStatusFlags.D[flags.D]
     assert cpu.D, "D flag should be set initially"
 
-    cpu.ram[0xFFFC] = instructions.BRK_IMPLIED_0x00
-    cpu.ram[0xFFFD] = 0x00
+    cpu.ram[pc] = instructions.BRK_IMPLIED_0x00
+    cpu.ram[pc + 1] = 0x00
 
     with contextlib.suppress(errors.CPUCycleExhaustionError, errors.CPUBreakError):
         cpu.execute(cycles=7)

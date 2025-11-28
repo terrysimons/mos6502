@@ -27,6 +27,9 @@ def verify_store_zeropage(cpu: CPU, data: Byte, instruction: instructions.Instru
                           offset_register_name: str = None, offset_value: int = 0x00) -> None:
     # given:
     initial_cpu: CPU = copy.deepcopy(cpu)
+    cycles_before = cpu.cycles_executed
+    cpu.PC = 0x0400
+    pc = cpu.PC
 
     # Load the register with a value to be stored in memory
     setattr(cpu, register_name, data)
@@ -36,8 +39,8 @@ def verify_store_zeropage(cpu: CPU, data: Byte, instruction: instructions.Instru
         setattr(cpu, offset_register_name, offset_value)
 
     # Load with zeropage offset
-    cpu.ram[0xFFFC] = instruction
-    cpu.ram[0xFFFD] = offset
+    cpu.ram[pc] = instruction
+    cpu.ram[pc + 1] = offset
 
     # zero page is 0x00-0xFF, so need to handle wraparound
     cpu.ram[(offset + offset_value) & 0xFF] = 0x00
@@ -47,7 +50,7 @@ def verify_store_zeropage(cpu: CPU, data: Byte, instruction: instructions.Instru
         cpu.execute(cycles=expected_cycles)
 
     # expect:
-    assert cpu.cycles_executed == expected_cycles
+    assert cpu.cycles_executed - cycles_before == expected_cycles
     assert cpu.ram[(offset + offset_value) & 0xFF] == data
     assert cpu.flags == expected_flags
     check_noop_flags(expected_cpu=initial_cpu, actual_cpu=cpu)
@@ -59,21 +62,24 @@ def verify_store_absolute(cpu: CPU, data: Byte, instruction: instructions.Instru
                           offset_register_name: str = None, offset_value: int = 0x00) -> None:
     # given:
     initial_cpu: CPU = copy.deepcopy(cpu)
+    cycles_before = cpu.cycles_executed
+    cpu.PC = 0x0400
+    pc = cpu.PC
 
     # Load the register with a value to be stored in memory
     setattr(cpu, register_name, data)
 
     # Load with absolute offset
-    cpu.ram[0xFFFC] = instruction
-    cpu.ram[0xFFFD] = offset.lowbyte
-    cpu.ram[0xFFFE] = offset.highbyte
+    cpu.ram[pc] = instruction
+    cpu.ram[pc + 1] = offset.lowbyte
+    cpu.ram[pc + 2] = offset.highbyte
 
     # when:
     with contextlib.suppress(errors.CPUCycleExhaustionError):
         cpu.execute(cycles=expected_cycles)
 
     # expect:
-    assert cpu.cycles_executed == expected_cycles
+    assert cpu.cycles_executed - cycles_before == expected_cycles
     assert cpu.ram[offset & 0xFFFF] == data
     assert cpu.flags == expected_flags
     check_noop_flags(expected_cpu=initial_cpu, actual_cpu=cpu)

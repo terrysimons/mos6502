@@ -4,7 +4,7 @@ import copy
 import logging
 
 import mos6502
-from mos6502 import errors, flags, instructions
+from mos6502 import CPU, errors, flags, instructions
 
 log: logging.Logger = logging.getLogger("mos6502")
 log.setLevel(logging.DEBUG)
@@ -22,12 +22,14 @@ def check_noop_flags(expected_cpu: CPU, actual_cpu: CPU) -> None:
 
 def test_cpu_instruction_RTS_IMPLIED_0x60(cpu: CPU) -> None:  # noqa: N802
     # given:
+    cpu.PC = 0x0400
+    pc = cpu.PC
     copy.deepcopy(cpu)
 
     # JSR to 0x4243, then return
-    cpu.ram[0xFFFC] = instructions.JSR_ABSOLUTE_0x20
-    cpu.ram[0xFFFD] = 0x43
-    cpu.ram[0xFFFE] = 0x42
+    cpu.ram[pc] = instructions.JSR_ABSOLUTE_0x20
+    cpu.ram[pc + 1] = 0x43
+    cpu.ram[pc + 2] = 0x42
 
     # Execute JSR first
     with contextlib.suppress(errors.CPUCycleExhaustionError):
@@ -35,16 +37,16 @@ def test_cpu_instruction_RTS_IMPLIED_0x60(cpu: CPU) -> None:  # noqa: N802
 
     assert cpu.PC == 0x4243
 
-    # Reset cycle counter for clearer RTS test
-    cpu.cycles_executed = 0
-
     # Now place RTS at the subroutine location
     cpu.ram[0x4243] = instructions.RTS_IMPLIED_0x60
+
+    # Capture cycles before RTS
+    cycles_before = cpu.cycles_executed
 
     # when: Execute only RTS (6 cycles per 6502 spec)
     with contextlib.suppress(errors.CPUCycleExhaustionError):
         cpu.execute(cycles=6)
 
-    # then: RTS should return to address after JSR (0xFFFF)
-    assert cpu.PC == 0xFFFF
-    assert cpu.cycles_executed == 6
+    # then: RTS should return to address after JSR
+    assert cpu.PC == pc + 3
+    assert cpu.cycles_executed - cycles_before == 6

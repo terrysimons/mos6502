@@ -19,19 +19,22 @@ def check_noop_flags(expected_cpu: CPU, actual_cpu: CPU) -> None:
 def test_cpu_instruction_SEC_IMPLIED_0x38(cpu: CPU) -> None:  # noqa: N802
     """Test SEC instruction sets carry flag on all CPU variants."""
     # given:
+    cycles_before = cpu.cycles_executed
+    cpu.PC = 0x0400
+    pc = cpu.PC
     initial_cpu: CPU = copy.deepcopy(cpu)
 
     cpu.flags[flags.C] = 0
 
-    cpu.ram[0xFFFC] = instructions.SEC_IMPLIED_0x38
+    cpu.ram[pc] = instructions.SEC_IMPLIED_0x38
 
     # when:
     with contextlib.suppress(errors.CPUCycleExhaustionError):
         cpu.execute(cycles=2)
 
     # then:
-    assert cpu.PC == 0xFFFD
-    assert cpu.cycles_executed == 2
+    assert cpu.PC == pc + 1
+    assert cpu.cycles_executed - cycles_before == 2
     assert cpu.flags[flags.C] == 1
     assert cpu.flags[flags.B] == initial_cpu.flags[flags.B]
     assert cpu.flags[flags.D] == initial_cpu.flags[flags.D]

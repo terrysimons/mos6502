@@ -12,46 +12,56 @@ log.setLevel(logging.DEBUG)
 def test_cpu_instruction_BVS_RELATIVE_0x70_branch_taken(cpu: CPU) -> None:  # noqa: N802
     """Test BVS when overflow flag is set (branch taken)."""
     # given:
+    cycles_before = cpu.cycles_executed
+    cpu.PC = 0x0400
+    pc = cpu.PC
 
     # Set overflow flag
     cpu.flags[flags.V] = 1
 
     # BVS with offset +5
-    cpu.ram[0xFFFC] = instructions.BVS_RELATIVE_0x70
-    cpu.ram[0xFFFD] = 0x05
+    cpu.ram[pc] = instructions.BVS_RELATIVE_0x70
+    cpu.ram[pc + 1] = 0x05
 
     # when:
     with contextlib.suppress(errors.CPUCycleExhaustionError):
         cpu.execute(cycles=3)
 
     # then:
-    assert cpu.PC == (0xFFFE + 5) & 0xFFFF  # PC after fetch_byte + offset (wrapped)
-    assert cpu.cycles_executed == 3  # 1 opcode + 1 read offset + 1 branch taken
+    # PC starts at 0x0400, after fetching opcode (0x0401), then offset (0x0402), then branch (+5)
+    assert cpu.PC == 0x0402 + 5  # PC after fetch_byte + offset
+    assert cpu.cycles_executed - cycles_before == 3  # 1 opcode + 1 read offset + 1 branch taken
 
 
 def test_cpu_instruction_BVS_RELATIVE_0x70_branch_not_taken(cpu: CPU) -> None:  # noqa: N802
     """Test BVS when overflow flag is clear (branch not taken)."""
     # given:
+    cycles_before = cpu.cycles_executed
+    cpu.PC = 0x0400
+    pc = cpu.PC
 
     # Clear overflow flag
     cpu.flags[flags.V] = 0
 
     # BVS with offset +5
-    cpu.ram[0xFFFC] = instructions.BVS_RELATIVE_0x70
-    cpu.ram[0xFFFD] = 0x05
+    cpu.ram[pc] = instructions.BVS_RELATIVE_0x70
+    cpu.ram[pc + 1] = 0x05
 
     # when:
     with contextlib.suppress(errors.CPUCycleExhaustionError):
         cpu.execute(cycles=2)
 
     # then:
-    assert cpu.PC == 0xFFFE  # PC just moved past offset byte
-    assert cpu.cycles_executed == 2  # 1 opcode + 1 read offset
+    assert cpu.PC == pc + 2  # PC just moved past offset byte
+    assert cpu.cycles_executed - cycles_before == 2  # 1 opcode + 1 read offset
 
 
 def test_cpu_instruction_BVS_RELATIVE_0x70_negative_offset(cpu: CPU) -> None:  # noqa: N802
     """Test BVS with negative offset (branch backward)."""
     # given:
+    cycles_before = cpu.cycles_executed
+    cpu.PC = 0x0400
+    pc = cpu.PC
 
     # Set overflow flag
     cpu.flags[flags.V] = 1
@@ -69,12 +79,15 @@ def test_cpu_instruction_BVS_RELATIVE_0x70_negative_offset(cpu: CPU) -> None:  #
 
     # then:
     assert cpu.PC == 0x0202 - 10  # PC after fetch_byte, then minus 10
-    assert cpu.cycles_executed == 3
+    assert cpu.cycles_executed - cycles_before == 3
 
 
 def test_cpu_instruction_BVS_RELATIVE_0x70_page_boundary_cross(cpu: CPU) -> None:  # noqa: N802
     """Test BVS with page boundary crossing (costs extra cycle)."""
     # given:
+    cycles_before = cpu.cycles_executed
+    cpu.PC = 0x0400
+    pc = cpu.PC
 
     # Set overflow flag
     cpu.flags[flags.V] = 1
@@ -95,4 +108,4 @@ def test_cpu_instruction_BVS_RELATIVE_0x70_page_boundary_cross(cpu: CPU) -> None
 
     # then:
     assert cpu.PC == 0x02FF + 5  # Crossed page boundary
-    assert cpu.cycles_executed == 4  # 1 opcode + 1 read + 1 branch + 1 page cross
+    assert cpu.cycles_executed - cycles_before == 4  # 1 opcode + 1 read + 1 branch + 1 page cross
