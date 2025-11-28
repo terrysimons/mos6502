@@ -582,246 +582,303 @@ class C64:
             self.regs[reg] = value
 
     class C64VIC:
+        """
+        Very small VIC-II model, enough for text mode + raster IRQs.
+
+        - 40×25 character text mode using character ROM
+        - Border colour, background colour
+        - $D018 screen/character memory selection
+        - $D011/$D016 fine scroll affect pixel origin correctly
+        - Raster IRQ from $D012/$D011 + $D01A/$D019
+        """
+
         def __init__(self, char_rom, cpu) -> None:
             self.log = logging.getLogger("c64.vic")
             self.regs = [0] * 0x40
             self.char_rom = char_rom
             self.cpu = cpu
 
-            # $D011: Control register 1
-            # Power-on value = %00011011 = $1B
+            # --- Power-on register defaults (C64 reset state-ish) -----------------
+            # $D011: Control register 1 (vertical scroll, display enable, 25-row mode)
+            #  %00011011 = $1B
             self.regs[0x11] = 0x1B
 
-            # $D012: Raster low byte
+            # $D012: raster low byte
             self.regs[0x12] = 0x00
 
-            # $D015: Sprite enable
+            # $D015: sprite enable (all off)
             self.regs[0x15] = 0x00
 
-            # $D016: Control register 2
-            # Power-on value = %00001000 = $08
+            # $D016: Control register 2 (horizontal scroll, 40-column mode)
+            #  %00001000 = $08
             self.regs[0x16] = 0x08
 
-            # $D017: Sprite Y expansion
+            # $D017: sprite Y-expand (all off)
             self.regs[0x17] = 0x00
 
-            # Set default VIC register values (C64 power-on state)
-            # $D020: Border color - Default light blue (14)
-            self.regs[0x20] = 0x0E  # Light blue
+            # $D018: Memory control – start with screen at $0400, chars at $1000
+            # Bits 4-7 = 0001 → 1 * $0400 = $0400 (screen RAM)
+            # Bits 1-3 = 010  → 2 * $0800 = $1000 (character ROM offset)
+            self.regs[0x18] = 0x14
+            log.info(
+                f"*** VIC INIT: Set $D018 = ${self.regs[0x18]:02X} "
+                f"(screen=$0400, char=$1000) ***"
+            )
 
-            # $D021: Background color - Default blue (6)
-            self.regs[0x21] = 0x06  # Blue
+            # $D019: IRQ flags – set bit 0 so KERNAL has something to clear
+            self.irq_flags = 0x01
 
-            # Display dimensions (hardware characteristics)
-            # Text area: 320x200 (40x25 characters at 8x8 pixels)
-            # Border: 32 pixels on each side (left/right), 35 pixels top/bottom
-            # Total visible area: 384x270
+            # $D01A: IRQ enable mask
+            self.irq_enabled = 0x00
+
+            # Colours
+            # $D020: border colour – light blue (14)
+            self.regs[0x20] = 0x0E
+            # $D021: background colour – blue (6)
+            self.regs[0x21] = 0x06
+
+            # --- Geometry / timing -----------------------------------------------
+            # Text area: 40×25 chars → 320×200 pixels
             self.text_width = 320
             self.text_height = 200
-            self.border_left = 32
-            self.border_right = 32
-            self.border_top = 35
-            self.border_bottom = 35
-            self.total_width = self.text_width + self.border_left + self.border_right  # 384
-            self.total_height = self.text_height + self.border_top + self.border_bottom  # 270
 
-            # NTSC timing: 263 raster lines, 63 cycles per line
+            # NTSC-style nominal origin (when fine scroll == 0)
+            # These match real VIC-II blanking pretty closely.
+            self.border_left = 24   # pixels from left edge to first text column
+            self.border_top = 42    # pixels from top edge to first text row
+
+            # Choose a total frame large enough for borders; keep your 384×270
+            self.total_width = 384
+            self.total_height = 270
+
+            # Derive remaining border sizes (mainly for information / aesthetics)
+            self.border_right = self.total_width - self.border_left - self.text_width
+            self.border_bottom = self.total_height - self.border_top - self.text_height
+
+            # NTSC-ish timing (match what you already use elsewhere)
             self.raster_lines = 263
             self.cycles_per_line = 63
-            self.cycles_per_frame = self.raster_lines * self.cycles_per_line  # 16,569
+            self.cycles_per_frame = self.raster_lines * self.cycles_per_line
 
-            # Current raster line - start at a reasonable position
+            # Current raster line
             self.current_raster = 0
 
-            # Interrupt flags - latched until read/cleared
-            # Set bit 0 initially so KERNAL can clear it (boot requirement)
-            self.irq_flags = 0x01  # Bit 0=raster, 1=sprite-bg, 2=sprite-sprite, 3=lightpen
-            self.irq_enabled = 0x00  # Which interrupts are enabled
-
-            # Track last cycle count to know when to increment raster
+            # Track last CPU cycle count to derive raster position
             self.last_cycle_count = 0
 
-            # Track initialization state
+            # Track when the KERNAL has acknowledged the initial IRQ
             self.initialized = False
 
-            # Set $D018 as the VERY LAST thing to ensure nothing overwrites it
-            # $D018: Memory Control - Screen at $0400, Char ROM at $1000
-            # Bits 4-7 = 0001 (screen at 1*$400 = $0400)
-            # Bits 1-3 = 010 (char at 2*$800 = $1000)
-            self.regs[0x18] = 0x14  # 0001 0100 binary
-            log.info(f"*** VIC INIT: Set $D018 = ${self.regs[0x18]:02X} (screen=$0400, char=$1000) ***")
+            self.log.info(
+                "VIC-II initialized (NTSC-ish: %d lines, %d cycles/line, %d cycles/frame)",
+                self.raster_lines,
+                self.cycles_per_line,
+                self.cycles_per_frame,
+            )
 
-            self.log.info("VIC-II initialized (NTSC: 263 lines, 63 cycles/line)")
-
+        # --------------------------------------------------------------------- IRQ /
         def update(self) -> None:
-            """Update VIC state based on CPU cycles.
-
-            This is called automatically during register reads to keep raster counter current.
-            Also checks if a raster IRQ should be triggered.
             """
-            # Calculate raster line based on total CPU cycles
+            Update raster position based on CPU cycles and generate raster IRQ
+            when the raster counter matches the compare register.
+            """
+            # Derive raster from total CPU cycles; we don't try to be sub-cycle accurate.
             total_lines = self.cpu.cycles_executed // self.cycles_per_line
             new_raster = total_lines % self.raster_lines
 
-            # Check if we should trigger raster IRQ on raster line match
             if new_raster != self.current_raster:
-                raster_compare = self.regs[0x12] | ((self.regs[0x11] & 0x80) << 1)
-                # Debug: Log every time we change raster line and check for match
-                if new_raster == raster_compare:
-                    log.info(f"*** VIC RASTER MATCH: line {new_raster} == compare {raster_compare}, irq_enabled=${self.irq_enabled:02X} (bit 0={'set' if (self.irq_enabled & 0x01) else 'clear'}) ***")
-                if new_raster == raster_compare and (self.irq_enabled & 0x01):
-                    # Set raster IRQ flag (bit 0)
-                    self.irq_flags |= 0x01
-                    # Signal CPU that IRQ is pending
-                    self.cpu.irq_pending = True
-                    log.info(f"*** VIC TRIGGERING IRQ: raster line {new_raster}, cpu.irq_pending=True, cycles={self.cpu.cycles_executed} ***")
-                    self.log.debug(f"VIC raster IRQ: line {new_raster}, setting cpu.irq_pending=True")
+                # 9-bit raster compare value: low byte in $D012, bit 8 in $D011 bit 7
+                compare = self.regs[0x12] | ((self.regs[0x11] & 0x80) << 1)
+
+                if new_raster == compare:
+                    log.info(
+                        "*** VIC RASTER MATCH: line %d == compare %d, irq_enabled=$%02X "
+                        "(bit0=%s) ***",
+                        new_raster,
+                        compare,
+                        self.irq_enabled,
+                        "set" if (self.irq_enabled & 0x01) else "clear",
+                    )
+
+                    if self.irq_enabled & 0x01:
+                        # Latch raster IRQ
+                        self.irq_flags |= 0x01
+                        # Tell CPU an IRQ is pending
+                        self.cpu.irq_pending = True
+                        log.info(
+                            "*** VIC TRIGGERING IRQ: raster line %d, "
+                            "cpu.irq_pending=True, cycles=%d ***",
+                            new_raster,
+                            self.cpu.cycles_executed,
+                        )
+                        self.log.debug(
+                            "VIC raster IRQ: line %d, setting cpu.irq_pending=True",
+                            new_raster,
+                        )
 
             self.current_raster = new_raster
 
+        # ---------------------------------------------------------------- Register I/O /
         def read(self, addr) -> int:
             reg = addr & 0x3F
 
-            # $D012: Raster line register (read current raster position)
+            # $D012: raster counter (low 8 bits)
             if reg == 0x12:
                 self.update()
                 return self.current_raster & 0xFF
 
-            # $D018: Memory control register - log when read
+            # $D018: handy debug decode
             if reg == 0x18:
                 val = self.regs[reg]
                 screen_addr = ((val & 0xF0) >> 4) * 0x0400
                 char_offset = ((val & 0x0E) >> 1) * 0x0800
-                log.info(f"*** VIC $D018 READ: value=${val:02X}, screen=${screen_addr:04X}, char_offset=${char_offset:04X} ***")
+                log.info(
+                    "*** VIC $D018 READ: value=$%02X, screen=$%04X, char_offset=$%04X ***",
+                    val,
+                    screen_addr,
+                    char_offset,
+                )
 
-            # $D019: Interrupt flags (read and acknowledge)
+            # $D019: IRQ flags
             if reg == 0x19:
-                # Return current flags with bit 7 set if any enabled IRQ is active
-                flags = self.irq_flags
-                # Bit 7 is set if any interrupt occurred (regardless of enable)
-                if flags & 0x0F:
-                    flags |= 0x80
+                flags = self.irq_flags & 0x0F
+                if flags:
+                    flags |= 0x80  # bit 7 set if any IRQ occurred
                 return flags
 
             return self.regs[reg]
 
         def write(self, addr, val) -> None:
             reg = addr & 0x3F
-            self.regs[reg] = val
+            self.regs[reg] = val & 0xFF
 
-            # $D012: Raster compare register
+            # $D012: raster compare low byte
             if reg == 0x12:
-                raster_compare = val | ((self.regs[0x11] & 0x80) << 1)
-                log.info(f"*** VIC RASTER COMPARE: $D012 = ${val:02X}, full compare value = {raster_compare} ***")
+                compare = val | ((self.regs[0x11] & 0x80) << 1)
+                log.info(
+                    "*** VIC RASTER COMPARE: $D012 = $%02X, full compare value = %d ***",
+                    val,
+                    compare,
+                )
 
-            # $D011: Control register (also affects raster compare bit 8)
+            # $D011: control register (contains raster compare bit 8 as bit 7)
             if reg == 0x11:
-                raster_compare = self.regs[0x12] | ((val & 0x80) << 1)
-                log.info(f"*** VIC CONTROL: $D011 = ${val:02X}, raster compare = {raster_compare} ***")
+                compare = self.regs[0x12] | ((val & 0x80) << 1)
+                log.info(
+                    "*** VIC CONTROL: $D011 = $%02X, raster compare = %d ***",
+                    val,
+                    compare,
+                )
 
-            # $D018: Memory control register (screen/char memory location)
+            # $D018: memory control (screen + char memory)
             if reg == 0x18:
                 screen_addr = ((val & 0xF0) >> 4) * 0x0400
                 char_offset = ((val & 0x0E) >> 1) * 0x0800
-                log.info(f"*** VIC $D018 WRITE: value=${val:02X}, screen=${screen_addr:04X}, char_offset=${char_offset:04X} ***")
+                log.info(
+                    "*** VIC $D018 WRITE: value=$%02X, screen=$%04X, char_offset=$%04X ***",
+                    val,
+                    screen_addr,
+                    char_offset,
+                )
 
-            # $D019: Interrupt flags - writing 1 to a bit CLEARS it (acknowledge)
+            # $D019: IRQ flags — write 1 to clear corresponding bits
             if reg == 0x19:
-                # Writing 1 clears the corresponding flag (interrupt latch behavior)
                 was_set = self.irq_flags & 0x0F
                 self.irq_flags &= ~(val & 0x0F)
 
-                # If all IRQ flags are now clear, clear the CPU's pending IRQ
                 if (self.irq_flags & 0x0F) == 0:
+                    # All IRQ sources cleared, let CPU drop its pending flag
                     self.cpu.irq_pending = False
                     self.log.debug("VIC IRQ acknowledged, cpu.irq_pending cleared")
 
-                # Log when KERNAL acknowledges the initial IRQ (completion of VIC init)
+                # Detect completion of KERNAL's initial IRQ sequence
                 if not self.initialized and was_set and (self.irq_flags & 0x0F) == 0:
                     self.initialized = True
                     self.log.info("VIC-II initialization complete (IRQ acknowledged)")
 
-            # $D01A: Interrupt enable register
+            # $D01A: IRQ enable mask
             if reg == 0x1A:
                 self.irq_enabled = val & 0x0F
-                log.info(f"*** VIC IRQ ENABLE: $D01A = ${val:02X}, irq_enabled=${self.irq_enabled:02X}, raster IRQ {'ENABLED' if (self.irq_enabled & 0x01) else 'DISABLED'} ***")
+                log.info(
+                    "*** VIC IRQ ENABLE: $D01A = $%02X, irq_enabled=$%02X, "
+                    "raster IRQ %s ***",
+                    val,
+                    self.irq_enabled,
+                    "ENABLED" if (self.irq_enabled & 0x01) else "DISABLED",
+                )
 
+        # ---------------------------------------------------------------- Rendering /
         def render_frame(self, surface, ram, color_ram) -> None:
-            """Render complete VIC-II frame including border and character area.
-
-            This method emulates the VIC-II's display generation:
-            - Fills the entire frame with border color
-            - Renders the 40x25 character text area with proper positioning
-            - Handles all VIC register settings (colors, memory locations, etc.)
-
-            Args:
-                surface: Pygame surface to render to (should be total_width x total_height)
-                ram: Memory accessor for screen RAM
-                color_ram: Memory accessor for color RAM
             """
-            # Border color from VIC register $D020 (register 0x20)
-            border_color = self.regs[0x20] & 0x0F
+            Render a full 40×25 text frame into the given pygame surface.
 
-            # Fill entire surface with border color (VIC draws border first)
+            - fills border with $D020
+            - draws characters using charset from char_rom selected via $D018
+            - background colour from $D021
+            - character colours from colour RAM
+            - respects $D011/$D016 fine scroll for the pixel origin
+            """
+            # Border colour
+            border_color = self.regs[0x20] & 0x0F
             surface.fill(COLORS[border_color])
 
-            # VIC register $D018 (Memory Control Register)
-            # Bits 4-7: Screen memory location (Video Matrix Base Address)
-            #   Value * 1024 = screen address (within current 16K VIC bank)
-            #   Default: 0001 = 1 * 1024 = 0x0400
-            # Bits 1-3: Character memory location (Character Dot-Data Base Address)
-            #   Value * 2048 = char ROM offset (within current 16K VIC bank)
-            #   Default: 010 = 2 * 2048 = 0x1000 (but points to ROM, not RAM)
+            # Decode $D018: video matrix base + character ROM offset
             mem_control = self.regs[0x18]
 
-            # Screen memory base address
+            # Bits 4-7: screen base in 1 KB blocks
             screen_base = ((mem_control & 0xF0) >> 4) * 0x0400
 
-            # Character ROM bank selection
+            # Bits 1-3: char base in 2 KB blocks (masked to 4 KB inside the real bank)
             char_bank_offset = ((mem_control & 0x0E) >> 1) * 0x0800
-            char_bank_offset = char_bank_offset & 0x0FFF  # Mask to 4K
+            char_bank_offset &= 0x0FFF  # under CHAR ROM window
 
-            # Background color from VIC register $D021 (register 0x21)
+            # Background colour
             bg_color = self.regs[0x21] & 0x0F
 
-            # Render text area within the border
-            # VIC positions text area at (border_left, border_top)
+            # Fine scroll values
+            hscroll = self.regs[0x16] & 0x07  # $D016 bits 0-2
+            vscroll = self.regs[0x11] & 0x07  # $D011 bits 0-2
+
+            # True NTSC-style pixel origin:
+            # When scroll = 0, origin is (24, 42); positive scroll values move
+            # the text area left/up by that many pixels.
+            x_origin = self.border_left - hscroll
+            y_origin = self.border_top - vscroll
+
+            # Render the 40×25 character matrix
             for row in range(25):
                 for col in range(40):
                     cell_addr = screen_base + row * 40 + col
                     char_code = ram[cell_addr]
+
                     color_offset = row * 40 + col
                     color = color_ram[color_offset] & 0x0F
 
-                    # Check for reverse video (character codes 128-255)
-                    reverse = char_code >= 128
-                    if reverse:
-                        char_code = char_code & 0x7F
+                    # Reverse video if bit 7 set
+                    reverse = char_code & 0x80
+                    char_code &= 0x7F
 
-                    # Get glyph from character ROM
+                    # Fetch 8×8 glyph from char ROM
                     glyph_addr = (char_code * 8) + char_bank_offset
-                    glyph_addr = glyph_addr & 0x0FFF
+                    glyph_addr &= 0x0FFF
                     glyph = self.char_rom[glyph_addr : glyph_addr + 8]
 
-                    # Render character at proper screen position
-                    # VIC places text area offset from top-left by border dimensions
+                    base_x = x_origin + col * 8
+                    base_y = y_origin + row * 8
+
                     for y in range(8):
                         line = glyph[y]
                         for x in range(8):
-                            pixel = (line >> (7 - x)) & 1
-                            # VIC positions pixels: border_offset + character_position
-                            pixel_x = self.border_left + col*8 + x
-                            pixel_y = self.border_top + row*8 + y
+                            bit = (line >> (7 - x)) & 0x01
 
                             if reverse:
-                                # Reverse video: swap foreground and background
-                                surface.set_at((pixel_x, pixel_y),
-                                            COLORS[bg_color] if pixel else COLORS[color])
+                                fg = COLORS[bg_color]
+                                bg = COLORS[color]
                             else:
-                                # Normal: foreground on background
-                                surface.set_at((pixel_x, pixel_y),
-                                            COLORS[color] if pixel else COLORS[bg_color])
+                                fg = COLORS[color]
+                                bg = COLORS[bg_color]
 
+                            surface.set_at((base_x + x, base_y + y), fg if bit else bg)
 
     class C64Memory:
         def __init__(self, ram, *, basic_rom, kernal_rom, char_rom, cia1, cia2, vic) -> None:
