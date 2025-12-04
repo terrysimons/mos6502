@@ -15,8 +15,10 @@ from c64.cartridges import (
     StaticROMCartridge,
     ErrorCartridge,
     CARTRIDGE_TYPES,
+    create_cartridge,
     ROML_START,
     ROML_END,
+    ROML_SIZE,
     ROMH_START,
     ROMH_END,
     IO1_START,
@@ -473,9 +475,9 @@ class C64:
         cart_group.add_argument(
             "--cartridge-type",
             type=str.lower,
-            choices=["auto", "8k", "16k"],
+            choices=["auto", "8k", "16k", "ultimax"],
             default="auto",
-            help="Cartridge type: auto (detect from file), 8k, or 16k (default: auto)",
+            help="Cartridge type: auto (detect from file), 8k, 16k, or ultimax (default: auto)",
         )
 
         # Execution control options
@@ -2931,10 +2933,36 @@ class C64:
         """
         size = len(data)
 
-        # Determine cartridge type from size if auto
+        # Determine cartridge type from size and content if auto
         if cart_type == "auto":
             if size == self.ROML_SIZE:
-                cart_type = "8k"
+                # 8KB file - check if it's a standard 8K cart or Ultimax
+                # Standard 8K carts have CBM80 signature at offset 4 ($8004)
+                # Ultimax carts have reset vector at end pointing to $E000-$FFFF
+                has_cbm80 = data[4:9] == b"CBM80"
+
+                if has_cbm80:
+                    cart_type = "8k"
+                    log.debug(f"Auto-detected 8K cartridge (CBM80 signature found)")
+                else:
+                    # Check reset vector at end of file (offsets $1FFC/$1FFD)
+                    # For Ultimax, this should point to $E000-$FFFF range
+                    reset_lo = data[0x1FFC]
+                    reset_hi = data[0x1FFD]
+                    reset_vector = reset_lo | (reset_hi << 8)
+
+                    if 0xE000 <= reset_vector <= 0xFFFF:
+                        cart_type = "ultimax"
+                        log.info(
+                            f"Auto-detected Ultimax cartridge: reset vector ${reset_vector:04X} "
+                            f"points to cartridge ROM space"
+                        )
+                    else:
+                        # Default to 8K if we can't determine
+                        cart_type = "8k"
+                        log.debug(
+                            f"Assuming 8K cartridge (no CBM80, reset vector ${reset_vector:04X})"
+                        )
             elif size == self.ROML_SIZE + self.ROMH_SIZE:
                 cart_type = "16k"
             else:
@@ -3140,9 +3168,8 @@ class C64:
             f"hardware_type={hardware_type} ({type_name}), EXROM={exrom_line}, GAME={game_line}"
         )
 
-        # We only support hardware type 0 (standard cartridge) for now
-        # For unsupported types, try to load a pre-generated error cartridge
-        if hardware_type != 0:
+        # Check if hardware type is supported
+        if hardware_type not in CARTRIDGE_TYPES:
             log.warning(
                 f"Unsupported cartridge type {hardware_type} ({type_name}). "
                 f"Loading error display cartridge."
@@ -3180,15 +3207,12 @@ class C64:
                     "",
                     f"  Cart: {cart_name}",
                     "",
-                    "  This emulator only supports",
-                    "  standard 8K/16K cartridges",
-                    "  (hardware type 0).",
+                    "  This emulator does not yet",
+                    "  support this cartridge type.",
                     "",
-                    "  Banked cartridges like",
-                    "  Ocean, EasyFlash, Action",
-                    "  Replay, etc. require bank",
-                    "  switching hardware that is",
-                    "  not yet implemented.",
+                    "  Supported types:",
+                    "  - Type 0: Normal (8K/16K)",
+                    "  - Type 1: Action Replay",
                 ]
                 error_roml_data = self._create_error_cartridge(error_lines)
 
@@ -3207,9 +3231,14 @@ class C64:
 
         # Parse CHIP packets
         offset = header_length
+
+        # For Type 0 (standard cartridge)
         roml_data = None
         romh_data = None
         ultimax_romh_data = None
+
+        # For banked cartridges (Type 1+)
+        banks: dict[int, bytes] = {}  # bank_number -> rom_data
 
         # Ultimax mode detection from CRT header
         # EXROM=1, GAME=0 indicates Ultimax mode
@@ -3240,64 +3269,96 @@ class C64:
                 offset += packet_length
                 continue
 
-            # We only support bank 0 for standard cartridges
-            if bank_number != 0:
-                log.warning(f"Skipping bank {bank_number} (only bank 0 supported)")
-                offset += packet_length
-                continue
-
             # Extract ROM data
             rom_data = data[offset + 16:offset + 16 + rom_size]
 
-            if load_address == self.ROML_START:
-                # Check if this is a 16KB ROM that needs to be split
-                if rom_size > self.ROML_SIZE:
-                    # Split 16KB ROM: first 8KB to ROML, second 8KB to ROMH
-                    roml_data = rom_data[:self.ROML_SIZE]
-                    romh_data = rom_data[self.ROML_SIZE:]
-                    log.info(f"Loaded ROML: ${load_address:04X}-${load_address + self.ROML_SIZE - 1:04X} ({self.ROML_SIZE} bytes)")
-                    log.info(f"Loaded ROMH: ${self.ROMH_START:04X}-${self.ROMH_START + len(romh_data) - 1:04X} ({len(romh_data)} bytes)")
+            if hardware_type == 0:
+                # Type 0: Standard cartridge - single bank only
+                if bank_number != 0:
+                    log.warning(f"Skipping bank {bank_number} for Type 0 cartridge")
+                    offset += packet_length
+                    continue
+
+                if load_address == self.ROML_START:
+                    # Check if this is a 16KB ROM that needs to be split
+                    if rom_size > self.ROML_SIZE:
+                        # Split 16KB ROM: first 8KB to ROML, second 8KB to ROMH
+                        roml_data = rom_data[:self.ROML_SIZE]
+                        romh_data = rom_data[self.ROML_SIZE:]
+                        log.info(f"Loaded ROML: ${load_address:04X}-${load_address + self.ROML_SIZE - 1:04X} ({self.ROML_SIZE} bytes)")
+                        log.info(f"Loaded ROMH: ${self.ROMH_START:04X}-${self.ROMH_START + len(romh_data) - 1:04X} ({len(romh_data)} bytes)")
+                    else:
+                        roml_data = rom_data
+                        log.info(f"Loaded ROML: ${load_address:04X}-${load_address + rom_size - 1:04X} ({rom_size} bytes)")
+                elif load_address == self.ROMH_START:
+                    romh_data = rom_data
+                    log.info(f"Loaded ROMH: ${load_address:04X}-${load_address + rom_size - 1:04X} ({rom_size} bytes)")
+                elif load_address == self.KERNAL_ROM_START:
+                    # Ultimax mode: ROM at $E000-$FFFF replaces KERNAL
+                    ultimax_romh_data = rom_data
+                    log.info(f"Loaded Ultimax ROMH: ${load_address:04X}-${load_address + rom_size - 1:04X} ({rom_size} bytes)")
                 else:
-                    roml_data = rom_data
-                    log.info(f"Loaded ROML: ${load_address:04X}-${load_address + rom_size - 1:04X} ({rom_size} bytes)")
-            elif load_address == self.ROMH_START:
-                romh_data = rom_data
-                log.info(f"Loaded ROMH: ${load_address:04X}-${load_address + rom_size - 1:04X} ({rom_size} bytes)")
-            elif load_address == self.KERNAL_ROM_START:
-                # Ultimax mode: ROM at $E000-$FFFF replaces KERNAL
-                ultimax_romh_data = rom_data
-                log.info(f"Loaded Ultimax ROMH: ${load_address:04X}-${load_address + rom_size - 1:04X} ({rom_size} bytes)")
+                    log.warning(f"Unknown CHIP load address: ${load_address:04X}")
             else:
-                log.warning(f"Unknown CHIP load address: ${load_address:04X}")
+                # Banked cartridges (Type 1+): Collect all banks
+                # For Action Replay, each bank is 8KB at $8000
+                if load_address == self.ROML_START:
+                    banks[bank_number] = rom_data
+                    log.info(f"Loaded bank {bank_number}: ${load_address:04X}-${load_address + rom_size - 1:04X} ({rom_size} bytes)")
+                else:
+                    log.warning(f"Unexpected load address ${load_address:04X} for bank {bank_number}")
 
             offset += packet_length
 
-        # Validate we got valid ROM data
-        if ultimax_romh_data is None and roml_data is None:
-            raise ValueError("CRT file contains no usable ROM data")
+        # Create appropriate cartridge object based on hardware type
+        if hardware_type == 0:
+            # Validate we got valid ROM data for Type 0
+            if ultimax_romh_data is None and roml_data is None:
+                raise ValueError("CRT file contains no usable ROM data")
 
-        # Create StaticROMCartridge object
-        # Note: The cartridge class handles EXROM/GAME based on which ROM regions are present
-        cartridge = StaticROMCartridge(
-            roml_data=roml_data,
-            romh_data=romh_data,
-            ultimax_romh_data=ultimax_romh_data,
-            name=cart_name,
-        )
+            cartridge = create_cartridge(
+                hardware_type=0,
+                roml_data=roml_data,
+                romh_data=romh_data,
+                ultimax_romh_data=ultimax_romh_data,
+                name=cart_name,
+            )
 
-        # Determine cartridge type from what we loaded
-        if ultimax_romh_data is not None:
-            self.cartridge_type = "ultimax"
-        elif romh_data is not None:
-            self.cartridge_type = "16k"
+            # Determine cartridge type from what we loaded
+            if ultimax_romh_data is not None:
+                self.cartridge_type = "ultimax"
+            elif romh_data is not None:
+                self.cartridge_type = "16k"
+            else:
+                self.cartridge_type = "8k"
         else:
-            self.cartridge_type = "8k"
+            # Banked cartridges - convert bank dict to sorted list
+            if not banks:
+                raise ValueError(f"CRT file contains no bank data for type {hardware_type}")
+
+            # Create sorted list of banks (fill missing banks with empty data)
+            max_bank = max(banks.keys())
+            bank_list = []
+            for i in range(max_bank + 1):
+                if i in banks:
+                    bank_list.append(banks[i])
+                else:
+                    # Fill missing banks with empty 8KB
+                    log.warning(f"Bank {i} missing, filling with empty data")
+                    bank_list.append(bytes(ROML_SIZE))
+
+            cartridge = create_cartridge(
+                hardware_type=hardware_type,
+                banks=bank_list,
+                name=cart_name,
+            )
+            self.cartridge_type = type_name.lower().replace(" ", "_")
 
         # Attach cartridge to memory handler
         if self.memory is not None:
             self.memory.cartridge = cartridge
 
-        log.info(f"Loaded CRT cartridge: '{cart_name}' ({self.cartridge_type.upper()})")
+        log.info(f"Loaded CRT cartridge: '{cart_name}' (type {hardware_type}: {type_name})")
 
     def get_video_standard(self) -> str:
         """Get the video standard (PAL or NTSC) based on the current video chip.
