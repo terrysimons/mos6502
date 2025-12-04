@@ -1,3 +1,25 @@
+# System ROMs
+systems/roms/
+
+# Test ROMs
+tests/fixtures/roms/
+
+# Python
+*.pyc
+*.pyo
+*.pyd
+*.pyw
+*.pyz
+*.pywz
+*.pyzw
+*.pyzwz
+*.pyzwzw
+*.pyzwzwz
+
+
+# macOS
+.DS_Store
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]

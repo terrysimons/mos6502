@@ -3,6 +3,10 @@ name = "mos6502"
 version = "0.1.0"
 description = ""
 authors = ["Terry Simons <terry.simons@gmail.com>"]
+packages = [
+    { include = "mos6502" },
+    { include = "c64", from = "systems" },
+]
 
 [tool.poetry.dependencies]
 python = ">=3.11,<4.0"
@@ -13,6 +17,10 @@ pygame-ce = {version = "*", optional = true}
 display = ["pygame-ce"]
 native = ["bitarray"]
 full = ["bitarray", "pygame-ce"]
+
+[tool.poetry.scripts]
+c64 = "c64:main"
+c64-benchmark = "c64.benchmark:main"
 
 
 [tool.poetry.group.test.dependencies]

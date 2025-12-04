@@ -10,7 +10,7 @@ from mos6502 import CPU, CPUVariant, errors
 from mos6502.core import INFINITE_CYCLES
 from mos6502.memory import Byte, Word
 
-from systems.cartridge import (
+from c64.cartridges import (
     Cartridge,
     StaticROMCartridge,
     ErrorCartridge,
@@ -2523,12 +2523,17 @@ class C64:
             if 0x0002 <= addr <= 0x7FFF:
                 return self._read_ram_direct(addr)
 
-            # Cartridge ROML ($8000-$9FFF) - visible when EXROM=0 (active low)
+            # Cartridge ROML ($8000-$9FFF)
+            # Visible when EXROM=0 (8KB/16KB modes) or in Ultimax mode (EXROM=1, GAME=0)
             # This has priority over RAM in this region
             if ROML_START <= addr <= ROML_END:
-                if self.cartridge is not None and not self.cartridge.exrom:
-                    return self.cartridge.read_roml(addr)
-                # No cartridge, fall through to RAM
+                if self.cartridge is not None:
+                    # ROML visible in 8KB mode (EXROM=0, GAME=1)
+                    # ROML visible in 16KB mode (EXROM=0, GAME=0)
+                    # ROML visible in Ultimax mode (EXROM=1, GAME=0) if present
+                    if not self.cartridge.exrom or (self.cartridge.exrom and not self.cartridge.game):
+                        return self.cartridge.read_roml(addr)
+                # No cartridge or ROML not visible, fall through to RAM
                 return self._read_ram_direct(addr)
 
             # Memory banking logic (only applies to $A000-$FFFF)
@@ -2548,8 +2553,15 @@ class C64:
                 return self._read_ram_direct(addr)
 
             # KERNAL ROM ($E000-$FFFF)
-            if C64.KERNAL_ROM_START <= addr <= C64.KERNAL_ROM_END and kernal_enabled:
-                return self.kernal[addr - C64.KERNAL_ROM_START]
+            # In Ultimax mode (EXROM=1, GAME=0), cartridge ROM replaces KERNAL
+            if C64.KERNAL_ROM_START <= addr <= C64.KERNAL_ROM_END:
+                if self.cartridge is not None and self.cartridge.exrom and not self.cartridge.game:
+                    # Ultimax mode: cartridge ROM at $E000-$FFFF
+                    return self.cartridge.read_ultimax_romh(addr)
+                if kernal_enabled:
+                    return self.kernal[addr - C64.KERNAL_ROM_START]
+                # RAM fallback when KERNAL disabled
+                return self._read_ram_direct(addr)
 
             # I/O or CHAR ROM ($D000-$DFFF)
             if C64.CHAR_ROM_START <= addr <= C64.CHAR_ROM_END:
@@ -3123,15 +3135,13 @@ class C64:
                 f"Loading error display cartridge."
             )
 
-            # Try to load pre-generated error cartridge from fixtures
-            error_cart_loaded = False
+            # Try to load pre-generated error cartridge from package
             safe_name = type_name.lower().replace(" ", "_").replace(",", "").replace("/", "_")
             error_cart_filename = f"error_type_{hardware_type:02d}_{safe_name}.bin"
 
-            # Search in common locations for the error cartridge
+            # Error carts live in the c64.cartridges.error_cartridges directory
             search_paths = [
-                Path(__file__).parent.parent / "tests" / "fixtures" / "error_carts" / error_cart_filename,
-                Path("tests/fixtures/error_carts") / error_cart_filename,
+                Path(__file__).parent / "cartridges" / "error_cartridges" / error_cart_filename,
             ]
 
             # Try to load pre-generated error cartridge ROM
@@ -3186,6 +3196,11 @@ class C64:
         offset = header_length
         roml_data = None
         romh_data = None
+        ultimax_romh_data = None
+
+        # Ultimax mode detection from CRT header
+        # EXROM=1, GAME=0 indicates Ultimax mode
+        is_ultimax = (exrom_line == 1 and game_line == 0)
 
         while offset < len(data):
             if offset + 16 > len(data):
@@ -3235,25 +3250,32 @@ class C64:
             elif load_address == self.ROMH_START:
                 romh_data = rom_data
                 log.info(f"Loaded ROMH: ${load_address:04X}-${load_address + rom_size - 1:04X} ({rom_size} bytes)")
+            elif load_address == self.KERNAL_ROM_START:
+                # Ultimax mode: ROM at $E000-$FFFF replaces KERNAL
+                ultimax_romh_data = rom_data
+                log.info(f"Loaded Ultimax ROMH: ${load_address:04X}-${load_address + rom_size - 1:04X} ({rom_size} bytes)")
             else:
                 log.warning(f"Unknown CHIP load address: ${load_address:04X}")
 
             offset += packet_length
 
-        # Validate we got at least ROML
-        if roml_data is None:
-            raise ValueError("CRT file contains no ROML data at $8000")
+        # Validate we got valid ROM data
+        if ultimax_romh_data is None and roml_data is None:
+            raise ValueError("CRT file contains no usable ROM data")
 
         # Create StaticROMCartridge object
-        # Note: The cartridge class handles EXROM/GAME based on whether ROMH is present
+        # Note: The cartridge class handles EXROM/GAME based on which ROM regions are present
         cartridge = StaticROMCartridge(
             roml_data=roml_data,
             romh_data=romh_data,
+            ultimax_romh_data=ultimax_romh_data,
             name=cart_name,
         )
 
         # Determine cartridge type from what we loaded
-        if romh_data is not None:
+        if ultimax_romh_data is not None:
+            self.cartridge_type = "ultimax"
+        elif romh_data is not None:
             self.cartridge_type = "16k"
         else:
             self.cartridge_type = "8k"

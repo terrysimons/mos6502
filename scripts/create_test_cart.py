@@ -15,9 +15,9 @@ from pathlib import Path
 
 # Add project root to path for imports
 project_root = Path(__file__).parent.parent
-sys.path.insert(0, str(project_root))
+sys.path.insert(0, str(project_root / "systems"))
 
-from systems.c64 import C64
+from c64 import C64
 
 
 def text_to_screen_codes(text: str) -> list[int]:
@@ -359,6 +359,9 @@ def write_crt_cartridge(
     romh: bytes | None = None,
     name: str = "TEST",
     single_chip: bool = False,
+    hardware_type: int = 0,
+    exrom: int | None = None,
+    game: int | None = None,
 ) -> None:
     """Write a CRT format cartridge file.
 
@@ -370,8 +373,17 @@ def write_crt_cartridge(
         single_chip: If True and romh is provided, write as single 16KB CHIP packet
                      at $8000 (like many real-world cartridges). If False, write
                      as two separate CHIP packets (ROML at $8000, ROMH at $A000).
+        hardware_type: CRT hardware type ID (0-85)
+        exrom: EXROM line state (0=active, 1=inactive). If None, defaults based on size.
+        game: GAME line state (0=active, 1=inactive). If None, defaults based on size.
     """
     is_16k = romh is not None
+
+    # Default EXROM/GAME based on cartridge size if not specified
+    if exrom is None:
+        exrom = 0  # Active (cartridge present)
+    if game is None:
+        game = 0 if is_16k else 1  # 0 for 16K, 1 for 8K
 
     # CRT Header (64 bytes)
     header = bytearray(64)
@@ -379,9 +391,9 @@ def write_crt_cartridge(
     header[0x10:0x14] = (64).to_bytes(4, 'big')  # Header length
     header[0x14] = 1  # Version hi
     header[0x15] = 0  # Version lo
-    header[0x16:0x18] = (0).to_bytes(2, 'big')  # Hardware type (0 = generic)
-    header[0x18] = 0  # EXROM (0 = active)
-    header[0x19] = 0 if is_16k else 1  # GAME (0 = active for 16K, 1 = inactive for 8K)
+    header[0x16:0x18] = hardware_type.to_bytes(2, 'big')  # Hardware type
+    header[0x18] = exrom  # EXROM
+    header[0x19] = game   # GAME
     name_bytes = name.encode('ascii')[:32].ljust(32, b'\x00')
     header[0x20:0x40] = name_bytes
 
@@ -425,6 +437,246 @@ def write_crt_cartridge(
                 f.write(romh)
 
 
+def create_ultimax_cartridge() -> tuple[bytes, str]:
+    """Create an Ultimax mode test cartridge with ROM at $E000.
+
+    Ultimax mode has EXROM=1, GAME=0 and places ROM at $E000-$FFFF,
+    replacing the KERNAL ROM. This is used by diagnostic cartridges
+    like the Dead Test ROM.
+
+    Returns:
+        Tuple of (cartridge bytes for $E000, description)
+    """
+    # Ultimax ROM is 8KB at $E000-$FFFF
+    cart = bytearray(C64.ROML_SIZE)
+
+    # Reset vector at $FFFC-$FFFD points to start of our code
+    # Code starts at $E009 (after the CBM80-style header area)
+    code_start = 0xE009
+
+    # Put reset vector at the end of ROM
+    # $FFFC = lo byte, $FFFD = hi byte of reset vector
+    cart[0x1FFC] = code_start & 0xFF        # $FFFC - reset vector lo
+    cart[0x1FFD] = (code_start >> 8) & 0xFF  # $FFFD - reset vector hi
+
+    # Also put a valid NMI vector (point to RTI)
+    rti_addr = 0xE000 + 0x1FF0  # Put RTI near end
+    cart[0x1FFA] = rti_addr & 0xFF          # $FFFA - NMI vector lo
+    cart[0x1FFB] = (rti_addr >> 8) & 0xFF   # $FFFB - NMI vector hi
+    cart[0x1FF0] = 0x40                      # RTI instruction
+
+    # IRQ vector (also point to RTI)
+    cart[0x1FFE] = rti_addr & 0xFF          # $FFFE - IRQ vector lo
+    cart[0x1FFF] = (rti_addr >> 8) & 0xFF   # $FFFF - IRQ vector hi
+
+    # Code starts at $E009
+    code_offset = 0x0009
+    code = []
+
+    # Initialize - disable interrupts, set up stack
+    code.extend([
+        0x78,              # SEI - disable interrupts
+        0xA2, 0xFF,        # LDX #$FF
+        0x9A,              # TXS - set stack pointer
+    ])
+
+    # In Ultimax mode, we need to initialize the VIC and screen RAM ourselves
+    # since KERNAL is not available
+
+    # Set up VIC for text mode
+    code.extend([
+        0xA9, 0x1B,        # LDA #$1B - enable screen, text mode
+        0x8D, 0x11, 0xD0,  # STA $D011
+        0xA9, 0x08,        # LDA #$08 - 40 columns
+        0x8D, 0x16, 0xD0,  # STA $D016
+        0xA9, 0x14,        # LDA #$14 - screen at $0400, charset at $1000
+        0x8D, 0x18, 0xD0,  # STA $D018
+    ])
+
+    # Clear screen by filling $0400-$07E7 with spaces (0x20)
+    code.extend([
+        0xA9, 0x20,        # LDA #$20 (space)
+        0xA2, 0x00,        # LDX #$00
+    ])
+    # clear_loop:
+    code.extend([
+        0x9D, 0x00, 0x04,  # STA $0400,X
+        0x9D, 0x00, 0x05,  # STA $0500,X
+        0x9D, 0x00, 0x06,  # STA $0600,X
+        0x9D, 0x00, 0x07,  # STA $0700,X
+        0xE8,              # INX
+        0xD0, 0xF1,        # BNE clear_loop (branch back -15 bytes)
+    ])
+
+    # Set border and background to purple
+    code.extend([
+        0xA9, 0x04,        # LDA #$04 (purple)
+        0x8D, 0x20, 0xD0,  # STA $D020 (border color)
+        0x8D, 0x21, 0xD0,  # STA $D021 (background color)
+    ])
+
+    # Display messages
+    code.extend(create_display_code("ULTIMAX CARTRIDGE TEST", line=0, color=0x01))  # white
+    code.extend(create_display_code("ROM AT $E000-$FFFF", line=2, color=0x07))  # yellow
+    code.extend(create_display_code("REPLACES KERNAL ROM", line=4, color=0x07))  # yellow
+    code.extend(create_display_code("EXROM=1 GAME=0", line=6, color=0x05))  # green
+
+    # Infinite loop
+    loop_addr = 0xE000 + code_offset + len(code)
+    code.extend([
+        0x4C, loop_addr & 0xFF, (loop_addr >> 8) & 0xFF,  # JMP to self
+    ])
+
+    # Copy code into cartridge
+    for i, byte in enumerate(code):
+        cart[code_offset + i] = byte
+
+    return bytes(cart), f"Code size: {len(code)} bytes starting at $E009"
+
+
+def write_ultimax_crt_cartridge(
+    path: Path,
+    ultimax_romh: bytes,
+    roml: bytes | None = None,
+    name: str = "TEST",
+) -> None:
+    """Write a CRT format Ultimax cartridge file.
+
+    Args:
+        path: Output file path
+        ultimax_romh: ROM data for $E000-$FFFF (8KB, replaces KERNAL)
+        roml: Optional ROM data for $8000-$9FFF (8KB)
+        name: Cartridge name (max 32 chars)
+    """
+    # CRT Header (64 bytes)
+    header = bytearray(64)
+    header[0:16] = b'C64 CARTRIDGE   '  # Signature
+    header[0x10:0x14] = (64).to_bytes(4, 'big')  # Header length
+    header[0x14] = 1  # Version hi
+    header[0x15] = 0  # Version lo
+    header[0x16:0x18] = (0).to_bytes(2, 'big')  # Hardware type (0 = normal)
+    header[0x18] = 1  # EXROM = 1 (inactive)
+    header[0x19] = 0  # GAME = 0 (active) -> Ultimax mode
+    name_bytes = name.encode('ascii')[:32].ljust(32, b'\x00')
+    header[0x20:0x40] = name_bytes
+
+    with open(path, 'wb') as f:
+        f.write(bytes(header))
+
+        # Write optional ROML CHIP packet
+        if roml is not None:
+            chip_roml = bytearray(16)
+            chip_roml[0:4] = b'CHIP'
+            chip_roml[4:8] = (16 + len(roml)).to_bytes(4, 'big')
+            chip_roml[8:10] = (0).to_bytes(2, 'big')  # Type (0 = ROM)
+            chip_roml[10:12] = (0).to_bytes(2, 'big')  # Bank (0)
+            chip_roml[12:14] = (C64.ROML_START).to_bytes(2, 'big')  # $8000
+            chip_roml[14:16] = (len(roml)).to_bytes(2, 'big')
+            f.write(bytes(chip_roml))
+            f.write(roml)
+
+        # Write Ultimax ROMH CHIP packet at $E000
+        chip_romh = bytearray(16)
+        chip_romh[0:4] = b'CHIP'
+        chip_romh[4:8] = (16 + len(ultimax_romh)).to_bytes(4, 'big')
+        chip_romh[8:10] = (0).to_bytes(2, 'big')  # Type (0 = ROM)
+        chip_romh[10:12] = (0).to_bytes(2, 'big')  # Bank (0)
+        chip_romh[12:14] = (C64.KERNAL_ROM_START).to_bytes(2, 'big')  # $E000
+        chip_romh[14:16] = (len(ultimax_romh)).to_bytes(2, 'big')
+        f.write(bytes(chip_romh))
+        f.write(ultimax_romh)
+
+
+def create_mapper_test_cartridge(hw_type: int, type_name: str) -> bytes:
+    """Create an 8KB test cartridge that displays the mapper type info.
+
+    This creates a valid cartridge ROM that can be used to test that
+    a specific hardware type is correctly identified and handled.
+
+    Args:
+        hw_type: CRT hardware type number
+        type_name: Human-readable name of the cartridge type
+
+    Returns:
+        8KB cartridge ROM data
+    """
+    cart = bytearray(C64.ROML_SIZE)
+
+    # Cartridge header at $8000-$8008
+    cart[0x0000] = 0x09  # Cold start lo -> $8009
+    cart[0x0001] = 0x80  # Cold start hi
+    cart[0x0002] = 0x09  # Warm start lo -> $8009
+    cart[0x0003] = 0x80  # Warm start hi
+    cart[0x0004] = 0xC3  # 'C' (CBM80 signature)
+    cart[0x0005] = 0xC2  # 'B'
+    cart[0x0006] = 0xCD  # 'M'
+    cart[0x0007] = 0x38  # '8'
+    cart[0x0008] = 0x30  # '0'
+
+    # Code starts at $8009
+    code_offset = 0x0009
+    code = []
+
+    # Initialize - disable interrupts, set up stack
+    code.extend([
+        0x78,              # SEI - disable interrupts
+        0xA2, 0xFF,        # LDX #$FF
+        0x9A,              # TXS - set stack pointer
+    ])
+
+    # Clear screen by filling $0400-$07E7 with spaces (0x20)
+    code.extend([
+        0xA9, 0x20,        # LDA #$20 (space)
+        0xA2, 0x00,        # LDX #$00
+    ])
+    # clear_loop:
+    code.extend([
+        0x9D, 0x00, 0x04,  # STA $0400,X
+        0x9D, 0x00, 0x05,  # STA $0500,X
+        0x9D, 0x00, 0x06,  # STA $0600,X
+        0x9D, 0x00, 0x07,  # STA $0700,X
+        0xE8,              # INX
+        0xD0, 0xF1,        # BNE clear_loop (branch back -15 bytes)
+    ])
+
+    # Set border and background to dark blue
+    code.extend([
+        0xA9, 0x06,        # LDA #$06 (blue)
+        0x8D, 0x20, 0xD0,  # STA $D020 (border color)
+        0x8D, 0x21, 0xD0,  # STA $D021 (background color)
+    ])
+
+    # Display messages - showing the mapper type
+    lines = [
+        ("MAPPER TEST CARTRIDGE", 1, 0x01),   # white
+        ("", 3, 0x01),
+        (f"TYPE: {hw_type}", 4, 0x07),        # yellow
+        (f"NAME: {type_name.upper()[:30]}", 6, 0x07),  # yellow (truncated)
+        ("", 8, 0x01),
+        ("THIS CARTRIDGE IS FOR TESTING", 10, 0x05),  # green
+        ("THE MAPPER TYPE IDENTIFICATION", 11, 0x05),
+        ("AND BANK SWITCHING LOGIC.", 12, 0x05),
+        ("", 14, 0x01),
+        ("CODE IS EXECUTING IN ROML", 16, 0x0E),  # light blue
+        ("AT $8000-$9FFF", 17, 0x0E),
+    ]
+
+    for text, line, color in lines:
+        code.extend(create_display_code(text, line=line, color=color))
+
+    # Infinite loop
+    loop_addr = C64.ROML_START + code_offset + len(code)
+    code.extend([
+        0x4C, loop_addr & 0xFF, (loop_addr >> 8) & 0xFF,  # JMP to self
+    ])
+
+    # Copy code into cartridge
+    for i, byte in enumerate(code):
+        cart[code_offset + i] = byte
+
+    return bytes(cart)
+
+
 def main():
     fixtures_dir = project_root / "tests" / "fixtures"
     fixtures_dir.mkdir(parents=True, exist_ok=True)
@@ -466,10 +718,25 @@ def main():
     print(f"  {path_16k_single_crt}")
     print("  (Tests single 16KB CHIP at $8000 that must be split into ROML+ROMH)")
 
+    # Create Ultimax mode cartridge (ROM at $E000, replaces KERNAL)
+    print("\nCreating Ultimax test cartridge (ROM at $E000)...")
+    ultimax_rom, desc_ultimax = create_ultimax_cartridge()
+
+    path_ultimax_bin = fixtures_dir / "test_cart_ultimax.bin"
+    write_raw_cartridge(path_ultimax_bin, ultimax_rom)
+    print(f"  {path_ultimax_bin} ({len(ultimax_rom)} bytes)")
+    print(f"  {desc_ultimax}")
+
+    path_ultimax_crt = fixtures_dir / "test_cart_ultimax.crt"
+    write_ultimax_crt_cartridge(path_ultimax_crt, ultimax_rom, name="ULTIMAX TEST CARTRIDGE")
+    print(f"  {path_ultimax_crt}")
+    print("  (Tests Ultimax mode: EXROM=1, GAME=0, ROM at $E000-$FFFF)")
+
     # Create error cartridges for all unsupported hardware types
     # These display a message showing what type of cartridge was attempted
+    # Error carts are runtime resources, so they live in the c64 package
     print("\nCreating error cartridges for unsupported types...")
-    error_cart_dir = fixtures_dir / "error_carts"
+    error_cart_dir = project_root / "systems" / "c64" / "cartridges" / "error_cartridges"
     error_cart_dir.mkdir(parents=True, exist_ok=True)
 
     for hw_type, type_name in sorted(C64.CRT_HARDWARE_TYPES.items()):
@@ -484,10 +751,30 @@ def main():
 
     print(f"\n  Created {len(C64.CRT_HARDWARE_TYPES) - 1} error cartridges in {error_cart_dir}")
 
+    # Create test CRT files for each mapper type in tests/fixtures/cartridge_types/
+    # These are used to test cartridge type identification and loading
+    print("\nCreating mapper test cartridges for all hardware types...")
+    cartridge_types_dir = fixtures_dir / "cartridge_types"
+    cartridge_types_dir.mkdir(parents=True, exist_ok=True)
+
+    for hw_type, type_name in sorted(C64.CRT_HARDWARE_TYPES.items()):
+        # Create a test ROM that displays the mapper type
+        mapper_rom = create_mapper_test_cartridge(hw_type, type_name)
+        # Use a sanitized filename
+        safe_name = type_name.lower().replace(" ", "_").replace(",", "").replace("/", "_").replace("(", "").replace(")", "").replace(".", "")
+        path = cartridge_types_dir / f"type_{hw_type:02d}_{safe_name}.crt"
+        write_crt_cartridge(path, mapper_rom, name=f"TYPE {hw_type} TEST", hardware_type=hw_type)
+        print(f"  Type {hw_type:2d}: {path.name}")
+
+    print(f"\n  Created {len(C64.CRT_HARDWARE_TYPES)} mapper test cartridges in {cartridge_types_dir}")
+
     print("\nDone! Test with:")
     print(f"  python systems/c64.py --rom-dir systems/roms --cartridge {path_8k_crt}")
     print(f"  python systems/c64.py --rom-dir systems/roms --cartridge {path_16k_crt}")
     print(f"  python systems/c64.py --rom-dir systems/roms --cartridge {path_16k_single_crt}")
+    print(f"  python systems/c64.py --rom-dir systems/roms --cartridge {path_ultimax_crt}")
+    print(f"\nTest unsupported type (should show error cart):")
+    print(f"  python systems/c64.py --rom-dir systems/roms --cartridge {cartridge_types_dir}/type_01_action_replay.crt")
 
 
 if __name__ == '__main__':
