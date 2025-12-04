@@ -5,7 +5,6 @@ import logging
 import mos6502
 from mos6502 import CPU, errors, flags, instructions
 from mos6502.flags import FlagsRegister
-from mos6502.memory import Byte
 
 log = logging.getLogger("mos6502")
 log.setLevel(logging.DEBUG)
@@ -25,13 +24,14 @@ def test_cpu_instruction_RTI_IMPLIED_0x40(cpu: CPU) -> None:  # noqa: N802
     cpu.ram[cpu.S - 1] = 0x00  # Low byte at 0x1FE
     cpu.S -= 2
 
-    # Push status (0xF3: C=1, Z=1, I=1, D=1, V=1, N=1)
-    status_value: int = 0xF3
+    # Push status (0xFF: all flags set - C=1, Z=1, I=1, D=1, B=1, V=1, N=1)
+    # Standard 6502 status register layout: NV-BDIZC (bit 7 to bit 0)
+    status_value: int = 0xFF
     cpu.ram[cpu.S] = status_value
     cpu.S -= 1
 
     # Clear flags to verify RTI restores them
-    cpu._flags = Byte(0x00)
+    cpu._flags = FlagsRegister(0x00)
 
     cpu.ram[pc] = instructions.RTI_IMPLIED_0x40
 

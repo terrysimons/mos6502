@@ -4,7 +4,7 @@
 import contextlib
 import importlib
 import logging
-from typing import TYPE_CHECKING, Callable, Generator, Literal, Self
+from typing import TYPE_CHECKING, Callable, Literal, Self
 
 from mos6502.bitarray_factory import ba2int
 
@@ -104,6 +104,14 @@ class MOS6502CPU(flags.ProcessorStatusFlagsInterface):
         # If callback raises StopIteration, execution will stop
         self.pc_callback: callable = None
 
+        # Optional callbacks for instruction execution hooks
+        # Useful for debugging, profiling, breakpoints, and generalizing to other CPU cores
+        # Signature: callback(cpu, instruction) -> None
+        # pre_instruction_callback: Called before each instruction executes
+        # post_instruction_callback: Called after each instruction executes
+        self.pre_instruction_callback: callable = None
+        self.post_instruction_callback: callable = None
+
     @property
     def variant(self: Self) -> variants.CPUVariant:
         """Return the CPU variant being emulated."""
@@ -162,49 +170,28 @@ class MOS6502CPU(flags.ProcessorStatusFlagsInterface):
         self._variant_handler_cache[cache_key] = handler
         return handler
 
-    @contextlib.contextmanager
-    def instruction_variant(
-        self: Self,
-        opcode: instructions.InstructionOpcode,
-    ) -> Generator[Callable[[], None], None, None]:
-        """Context manager for executing variant-specific instruction.
+    def _execute_instruction(self: Self, opcode: instructions.InstructionOpcode) -> None:
+        """Execute a variant-specific instruction.
 
-        Provides debugging support by wrapping instruction execution with
-        entry/exit hooks for logging, state validation, and error handling.
+        Handles pre/post instruction callbacks for debugging, profiling, and extensibility.
 
         Arguments:
         ---------
             opcode: The instruction opcode carrying variant metadata
-
-        Yields:
-        ------
-            A callable instruction that executes the variant-specific implementation
-
-        Example:
-        -------
-            with self.instruction_variant(instruction) as nop:
-                nop()
         """
-        # Extract package and function from opcode metadata
-        instruction_package = opcode.package  # type: ignore
-        function_name = opcode.function  # type: ignore
+        # Look up the variant-specific handler (cached for performance)
+        handler = self._load_variant_handler(opcode.package, opcode.function)
 
-        # Look up the variant-specific handler
-        handler = self._load_variant_handler(instruction_package, function_name)
+        # Pre-instruction callback (for debugging, profiling, breakpoints)
+        if self.pre_instruction_callback:
+            self.pre_instruction_callback(self, opcode)
 
-        # Create a bound callable that doesn't require arguments
-        def instruction() -> None:
-            handler(self)
+        # Execute the instruction
+        handler(self)
 
-        # TODO: Add debug logging here if needed
-        # self.log.debug(f"Executing {function_name} (variant: {self.variant_name})")
-
-        try:
-            yield instruction
-        finally:
-            # TODO: Add exit logging/validation here if needed
-            # self.log.debug(f"Completed {function_name} (variant: {self.variant_name})")
-            pass
+        # Post-instruction callback (for debugging, profiling, state validation)
+        if self.post_instruction_callback:
+            self.post_instruction_callback(self, opcode)
 
     def __enter__(self: Self) -> Self:
         """With entrypoint."""
@@ -1273,8 +1260,7 @@ class MOS6502CPU(flags.ProcessorStatusFlagsInterface):
             # This automatically invokes the correct opcode handler based on the configured CPU variant.
             # Legal instructions have metadata (package/function), illegal ones don't
             if hasattr(instruction, "package") and hasattr(instruction, "function"):
-                with self.instruction_variant(instruction) as execute_instruction_variant:
-                    execute_instruction_variant()
+                self._execute_instruction(instruction)
             else:
                 # Illegal instruction - no metadata found
                 self.log.error(f"ILLEGAL INSTRUCTION: {instruction} ({instruction:02X})")

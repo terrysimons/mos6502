@@ -1,36 +1,47 @@
 #!/usr/bin/env python3
-"""Flags for the mos6502 CPU."""
+"""Flags for the mos6502 CPU.
+
+Performance optimization: Flags are stored as a plain int, not a bitarray.
+Bit operations use simple masking instead of bitarray indexing.
+"""
 
 import logging
 from typing import Self
 
-from mos6502.bitarray_factory import bitarray, int2ba
-
-from mos6502.memory import Byte
-
 # Dedicated logger for flag modifications
 flag_logger = logging.getLogger("mos6502.cpu.flags")
 
-# Bit index into flags bitarray
-C: int = 0x07
-Z: int = 0x06
-I: int = 0x05  # noqa: E741
-D: int = 0x04
-B: int = 0x03
-_: int = 0x02
-V: int = 0x01
-N: int = 0x00
+# Bit positions (from LSB, matching 6502 status register layout)
+# Status register layout: NV-BDIZC (bit 7 to bit 0)
+C: int = 0  # Carry
+Z: int = 1  # Zero
+I: int = 2  # IRQ Disable  # noqa: E741
+D: int = 3  # Decimal Mode
+B: int = 4  # Break Command
+_: int = 5  # Unused (always 1)
+V: int = 6  # Overflow
+N: int = 7  # Negative
+
+# Bit masks for each flag
+C_MASK: int = 1 << C  # 0x01
+Z_MASK: int = 1 << Z  # 0x02
+I_MASK: int = 1 << I  # 0x04
+D_MASK: int = 1 << D  # 0x08
+B_MASK: int = 1 << B  # 0x10
+_MASK: int = 1 << _   # 0x20
+V_MASK: int = 1 << V  # 0x40
+N_MASK: int = 1 << N  # 0x80
 
 # Flag names for logging
 FLAG_NAMES = {
-    0x00: "N",
-    0x01: "V",
-    0x02: "_",
-    0x03: "B",
-    0x04: "D",
-    0x05: "I",
-    0x06: "Z",
-    0x07: "C",
+    0: "C",
+    1: "Z",
+    2: "I",
+    3: "D",
+    4: "B",
+    5: "_",
+    6: "V",
+    7: "N",
 }
 
 
@@ -46,156 +57,203 @@ def format_flags(flags_value: int) -> str:
         Formatted string like "Nv-Bdizc" or "NV-BDIZC"
 
     """
-    # Extract individual flag bits from flags_value
-    n_bit = (flags_value >> N) & 1
-    v_bit = (flags_value >> V) & 1
-    b_bit = (flags_value >> B) & 1
-    d_bit = (flags_value >> D) & 1
-    i_bit = (flags_value >> I) & 1
-    z_bit = (flags_value >> Z) & 1
-    c_bit = (flags_value >> C) & 1
-
     return (
-        f"{'N' if n_bit else 'n'}"
-        f"{'V' if v_bit else 'v'}"
+        f"{'N' if flags_value & N_MASK else 'n'}"
+        f"{'V' if flags_value & V_MASK else 'v'}"
         "-"  # Unused flag
-        f"{'B' if b_bit else 'b'}"
-        f"{'D' if d_bit else 'd'}"
-        f"{'I' if i_bit else 'i'}"
-        f"{'Z' if z_bit else 'z'}"
-        f"{'C' if c_bit else 'c'}"
+        f"{'B' if flags_value & B_MASK else 'b'}"
+        f"{'D' if flags_value & D_MASK else 'd'}"
+        f"{'I' if flags_value & I_MASK else 'i'}"
+        f"{'Z' if flags_value & Z_MASK else 'z'}"
+        f"{'C' if flags_value & C_MASK else 'c'}"
     )
 
 
-class FlagsRegister(Byte):
-    """A Byte that logs all individual flag bit modifications."""
+class FlagsRegister:
+    """Int-based flags register with change logging.
+
+    Stores the 6502 processor status register as a plain int for performance.
+    Provides indexed access via __getitem__/__setitem__ for compatibility.
+    """
+
+    __slots__ = ('_value', '_last_logged_value')
 
     def __init__(self: Self, value: int = 0, endianness: str = "little") -> None:
-        """Initialize FlagsRegister with tracking for change detection."""
-        super().__init__(value, endianness)
-        self._last_logged_value: int = value
+        """Initialize FlagsRegister.
 
-    def __setitem__(self: Self, index: int, value: int) -> None:
-        """Set a flag bit, but only if it's different. Log only on change."""
-        # Get current value of this bit
-        old_bit_value = int(self._value[index])
-        new_bit_value = int(value) if isinstance(value, int) else int(value._value[index])  # noqa: SLF001
+        Args:
+            value: Initial flags value (0x00-0xFF), or a FlagsRegister to copy
+            endianness: Ignored, kept for API compatibility
+        """
+        if isinstance(value, FlagsRegister):
+            self._value: int = value._value
+        elif hasattr(value, 'value'):
+            # Handle Byte or other objects with .value
+            self._value: int = int(value.value) & 0xFF
+        else:
+            self._value: int = int(value) & 0xFF
+        self._last_logged_value: int = self._value
 
-        # Early return if no change - saves cycles!
-        if old_bit_value == new_bit_value:
+    @property
+    def value(self: Self) -> int:
+        """Return the flags register value as an int (0x00-0xFF)."""
+        return self._value
+
+    @value.setter
+    def value(self: Self, new_value: int) -> None:
+        """Set the flags register value."""
+        self._value = int(new_value) & 0xFF
+
+    def __getitem__(self: Self, bit_index: int) -> int:
+        """Get a flag bit by index. Returns 0 or 1."""
+        return (self._value >> bit_index) & 1
+
+    def __setitem__(self: Self, bit_index: int, bit_value: int) -> None:
+        """Set a flag bit by index.
+
+        Args:
+            bit_index: Bit position (0-7)
+            bit_value: New value (0 or non-zero for 1)
+        """
+        # Normalize to 0 or 1
+        new_bit = 1 if bit_value else 0
+        old_bit = (self._value >> bit_index) & 1
+
+        # Early return if no change
+        if old_bit == new_bit:
             return
 
-        # Call parent to actually set the value
-        super().__setitem__(index, value)
+        # Update the bit
+        if new_bit:
+            self._value |= (1 << bit_index)
+        else:
+            self._value &= ~(1 << bit_index)
 
-        # Only log if the overall flags value changed since last log
-        # This prevents logging the same value multiple times
-        if self.value != self._last_logged_value:
-            flag_logger.info(f"⎿ {format_flags(self.value)} (0x{self.value:02X})")
-            self._last_logged_value = self.value
+        # Log if overall value changed since last log
+        if self._value != self._last_logged_value:
+            flag_logger.info(f"⎿ {format_flags(self._value)} (0x{self._value:02X})")
+            self._last_logged_value = self._value
+
+    def __int__(self: Self) -> int:
+        """Return the flags value as an int."""
+        return self._value
+
+    def __and__(self: Self, other: int) -> int:
+        """Bitwise AND with an int."""
+        return self._value & other
+
+    def __or__(self: Self, other: int) -> int:
+        """Bitwise OR with an int."""
+        return self._value | other
+
+    def __eq__(self: Self, other: object) -> bool:
+        """Compare equality with another FlagsRegister or int."""
+        if isinstance(other, FlagsRegister):
+            return self._value == other._value
+        if isinstance(other, int):
+            return self._value == other
+        return NotImplemented
+
+    def __repr__(self: Self) -> str:
+        """Return a string representation."""
+        return f"FlagsRegister(0x{self._value:02X})"
 
 
+# Legacy compatibility - these were used for bitarray operations
+# Now we use simple bit masks instead
 class ProcessorStatusFlags:
-    """Flags for the mos6502 CPU."""
+    """Legacy flag constants for compatibility.
 
-    # Simplifies tests
-    SET_ZERO = bitarray([0] * 8, endian="little")
-    SET_ONE = bitarray([1] * 8, endian="little")
+    These are kept for any code that references ProcessorStatusFlags.C, etc.
+    The actual values are just the bit masks now.
+    """
 
-    # Carry Flag - 0 == False, 1 == True
-    C = int2ba(1 << C, endian="little")
+    # These return 1 for the bit position (for compatibility with old code)
+    C = type('FlagBit', (), {'__getitem__': lambda s, i: 1})()
+    Z = type('FlagBit', (), {'__getitem__': lambda s, i: 1})()
+    I = type('FlagBit', (), {'__getitem__': lambda s, i: 1})()  # noqa: E741
+    D = type('FlagBit', (), {'__getitem__': lambda s, i: 1})()
+    B = type('FlagBit', (), {'__getitem__': lambda s, i: 1})()
+    V = type('FlagBit', (), {'__getitem__': lambda s, i: 1})()
+    N = type('FlagBit', (), {'__getitem__': lambda s, i: 1})()
 
-    # Zero Flag - 0 == Result not zero, 1 == Result zero
-    Z = int2ba(1 << Z, endian="little")
-
-    # IRQ Disable Flag - 0 == Enable, 1 == Disable
-    I = int2ba(1 << I, endian="little")  # noqa: E741
-
-    # Decimal Mode Flag - 0 == False, 1 == True
-    D = int2ba(1 << D, endian="little")
-
-    # Break Command Flag - 0 == No break, 1 == Break
-    B = int2ba(1 << B, endian="little")
-
-    # Unused
-    _ = int2ba(1 << _, endian="little")
-
-    # Overflow Flag - 0 == False, 1 == True
-    V = int2ba(1 << V, endian="little")
-
-    # Negative Flag - 0 == Positive, 1 == Negative
-    N = int2ba(1 << N, endian="little")
+    # SET_ZERO returns 0, SET_ONE returns 1 (for legacy test compatibility)
+    SET_ZERO = type('SetZero', (), {'__getitem__': lambda s, i: 0})()
+    SET_ONE = type('SetOne', (), {'__getitem__': lambda s, i: 1})()
 
 
 class ProcessorStatusFlagsInterface:
-    """CPU interface for the mos6502 CPU flags."""
+    """CPU interface for the mos6502 CPU flags.
+
+    Provides property access to individual flags via the CPU's _flags attribute.
+    """
 
     @property
     def C(self: Self) -> bool:  # noqa: N802
-        """C is True if the CPU.C flag non-zero."""
-        return self._flags[C] & ProcessorStatusFlags.C[C]
+        """C is True if the Carry flag is set."""
+        return bool(self._flags[C])
 
     @C.setter
     def C(self: Self, flag: int) -> None:  # noqa: N802
-        """Set the C flag to {flag}."""
+        """Set the Carry flag."""
         self._flags[C] = flag
 
     @property
     def Z(self: Self) -> bool:  # noqa: N802
-        """Z is True if the CPU.Z flag non-zero."""
-        return self._flags[Z] & ProcessorStatusFlags.Z[Z]
+        """Z is True if the Zero flag is set."""
+        return bool(self._flags[Z])
 
     @Z.setter
-    def Z(self: Self, flag: bitarray) -> None:  # noqa: N802
-        """Set the Z flag to {flag}."""
+    def Z(self: Self, flag: int) -> None:  # noqa: N802
+        """Set the Zero flag."""
         self._flags[Z] = flag
 
     @property
     def I(self: Self) -> bool:  # noqa: E743 N802
-        """I is True if the CPU.I flag non-zero."""
-        return self._flags[I] & ProcessorStatusFlags.I[I]
+        """I is True if the IRQ Disable flag is set."""
+        return bool(self._flags[I])
 
     @I.setter
-    def I(self: Self, flag: bitarray) -> None:  # noqa: E743 N802
-        """Set the I flag to {flag}."""
+    def I(self: Self, flag: int) -> None:  # noqa: E743 N802
+        """Set the IRQ Disable flag."""
         self._flags[I] = flag
 
     @property
     def D(self: Self) -> bool:  # noqa: N802
-        """D is True if the CPU.D flag non-zero."""
-        return self._flags[D] & ProcessorStatusFlags.D[D]
+        """D is True if the Decimal Mode flag is set."""
+        return bool(self._flags[D])
 
     @D.setter
-    def D(self: Self, flag: bitarray) -> None:  # noqa: N802
-        """Set the D flag to {flag}."""
+    def D(self: Self, flag: int) -> None:  # noqa: N802
+        """Set the Decimal Mode flag."""
         self._flags[D] = flag
 
     @property
     def B(self: Self) -> bool:  # noqa: N802
-        """B is True if the CPU.B flag non-zero."""
-        return self._flags[B] & ProcessorStatusFlags.B[B]
+        """B is True if the Break flag is set."""
+        return bool(self._flags[B])
 
     @B.setter
-    def B(self: Self, flag: bitarray) -> None:  # noqa: N802
-        """Set the B flag to {flag}."""
+    def B(self: Self, flag: int) -> None:  # noqa: N802
+        """Set the Break flag."""
         self._flags[B] = flag
 
     @property
     def V(self: Self) -> bool:  # noqa: N802
-        """V is True if the CPU.V flag non-zero."""
-        return self._flags[V] & ProcessorStatusFlags.V[V]
+        """V is True if the Overflow flag is set."""
+        return bool(self._flags[V])
 
     @V.setter
-    def V(self: Self, flag: bitarray) -> None:  # noqa: N802
-        """Set the V flag to {flag}."""
+    def V(self: Self, flag: int) -> None:  # noqa: N802
+        """Set the Overflow flag."""
         self._flags[V] = flag
 
     @property
     def N(self: Self) -> bool:  # noqa: N802
-        """N is True if the CPU.N flag non-zero."""
-        return self._flags[N] & ProcessorStatusFlags.N[N]
+        """N is True if the Negative flag is set."""
+        return bool(self._flags[N])
 
     @N.setter
-    def N(self: Self, flag: bitarray) -> None:  # noqa: N802
-        """Set the N flag to {flag}."""
+    def N(self: Self, flag: int) -> None:  # noqa: N802
+        """Set the Negative flag."""
         self._flags[N] = flag

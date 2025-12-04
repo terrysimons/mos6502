@@ -18,9 +18,9 @@ def test_cpu_instruction_PLP_IMPLIED_0x28(cpu: CPU) -> None:  # noqa: N802
     pc = cpu.PC
 
     # Push a status value onto the stack
-    # Bit layout: C=7, Z=6, I=5, D=4, B=3, -, V=1, N=0
-    # Set C, Z, I, D, V, N = 0b11110011 = 0xF3
-    status_value: int = 0b11110011
+    # Standard 6502 status register layout: NV-BDIZC (bit 7 to bit 0)
+    # Set all flags: C=1, Z=1, I=1, D=1, B=1, _=1, V=1, N=1 = 0xFF
+    status_value: int = 0xFF
     cpu.ram[cpu.S] = status_value
     cpu.S -= 1
 

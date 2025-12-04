@@ -62,7 +62,8 @@ def test_cpu_instruction_PHP_IMPLIED_0x08_b_flag(cpu: CPU) -> None:  # noqa: N80
     cpu.PC = 0x0400
     pc = cpu.PC
 
-    # Flags are already 0 after reset
+    # Clear all flags to start with a known state
+    cpu._flags.value = 0x00
     initial_sp: int = cpu.S
     initial_flags: int = cpu.flags.value
 
@@ -74,7 +75,8 @@ def test_cpu_instruction_PHP_IMPLIED_0x08_b_flag(cpu: CPU) -> None:  # noqa: N80
 
     # then:
     pushed_status: int = cpu.ram[initial_sp]
-    # B flag (bits 4 and 5) should be set in pushed value
-    assert pushed_status == 0b00110000
+    # B flag (bit 4) and unused flag (bit 5) should be set in pushed value
+    # Standard 6502 status register layout: NV-BDIZC (bit 7 to bit 0)
+    assert pushed_status == 0b00110000  # 0x30: B and unused bits set
     # But actual flags should still be 0
     assert cpu.flags.value == initial_flags
