@@ -19,6 +19,7 @@ from c64.cartridges import (
     Cartridge,
     ErrorCartridge,
     StaticROMCartridge,
+    ActionReplayCartridge,
     create_cartridge,
     ROML_START,
     ROMH_START,
@@ -54,8 +55,17 @@ class TestCartridgeModule:
 
     def test_cartridge_types_registry_contains_type_0(self):
         """Type 0 (Normal cartridge) should be in the registry."""
-        assert 0 in CARTRIDGE_TYPES
-        assert CARTRIDGE_TYPES[0] == StaticROMCartridge
+        assert StaticROMCartridge.HARDWARE_TYPE in CARTRIDGE_TYPES
+        assert CARTRIDGE_TYPES[StaticROMCartridge.HARDWARE_TYPE] == StaticROMCartridge
+
+    def test_cartridge_types_registry_contains_type_1(self):
+        """Type 1 (Action Replay) should be in the registry."""
+        assert ActionReplayCartridge.HARDWARE_TYPE in CARTRIDGE_TYPES
+        assert CARTRIDGE_TYPES[ActionReplayCartridge.HARDWARE_TYPE] == ActionReplayCartridge
+
+    def test_action_replay_cartridge_hardware_type(self):
+        """ActionReplayCartridge should have hardware type 1."""
+        assert ActionReplayCartridge.HARDWARE_TYPE == 1
 
     def test_static_rom_cartridge_hardware_type(self):
         """StaticROMCartridge should have hardware type 0."""
@@ -201,19 +211,32 @@ class TestCreateCartridgeFactory:
     def test_create_type_0_returns_static_rom_cartridge(self):
         """create_cartridge with type 0 should return StaticROMCartridge."""
         roml_data = bytes(ROML_SIZE)
-        cart = create_cartridge(0, roml_data, name="Test")
+        cart = create_cartridge(StaticROMCartridge.HARDWARE_TYPE, roml_data, name="Test")
 
         assert isinstance(cart, StaticROMCartridge)
+
+    def test_create_type_1_returns_action_replay_cartridge(self):
+        """create_cartridge with type 1 should return ActionReplayCartridge."""
+        banks = [bytes(ROML_SIZE) for _ in range(4)]  # 4 x 8KB banks
+        cart = create_cartridge(
+            ActionReplayCartridge.HARDWARE_TYPE,
+            banks=banks,
+            name="Test Action Replay"
+        )
+
+        assert isinstance(cart, ActionReplayCartridge)
+        assert cart.num_banks == 4
 
     def test_create_unsupported_type_raises_value_error(self):
         """create_cartridge with unsupported type should raise ValueError."""
         roml_data = bytes(ROML_SIZE)
 
+        # Use raw numbers here since these types don't have classes yet
         with pytest.raises(ValueError, match="Unsupported cartridge hardware type"):
-            create_cartridge(1, roml_data, name="Test")
+            create_cartridge(2, roml_data, name="Test")  # KCS Power - not yet implemented
 
         with pytest.raises(ValueError, match="Unsupported cartridge hardware type"):
-            create_cartridge(32, roml_data, name="Test")
+            create_cartridge(32, roml_data, name="Test")  # EasyFlash - not yet implemented
 
 
 class TestC64CartridgeLoading:
@@ -344,12 +367,33 @@ class TestC64CartridgeLoading:
 
     @requires_c64_roms
     def test_load_type_00_ultimax_bin_cartridge(self, c64):
-        """Type 0: Ultimax cartridge (raw .bin, EXROM=1, GAME=0)."""
+        """Type 0: Ultimax cartridge (raw .bin with explicit type, EXROM=1, GAME=0)."""
         bin_path = FIXTURES_DIR / "test_cart_ultimax.bin"
         if not bin_path.exists():
             pytest.skip(f"Test fixture not found: {bin_path}")
 
         c64.load_cartridge(bin_path, cart_type="ultimax")
+
+        assert c64.cartridge_type == "ultimax"
+        assert c64.memory.cartridge is not None
+        assert isinstance(c64.memory.cartridge, StaticROMCartridge)
+        assert c64.memory.cartridge.exrom is True   # Inactive (Ultimax)
+        assert c64.memory.cartridge.game is False   # Active (Ultimax)
+        assert c64.memory.cartridge.ultimax_romh_data is not None
+
+    @requires_c64_roms
+    def test_load_type_00_ultimax_bin_autodetect_cartridge(self, c64):
+        """Type 0: Ultimax cartridge auto-detection from reset vector.
+
+        When an 8KB .bin file doesn't have CBM80 signature but has a reset
+        vector pointing to $E000-$FFFF, it should be auto-detected as Ultimax.
+        """
+        bin_path = FIXTURES_DIR / "test_cart_ultimax.bin"
+        if not bin_path.exists():
+            pytest.skip(f"Test fixture not found: {bin_path}")
+
+        # Load with auto-detection (no explicit cart_type)
+        c64.load_cartridge(bin_path)
 
         assert c64.cartridge_type == "ultimax"
         assert c64.memory.cartridge is not None
@@ -377,7 +421,7 @@ class TestC64CartridgeLoading:
     @requires_c64_roms
     def test_load_type_01_action_replay_cartridge(self, c64):
         """Type 1: Action Replay."""
-        self._test_load_cartridge_type(c64, 1)
+        self._test_load_cartridge_type(c64, ActionReplayCartridge.HARDWARE_TYPE)
 
     @requires_c64_roms
     def test_load_type_02_kcs_power_cartridge(self, c64):

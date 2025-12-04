@@ -1930,6 +1930,21 @@ class C64:
             # Light pen state
             self.light_pen_triggered = False
 
+            # Frame-ready flag for render synchronization
+            # VIC sets this when a frame completes (raster wraps to 0)
+            # Pygame checks it, grabs a snapshot, and clears it
+            # No blocking - VIC runs at full speed, pygame renders what it catches
+            # Using multiprocessing.Event for proper cross-process visibility
+            import multiprocessing
+            self.frame_complete = multiprocessing.Event()
+
+            # RAM snapshots taken at VBlank for consistent rendering
+            # Only the 16KB VIC bank is snapshotted (not full 64KB) for performance
+            self.ram_snapshot = None
+            self.ram_snapshot_bank = 0  # Base address of snapshotted bank
+            self.color_snapshot = None
+            self.c64_memory = None  # Set later via set_memory()
+
             self.log.info(
                 "VIC-II %s initialized (%d lines, %d cycles/line, %d cycles/frame)",
                 self.video_timing.chip_name,
@@ -1941,6 +1956,10 @@ class C64:
         def set_cia2(self, cia2) -> None:
             """Set reference to CIA2 for VIC bank selection."""
             self.cia2 = cia2
+
+        def set_memory(self, c64_memory) -> None:
+            """Set reference to C64Memory for VBlank snapshots."""
+            self.c64_memory = c64_memory
 
         def get_vic_bank(self) -> int:
             """Get the current VIC bank address from CIA2."""
@@ -1959,6 +1978,20 @@ class C64:
             new_raster = total_lines % self.raster_lines
 
             if new_raster != self.current_raster:
+                # Detect frame completion (VBlank) when raster wraps back to 0
+                # This happens when new_raster < current_raster (wrapped around)
+                if new_raster < self.current_raster:
+                    # Take RAM snapshot NOW while we're at VBlank
+                    # This ensures consistent frame data before CPU continues
+                    # Use snapshot_vic_bank() to bypass memory handler and avoid infinite recursion
+                    # Only snapshot the 16KB VIC bank that's currently visible
+                    if self.c64_memory:
+                        vic_bank = self.get_vic_bank()
+                        self.ram_snapshot = self.c64_memory.snapshot_vic_bank(vic_bank)
+                        self.ram_snapshot_bank = vic_bank  # Remember bank offset for rendering
+                        self.color_snapshot = bytes(self.c64_memory.ram_color)
+                    # Signal frame complete - pygame will use the snapshot
+                    self.frame_complete.set()
                 # 9-bit raster compare value: low byte in $D012, bit 8 in $D011 bit 7
                 compare = self.regs[0x12] | ((self.regs[0x11] & 0x80) << 1)
 
@@ -2484,6 +2517,108 @@ class C64:
             elif addr <= 65535:
                 self.ram_heap[addr - 512] = int_value
 
+        def snapshot_ram(self) -> bytes:
+            """Create a fast RAM snapshot by directly accessing underlying storage.
+
+            This bypasses the memory handler to avoid triggering VIC/CIA reads
+            and the infinite recursion that would cause. The snapshot captures
+            the raw RAM state, not the banked view the CPU sees.
+
+            Returns:
+                65536 bytes representing the full 64KB RAM.
+            """
+            # Concatenate the three RAM regions directly - no memory handler involved
+            # This is O(n) but avoids 65536 individual memory handler calls
+            return bytes(self.ram_zeropage) + bytes(self.ram_stack) + bytes(self.ram_heap)
+
+        def snapshot_vic_bank(self, vic_bank: int) -> bytes:
+            """Create a fast snapshot of only the 16KB VIC bank the VIC can see.
+
+            The VIC can only see 16KB of RAM at a time, selected by CIA2:
+            - Bank 0: $0000-$3FFF (includes screen at $0400)
+            - Bank 1: $4000-$7FFF
+            - Bank 2: $8000-$BFFF
+            - Bank 3: $C000-$FFFF
+
+            Arguments:
+                vic_bank: Base address of VIC bank (0x0000, 0x4000, 0x8000, or 0xC000)
+
+            Returns:
+                16384 bytes representing the 16KB VIC bank.
+            """
+            # Use slice operations for speed instead of byte-by-byte copy
+            # RAM layout: zeropage[0:256], stack[256:512], heap[512:65536]
+            bank_size = 0x4000  # 16KB
+
+            if vic_bank == 0x0000:
+                # Bank 0: $0000-$3FFF (zeropage + stack + heap[0:0x3E00])
+                return (bytes(self.ram_zeropage) +
+                        bytes(self.ram_stack) +
+                        bytes(self.ram_heap[:bank_size - 512]))
+            elif vic_bank == 0x4000:
+                # Bank 1: $4000-$7FFF (all from heap)
+                heap_start = vic_bank - 512
+                return bytes(self.ram_heap[heap_start:heap_start + bank_size])
+            elif vic_bank == 0x8000:
+                # Bank 2: $8000-$BFFF (all from heap)
+                heap_start = vic_bank - 512
+                return bytes(self.ram_heap[heap_start:heap_start + bank_size])
+            else:  # vic_bank == 0xC000
+                # Bank 3: $C000-$FFFF (all from heap)
+                heap_start = vic_bank - 512
+                return bytes(self.ram_heap[heap_start:heap_start + bank_size])
+
+        def snapshot_screen_area(self, screen_base: int, bitmap_mode: bool = False) -> bytes:
+            """Create a minimal snapshot of just the video memory the VIC needs.
+
+            For text mode: Just 1024 bytes at screen_base (1000 chars + sprite ptrs)
+            For bitmap mode: 8192 bytes of bitmap data + 1024 bytes screen/color info
+
+            Arguments:
+                screen_base: Starting address of screen RAM (e.g., 0x0400)
+                bitmap_mode: If True, snapshot includes 8KB bitmap data
+
+            Returns:
+                Snapshot of just the visible screen area.
+            """
+            # Screen RAM is 1000 bytes (40*25), but we grab 1024 to include
+            # sprite pointers at screen+$3F8 (8 bytes)
+            size = 0x2400 if bitmap_mode else 0x0400  # 9KB or 1KB
+
+            return self._snapshot_range(screen_base, size)
+
+        def _snapshot_range(self, start: int, size: int) -> bytes:
+            """Snapshot a specific memory range directly from RAM storage.
+
+            Arguments:
+                start: Starting address
+                size: Number of bytes to snapshot
+
+            Returns:
+                bytes object containing the memory range
+            """
+            end = start + size
+
+            # Fast path: entire range is in heap (addresses >= 512)
+            # This is the common case for screen RAM at $0400, $0800, etc.
+            if start >= 512:
+                heap_start = start - 512
+                heap_end = end - 512
+                return bytes(self.ram_heap[heap_start:heap_end])
+
+            # Slow path: range spans multiple regions (rare)
+            result = bytearray(size)
+            for addr in range(start, end):
+                offset = addr - start
+                if addr < 256:
+                    result[offset] = self.ram_zeropage[addr]
+                elif addr < 512:
+                    result[offset] = self.ram_stack[addr - 256]
+                else:
+                    result[offset] = self.ram_heap[addr - 512]
+
+            return bytes(result)
+
         def _read_io_area(self, addr: int) -> int:
             """Read from I/O area ($D000-$DFFF)."""
             # VIC registers
@@ -2863,6 +2998,9 @@ class C64:
         )
         # Hook up the memory handler so CPU RAM accesses go through C64Memory
         self.cpu.ram.memory_handler = self.memory
+
+        # Give VIC access to C64Memory for VBlank snapshots
+        self.vic.set_memory(self.memory)
 
         # Set up periodic update callback for VIC, CIA1, and CIA2
         # VIC checks cycle count and triggers raster IRQs
@@ -3700,6 +3838,9 @@ class C64:
 
         try:
             # Execute with cycle counter display
+            # Use threading for concurrent execution - multiprocessing has pickling issues
+            # with closures and the GIL doesn't affect us since we're I/O bound on display
+            # The frame_complete uses multiprocessing.Event for cross-process safety
             import threading
             import time
             import sys as _sys
@@ -4509,31 +4650,55 @@ class C64:
                 elif event.type == pygame.KEYUP:
                     self._handle_pygame_keyboard(event, pygame)
 
-            # Skip rendering if nothing changed
-            if not self.dirty_tracker.has_changes():
-                return
+            # Check if VIC has a new frame ready (VBlank)
+            # VIC takes the snapshot at the exact moment of VBlank for consistency
+            new_frame = self.vic.frame_complete.is_set()
+            if new_frame:
+                self.vic.frame_complete.clear()
+                self._frame_count = getattr(self, '_frame_count', 0) + 1
+                if self._frame_count <= 5 or self._frame_count % 50 == 0:
+                    log.info(f"*** PYGAME: Caught frame {self._frame_count}, cycles={self.cpu.cycles_executed} ***")
 
             # Create memory wrappers for VIC
+            # Use VIC's snapshot (taken at VBlank) if available, otherwise live RAM
+            # The snapshot is only 16KB (one VIC bank), so we need to adjust addresses
             class RAMWrapper:
-                def __init__(self, cpu_ram):
-                    self.cpu_ram = cpu_ram
+                def __init__(wrapper_self, snapshot, snapshot_bank, live_ram):
+                    wrapper_self.snapshot = snapshot
+                    wrapper_self.snapshot_bank = snapshot_bank
+                    wrapper_self.live_ram = live_ram
 
-                def __getitem__(self, index):
-                    return int(self.cpu_ram[index])
+                def __getitem__(wrapper_self, index):
+                    if wrapper_self.snapshot is not None:
+                        # Convert absolute address to bank-relative offset
+                        # The snapshot covers snapshot_bank to snapshot_bank + 16KB
+                        relative_index = index - wrapper_self.snapshot_bank
+                        if 0 <= relative_index < len(wrapper_self.snapshot):
+                            return wrapper_self.snapshot[relative_index]
+                        # Address outside snapshot bank - fall through to live RAM
+                    return int(wrapper_self.live_ram[index])
 
             class ColorRAMWrapper:
-                def __init__(self, color_ram):
-                    self.color_ram = color_ram
+                def __init__(wrapper_self, snapshot, live_color):
+                    wrapper_self.snapshot = snapshot
+                    wrapper_self.live_color = live_color
 
-                def __getitem__(self, index):
-                    return self.color_ram[index] & 0x0F
+                def __getitem__(wrapper_self, index):
+                    if wrapper_self.snapshot is not None:
+                        return wrapper_self.snapshot[index] & 0x0F
+                    return wrapper_self.live_color[index] & 0x0F
 
-            ram_wrapper = RAMWrapper(self.cpu.ram)
-            color_wrapper = ColorRAMWrapper(self.memory.ram_color)
+            ram_wrapper = RAMWrapper(
+                self.vic.ram_snapshot,
+                self.vic.ram_snapshot_bank,
+                self.cpu.ram
+            )
+            color_wrapper = ColorRAMWrapper(
+                self.vic.color_snapshot,
+                self.memory.ram_color
+            )
 
             # Let VIC render the complete frame (border + text)
-            # VIC handles all positioning and color logic internally
-            # TODO: Future optimization - pass dirty cells to VIC for partial rendering
             self.vic.render_frame(self.pygame_surface, ram_wrapper, color_wrapper)
 
             # Scale and blit to screen

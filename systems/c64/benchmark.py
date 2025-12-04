@@ -21,19 +21,19 @@ for logger_name in ['c64', 'c64.vic', 'mos6502', 'mos6502.cpu', 'mos6502.cpu.fla
     logging.getLogger(logger_name).setLevel(logging.CRITICAL)
 
 
-def benchmark_c64(rom_dir: str, max_cycles: int, video_mode: str = "pal", verbose_cycles: bool = False) -> tuple[float, int]:
+def benchmark_c64(rom_dir: str, max_cycles: int, video_chip: str = "6569", verbose_cycles: bool = False) -> tuple[float, int]:
     """Benchmark C64 execution.
 
     Args:
         rom_dir: Path to ROM directory
         max_cycles: Maximum cycles to execute
-        video_mode: "pal" or "ntsc"
+        video_chip: VIC-II chip variant ("6569", "6567R8", "6567R56A", "PAL", "NTSC")
         verbose_cycles: Enable per-cycle CPU logging
 
     Returns:
         (elapsed_seconds, cycles_executed)
     """
-    c64 = C64(rom_dir=rom_dir, display_mode="headless", video_mode=video_mode, verbose_cycles=verbose_cycles)
+    c64 = C64(rom_dir=rom_dir, display_mode="headless", video_chip=video_chip, verbose_cycles=verbose_cycles)
     c64.cpu.reset()
 
     start_time = time.perf_counter()
@@ -46,19 +46,19 @@ def benchmark_c64(rom_dir: str, max_cycles: int, video_mode: str = "pal", verbos
     return elapsed, c64.cpu.cycles_executed
 
 
-def benchmark_boot(rom_dir: str, video_mode: str = "pal", debug: bool = False, verbose_cycles: bool = False) -> tuple[float, int, int, str]:
+def benchmark_boot(rom_dir: str, video_chip: str = "6569", debug: bool = False, verbose_cycles: bool = False) -> tuple[float, int, int, str]:
     """Benchmark C64 boot time until BASIC is ready.
 
     Args:
         rom_dir: Path to ROM directory
-        video_mode: "pal" or "ntsc"
+        video_chip: VIC-II chip variant ("6569", "6567R8", "6567R56A", "PAL", "NTSC")
         debug: If True, print debug info about PC locations
         verbose_cycles: Enable per-cycle CPU logging
 
     Returns:
         (elapsed_seconds, cycles_executed, entry_address, screen_capture)
     """
-    c64 = C64(rom_dir=rom_dir, display_mode="headless", video_mode=video_mode, verbose_cycles=verbose_cycles)
+    c64 = C64(rom_dir=rom_dir, display_mode="headless", video_chip=video_chip, verbose_cycles=verbose_cycles)
     c64.cpu.reset()
 
     # State for detecting when we first enter BASIC ROM
@@ -154,9 +154,16 @@ def main():
         print(f"Error: ROM directory not found at {args.rom_dir}")
         exit(1)
 
-    timing = PAL if args.video == "pal" else NTSC
+    # Get video chip from args (C64.args adds --video-chip which becomes args.video_chip)
+    video_chip = args.video_chip
 
-    print(f"\nBenchmarking CPU execution speed ({args.video.upper()} mode)...\n")
+    # Determine timing based on video chip
+    if video_chip.upper() in ("6569", "PAL"):
+        timing = PAL
+    else:
+        timing = NTSC
+
+    print(f"\nBenchmarking CPU execution speed (VIC-II {timing.chip_name})...\n")
 
     # Benchmark different cycle counts
     test_cycles = [100_000, 500_000, 1_000_000, 5_000_000]
@@ -164,18 +171,18 @@ def main():
     verbose_cycles = getattr(args, 'verbose_cycles', False)
 
     for cycles in test_cycles:
-        elapsed, executed = benchmark_c64(str(args.rom_dir), cycles, args.video, verbose_cycles)
+        elapsed, executed = benchmark_c64(str(args.rom_dir), cycles, video_chip, verbose_cycles)
         cycles_per_sec = executed / elapsed
         speed_ratio = cycles_per_sec / timing.cpu_freq
         print(f"{executed:,} cycles: {elapsed:.2f}s ({cycles_per_sec:,.0f} cycles/sec, {speed_ratio:.1%})")
 
     print()
-    print(f"Real C64 ({args.video.upper()}): {timing.cpu_freq:,} cycles/sec")
+    print(f"Real C64 ({timing.chip_name}): {timing.cpu_freq:,} cycles/sec")
     print()
 
     # Boot time benchmark - run until BASIC prompt is ready
     print("Boot benchmark (running until BASIC prompt)...")
-    elapsed, executed, entry_pc, screen = benchmark_boot(str(args.rom_dir), args.video, debug=args.debug, verbose_cycles=verbose_cycles)
+    elapsed, executed, entry_pc, screen = benchmark_boot(str(args.rom_dir), video_chip, debug=args.debug, verbose_cycles=verbose_cycles)
     cycles_per_sec = executed / elapsed if elapsed > 0 else 0
     speed_ratio = cycles_per_sec / timing.cpu_freq
     print(f"Cycles to boot to BASIC @ ${entry_pc:04X}: {executed:,} ({elapsed:.2f}s, {cycles_per_sec:,.0f} cycles/sec, {speed_ratio:.1%})")
