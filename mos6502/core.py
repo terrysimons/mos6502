@@ -95,6 +95,11 @@ class MOS6502CPU(flags.ProcessorStatusFlagsInterface):
         self.periodic_callback: callable = None
         self.periodic_callback_interval: int = 100  # Call every 100 instructions
 
+        # Optional callback called when PC changes (for breakpoints, monitors, etc.)
+        # Signature: pc_callback(new_pc: int) -> None
+        # If callback raises StopIteration, execution will stop
+        self.pc_callback: callable = None
+
     @property
     def variant(self: Self) -> variants.CPUVariant:
         """Return the CPU variant being emulated."""
@@ -281,9 +286,9 @@ class MOS6502CPU(flags.ProcessorStatusFlagsInterface):
         addr: Word = self.PC
         byte: Byte = self.ram[self.PC]
 
-        # TODO: This should be handled in the Word class
+        # Use explicit assignment to trigger PC setter (for pc_callback)
         if self.PC < 65535:
-            self.PC += 1
+            self.PC = self.PC + 1
         else:
             self.PC = 0
         self.log.info("f")
@@ -1431,6 +1436,10 @@ class MOS6502CPU(flags.ProcessorStatusFlagsInterface):
         """
         self._registers.PC = Word(PC)
         self.log.info(f"PC -> 0x{self._registers.PC:04X}")
+
+        # Call PC change callback if set
+        if self.pc_callback is not None:
+            self.pc_callback(int(self._registers.PC))
 
     @property
     def S(self: Self) -> Word:  # noqa: N802

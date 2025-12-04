@@ -4,7 +4,7 @@
 import logging
 import sys
 from pathlib import Path
-from typing import Optional
+from typing import NamedTuple, Optional
 
 from mos6502 import CPU, CPUVariant, errors
 from mos6502.core import INFINITE_CYCLES
@@ -22,6 +22,36 @@ DEBUG_SCREEN = False   # Screen memory writes
 DEBUG_CURSOR = False   # Cursor position variables
 DEBUG_KERNAL = False   # Enable CPU logging when entering KERNAL ROM
 DEBUG_BASIC = False    # Enable CPU logging when entering BASIC ROM
+
+# Video system timing constants
+
+
+class VideoTiming(NamedTuple):
+    """Video system timing parameters."""
+    cpu_freq: int           # CPU frequency in Hz
+    refresh_hz: float       # Screen refresh rate in Hz
+    cycles_per_frame: int   # CPU cycles per video frame
+    raster_lines: int       # Total raster lines per frame
+    render_interval: float  # Seconds between frame renders (1/refresh_hz)
+
+
+# PAL (Europe, Australia) - more compatible with demos/games, slightly slower CPU
+PAL = VideoTiming(
+    cpu_freq=985248,           # ~0.985 MHz
+    refresh_hz=50.125,         # ~50 Hz
+    cycles_per_frame=19656,    # 312 lines × 63 cycles
+    raster_lines=312,
+    render_interval=1.0 / 50.125,
+)
+
+# NTSC (North America, Japan) - faster CPU, fewer raster lines
+NTSC = VideoTiming(
+    cpu_freq=1022727,          # ~1.023 MHz
+    refresh_hz=59.826,         # ~60 Hz
+    cycles_per_frame=17095,    # 262 lines × 65 cycles
+    raster_lines=262,
+    render_interval=1.0 / 59.826,
+)
 COLORS = [
     (0x00, 0x00, 0x00),   # 0  Black
     (0xFF, 0xFF, 0xFF),   # 1  White
@@ -40,6 +70,119 @@ COLORS = [
     (0x6C, 0x5E, 0xB5),   # 14 Light blue
     (0x95, 0x95, 0x95),   # 15 Light gray
 ]
+
+# ANSI true color (24-bit) escape sequences for exact C64 color matching
+# Using 24-bit mode: \033[38;2;R;G;Bm for foreground, \033[48;2;R;G;Bm for background
+
+
+def c64_to_ansi_fg(c64_color: int) -> str:
+    """Convert C64 color to ANSI 24-bit true color foreground escape sequence."""
+    r, g, b = COLORS[c64_color & 0x0F]
+    return f"\033[38;2;{r};{g};{b}m"
+
+
+def c64_to_ansi_bg(c64_color: int) -> str:
+    """Convert C64 color to ANSI 24-bit true color background escape sequence."""
+    r, g, b = COLORS[c64_color & 0x0F]
+    return f"\033[48;2;{r};{g};{b}m"
+
+
+ANSI_RESET = "\033[0m"
+
+
+class ScreenDirtyTracker:
+    """Track which screen cells have changed since last render.
+
+    Optimizes rendering by only updating cells that have been modified.
+    Tracks both screen RAM ($0400-$07E7) and color RAM ($D800-$DBE7).
+    Also tracks VIC register changes that affect global rendering.
+    """
+
+    SCREEN_RAM_START = 0x0400
+    SCREEN_RAM_END = 0x07E7
+    COLOR_RAM_START = 0xD800
+    COLOR_RAM_END = 0xDBE7
+    VIC_START = 0xD000
+    VIC_END = 0xD02E
+
+    SCREEN_COLS = 40
+    SCREEN_ROWS = 25
+    SCREEN_SIZE = SCREEN_COLS * SCREEN_ROWS  # 1000 cells
+
+    def __init__(self):
+        # Track dirty cells as a set of (row, col) tuples for fast lookup
+        self._dirty_cells = set()
+        # Track if any VIC registers changed (requires full redraw)
+        self._vic_dirty = False
+        # Track if color RAM changed
+        self._color_dirty_cells = set()
+        # Force full redraw on first frame
+        self._force_full_redraw = True
+        # Previous screen state for comparison (optional optimization)
+        self._prev_screen = None
+        self._prev_color = None
+
+    def mark_screen_dirty(self, addr: int) -> None:
+        """Mark a screen RAM address as dirty."""
+        if self.SCREEN_RAM_START <= addr <= self.SCREEN_RAM_END:
+            offset = addr - self.SCREEN_RAM_START
+            row = offset // self.SCREEN_COLS
+            col = offset % self.SCREEN_COLS
+            self._dirty_cells.add((row, col))
+
+    def mark_color_dirty(self, addr: int) -> None:
+        """Mark a color RAM address as dirty."""
+        if self.COLOR_RAM_START <= addr <= self.COLOR_RAM_END:
+            offset = addr - self.COLOR_RAM_START
+            if offset < self.SCREEN_SIZE:
+                row = offset // self.SCREEN_COLS
+                col = offset % self.SCREEN_COLS
+                self._color_dirty_cells.add((row, col))
+
+    def mark_vic_dirty(self) -> None:
+        """Mark VIC registers as changed (forces full redraw)."""
+        self._vic_dirty = True
+
+    def mark_address_dirty(self, addr: int) -> None:
+        """Mark any address as dirty (routes to appropriate tracker)."""
+        if self.SCREEN_RAM_START <= addr <= self.SCREEN_RAM_END:
+            self.mark_screen_dirty(addr)
+        elif self.COLOR_RAM_START <= addr <= self.COLOR_RAM_END:
+            self.mark_color_dirty(addr)
+        elif self.VIC_START <= addr <= self.VIC_END:
+            self.mark_vic_dirty()
+
+    def needs_full_redraw(self) -> bool:
+        """Check if a full screen redraw is needed."""
+        return self._force_full_redraw or self._vic_dirty
+
+    def get_dirty_cells(self) -> set:
+        """Get all dirty cells (screen + color changes combined)."""
+        return self._dirty_cells | self._color_dirty_cells
+
+    def get_dirty_rows(self) -> set:
+        """Get set of row numbers that have any dirty cells."""
+        dirty = self.get_dirty_cells()
+        return {row for row, col in dirty}
+
+    def has_changes(self) -> bool:
+        """Check if any changes need to be rendered."""
+        return (self._force_full_redraw or
+                self._vic_dirty or
+                len(self._dirty_cells) > 0 or
+                len(self._color_dirty_cells) > 0)
+
+    def clear(self) -> None:
+        """Clear all dirty flags after rendering."""
+        self._dirty_cells.clear()
+        self._color_dirty_cells.clear()
+        self._vic_dirty = False
+        self._force_full_redraw = False
+
+    def force_redraw(self) -> None:
+        """Force a full redraw on next render."""
+        self._force_full_redraw = True
+
 
 class C64:
     """Commodore 64 Emulator.
@@ -83,6 +226,176 @@ class C64:
 
     # Reset vector location
     RESET_VECTOR_ADDR = 0xFFFC
+
+    @classmethod
+    def args(cls, parser) -> None:
+        """Add C64-specific command-line arguments to an argument parser.
+
+        Args:
+            parser: An argparse.ArgumentParser instance
+        """
+        # Core emulator options
+        core_group = parser.add_argument_group("Core Options")
+        core_group.add_argument(
+            "--rom-dir",
+            type=Path,
+            default=Path("./roms"),
+            help="Directory containing ROM files (default: ./roms)",
+        )
+        core_group.add_argument(
+            "--display",
+            type=str,
+            choices=["terminal", "pygame", "headless", "repl"],
+            default="pygame",
+            help="Display mode: pygame (default, graphical window), terminal (ASCII art), headless (no display), or repl (interactive terminal with keyboard input). Automatically falls back to terminal if pygame unavailable.",
+        )
+        core_group.add_argument(
+            "--scale",
+            type=int,
+            default=2,
+            help="Pygame window scaling factor (default: 2 = 640x400)",
+        )
+        core_group.add_argument(
+            "--video",
+            type=str.lower,
+            choices=["pal", "ntsc"],
+            default="pal",
+            help="Video timing mode: pal (default, ~50Hz, ~0.985MHz) or ntsc (~60Hz, ~1.023MHz)",
+        )
+        core_group.add_argument(
+            "--no-irq",
+            action="store_true",
+            help="Disable IRQ injection (for debugging; system will hang waiting for IRQs)",
+        )
+
+        # Program loading options
+        program_group = parser.add_argument_group("Program Loading")
+        program_group.add_argument(
+            "--program",
+            type=Path,
+            help="Program file to load and run (.prg, .bin, etc.)",
+        )
+        program_group.add_argument(
+            "--load-address",
+            type=lambda x: int(x, 0),
+            help="Override load address (hex or decimal, e.g., 0x0801 or 2049)",
+        )
+        program_group.add_argument(
+            "--no-roms",
+            action="store_true",
+            help="Run without C64 ROMs (for testing standalone programs)",
+        )
+
+        # Execution control options
+        exec_group = parser.add_argument_group("Execution Control")
+        exec_group.add_argument(
+            "--max-cycles",
+            type=int,
+            default=INFINITE_CYCLES,
+            help="Maximum CPU cycles to execute (default: infinite)",
+        )
+        exec_group.add_argument(
+            "--stop-on-basic",
+            action="store_true",
+            help="Stop execution when BASIC prompt is ready (useful for benchmarking boot time)",
+        )
+
+        # Output options
+        output_group = parser.add_argument_group("Output Options")
+        output_group.add_argument(
+            "--dump-mem",
+            nargs=2,
+            metavar=("START", "END"),
+            type=lambda x: int(x, 0),
+            help="Dump memory region after execution (hex or decimal addresses)",
+        )
+        output_group.add_argument(
+            "--show-screen",
+            action="store_true",
+            help="Display screen RAM after execution (40x25 character display)",
+        )
+        output_group.add_argument(
+            "--verbose",
+            "-v",
+            action="store_true",
+            help="Enable verbose logging",
+        )
+
+        # Disassembly options
+        disasm_group = parser.add_argument_group("Disassembly")
+        disasm_group.add_argument(
+            "--disassemble",
+            type=lambda x: int(x, 0),
+            metavar="ADDRESS",
+            help="Disassemble at address and exit (hex or decimal)",
+        )
+        disasm_group.add_argument(
+            "--num-instructions",
+            type=int,
+            default=20,
+            help="Number of instructions to disassemble (default: 20)",
+        )
+
+        # Debug flag arguments
+        debug_group = parser.add_argument_group("Debug Flags")
+        debug_group.add_argument(
+            "--debug-cia",
+            action="store_true",
+            help="Enable CIA register read/write logging",
+        )
+        debug_group.add_argument(
+            "--debug-vic",
+            action="store_true",
+            help="Enable VIC register operation logging",
+        )
+        debug_group.add_argument(
+            "--debug-jiffy",
+            action="store_true",
+            help="Enable jiffy clock update logging",
+        )
+        debug_group.add_argument(
+            "--debug-keyboard",
+            action="store_true",
+            help="Enable keyboard event logging",
+        )
+        debug_group.add_argument(
+            "--debug-screen",
+            action="store_true",
+            help="Enable screen memory write logging",
+        )
+        debug_group.add_argument(
+            "--debug-cursor",
+            action="store_true",
+            help="Enable cursor position variable logging",
+        )
+        debug_group.add_argument(
+            "--debug-kernal",
+            action="store_true",
+            help="Enable CPU logging when entering KERNAL ROM",
+        )
+        debug_group.add_argument(
+            "--debug-basic",
+            action="store_true",
+            help="Enable CPU logging when entering BASIC ROM",
+        )
+
+    @classmethod
+    def from_args(cls, args) -> "C64":
+        """Create a C64 instance from parsed command-line arguments.
+
+        Args:
+            args: Parsed argparse namespace with C64 arguments
+
+        Returns:
+            Configured C64 instance
+        """
+        return cls(
+            rom_dir=args.rom_dir,
+            display_mode=args.display,
+            scale=args.scale,
+            enable_irq=not getattr(args, 'no_irq', False),
+            video_mode=args.video,
+        )
 
     class CIA1:
         """CIA1 (Complex Interface Adapter) at $DC00-$DCFF.
@@ -1914,7 +2227,7 @@ class C64:
                 surface.set_at((x, y), color)
 
     class C64Memory:
-        def __init__(self, ram, *, basic_rom, kernal_rom, char_rom, cia1, cia2, vic) -> None:
+        def __init__(self, ram, *, basic_rom, kernal_rom, char_rom, cia1, cia2, vic, dirty_tracker=None) -> None:
             # Store references to actual RAM storage for direct access (avoids delegation loop)
             self.ram_zeropage = ram.zeropage
             self.ram_stack = ram.stack
@@ -1925,6 +2238,7 @@ class C64:
             self.cia1 = cia1
             self.cia2 = cia2
             self.vic = vic
+            self.dirty_tracker = dirty_tracker
 
             # Color RAM - 1000 bytes ($D800-$DBE7), only low 4 bits used
             self.ram_color = bytearray(1024)
@@ -2012,6 +2326,9 @@ class C64:
             # VIC registers
             if 0xD000 <= addr <= 0xD3FF:
                 self.vic.write(addr, value)
+                # Track VIC register changes (may affect global rendering)
+                if self.dirty_tracker is not None and addr <= 0xD02E:
+                    self.dirty_tracker.mark_vic_dirty()
                 return
             # SID registers (stub)
             if 0xD400 <= addr <= 0xD7FF:
@@ -2019,6 +2336,9 @@ class C64:
             # Color RAM
             if 0xD800 <= addr <= 0xDBFF:
                 self.ram_color[addr - 0xD800] = value & 0x0F  # Only 4 bits
+                # Track color RAM changes
+                if self.dirty_tracker is not None:
+                    self.dirty_tracker.mark_color_dirty(addr)
                 return
             # CIA1
             if 0xDC00 <= addr <= 0xDCFF:
@@ -2049,8 +2369,12 @@ class C64:
                 if 0xA0 <= addr <= 0xA2 and DEBUG_JIFFY:
                     log.info(f"*** JIFFY CLOCK WRITE: addr=${addr:04X}, value=${value:02X} ***")
                 # Log writes to screen RAM ($0400-$07E7)
-                if 0x0400 <= addr <= 0x07E7 and DEBUG_SCREEN:
-                    log.info(f"*** SCREEN WRITE: addr=${addr:04X}, value=${value:02X} (char={chr(value) if 32 <= value < 127 else '?'}) ***")
+                if 0x0400 <= addr <= 0x07E7:
+                    if DEBUG_SCREEN:
+                        log.info(f"*** SCREEN WRITE: addr=${addr:04X}, value=${value:02X} (char={chr(value) if 32 <= value < 127 else '?'}) ***")
+                    # Track dirty screen cells for optimized rendering
+                    if self.dirty_tracker is not None:
+                        self.dirty_tracker.mark_screen_dirty(addr)
                 # Log writes to cursor position variables ($D1-$D6)
                 if 0xD1 <= addr <= 0xD6 and DEBUG_CURSOR:
                     var_names = {0xD1: "PNT_LO", 0xD2: "PNT_HI", 0xD3: "PNTR(col)", 0xD4: "QTSW", 0xD5: "LNMX", 0xD6: "TBLX(row)"}
@@ -2079,7 +2403,7 @@ class C64:
             self._write_ram_direct(addr, value & 0xFF)
 
 
-    def __init__(self, rom_dir: Path = Path("./roms"), display_mode: str = "pygame", scale: int = 2, enable_irq: bool = True) -> None:
+    def __init__(self, rom_dir: Path = Path("./roms"), display_mode: str = "pygame", scale: int = 2, enable_irq: bool = True, video_mode: str = "pal") -> None:
         """Initialize the C64 emulator.
 
         Arguments:
@@ -2088,11 +2412,14 @@ class C64:
                          If pygame fails to initialize, will automatically fall back to terminal
             scale: Pygame window scaling factor
             enable_irq: Enable IRQ injection (default: True)
+            video_mode: Video timing mode ("pal" or "ntsc", default: "pal")
         """
         self.rom_dir = Path(rom_dir)
         self.display_mode = display_mode
         self.scale = scale
         self.enable_irq = enable_irq
+        self.video_timing = PAL if video_mode.lower() == "pal" else NTSC
+        self.video_mode = video_mode.upper()
 
         # If pygame mode requested, try to initialize it and fall back to terminal if it fails
         if self.display_mode == "pygame":
@@ -2125,9 +2452,16 @@ class C64:
         self.pygame_surface = None
         self.pygame_available = False
 
+        # Screen dirty tracking for optimized rendering
+        self.dirty_tracker = ScreenDirtyTracker()
+
         # Debug logging control
         self.basic_logging_enabled = False
         self.last_pc_region = None
+
+        # BASIC ready detection (set by pc_callback when PC enters BASIC ROM range)
+        self._basic_ready = False
+        self._stop_on_basic = False
 
         # Load ROMs during initialization
         # This sets up the memory handler and all peripherals (VIC, CIAs)
@@ -2239,6 +2573,7 @@ class C64:
             cia1=self.cia1,
             cia2=self.cia2,
             vic=self.vic,
+            dirty_tracker=self.dirty_tracker,
         )
         # Hook up the memory handler so CPU RAM accesses go through C64Memory
         self.cpu.ram.memory_handler = self.memory
@@ -2403,6 +2738,35 @@ class C64:
         else:
             return "???"
 
+    @property
+    def basic_ready(self) -> bool:
+        """Return True if BASIC input loop has been reached."""
+        return self._basic_ready
+
+    def _pc_callback(self, new_pc: int) -> None:
+        """PC change callback - detects when BASIC is ready.
+
+        This is called by the CPU every time PC changes.
+        """
+        # Check if PC is in BASIC ROM range
+        if self.BASIC_ROM_START <= new_pc <= self.BASIC_ROM_END:
+            self._basic_ready = True
+            if self._stop_on_basic:
+                raise StopIteration("BASIC is ready")
+
+    def _setup_pc_callback(self, stop_on_basic: bool = False) -> None:
+        """Set up the PC callback for BASIC detection.
+
+        Arguments:
+            stop_on_basic: If True, raise StopIteration when BASIC is ready
+        """
+        self._stop_on_basic = stop_on_basic
+        self.cpu.pc_callback = self._pc_callback
+
+    def _clear_pc_callback(self) -> None:
+        """Remove the PC callback."""
+        self.cpu.pc_callback = None
+
     def _check_pc_region(self) -> None:
         """Monitor PC and enable detailed logging when entering BASIC or KERNAL ROM."""
         region = self.get_pc_region()
@@ -2410,10 +2774,11 @@ class C64:
         # Track important PC locations
         pc = self.cpu.PC
 
-        # Log when we reach BASIC input loop at $A7AE
-        if pc == 0xA7AE and not hasattr(self, '_logged_a7ae'):
-            self._logged_a7ae = True
-            log.info(f"*** REACHED BASIC INPUT LOOP at $A7AE ***")
+        # Log when we enter BASIC ROM
+        if self.BASIC_ROM_START <= pc <= self.BASIC_ROM_END and not hasattr(self, '_logged_basic_entry'):
+            self._logged_basic_entry = True
+            self._basic_ready = True
+            log.info(f"*** ENTERED BASIC ROM at ${pc:04X} ***")
 
         # Log when stuck at KERNAL idle loop ($E5CF-$E5D2)
         if 0xE5CF <= pc <= 0xE5D2:
@@ -2450,15 +2815,20 @@ class C64:
 
 
 
-    def run(self, max_cycles: int = INFINITE_CYCLES) -> None:
+    def run(self, max_cycles: int = INFINITE_CYCLES, stop_on_basic: bool = False) -> None:
         """Run the C64 emulator.
 
         Arguments:
             max_cycles: Maximum number of CPU cycles to execute
                        (default: INFINITE_CYCLES for continuous execution)
+            stop_on_basic: If True, stop execution when BASIC prompt is ready
         """
         log.info(f"Starting execution at PC=${self.cpu.PC:04X}")
         log.info("Press Ctrl+C to stop")
+
+        # Set up PC callback for BASIC detection if requested
+        if stop_on_basic:
+            self._setup_pc_callback(stop_on_basic=True)
 
         try:
             # Execute with cycle counter display
@@ -2472,7 +2842,7 @@ class C64:
             # For pygame mode, run CPU in background thread and pygame in main thread
             # For other modes, run display in background and CPU in main thread
             if self.display_mode == "pygame" and self.pygame_available:
-                # Pygame mode: CPU in background, rendering in main thread
+                # Pygame mode: CPU in background, rendering + input in main thread
                 cpu_done = threading.Event()
                 cpu_error = None
 
@@ -2491,14 +2861,45 @@ class C64:
                 cpu_thread_obj = threading.Thread(target=cpu_thread, daemon=True)
                 cpu_thread_obj.start()
 
-                # Main thread handles pygame rendering
+                # Try to set up terminal input (REPL-style) alongside pygame
+                terminal_input_available = False
+                old_settings = None
+                try:
+                    import select
+                    import termios
+                    import tty
+                    if _sys.stdin.isatty():
+                        old_settings = termios.tcgetattr(_sys.stdin)
+                        tty.setcbreak(_sys.stdin.fileno())
+                        terminal_input_available = True
+                except ImportError:
+                    pass  # Terminal input not available (Windows, etc.)
+
+                # Main thread handles pygame rendering + terminal input
                 try:
                     while not cpu_done.is_set():
+                        # Check for BASIC ready if requested
+                        if stop_on_basic and self.basic_ready:
+                            break
+
+                        # Handle terminal keyboard input if available
+                        if terminal_input_available:
+                            import select
+                            if select.select([_sys.stdin], [], [], 0.01)[0]:
+                                char = _sys.stdin.read(1)
+                                if self._handle_terminal_input(char):
+                                    break  # Ctrl+C pressed
+
+                        # Render as fast as possible
                         self._render_pygame()
-                        time.sleep(0.1)  # Update 10 times per second
                 finally:
                     cpu_done.set()
                     cpu_thread_obj.join(timeout=0.5)
+
+                    # Restore terminal settings if we changed them
+                    if old_settings is not None:
+                        import termios
+                        termios.tcsetattr(_sys.stdin, termios.TCSADRAIN, old_settings)
 
                     # Cleanup pygame
                     if self.pygame_available:
@@ -2531,14 +2932,16 @@ class C64:
                 display_thread.start()
 
                 try:
-                    # IRQs are now handled automatically by the CPU based on irq_pending flag
-                    # No need for separate execute_with_irqs method
+                    # Run CPU - if stop_on_basic, pc_callback will raise StopIteration
                     self.cpu.execute(cycles=max_cycles)
                 finally:
                     # Stop the display thread
                     stop_display.set()
                     display_thread.join(timeout=0.5)
 
+        except StopIteration:
+            # PC callback requested stop (e.g., BASIC is ready)
+            log.info(f"Execution stopped at PC=${self.cpu.PC:04X} (BASIC ready)")
         except errors.CPUCycleExhaustionError as e:
             log.info(f"CPU execution completed: {e}")
         except errors.CPUBreakError as e:
@@ -2546,7 +2949,7 @@ class C64:
         except KeyboardInterrupt:
             log.info("\nExecution interrupted by user")
             log.info(f"PC=${self.cpu.PC:04X}, Cycles={self.cpu.cycles_executed}")
-        except (errors.CPUCycleExhaustionError, errors.IllegalCPUInstructionError, RuntimeError) as e:
+        except (errors.IllegalCPUInstructionError, RuntimeError) as e:
             log.exception(f"Execution error at PC=${self.cpu.PC:04X}")
             # Show context around error
             try:
@@ -2557,6 +2960,8 @@ class C64:
                 log.exception("Could not display context")
             raise
         finally:
+            # Clean up PC callback
+            self._clear_pc_callback()
             # Always show screen buffer on termination
             self.show_screen()
 
@@ -2758,30 +3163,56 @@ class C64:
         print("=" * 42)
 
     def _render_terminal(self) -> None:
-        """Render C64 screen to terminal."""
+        """Render C64 screen to terminal with dirty region optimization."""
         import sys as _sys
 
         screen_start = 0x0400
         cols = 40
         rows = 25
 
-        # Clear screen and move cursor to top
-        _sys.stdout.write("\033[2J\033[H")
+        # Header row offset (3 lines: border, title, border)
+        header_offset = 3
 
-        # Render C64 screen (40x25 characters)
-        _sys.stdout.write("=" * 42 + "\n")
-        _sys.stdout.write(" C64 SCREEN\n")
-        _sys.stdout.write("=" * 42 + "\n")
+        # Check if we need a full redraw
+        needs_full = self.dirty_tracker.needs_full_redraw()
 
-        for row in range(rows):
-            line = ""
-            for col in range(cols):
+        if needs_full:
+            # Full screen redraw
+            _sys.stdout.write("\033[2J\033[H")  # Clear screen and move to top
+
+            # Render C64 screen (40x25 characters)
+            _sys.stdout.write("=" * 42 + "\n")
+            _sys.stdout.write(" C64 SCREEN\n")
+            _sys.stdout.write("=" * 42 + "\n")
+
+            for row in range(rows):
+                line = ""
+                for col in range(cols):
+                    addr = screen_start + (row * cols) + col
+                    petscii = int(self.cpu.ram[addr])
+                    line += self.petscii_to_ascii(petscii)
+                _sys.stdout.write(line + "\n")
+
+            _sys.stdout.write("=" * 42 + "\n")
+
+        elif self.dirty_tracker.has_changes():
+            # Incremental update - only redraw dirty cells
+            dirty_cells = self.dirty_tracker.get_dirty_cells()
+            for row, col in dirty_cells:
+                # Move cursor to the cell position
+                # Terminal rows are 1-indexed, add header offset
+                term_row = row + header_offset + 1
+                term_col = col + 1
+                _sys.stdout.write(f"\033[{term_row};{term_col}H")
+
+                # Get and render the character
                 addr = screen_start + (row * cols) + col
                 petscii = int(self.cpu.ram[addr])
-                line += self.petscii_to_ascii(petscii)
-            _sys.stdout.write(line + "\n")
+                char = self.petscii_to_ascii(petscii)
+                _sys.stdout.write(char)
 
-        _sys.stdout.write("=" * 42 + "\n")
+        # Always update status line (at row 29: 3 header + 25 screen + 1 border)
+        status_row = header_offset + rows + 2
 
         # Get flag values using shared formatter
         from mos6502.flags import format_flags
@@ -2805,13 +3236,238 @@ class C64:
             except IndexError:
                 inst_display = "???"
 
-        # Status line at bottom
+        # Move to status line and update it
+        _sys.stdout.write(f"\033[{status_row};1H")
         status = (f"Cycles: {self.cpu.cycles_executed:,} | "
                 f"PC=${self.cpu.PC:04X}[{region}] {inst_display:20s} | "
                 f"A=${self.cpu.A:02X} X=${self.cpu.X:02X} "
                 f"Y=${self.cpu.Y:02X} S=${self.cpu.S & 0xFF:02X} P={flags}")
+        # Clear line and write status
+        _sys.stdout.write("\033[K" + status)
+        _sys.stdout.flush()
+
+        # Clear dirty flags after rendering
+        self.dirty_tracker.clear()
+
+    def _render_terminal_debug(self) -> None:
+        """Render C64 screen and CPU state to terminal (for pygame mode debug).
+
+        This version uses ANSI escape codes to update in place without scrolling.
+        It shows the screen, CPU registers, and current instruction.
+        """
+        import sys as _sys
+
+        screen_start = 0x0400
+        cols = 40
+        rows = 25
+
+        # Get colors
+        bg_color = self.vic.regs[0x21] & 0x0F
+        bg_ansi = c64_to_ansi_bg(bg_color)
+        border_color = self.vic.regs[0x20] & 0x0F
+        border_ansi = c64_to_ansi_bg(border_color)
+
+        # Clear screen and move to top
+        _sys.stdout.write("\033[2J\033[H")
+
+        # Border and title
+        _sys.stdout.write(border_ansi + " " * 44 + ANSI_RESET + "\n")
+        _sys.stdout.write(border_ansi + " " + ANSI_RESET +
+                         " C64 (pygame mode) " +
+                         border_ansi + " " * 24 + ANSI_RESET + "\n")
+        _sys.stdout.write(border_ansi + " " * 44 + ANSI_RESET + "\n")
+
+        # Screen content with colors
+        for row in range(rows):
+            # Left border
+            _sys.stdout.write(border_ansi + "  " + ANSI_RESET)
+
+            last_fg = -1
+            for col in range(cols):
+                screen_addr = screen_start + (row * cols) + col
+                color_addr = row * cols + col
+                petscii = int(self.cpu.ram[screen_addr])
+                fg_color = self.memory.ram_color[color_addr] & 0x0F
+
+                # Check for reverse video (screen codes 128-255)
+                if petscii >= 128:
+                    char = self.petscii_to_ascii(petscii)
+                    _sys.stdout.write(c64_to_ansi_bg(fg_color) +
+                                    c64_to_ansi_fg(bg_color) + char)
+                    last_fg = -1
+                else:
+                    if fg_color != last_fg:
+                        _sys.stdout.write(bg_ansi + c64_to_ansi_fg(fg_color))
+                        last_fg = fg_color
+                    char = self.petscii_to_ascii(petscii)
+                    _sys.stdout.write(char)
+
+            # Right border
+            _sys.stdout.write(ANSI_RESET + border_ansi + "  " + ANSI_RESET + "\n")
+
+        # Bottom border
+        _sys.stdout.write(border_ansi + " " * 44 + ANSI_RESET + "\n")
+
+        # CPU state
+        from mos6502.flags import format_flags
+        flags = format_flags(self.cpu._flags.value)
+        pc = self.cpu.PC
+        region = self.get_pc_region()
+
+        # Disassemble current instruction
+        try:
+            inst_str = self.disassemble_instruction(pc)
+            inst_display = inst_str.strip()
+        except (KeyError, ValueError, IndexError):
+            try:
+                b0 = self.cpu.ram[pc]
+                b1 = self.cpu.ram[pc+1]
+                b2 = self.cpu.ram[pc+2]
+                inst_display = f"{b0:02X} {b1:02X} {b2:02X}  ???"
+            except IndexError:
+                inst_display = "???"
+
+        # Status line
+        status = (f"Cycles: {self.cpu.cycles_executed:,} | "
+                f"PC=${pc:04X}[{region}] {inst_display:20s} | "
+                f"A=${self.cpu.A:02X} X=${self.cpu.X:02X} "
+                f"Y=${self.cpu.Y:02X} S=${self.cpu.S & 0xFF:02X} P={flags}")
         _sys.stdout.write(status + "\n")
         _sys.stdout.flush()
+
+    def _render_terminal_repl(self) -> None:
+        """Render C64 screen to terminal for REPL mode with color support.
+
+        This version uses \r\n for line endings to work correctly in cbreak mode.
+        Colors are rendered using ANSI 256-color escape codes.
+        """
+        import sys as _sys
+
+        screen_start = 0x0400
+        cols = 40
+        rows = 25
+
+        # Get background color from VIC register $D021
+        bg_color = self.vic.regs[0x21] & 0x0F
+        bg_ansi = c64_to_ansi_bg(bg_color)
+
+        # Get border color from VIC register $D020
+        border_color = self.vic.regs[0x20] & 0x0F
+        border_ansi = c64_to_ansi_bg(border_color)
+
+        # Header row offset (3 lines: border, title, border)
+        header_offset = 3
+
+        # Check if we need a full redraw
+        needs_full = self.dirty_tracker.needs_full_redraw()
+
+        if needs_full:
+            # Full screen redraw
+            _sys.stdout.write("\033[2J\033[H")  # Clear screen and move to top
+
+            # Border line
+            _sys.stdout.write(border_ansi + " " * 44 + ANSI_RESET + "\r\n")
+            _sys.stdout.write(border_ansi + " " + ANSI_RESET +
+                            " C64 REPL (Ctrl+C to exit) " +
+                            border_ansi + " " * 16 + ANSI_RESET + "\r\n")
+            _sys.stdout.write(border_ansi + " " * 44 + ANSI_RESET + "\r\n")
+
+            for row in range(rows):
+                # Left border
+                _sys.stdout.write(border_ansi + "  " + ANSI_RESET)
+
+                # Screen content with colors
+                last_fg = -1
+                for col in range(cols):
+                    screen_addr = screen_start + (row * cols) + col
+                    color_addr = row * cols + col
+                    petscii = int(self.cpu.ram[screen_addr])
+                    fg_color = self.memory.ram_color[color_addr] & 0x0F
+
+                    # Check for reverse video (screen codes 128-255)
+                    if petscii >= 128:
+                        # Reverse video: swap fg and bg
+                        char = self.petscii_to_ascii(petscii)
+                        _sys.stdout.write(c64_to_ansi_bg(fg_color) +
+                                        c64_to_ansi_fg(bg_color) + char)
+                        last_fg = -1  # Force color reset
+                    else:
+                        # Normal: fg on bg
+                        if fg_color != last_fg:
+                            _sys.stdout.write(bg_ansi + c64_to_ansi_fg(fg_color))
+                            last_fg = fg_color
+                        char = self.petscii_to_ascii(petscii)
+                        _sys.stdout.write(char)
+
+                # Right border and reset
+                _sys.stdout.write(ANSI_RESET + border_ansi + "  " + ANSI_RESET + "\r\n")
+
+            # Bottom border
+            _sys.stdout.write(border_ansi + " " * 44 + ANSI_RESET + "\r\n")
+
+        elif self.dirty_tracker.has_changes():
+            # Incremental update - only redraw dirty cells
+            dirty_cells = self.dirty_tracker.get_dirty_cells()
+            for row, col in dirty_cells:
+                # Move cursor to the cell position
+                # Terminal rows are 1-indexed, add header offset, +2 for left border
+                term_row = row + header_offset + 1
+                term_col = col + 3  # +2 for border, +1 for 1-indexing
+                _sys.stdout.write(f"\033[{term_row};{term_col}H")
+
+                # Get screen and color data
+                screen_addr = screen_start + (row * cols) + col
+                color_addr = row * cols + col
+                petscii = int(self.cpu.ram[screen_addr])
+                fg_color = self.memory.ram_color[color_addr] & 0x0F
+
+                # Render with color
+                if petscii >= 128:
+                    # Reverse video
+                    char = self.petscii_to_ascii(petscii)
+                    _sys.stdout.write(c64_to_ansi_bg(fg_color) +
+                                    c64_to_ansi_fg(bg_color) + char + ANSI_RESET)
+                else:
+                    char = self.petscii_to_ascii(petscii)
+                    _sys.stdout.write(bg_ansi + c64_to_ansi_fg(fg_color) + char + ANSI_RESET)
+
+        # Always update status line (at row 30: 3 header + 25 screen + 1 border + 1)
+        status_row = header_offset + rows + 2
+
+        # Get flag values using shared formatter
+        from mos6502.flags import format_flags
+        flags = format_flags(self.cpu._flags.value)
+
+        # Determine what's mapped at PC
+        pc = self.cpu.PC
+        region = self.get_pc_region()
+
+        # Disassemble current instruction
+        try:
+            inst_str = self.disassemble_instruction(pc)
+            inst_display = inst_str.strip()
+        except (KeyError, ValueError, IndexError):
+            # Fallback: just show opcode bytes if disassembly fails
+            try:
+                b0 = self.cpu.ram[pc]
+                b1 = self.cpu.ram[pc+1]
+                b2 = self.cpu.ram[pc+2]
+                inst_display = f"{b0:02X} {b1:02X} {b2:02X}  ???"
+            except IndexError:
+                inst_display = "???"
+
+        # Move to status line and update it
+        _sys.stdout.write(f"\033[{status_row};1H")
+        status = (f"Cycles: {self.cpu.cycles_executed:,} | "
+                f"PC=${self.cpu.PC:04X}[{region}] {inst_display:20s} | "
+                f"A=${self.cpu.A:02X} X=${self.cpu.X:02X} "
+                f"Y=${self.cpu.Y:02X} S=${self.cpu.S & 0xFF:02X} P={flags}")
+        # Clear line and write status
+        _sys.stdout.write("\033[K" + status)
+        _sys.stdout.flush()
+
+        # Clear dirty flags after rendering
+        self.dirty_tracker.clear()
 
     def _handle_pygame_keyboard(self, event, pygame) -> None:
         """Handle pygame keyboard events and update CIA1 keyboard matrix.
@@ -2958,7 +3614,7 @@ class C64:
                     log.info(f"*** KEY RELEASED: pygame key {event.key}, row={row}, col={col} ***")
 
     def _render_pygame(self) -> None:
-        """Render C64 screen to pygame window."""
+        """Render C64 screen to pygame window with dirty region optimization."""
         if not self.pygame_available or self.pygame_screen is None:
             return
 
@@ -2980,6 +3636,10 @@ class C64:
                 elif event.type == pygame.KEYUP:
                     self._handle_pygame_keyboard(event, pygame)
 
+            # Skip rendering if nothing changed
+            if not self.dirty_tracker.has_changes():
+                return
+
             # Create memory wrappers for VIC
             class RAMWrapper:
                 def __init__(self, cpu_ram):
@@ -3000,6 +3660,7 @@ class C64:
 
             # Let VIC render the complete frame (border + text)
             # VIC handles all positioning and color logic internally
+            # TODO: Future optimization - pass dirty cells to VIC for partial rendering
             self.vic.render_frame(self.pygame_surface, ram_wrapper, color_wrapper)
 
             # Scale and blit to screen
@@ -3010,8 +3671,310 @@ class C64:
             self.pygame_screen.blit(scaled_surface, (0, 0))
             pygame.display.flip()
 
+            # Also render terminal repl output (screen with colors)
+            # Force full redraw since pygame already handled the dirty tracking
+            self.dirty_tracker.force_redraw()
+            self._render_terminal_repl()
+
         except Exception as e:
             log.error(f"Error rendering pygame display: {e}")
+
+    # ASCII to C64 keyboard matrix mapping
+    # Maps ASCII characters to (row, col) positions in the C64 keyboard matrix
+    # Some characters require SHIFT to be pressed
+    ASCII_TO_MATRIX = {
+        # Letters (unshifted = uppercase on C64 in default mode)
+        'A': (1, 2), 'B': (3, 4), 'C': (2, 4), 'D': (2, 2), 'E': (1, 6),
+        'F': (2, 5), 'G': (3, 2), 'H': (3, 5), 'I': (4, 1), 'J': (4, 2),
+        'K': (4, 5), 'L': (5, 2), 'M': (4, 4), 'N': (4, 7), 'O': (4, 6),
+        'P': (5, 1), 'Q': (7, 6), 'R': (2, 1), 'S': (1, 5), 'T': (2, 6),
+        'U': (3, 6), 'V': (3, 7), 'W': (1, 1), 'X': (2, 7), 'Y': (3, 1),
+        'Z': (1, 4),
+        # Lowercase (same matrix position, C64 handles shift mode internally)
+        'a': (1, 2), 'b': (3, 4), 'c': (2, 4), 'd': (2, 2), 'e': (1, 6),
+        'f': (2, 5), 'g': (3, 2), 'h': (3, 5), 'i': (4, 1), 'j': (4, 2),
+        'k': (4, 5), 'l': (5, 2), 'm': (4, 4), 'n': (4, 7), 'o': (4, 6),
+        'p': (5, 1), 'q': (7, 6), 'r': (2, 1), 's': (1, 5), 't': (2, 6),
+        'u': (3, 6), 'v': (3, 7), 'w': (1, 1), 'x': (2, 7), 'y': (3, 1),
+        'z': (1, 4),
+        # Digits
+        '0': (4, 3), '1': (7, 0), '2': (7, 3), '3': (1, 0), '4': (1, 3),
+        '5': (2, 0), '6': (2, 3), '7': (3, 0), '8': (3, 3), '9': (4, 0),
+        # Special characters
+        ' ': (7, 4),      # SPACE
+        '\n': (0, 1),     # RETURN
+        '\r': (0, 1),     # RETURN
+        '+': (5, 0),
+        '-': (5, 3),
+        '*': (6, 1),
+        '/': (6, 7),
+        '=': (6, 5),
+        '.': (5, 4),
+        ',': (5, 7),
+        ':': (5, 5),
+        ';': (6, 2),
+        '@': (5, 6),
+        '#': None,        # Requires SHIFT+3 (handled specially)
+        '$': None,        # Requires SHIFT+4 (handled specially)
+        '%': None,        # Requires SHIFT+5 (handled specially)
+        '(': None,        # Requires SHIFT+8 (handled specially)
+        ')': None,        # Requires SHIFT+9 (handled specially)
+        '"': None,        # Requires SHIFT+2 (handled specially)
+        '!': None,        # Requires SHIFT+1 (handled specially)
+        '?': None,        # Requires SHIFT+/ (handled specially)
+        '<': None,        # Requires SHIFT+, (handled specially)
+        '>': None,        # Requires SHIFT+. (handled specially)
+    }
+
+    # Characters that require SHIFT: (shift_row, shift_col, key_row, key_col)
+    ASCII_SHIFTED = {
+        '!': (1, 7, 7, 0),   # SHIFT + 1
+        '"': (1, 7, 7, 3),   # SHIFT + 2
+        '#': (1, 7, 1, 0),   # SHIFT + 3
+        '$': (1, 7, 1, 3),   # SHIFT + 4
+        '%': (1, 7, 2, 0),   # SHIFT + 5
+        '&': (1, 7, 2, 3),   # SHIFT + 6
+        "'": (1, 7, 3, 0),   # SHIFT + 7
+        '(': (1, 7, 3, 3),   # SHIFT + 8
+        ')': (1, 7, 4, 0),   # SHIFT + 9
+        '?': (1, 7, 6, 7),   # SHIFT + /
+        '<': (1, 7, 5, 7),   # SHIFT + ,
+        '>': (1, 7, 5, 4),   # SHIFT + .
+    }
+
+    def ascii_to_key_press(self, char: str) -> tuple:
+        """Convert ASCII character to C64 key press.
+
+        Arguments:
+            char: Single ASCII character
+
+        Returns:
+            Tuple of (needs_shift, row, col) or None if not mappable
+        """
+        if char in self.ASCII_SHIFTED:
+            shift_row, shift_col, key_row, key_col = self.ASCII_SHIFTED[char]
+            return (True, key_row, key_col)
+        elif char in self.ASCII_TO_MATRIX:
+            pos = self.ASCII_TO_MATRIX[char]
+            if pos is not None:
+                return (False, pos[0], pos[1])
+        return None
+
+    def type_character(self, char: str, hold_cycles: int = 5000) -> None:
+        """Simulate typing a character on the C64 keyboard.
+
+        Arguments:
+            char: Single ASCII character to type
+            hold_cycles: Number of CPU cycles to hold the key down
+        """
+        key_info = self.ascii_to_key_press(char)
+        if key_info is None:
+            log.warning(f"Cannot type character: {repr(char)}")
+            return
+
+        needs_shift, row, col = key_info
+
+        # Press SHIFT if needed
+        if needs_shift:
+            self.cia1.press_key(1, 7)  # Left SHIFT
+
+        # Press the key
+        self.cia1.press_key(row, col)
+
+        # Run CPU for some cycles to let the KERNAL process the keypress
+        try:
+            self.cpu.execute(cycles=hold_cycles)
+        except errors.CPUCycleExhaustionError:
+            pass
+
+        # Release the key
+        self.cia1.release_key(row, col)
+
+        # Release SHIFT if it was pressed
+        if needs_shift:
+            self.cia1.release_key(1, 7)
+
+        # Run a bit more to ensure key release is processed
+        try:
+            self.cpu.execute(cycles=hold_cycles // 2)
+        except errors.CPUCycleExhaustionError:
+            pass
+
+    def type_string(self, text: str, hold_cycles: int = 5000) -> None:
+        """Type a string of characters on the C64 keyboard.
+
+        Arguments:
+            text: String to type
+            hold_cycles: Number of CPU cycles to hold each key down
+        """
+        for char in text:
+            self.type_character(char, hold_cycles)
+
+    def _handle_terminal_input(self, char: str) -> bool:
+        """Handle a single character of terminal input.
+
+        Converts ASCII input to C64 key presses. Handles escape sequences
+        for arrow keys and other special keys.
+
+        Arguments:
+            char: Single character from terminal input
+
+        Returns:
+            True if Ctrl+C was pressed (should exit), False otherwise
+        """
+        import sys as _sys
+        import time
+
+        # Handle special keys
+        if char == '\x03':  # Ctrl+C
+            return True
+        elif char == '\x1b':  # Escape sequence
+            # Read the rest of the escape sequence
+            try:
+                import select
+                if select.select([_sys.stdin], [], [], 0.1)[0]:
+                    seq = _sys.stdin.read(2)
+                    if seq == '[A':  # Up arrow -> CRSR UP (SHIFT + CRSR DOWN)
+                        self.cia1.press_key(1, 7)  # SHIFT
+                        self.cia1.press_key(0, 7)  # CRSR DOWN
+                        time.sleep(0.05)
+                        self.cia1.release_key(0, 7)
+                        self.cia1.release_key(1, 7)
+                    elif seq == '[B':  # Down arrow -> CRSR DOWN
+                        self.cia1.press_key(0, 7)
+                        time.sleep(0.05)
+                        self.cia1.release_key(0, 7)
+                    elif seq == '[C':  # Right arrow -> CRSR RIGHT
+                        self.cia1.press_key(0, 2)
+                        time.sleep(0.05)
+                        self.cia1.release_key(0, 2)
+                    elif seq == '[D':  # Left arrow -> CRSR LEFT (SHIFT + CRSR RIGHT)
+                        self.cia1.press_key(1, 7)  # SHIFT
+                        self.cia1.press_key(0, 2)  # CRSR RIGHT
+                        time.sleep(0.05)
+                        self.cia1.release_key(0, 2)
+                        self.cia1.release_key(1, 7)
+                    elif seq == '[3':  # Delete key (followed by ~)
+                        if select.select([_sys.stdin], [], [], 0.1)[0]:
+                            _sys.stdin.read(1)  # Consume the ~
+                        self.cia1.press_key(0, 0)  # DEL
+                        time.sleep(0.05)
+                        self.cia1.release_key(0, 0)
+            except ImportError:
+                pass  # select not available
+        elif char == '\x7f':  # Backspace
+            self.cia1.press_key(0, 0)  # DEL
+            time.sleep(0.05)
+            self.cia1.release_key(0, 0)
+        else:
+            # Regular character - just press and release the key
+            key_info = self.ascii_to_key_press(char)
+            if key_info:
+                needs_shift, row, col = key_info
+                if needs_shift:
+                    self.cia1.press_key(1, 7)  # SHIFT
+                self.cia1.press_key(row, col)
+                time.sleep(0.05)  # Hold key briefly
+                self.cia1.release_key(row, col)
+                if needs_shift:
+                    self.cia1.release_key(1, 7)
+
+        return False
+
+    def run_repl(self, max_cycles: int = INFINITE_CYCLES) -> None:
+        """Run the C64 in REPL mode with terminal input.
+
+        This mode renders the C64 screen to the terminal and accepts
+        keyboard input, converting ASCII to C64 key presses.
+
+        Note: REPL mode requires Unix-like terminal support (termios, tty).
+        It is not available on Windows.
+
+        Arguments:
+            max_cycles: Maximum cycles to run (default: infinite)
+        """
+        import sys as _sys
+        import threading
+        import time
+
+        try:
+            import select
+            import termios
+            import tty
+        except ImportError:
+            log.error("REPL mode requires Unix-like terminal support (termios, tty).")
+            log.error("This mode is not available on Windows. Use --display terminal instead.")
+            return
+
+        if not _sys.stdin.isatty():
+            log.error("REPL mode requires an interactive terminal (stdin must be a TTY).")
+            return
+
+        # Save terminal settings
+        old_settings = termios.tcgetattr(_sys.stdin)
+
+        # Shared state between threads
+        stop_event = threading.Event()
+        cpu_error = None
+
+        def cpu_thread():
+            """Run CPU in background thread."""
+            nonlocal cpu_error
+            try:
+                self.cpu.execute(cycles=max_cycles)
+            except errors.CPUCycleExhaustionError:
+                pass  # Normal termination when max_cycles reached
+            except Exception as e:
+                cpu_error = e
+                log.error(f"CPU thread error: {e}")
+            finally:
+                stop_event.set()
+
+        try:
+            # Put terminal in cbreak mode (character-at-a-time, no echo)
+            tty.setcbreak(_sys.stdin.fileno())
+
+            # Start CPU in background thread
+            cpu_thread_obj = threading.Thread(target=cpu_thread, daemon=True)
+            cpu_thread_obj.start()
+
+            # Main loop: handle input and render
+            # Limit render rate to match video timing (PAL ~50Hz, NTSC ~60Hz)
+            last_render = 0
+            render_interval = self.video_timing.render_interval
+
+            while not stop_event.is_set():
+                # Check for input (non-blocking with short timeout)
+                if select.select([_sys.stdin], [], [], 0.01)[0]:
+                    char = _sys.stdin.read(1)
+                    if self._handle_terminal_input(char):
+                        break  # Ctrl+C pressed
+
+                # Render at limited rate to avoid terminal buffer overflow
+                now = time.time()
+                if now - last_render >= render_interval:
+                    self.dirty_tracker.force_redraw()
+                    self._render_terminal_repl()
+                    last_render = now
+
+        except KeyboardInterrupt:
+            pass
+        finally:
+            stop_event.set()
+            # Wait for CPU thread to finish
+            cpu_thread_obj.join(timeout=0.5)
+
+            # Restore terminal settings
+            termios.tcsetattr(_sys.stdin, termios.TCSADRAIN, old_settings)
+
+            # Clear screen and show final state
+            _sys.stdout.write("\033[2J\033[H")
+            _sys.stdout.flush()
+            self.show_screen()
+
+            # Re-raise CPU error if any
+            if cpu_error:
+                raise cpu_error
 
     def disassemble_instruction(self, address: int) -> str:
         """Disassemble a single instruction at the given address.
@@ -3093,124 +4056,7 @@ def main() -> int | None:
     import argparse
 
     parser = argparse.ArgumentParser(description="Commodore 64 Emulator")
-    parser.add_argument(
-        "--rom-dir",
-        type=Path,
-        default=Path("./roms"),
-        help="Directory containing ROM files (default: ./roms)",
-    )
-    parser.add_argument(
-        "--program",
-        type=Path,
-        help="Program file to load and run (.prg, .bin, etc.)",
-    )
-    parser.add_argument(
-        "--load-address",
-        type=lambda x: int(x, 0),
-        help="Override load address (hex or decimal, e.g., 0x0801 or 2049)",
-    )
-    parser.add_argument(
-        "--max-cycles",
-        type=int,
-        default=INFINITE_CYCLES,
-        help="Maximum CPU cycles to execute (default: infinite)",
-    )
-    parser.add_argument(
-        "--dump-mem",
-        nargs=2,
-        metavar=("START", "END"),
-        type=lambda x: int(x, 0),
-        help="Dump memory region after execution (hex or decimal addresses)",
-    )
-    parser.add_argument(
-        "--verbose",
-        "-v",
-        action="store_true",
-        help="Enable verbose logging",
-    )
-    parser.add_argument(
-        "--no-roms",
-        action="store_true",
-        help="Run without C64 ROMs (for testing standalone programs)",
-    )
-    parser.add_argument(
-        "--disassemble",
-        type=lambda x: int(x, 0),
-        metavar="ADDRESS",
-        help="Disassemble at address and exit (hex or decimal)",
-    )
-    parser.add_argument(
-        "--num-instructions",
-        type=int,
-        default=20,
-        help="Number of instructions to disassemble (default: 20)",
-    )
-    parser.add_argument(
-        "--show-screen",
-        action="store_true",
-        help="Display screen RAM after execution (40x25 character display)",
-    )
-    parser.add_argument(
-        "--display",
-        type=str,
-        choices=["terminal", "pygame", "headless"],
-        default="pygame",
-        help="Display mode: pygame (default, graphical window), terminal (ASCII art), or headless (no display). Automatically falls back to terminal if pygame unavailable.",
-    )
-    parser.add_argument(
-        "--scale",
-        type=int,
-        default=2,
-        help="Pygame window scaling factor (default: 2 = 640x400)",
-    )
-    parser.add_argument(
-        "--no-irq",
-        action="store_true",
-        help="Disable IRQ injection (for debugging; system will hang waiting for IRQs)",
-    )
-
-    # Debug flag arguments
-    parser.add_argument(
-        "--debug-cia",
-        action="store_true",
-        help="Enable CIA register read/write logging",
-    )
-    parser.add_argument(
-        "--debug-vic",
-        action="store_true",
-        help="Enable VIC register operation logging",
-    )
-    parser.add_argument(
-        "--debug-jiffy",
-        action="store_true",
-        help="Enable jiffy clock update logging",
-    )
-    parser.add_argument(
-        "--debug-keyboard",
-        action="store_true",
-        help="Enable keyboard event logging",
-    )
-    parser.add_argument(
-        "--debug-screen",
-        action="store_true",
-        help="Enable screen memory write logging",
-    )
-    parser.add_argument(
-        "--debug-cursor",
-        action="store_true",
-        help="Enable cursor position variable logging",
-    )
-    parser.add_argument(
-        "--debug-kernal",
-        action="store_true",
-        help="Enable CPU logging when entering KERNAL ROM",
-    )
-    parser.add_argument(
-        "--debug-basic",
-        action="store_true",
-        help="Enable CPU logging when entering BASIC ROM",
-    )
-
+    C64.args(parser)
     args = parser.parse_args()
 
     if args.verbose:
@@ -3238,7 +4084,8 @@ def main() -> int | None:
 
     try:
         # Initialize C64
-        c64 = C64(rom_dir=args.rom_dir, display_mode=args.display, scale=args.scale, enable_irq=not args.no_irq)
+        c64 = C64(rom_dir=args.rom_dir, display_mode=args.display, scale=args.scale, enable_irq=not args.no_irq, video_mode=args.video)
+        log.info(f"Video mode: {c64.video_mode} ({c64.video_timing.refresh_hz:.2f}Hz, {c64.video_timing.cpu_freq/1e6:.3f}MHz)")
 
         # Start with minimal logging - will auto-enable when BASIC ROM is entered
         # This avoids flooding the console during KERNAL boot
@@ -3292,7 +4139,11 @@ def main() -> int | None:
                 c64.dump_memory(args.dump_mem[0], args.dump_mem[1])
 
         # Run
-        c64.run(max_cycles=args.max_cycles)
+        if args.display == "repl":
+            # REPL mode: interactive terminal with keyboard input
+            c64.run_repl(max_cycles=args.max_cycles)
+        else:
+            c64.run(max_cycles=args.max_cycles, stop_on_basic=args.stop_on_basic)
 
         # Dump final state
         c64.dump_registers()

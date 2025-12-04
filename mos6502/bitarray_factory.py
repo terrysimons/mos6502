@@ -15,10 +15,19 @@ pure-Python mode, set the environment variable:
 Or call configure() before any other imports:
     from mos6502 import bitarray_factory
     bitarray_factory.configure(use_native=False)
+
+PyPy is automatically detected and forces pure-Python mode for better
+performance (PyPy's JIT works better with pure Python code).
 """
 
 import os
+import sys
 from typing import Literal
+
+# Auto-detect PyPy and force pure-Python mode
+# PyPy's JIT compiler works much better with pure Python than with C extensions
+if sys.implementation.name == "pypy":
+    os.environ.setdefault("MOS6502_PURE_PYTHON", "1")
 
 # Configuration - can be overridden before first use
 _USE_NATIVE: bool | None = None  # None means auto-detect
