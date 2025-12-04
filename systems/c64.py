@@ -227,6 +227,18 @@ class C64:
     # Reset vector location
     RESET_VECTOR_ADDR = 0xFFFC
 
+    # Cartridge memory regions
+    ROML_START = 0x8000  # Low ROM (8KB) - active when EXROM=0
+    ROML_END = 0x9FFF
+    ROML_SIZE = 0x2000   # 8KB
+
+    ROMH_START = 0xA000  # High ROM (8KB) - overlaps BASIC ROM area
+    ROMH_END = 0xBFFF
+    ROMH_SIZE = 0x2000   # 8KB
+
+    # Cartridge auto-start signature location
+    CART_SIGNATURE_ADDR = 0x8004  # "CBM80" signature for auto-start
+
     @classmethod
     def args(cls, parser) -> None:
         """Add C64-specific command-line arguments to an argument parser.
@@ -284,6 +296,21 @@ class C64:
             "--no-roms",
             action="store_true",
             help="Run without C64 ROMs (for testing standalone programs)",
+        )
+
+        # Cartridge options
+        cart_group = parser.add_argument_group("Cartridge Options")
+        cart_group.add_argument(
+            "--cartridge",
+            type=Path,
+            help="Cartridge file to load (.crt format or raw binary)",
+        )
+        cart_group.add_argument(
+            "--cartridge-type",
+            type=str.lower,
+            choices=["auto", "8k", "16k"],
+            default="auto",
+            help="Cartridge type: auto (detect from file), 8k, or 16k (default: auto)",
         )
 
         # Execution control options
@@ -2253,6 +2280,16 @@ class C64:
             self.ddr = 0x00  # $0000
             self.port = 0x37  # $0001 default value
 
+            # Cartridge support - set by C64.load_cartridge()
+            # ROML: $8000-$9FFF (8KB) - active when EXROM=0
+            # ROMH: $A000-$BFFF (8KB) - active when EXROM=0 and GAME=0 (16KB mode)
+            self.cartridge_roml: Optional[bytes] = None
+            self.cartridge_romh: Optional[bytes] = None
+            # EXROM and GAME are active-low signals from the cartridge port
+            # True = inactive (high), False = active (low)
+            self.exrom: bool = True   # No cartridge by default
+            self.game: bool = True    # No cartridge by default
+
         def _read_ram_direct(self, addr) -> int:
             """Read directly from RAM storage without delegation."""
             # RAM lists now store plain ints, not Byte objects
@@ -2301,9 +2338,17 @@ class C64:
                 # Bits with DDR=0 read as 1
                 return (self.port | (~self.ddr)) & 0xFF
 
-            # $0002-$9FFF is ALWAYS RAM (never banked on C64)
+            # $0002-$7FFF is ALWAYS RAM (never banked on C64)
             # This includes zero page, stack, KERNAL/BASIC working storage, and screen RAM
-            if 0x0002 <= addr <= 0x9FFF:
+            if 0x0002 <= addr <= 0x7FFF:
+                return self._read_ram_direct(addr)
+
+            # Cartridge ROML ($8000-$9FFF) - visible when EXROM=0 (active low)
+            # This has priority over RAM in this region
+            if C64.ROML_START <= addr <= C64.ROML_END:
+                if not self.exrom and self.cartridge_roml is not None:
+                    return self.cartridge_roml[addr - C64.ROML_START]
+                # No cartridge, fall through to RAM
                 return self._read_ram_direct(addr)
 
             # Memory banking logic (only applies to $A000-$FFFF)
@@ -2311,9 +2356,16 @@ class C64:
             basic_enabled = self.port & 0b00000001
             kernal_enabled = self.port & 0b00000010
 
-            # BASIC ROM ($A000-$BFFF)
-            if C64.BASIC_ROM_START <= addr <= C64.BASIC_ROM_END and basic_enabled:
-                return self.basic[addr - C64.BASIC_ROM_START]
+            # Cartridge ROMH ($A000-$BFFF) - visible when EXROM=0 AND GAME=0 (16KB mode)
+            # Takes priority over BASIC ROM
+            if C64.ROMH_START <= addr <= C64.ROMH_END:
+                if not self.exrom and not self.game and self.cartridge_romh is not None:
+                    return self.cartridge_romh[addr - C64.ROMH_START]
+                # Fall through to BASIC ROM check
+                if basic_enabled:
+                    return self.basic[addr - C64.BASIC_ROM_START]
+                # RAM fallback
+                return self._read_ram_direct(addr)
 
             # KERNAL ROM ($E000-$FFFF)
             if C64.KERNAL_ROM_START <= addr <= C64.KERNAL_ROM_END and kernal_enabled:
@@ -2326,7 +2378,7 @@ class C64:
                 else:
                     return self.char[addr - C64.CHAR_ROM_START]
 
-            # RAM fallback (for $A000-$FFFF when banking is off)
+            # RAM fallback (for $C000-$CFFF and $A000-$FFFF when banking is off)
             return self._read_ram_direct(addr)
 
         def _write_io_area(self, addr: int, value: int) -> None:
@@ -2455,6 +2507,18 @@ class C64:
         self.vic: Optional[C64.C64VIC] = None
         self.cia1: Optional[C64.CIA1] = None
         self.cia2: Optional[C64.CIA2] = None
+
+        # Cartridge support
+        # ROML: $8000-$9FFF (8KB) - active when EXROM=0
+        # ROMH: $A000-$BFFF (8KB) - active when EXROM=0 and GAME=0 (16KB mode)
+        self.cartridge_roml: Optional[bytes] = None
+        self.cartridge_romh: Optional[bytes] = None
+        self.cartridge_type: str = "none"  # "none", "8k", "16k"
+        # EXROM and GAME are accent-low signals from the cartridge port
+        # EXROM=0, GAME=1: 8KB cartridge (ROML at $8000)
+        # EXROM=0, GAME=0: 16KB cartridge (ROML at $8000, ROMH at $A000)
+        self.exrom: bool = True   # True = inactive (active-low, no cartridge)
+        self.game: bool = True    # True = inactive (active-low, no cartridge)
 
         # Pygame display attributes
         self.pygame_screen = None
@@ -2605,6 +2669,214 @@ class C64:
         # The reset() method handles the complete reset sequence including
         # fetching the vector from $FFFC/$FFFD and setting PC accordingly
         log.info(f"PC initialized to ${self.cpu.PC:04X} (from reset vector at ${self.RESET_VECTOR_ADDR:04X})")
+
+    def load_cartridge(self, path: Path, cart_type: str = "auto") -> None:
+        """Load a cartridge ROM file.
+
+        Supports:
+        - Raw binary files (.bin, .rom): 8KB or 16KB
+        - CRT files (.crt): Standard C64 cartridge format with header
+
+        Arguments:
+            path: Path to cartridge file
+            cart_type: "auto" (detect from file), "8k", or "16k"
+
+        Raises:
+            FileNotFoundError: If cartridge file doesn't exist
+            ValueError: If cartridge format is invalid or unsupported
+        """
+        path = Path(path)
+        if not path.exists():
+            raise FileNotFoundError(f"Cartridge file not found: {path}")
+
+        data = path.read_bytes()
+        suffix = path.suffix.lower()
+
+        # Check for CRT format (has "C64 CARTRIDGE" signature)
+        if suffix == ".crt" or data[:16] == b"C64 CARTRIDGE   ":
+            self._load_crt_cartridge(data, path)
+        else:
+            # Raw binary format
+            self._load_raw_cartridge(data, path, cart_type)
+
+        # Update the memory handler with cartridge info
+        if self.memory is not None:
+            self.memory.cartridge_roml = self.cartridge_roml
+            self.memory.cartridge_romh = self.cartridge_romh
+            self.memory.exrom = self.exrom
+            self.memory.game = self.game
+
+        log.info(
+            f"Cartridge loaded: {path.name} "
+            f"(type: {self.cartridge_type}, EXROM={0 if not self.exrom else 1}, GAME={0 if not self.game else 1})"
+        )
+
+    def _load_raw_cartridge(self, data: bytes, path: Path, cart_type: str) -> None:
+        """Load a raw binary cartridge file.
+
+        Arguments:
+            data: Raw cartridge data
+            path: Path to cartridge file (for error messages)
+            cart_type: "auto", "8k", or "16k"
+
+        Raises:
+            ValueError: If size doesn't match expected cartridge size
+        """
+        size = len(data)
+
+        # Determine cartridge type from size if auto
+        if cart_type == "auto":
+            if size == self.ROML_SIZE:
+                cart_type = "8k"
+            elif size == self.ROML_SIZE + self.ROMH_SIZE:
+                cart_type = "16k"
+            else:
+                raise ValueError(
+                    f"Cannot auto-detect cartridge type for {path.name}: "
+                    f"size {size} bytes (expected 8192 or 16384)"
+                )
+
+        # Validate size matches specified type
+        if cart_type == "8k":
+            if size != self.ROML_SIZE:
+                raise ValueError(
+                    f"8K cartridge {path.name} has wrong size: "
+                    f"{size} bytes (expected {self.ROML_SIZE})"
+                )
+            self.cartridge_roml = data
+            self.cartridge_romh = None
+            self.cartridge_type = "8k"
+            # 8KB cart: EXROM=0, GAME=1
+            self.exrom = False
+            self.game = True
+        elif cart_type == "16k":
+            if size != self.ROML_SIZE + self.ROMH_SIZE:
+                raise ValueError(
+                    f"16K cartridge {path.name} has wrong size: "
+                    f"{size} bytes (expected {self.ROML_SIZE + self.ROMH_SIZE})"
+                )
+            self.cartridge_roml = data[:self.ROML_SIZE]
+            self.cartridge_romh = data[self.ROML_SIZE:]
+            self.cartridge_type = "16k"
+            # 16KB cart: EXROM=0, GAME=0
+            self.exrom = False
+            self.game = False
+        else:
+            raise ValueError(f"Unknown cartridge type: {cart_type}")
+
+        log.info(f"Loaded raw {cart_type.upper()} cartridge: {path.name} ({size} bytes)")
+
+    def _load_crt_cartridge(self, data: bytes, path: Path) -> None:
+        """Load a CRT format cartridge file.
+
+        CRT format:
+        - 64-byte header with signature, hardware type, EXROM/GAME lines
+        - CHIP packets containing ROM data with load addresses
+
+        Arguments:
+            data: CRT file data
+            path: Path to cartridge file (for error messages)
+
+        Raises:
+            ValueError: If CRT format is invalid or unsupported
+        """
+        # Validate CRT header
+        if len(data) < 64:
+            raise ValueError(f"CRT file too small: {len(data)} bytes (minimum 64)")
+
+        signature = data[:16]
+        if signature != b"C64 CARTRIDGE   ":
+            raise ValueError(f"Invalid CRT signature: {signature!r}")
+
+        # Parse header (big-endian values)
+        header_length = int.from_bytes(data[0x10:0x14], "big")
+        version_hi = data[0x14]
+        version_lo = data[0x15]
+        hardware_type = int.from_bytes(data[0x16:0x18], "big")
+        exrom_line = data[0x18]
+        game_line = data[0x19]
+        cart_name = data[0x20:0x40].rstrip(b"\x00").decode("latin-1", errors="replace")
+
+        log.info(
+            f"CRT header: name='{cart_name}', version={version_hi}.{version_lo}, "
+            f"hardware_type={hardware_type}, EXROM={exrom_line}, GAME={game_line}"
+        )
+
+        # We only support hardware type 0 (standard cartridge) for now
+        if hardware_type != 0:
+            raise ValueError(
+                f"Unsupported cartridge hardware type: {hardware_type} "
+                f"(only type 0 'Generic Cartridge' is supported)"
+            )
+
+        # Set EXROM/GAME lines (0 = active/low, 1 = inactive/high)
+        self.exrom = exrom_line != 0
+        self.game = game_line != 0
+
+        # Parse CHIP packets
+        offset = header_length
+        roml_data = None
+        romh_data = None
+
+        while offset < len(data):
+            if offset + 16 > len(data):
+                break  # Not enough data for another CHIP header
+
+            chip_sig = data[offset:offset + 4]
+            if chip_sig != b"CHIP":
+                raise ValueError(f"Invalid CHIP signature at offset {offset}: {chip_sig!r}")
+
+            packet_length = int.from_bytes(data[offset + 4:offset + 8], "big")
+            chip_type = int.from_bytes(data[offset + 8:offset + 10], "big")
+            bank_number = int.from_bytes(data[offset + 10:offset + 12], "big")
+            load_address = int.from_bytes(data[offset + 12:offset + 14], "big")
+            rom_size = int.from_bytes(data[offset + 14:offset + 16], "big")
+
+            log.debug(
+                f"CHIP packet: type={chip_type}, bank={bank_number}, "
+                f"load=${load_address:04X}, size={rom_size}"
+            )
+
+            # Only handle ROM chips (type 0) for now
+            if chip_type != 0:
+                log.warning(f"Skipping non-ROM CHIP type {chip_type}")
+                offset += packet_length
+                continue
+
+            # We only support bank 0 for standard cartridges
+            if bank_number != 0:
+                log.warning(f"Skipping bank {bank_number} (only bank 0 supported)")
+                offset += packet_length
+                continue
+
+            # Extract ROM data
+            rom_data = data[offset + 16:offset + 16 + rom_size]
+
+            if load_address == self.ROML_START:
+                roml_data = rom_data
+                log.info(f"Loaded ROML: ${load_address:04X}-${load_address + rom_size - 1:04X} ({rom_size} bytes)")
+            elif load_address == self.ROMH_START:
+                romh_data = rom_data
+                log.info(f"Loaded ROMH: ${load_address:04X}-${load_address + rom_size - 1:04X} ({rom_size} bytes)")
+            else:
+                log.warning(f"Unknown CHIP load address: ${load_address:04X}")
+
+            offset += packet_length
+
+        # Validate we got at least ROML
+        if roml_data is None:
+            raise ValueError("CRT file contains no ROML data at $8000")
+
+        self.cartridge_roml = roml_data
+        self.cartridge_romh = romh_data
+
+        # Determine cartridge type from what we loaded
+        if romh_data is not None:
+            self.cartridge_type = "16k"
+        else:
+            self.cartridge_type = "8k"
+
+        log.info(f"Loaded CRT cartridge: '{cart_name}' ({self.cartridge_type.upper()})")
 
     def init_pygame_display(self) -> bool:
         """Initialize pygame display.
@@ -4101,6 +4373,12 @@ def main() -> int | None:
         logging.getLogger("mos6502").setLevel(logging.CRITICAL)
         logging.getLogger("mos6502.cpu.flags").setLevel(logging.CRITICAL)
         log.info("CPU logging will enable when BASIC ROM is entered")
+
+        # Load cartridge BEFORE reset if specified
+        # Cartridge ROMs affect memory banking and may provide auto-start vectors
+        if args.cartridge:
+            c64.load_cartridge(args.cartridge, args.cartridge_type)
+            log.info(f"Cartridge type: {c64.cartridge_type}")
 
         # ROMs are automatically loaded in C64.__init__()
         # Reset CPU AFTER ROMs are loaded so reset vector can be read correctly
