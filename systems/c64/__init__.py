@@ -2924,7 +2924,7 @@ class C64:
         Arguments:
             data: Raw cartridge data
             path: Path to cartridge file (for error messages)
-            cart_type: "auto", "8k", or "16k"
+            cart_type: "auto", "8k", "16k", or "ultimax"
 
         Raises:
             ValueError: If size doesn't match expected cartridge size
@@ -2968,6 +2968,19 @@ class C64:
                 name=path.stem,
             )
             self.cartridge_type = "16k"
+        elif cart_type == "ultimax":
+            if size != self.ROMH_SIZE:
+                raise ValueError(
+                    f"Ultimax cartridge {path.name} has wrong size: "
+                    f"{size} bytes (expected {self.ROMH_SIZE})"
+                )
+            cartridge = StaticROMCartridge(
+                roml_data=None,
+                romh_data=None,
+                ultimax_romh_data=data,
+                name=path.stem,
+            )
+            self.cartridge_type = "ultimax"
         else:
             raise ValueError(f"Unknown cartridge type: {cart_type}")
 

@@ -257,9 +257,122 @@ class TestC64CartridgeLoading:
             f"Type {hw_type} loaded as ErrorCartridge - mapper not implemented"
 
     @requires_c64_roms
-    def test_load_type_00_normal_cartridge(self, c64):
-        """Type 0: Normal cartridge."""
-        self._test_load_cartridge_type(c64, 0)
+    def test_load_type_00_normal_8kb_bin_cartridge(self, c64):
+        """Type 0: Normal 8KB cartridge (raw .bin, EXROM=0, GAME=1)."""
+        bin_path = FIXTURES_DIR / "test_cart_8k.bin"
+        if not bin_path.exists():
+            pytest.skip(f"Test fixture not found: {bin_path}")
+
+        c64.load_cartridge(bin_path)
+
+        assert c64.cartridge_type == "8k"
+        assert c64.memory.cartridge is not None
+        assert isinstance(c64.memory.cartridge, StaticROMCartridge)
+        assert c64.memory.cartridge.exrom is False  # Active
+        assert c64.memory.cartridge.game is True    # Inactive (8KB mode)
+
+    @requires_c64_roms
+    def test_load_type_00_normal_8kb_crt_cartridge(self, c64):
+        """Type 0: Normal 8KB cartridge (.crt, EXROM=0, GAME=1)."""
+        crt_path = FIXTURES_DIR / "test_cart_8k.crt"
+        if not crt_path.exists():
+            pytest.skip(f"Test fixture not found: {crt_path}")
+
+        c64.load_cartridge(crt_path)
+
+        assert c64.cartridge_type == "8k"
+        assert c64.memory.cartridge is not None
+        assert isinstance(c64.memory.cartridge, StaticROMCartridge)
+        assert c64.memory.cartridge.exrom is False  # Active
+        assert c64.memory.cartridge.game is True    # Inactive (8KB mode)
+        assert c64.memory.cartridge.roml_data is not None
+
+    @requires_c64_roms
+    def test_load_type_00_normal_16kb_bin_cartridge(self, c64):
+        """Type 0: Normal 16KB cartridge (raw .bin, EXROM=0, GAME=0)."""
+        bin_path = FIXTURES_DIR / "test_cart_16k.bin"
+        if not bin_path.exists():
+            pytest.skip(f"Test fixture not found: {bin_path}")
+
+        c64.load_cartridge(bin_path)
+
+        assert c64.cartridge_type == "16k"
+        assert c64.memory.cartridge is not None
+        assert isinstance(c64.memory.cartridge, StaticROMCartridge)
+        assert c64.memory.cartridge.exrom is False  # Active
+        assert c64.memory.cartridge.game is False   # Active (16KB mode)
+
+    @requires_c64_roms
+    def test_load_type_00_normal_16kb_crt_1_chip_cartridge(self, c64):
+        """Type 0: Normal 16KB cartridge (.crt with single CHIP, EXROM=0, GAME=0).
+
+        CRT structure: One 16KB CHIP at $8000, split into ROML and ROMH.
+        """
+        crt_path = FIXTURES_DIR / "test_cart_16k_single_chip.crt"
+        if not crt_path.exists():
+            pytest.skip(f"Test fixture not found: {crt_path}")
+
+        c64.load_cartridge(crt_path)
+
+        assert c64.cartridge_type == "16k"
+        assert c64.memory.cartridge is not None
+        assert isinstance(c64.memory.cartridge, StaticROMCartridge)
+        assert c64.memory.cartridge.exrom is False  # Active
+        assert c64.memory.cartridge.game is False   # Active (16KB mode)
+        assert c64.memory.cartridge.roml_data is not None
+        assert c64.memory.cartridge.romh_data is not None
+
+    @requires_c64_roms
+    def test_load_type_00_normal_16kb_crt_2_chip_cartridge(self, c64):
+        """Type 0: Normal 16KB cartridge (.crt with two CHIPs, EXROM=0, GAME=0).
+
+        CRT structure: Two separate 8KB CHIPs at $8000 (ROML) and $A000 (ROMH).
+        """
+        crt_path = FIXTURES_DIR / "test_cart_16k.crt"
+        if not crt_path.exists():
+            pytest.skip(f"Test fixture not found: {crt_path}")
+
+        c64.load_cartridge(crt_path)
+
+        assert c64.cartridge_type == "16k"
+        assert c64.memory.cartridge is not None
+        assert isinstance(c64.memory.cartridge, StaticROMCartridge)
+        assert c64.memory.cartridge.exrom is False  # Active
+        assert c64.memory.cartridge.game is False   # Active (16KB mode)
+        assert c64.memory.cartridge.roml_data is not None
+        assert c64.memory.cartridge.romh_data is not None
+
+    @requires_c64_roms
+    def test_load_type_00_ultimax_bin_cartridge(self, c64):
+        """Type 0: Ultimax cartridge (raw .bin, EXROM=1, GAME=0)."""
+        bin_path = FIXTURES_DIR / "test_cart_ultimax.bin"
+        if not bin_path.exists():
+            pytest.skip(f"Test fixture not found: {bin_path}")
+
+        c64.load_cartridge(bin_path, cart_type="ultimax")
+
+        assert c64.cartridge_type == "ultimax"
+        assert c64.memory.cartridge is not None
+        assert isinstance(c64.memory.cartridge, StaticROMCartridge)
+        assert c64.memory.cartridge.exrom is True   # Inactive (Ultimax)
+        assert c64.memory.cartridge.game is False   # Active (Ultimax)
+        assert c64.memory.cartridge.ultimax_romh_data is not None
+
+    @requires_c64_roms
+    def test_load_type_00_ultimax_crt_cartridge(self, c64):
+        """Type 0: Ultimax cartridge (.crt, EXROM=1, GAME=0)."""
+        crt_path = FIXTURES_DIR / "test_cart_ultimax.crt"
+        if not crt_path.exists():
+            pytest.skip(f"Test fixture not found: {crt_path}")
+
+        c64.load_cartridge(crt_path)
+
+        assert c64.cartridge_type == "ultimax"
+        assert c64.memory.cartridge is not None
+        assert isinstance(c64.memory.cartridge, StaticROMCartridge)
+        assert c64.memory.cartridge.exrom is True   # Inactive (Ultimax)
+        assert c64.memory.cartridge.game is False   # Active (Ultimax)
+        assert c64.memory.cartridge.ultimax_romh_data is not None
 
     @requires_c64_roms
     def test_load_type_01_action_replay_cartridge(self, c64):
@@ -685,52 +798,6 @@ class TestC64CartridgeLoading:
     def test_load_type_85_magic_desk_16_cartridge(self, c64):
         """Type 85: Magic Desk 16."""
         self._test_load_cartridge_type(c64, 85)
-
-    @requires_c64_roms
-    def test_load_type_00_normal_8kb_cartridge(self, c64):
-        """Type 0: Normal 8KB cartridge (EXROM=0, GAME=1)."""
-        bin_path = FIXTURES_DIR / "test_cart_8k.bin"
-        if not bin_path.exists():
-            pytest.skip(f"Test fixture not found: {bin_path}")
-
-        c64.load_cartridge(bin_path)
-
-        assert c64.cartridge_type == "8k"
-        assert c64.memory.cartridge is not None
-        assert isinstance(c64.memory.cartridge, StaticROMCartridge)
-        assert c64.memory.cartridge.exrom is False  # Active
-        assert c64.memory.cartridge.game is True    # Inactive (8KB mode)
-
-    @requires_c64_roms
-    def test_load_type_00_normal_16kb_cartridge(self, c64):
-        """Type 0: Normal 16KB cartridge (EXROM=0, GAME=0)."""
-        bin_path = FIXTURES_DIR / "test_cart_16k.bin"
-        if not bin_path.exists():
-            pytest.skip(f"Test fixture not found: {bin_path}")
-
-        c64.load_cartridge(bin_path)
-
-        assert c64.cartridge_type == "16k"
-        assert c64.memory.cartridge is not None
-        assert isinstance(c64.memory.cartridge, StaticROMCartridge)
-        assert c64.memory.cartridge.exrom is False  # Active
-        assert c64.memory.cartridge.game is False   # Active (16KB mode)
-
-    @requires_c64_roms
-    def test_load_type_00_ultimax_cartridge(self, c64):
-        """Type 0: Ultimax cartridge with ROM at $E000 (EXROM=1, GAME=0)."""
-        crt_path = FIXTURES_DIR / "test_cart_ultimax.crt"
-        if not crt_path.exists():
-            pytest.skip(f"Test fixture not found: {crt_path}")
-
-        c64.load_cartridge(crt_path)
-
-        assert c64.cartridge_type == "ultimax"
-        assert c64.memory.cartridge is not None
-        assert isinstance(c64.memory.cartridge, StaticROMCartridge)
-        assert c64.memory.cartridge.exrom is True   # Inactive (Ultimax)
-        assert c64.memory.cartridge.game is False   # Active (Ultimax)
-        assert c64.memory.cartridge.ultimax_romh_data is not None
 
 
 class TestCRTHeaderParsing:
