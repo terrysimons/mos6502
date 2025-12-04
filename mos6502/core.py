@@ -1439,39 +1439,39 @@ class MOS6502CPU(flags.ProcessorStatusFlagsInterface):
 
         setattr(self._flags, flags)
     @property
-    def PC(self: Self) -> Word:  # noqa: N802
+    def PC(self: Self) -> int:  # noqa: N802
         """
         Return the CPU PC register.
 
         Returns
         -------
-            Word()
+            int (16-bit value)
         """
         self.log.debug(f"PC <- 0x{self._registers.PC:04X}")
         return self._registers.PC
 
     @PC.setter
-    def PC(self: Self, PC: Word) -> None:  # noqa: N802 N803
+    def PC(self: Self, PC: int) -> None:  # noqa: N802 N803
         """
         Set the CPU PC register.
 
         Arguments:
         ---------
-            PC: Word()
+            PC: int (16-bit value)
 
         Returns:
         -------
             None
         """
-        self._registers.PC = Word(PC)
+        self._registers.PC = PC & 0xFFFF
         self.log.info(f"PC -> 0x{self._registers.PC:04X}")
 
         # Call PC change callback if set
         if self.pc_callback is not None:
-            self.pc_callback(int(self._registers.PC))
+            self.pc_callback(self._registers.PC)
 
     @property
-    def S(self: Self) -> Word:  # noqa: N802
+    def S(self: Self) -> int:  # noqa: N802
         """
         Return the CPU S register.
 
@@ -1481,13 +1481,13 @@ class MOS6502CPU(flags.ProcessorStatusFlagsInterface):
 
         Returns
         -------
-            Word()
+            int (9-bit value: 0x0100-0x01FF)
         """
         self.log.debug(f"S <- 0x{self._registers.S:02X} ")
         return self._registers.S
 
     @S.setter
-    def S(self: Self, S: Word) -> None:  # noqa: N802 N803
+    def S(self: Self, S: int) -> None:  # noqa: N802 N803
         """
         Set the CPU S register.
 
@@ -1496,7 +1496,7 @@ class MOS6502CPU(flags.ProcessorStatusFlagsInterface):
 
         Arguments:
         ---------
-            S: Byte() or Word() (low byte used, always OR'd with 0x0100)
+            S: int (low byte used, always OR'd with 0x0100)
 
         Returns:
         -------
@@ -1504,91 +1504,91 @@ class MOS6502CPU(flags.ProcessorStatusFlagsInterface):
         """
         # Stack pointer is 8 bits, always in page 1 (0x0100-0x01FF)
         # Mask to 8 bits and force page 1
-        self._registers.S = Word(0x0100 | (S & 0xFF))
+        self._registers.S = 0x0100 | (S & 0xFF)
         self.log.info(f"S -> 0x{self._registers.S & 0xFF:02X}")
 
     @property
-    def A(self: Self) -> Byte:  # noqa: N802
+    def A(self: Self) -> int:  # noqa: N802
         """
         Return the CPU A register.
 
         Returns
         -------
-            Byte()
+            int (8-bit value)
         """
         self.log.debug(f"A <- 0x{self._registers.A:02X}")
         return self._registers.A
 
     @A.setter
-    def A(self: Self, A: Byte) -> Byte:  # noqa: N802 N803
+    def A(self: Self, A: int) -> None:  # noqa: N802 N803
         """
         Set the CPU A register.
 
         Arguments:
         ---------
-            A: Byte()
+            A: int (8-bit value)
 
         Returns:
         -------
             None
         """
-        self._registers.A = A
+        self._registers.A = A & 0xFF
         self.log.info(f"A -> 0x{self._registers.A:02X}")
 
     @property
-    def X(self: Self) -> Byte:  # noqa: N802
+    def X(self: Self) -> int:  # noqa: N802
         """
         Return the CPU X register.
 
         Returns
         -------
-            Byte()
+            int (8-bit value)
         """
-        self.log.debug(f"X <- 0x{self._registers.Y:02X}")
+        self.log.debug(f"X <- 0x{self._registers.X:02X}")
         return self._registers.X
 
     @X.setter
-    def X(self: Self, X: Byte) -> None:  # noqa: N802 N803
+    def X(self: Self, X: int) -> None:  # noqa: N802 N803
         """
         Set the CPU X register.
 
         Arguments:
         ---------
-            X: Byte()
+            X: int (8-bit value)
 
         Returns:
         -------
             None
         """
-        self._registers.X = X
+        self._registers.X = X & 0xFF
         self.log.info(f"X -> 0x{self._registers.X:02X}")
 
     @property
-    def Y(self: Self) -> Byte:  # noqa: N802
+    def Y(self: Self) -> int:  # noqa: N802
         """
         Return the CPU Y register.
 
         Returns
         -------
-            Byte()
+            int (8-bit value)
         """
         self.log.debug(f"Y <- 0x{self._registers.Y:02X}")
         return self._registers.Y
 
     @Y.setter
-    def Y(self: Self, Y: Byte) -> None:  # noqa: N802 N803
+    def Y(self: Self, Y: int) -> None:  # noqa: N802 N803
         """
         Set the CPU Y register.
 
         Arguments:
         ---------
-            Y: Byte()
+            Y: int (8-bit value)
 
         Returns:
         -------
             None
         """
-        self._registers.Y = Y
+        self._registers.Y = Y & 0xFF
         self.log.info(f"Y -> 0x{self._registers.Y:02X}")
 
     def __str__(self: Self) -> str:

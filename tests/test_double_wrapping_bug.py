@@ -9,7 +9,12 @@ and PASS once the bug is fixed.
 import unittest
 from unittest.mock import patch, MagicMock
 from mos6502.memory import Byte, Word, ENDIANNESS
-from mos6502.registers import Registers, ZERO_BYTE, ZERO_WORD
+from mos6502.registers import Registers
+
+# These constants used to exist in registers.py, but are no longer needed
+# since registers are now stored as plain ints
+ZERO_BYTE = 0x00
+ZERO_WORD = 0x0000
 
 
 class TestDoubleWrappingBug(unittest.TestCase):
