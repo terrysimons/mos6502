@@ -2255,23 +2255,25 @@ class C64:
 
         def _read_ram_direct(self, addr) -> int:
             """Read directly from RAM storage without delegation."""
+            # RAM lists now store plain ints, not Byte objects
             if 0 <= addr < 256:
-                return self.ram_zeropage[addr].value
+                return self.ram_zeropage[addr]
             elif 256 <= addr < 512:
-                return self.ram_stack[addr - 256].value
+                return self.ram_stack[addr - 256]
             elif addr <= 65535:
-                return self.ram_heap[addr - 512].value
+                return self.ram_heap[addr - 512]
             return 0
 
         def _write_ram_direct(self, addr, value) -> None:
             """Write directly to RAM storage without delegation."""
-            from mos6502.memory import Byte, int2ba
+            # RAM lists now store plain ints, not Byte objects
+            int_value = int(value) & 0xFF
             if 0 <= addr < 256:
-                self.ram_zeropage[addr] = Byte(value=int2ba(value, length=8, endian="little"), endianness="little")
+                self.ram_zeropage[addr] = int_value
             elif 256 <= addr < 512:
-                self.ram_stack[addr - 256] = Byte(value=int2ba(value, length=8, endian="little"), endianness="little")
+                self.ram_stack[addr - 256] = int_value
             elif addr <= 65535:
-                self.ram_heap[addr - 512] = Byte(value=int2ba(value, length=8, endian="little"), endianness="little")
+                self.ram_heap[addr - 512] = int_value
 
         def _read_io_area(self, addr: int) -> int:
             """Read from I/O area ($D000-$DFFF)."""

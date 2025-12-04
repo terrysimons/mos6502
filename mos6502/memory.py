@@ -1,5 +1,9 @@
 #!/usr/bin/env python3
-"""mos6502 Memory."""
+"""mos6502 Memory.
+
+Performance optimization: MemoryUnit stores values as plain ints, not bitarrays.
+Bitarray conversion only happens when explicitly needed for bit operations.
+"""
 import logging
 from collections.abc import MutableSequence
 from typing import Literal, Self
@@ -10,47 +14,46 @@ from mos6502 import errors
 
 ENDIANNESS: Literal["little"] = "little"
 
-# TODO:
-#
-# Wrap memory sections with a class so we can do interesting things with __str__
-# class MemoryBytes:
-#     def __str__
-
-# class ZeroPage:
-#     pass
-
-# class Stack:
-#     pass
-
-# class Heap:
-#     pass
-
 
 class MemoryUnit:
-    """An base class for dealing with Bytes and Words."""
+    """A base class for dealing with Bytes and Words.
+
+    Performance optimization: Values stored as plain ints internally.
+    Bitarray conversion only happens when needed for bit operations.
+    """
 
     log: logging.Logger = logging.getLogger("mos6502.memory")
 
+    # Use __slots__ for memory efficiency
+    __slots__ = ('_value', '_endianness', '_overflow', '_underflow')
+
     def __init__(self: Self, value: int | bitarray = 0,
                  endianness: str = ENDIANNESS) -> None:
-        """
-        Initialize a MemoryUnit.
+        """Initialize a MemoryUnit.
 
         Arguments:
         ---------
             value: the value to store in the memory unit (default: 0)
             endianness: the endianness of this memory unit (default: mos6502.memory.ENDIANNESS)
         """
-        super().__init__()
         self._overflow: bool = False
         self._underflow: bool = False
+        self._endianness: str = endianness
 
+        # Store as int internally for performance
         if isinstance(value, type(self)):
-            self._value = value._value  # noqa: SLF001
+            self._value: int = value._value  # noqa: SLF001
         elif is_bitarray(value):
-            self._value = value
+            self._value: int = ba2int(value)
+        elif isinstance(value, MemoryUnit):
+            self._value: int = value._value  # noqa: SLF001
         else:
-            self._value: bitarray = int2ba(value, length=self.size_bits, endian=endianness)
+            self._value: int = int(value) & self._mask
+
+    @property
+    def _mask(self: Self) -> int:
+        """Return the bit mask for this MemoryUnit type."""
+        return (1 << self.size_bits) - 1 if self.size_bits > 0 else 0
 
     @property
     def size_bits(self: Self) -> Literal[0]:
@@ -60,12 +63,17 @@ class MemoryUnit:
     @property
     def endianness(self: Self) -> str:
         """Return endianness of the architecture - "big" or "little" (default=little)."""
-        return self._value.endian
+        return self._endianness
 
     @property
     def value(self: Self) -> int:
         """Return value of the MemoryUnit as an integer."""
-        return ba2int(self._value)
+        return self._value
+
+    @value.setter
+    def value(self: Self, new_value: int) -> None:
+        """Set the value of the MemoryUnit."""
+        self._value = int(new_value) & self._mask
 
     @property
     def overflow(self: Self) -> bool:
@@ -89,76 +97,59 @@ class MemoryUnit:
 
     def bits(self: Self) -> bitarray:
         """Return a bitarray of size self.size_bits with endianness self.endianness."""
-        return int2ba(self.value, length=self.size_bits, endian=self.endianness)
+        return int2ba(self._value, length=self.size_bits, endian=self._endianness)
 
     @property
-    def lowbyte(self: Self) -> bitarray:
+    def lowbyte(self: Self) -> int:
         """Return the low byte as an int."""
-        if self.size_bits >= 8:
-            return ba2int(self.bits()[0:8])
-
-        return ba2int(self.bits())
+        return self._value & 0xFF
 
     @property
     def lowbyte_bits(self: Self) -> bitarray:
-        """Return the low byte of this data type as a bitarray or None."""
-        if self.size_bits >= 8:
-            return self.bits()[0:8]
-
-        return self.bits()
+        """Return the low byte of this data type as a bitarray."""
+        return int2ba(self._value & 0xFF, length=8, endian=self._endianness)
 
     @property
-    def highbyte(self: Self) -> bitarray:
+    def highbyte(self: Self) -> int | None:
         """Return the high byte as an int."""
         if self.size_bits > 8:
-            return ba2int(self.bits()[8:])
-
+            return (self._value >> 8) & 0xFF
         return None
 
     @property
-    def highbyte_bits(self: Self) -> bitarray:
+    def highbyte_bits(self: Self) -> bitarray | None:
         """Return the high byte of this data type as a bitarray or None."""
         if self.size_bits > 8:
-            return self.bits()[8:]
-
+            return int2ba((self._value >> 8) & 0xFF, length=8, endian=self._endianness)
         return None
 
     """ Math Operators"""
-    def __add__(self: Self, rvalue: int | bitarray) -> bitarray:
+    def __add__(self: Self, rvalue: int | bitarray) -> "MemoryUnit":
         """Add an integer or bitarray to a MemoryUnit."""
-        # Early return for adding 0 - saves cycles
-        if isinstance(rvalue, int) and rvalue == 0:
-            return type(self)(self.value, endianness=self.endianness)
+        # Get int value from rvalue
+        if isinstance(rvalue, int):
+            if rvalue == 0:
+                return type(self)(self._value, endianness=self._endianness)
+            local_rvalue = rvalue
+        elif isinstance(rvalue, MemoryUnit):
+            if rvalue._value == 0:  # noqa: SLF001
+                return type(self)(self._value, endianness=self._endianness)
+            local_rvalue = rvalue._value  # noqa: SLF001
+        elif is_bitarray(rvalue):
+            local_rvalue = ba2int(rvalue)
+            if local_rvalue == 0:
+                return type(self)(self._value, endianness=self._endianness)
+        else:
+            local_rvalue = int(rvalue)
 
         result: MemoryUnit = None
 
-        local_rvalue = rvalue
-
-        # MemoryUnit is the base class for Byte/Word so this
-        # gives us a bit of a speedup
-        if isinstance(rvalue, MemoryUnit):
-            local_rvalue: int = rvalue.value
-            # Early return for adding 0
-            if local_rvalue == 0:
-                return type(self)(self.value, endianness=self.endianness)
-        elif is_bitarray(rvalue):
-            local_rvalue: int = ba2int(local_rvalue)
-            # Early return for adding 0
-            if local_rvalue == 0:
-                return type(self)(self.value, endianness=self.endianness)
-
-        # If we're adding data to a word and it causes a carry
-        # we need to account for the CPU cycles.
-        #
-        # This gives us slightly better emulator behavior and
-        # cleaner code overall since it means we don't have to
-        # account for it arbitrarily in each relevant instruction
-        self.value + local_rvalue
-        initial_msb: bitarray = self.highbyte_bits
+        # Track overflow/underflow for Words
         if isinstance(self, Word):
-            result: Word = Word(self.value + local_rvalue, endianness=self.endianness)
-
-            result_msb: bitarray = result.highbyte_bits
+            initial_msb = (self._value >> 8) & 0xFF
+            new_value = (self._value + local_rvalue) & 0xFFFF
+            result = Word(new_value, endianness=self._endianness)
+            result_msb = (new_value >> 8) & 0xFF
 
             if result_msb > initial_msb:
                 result.underflow = False
@@ -170,183 +161,150 @@ class MemoryUnit:
                 result.overflow = False
                 result.underflow = False
 
-        if isinstance(self, Byte):
-            try:
-                result: Byte = Byte(self.value + local_rvalue, endianness=self.endianness)
-            except OverflowError:
-                # TODO: Set the carry bit
-                result: Word = Word(self.value + local_rvalue, endianness=self.endianness)
-                result: Byte = Byte(ba2int(result.lowbyte_bits), endianness=self.endianness)
+        elif isinstance(self, Byte):
+            new_value = (self._value + local_rvalue) & 0xFF
+            result = Byte(new_value, endianness=self._endianness)
 
         return result
 
-        # if isinstance(rvalue, type(self)):
-        #     return type(self)(
-        #             self.value + rvalue.value,
-        #         ),
-        # elif isinstance()
-
-        # return int2ba(
-
-    def __sub__(self: Self, rvalue: int | bitarray) -> bitarray:
+    def __sub__(self: Self, rvalue: int | bitarray) -> "MemoryUnit":
         """Subtract an integer or bitarray from a MemoryUnit."""
-        # Early return for subtracting 0 - saves cycles
-        if isinstance(rvalue, int) and rvalue == 0:
-            return type(self)(self.value, endianness=self.endianness)
+        # Get int value from rvalue
+        if isinstance(rvalue, int):
+            if rvalue == 0:
+                return type(self)(self._value, endianness=self._endianness)
+            local_rvalue = rvalue
+        elif isinstance(rvalue, MemoryUnit):
+            if rvalue._value == 0:  # noqa: SLF001
+                return type(self)(self._value, endianness=self._endianness)
+            local_rvalue = rvalue._value  # noqa: SLF001
+        elif is_bitarray(rvalue):
+            local_rvalue = ba2int(rvalue)
+            if local_rvalue == 0:
+                return type(self)(self._value, endianness=self._endianness)
+        else:
+            local_rvalue = int(rvalue)
 
-        if isinstance(rvalue, type(self)):
-            # Early return for subtracting 0
-            if rvalue.value == 0:
-                return type(self)(self.value, endianness=self.endianness)
-            return type(self)(
-                value=int2ba(
-                    ba2int(self._value) - ba2int(rvalue._value),  # noqa: SLF001
-                ),
-                endianness=self.endianness,
-            )
-
-        return type(self)(
-            value=int2ba(
-                ba2int(self._value) - rvalue,
-                endian=self.endianness,
-            ),
-            endianness=self.endianness,
-        )
+        new_value = (self._value - local_rvalue) & self._mask
+        return type(self)(new_value, endianness=self._endianness)
 
     """ Bitwise Operators """
     def __or__(self: Self, rvalue: int | bitarray) -> int:
         """Bitwise-OR this MemoryUnit with Byte|Word, bitarray, or int types."""
-        # bitarrays are a little bit tricky to work with
-        # so we're using a super safe option here.
-        if isinstance(rvalue, Byte | Word):
-            self.log.critical("Byte or Word")
+        if isinstance(rvalue, MemoryUnit):
+            return self._value | rvalue._value  # noqa: SLF001
         elif is_bitarray(rvalue):
-            self.log.critical("Bitarray")
+            return self._value | ba2int(rvalue)
         elif isinstance(rvalue, int):
-            self.log.critical("Int")
-        return int.from_bytes(self._value.tobytes(), byteorder=self.endianness) | \
-            int.from_bytes(rvalue.tobytes(), byteorder=self.endianness)
+            return self._value | rvalue
+        else:
+            raise TypeError(f"Cannot perform bitwise OR on types {type(self)} and {type(rvalue)}")
 
     def __and__(self: Self, rvalue: int | bitarray) -> int:
         """Bitwise-AND this MemoryUnit with Byte|Word, bitarray, or int types."""
-        # bitarrays are a little bit tricky to work with
-        # so we're using a super safe option here.
-
-        try:
-            int_lvalue: int = self.value
-            if isinstance(rvalue, Byte | Word):
-                int_rvalue = rvalue.value
-            elif is_bitarray(rvalue):
-                int_rvalue: int = int.from_bytes(rvalue.tobytes(), byteorder=self.endianness)
-            elif isinstance(rvalue, int):
-                int_rvalue = rvalue
-        except (AttributeError, TypeError, ValueError) as e:
-            raise TypeError(f"Cannot perform bitwise AND on types {type(self)} and {type(rvalue)}") from e
+        if isinstance(rvalue, MemoryUnit):
+            return self._value & rvalue._value  # noqa: SLF001
+        elif is_bitarray(rvalue):
+            return self._value & ba2int(rvalue)
+        elif isinstance(rvalue, int):
+            return self._value & rvalue
         else:
-            return int_lvalue & int_rvalue
+            raise TypeError(f"Cannot perform bitwise AND on types {type(self)} and {type(rvalue)}")
 
-    def __lshift__(self: Self, rvalue: int | bitarray) -> bitarray:
-        """
-        Left-shift rvalue bits.
-
-        Returns: bitarray
-        """
+    def __lshift__(self: Self, rvalue: int) -> int:
+        """Left-shift by rvalue bits. Returns int."""
         return self._value << rvalue
 
-    def __rshift__(self: Self, rvalue: int | bitarray) -> bitarray:
-        """
-        Right-shift rvalue bits.
-
-        Returns: bitarray
-        """
+    def __rshift__(self: Self, rvalue: int) -> int:
+        """Right-shift by rvalue bits. Returns int."""
         return self._value >> rvalue
 
     """ Equality Operators """
     def __lt__(self: Self, value: int | bitarray) -> bool:
         """Less than comparison with MemoryUnit."""
-        if is_bitarray(value):
-            return self._value < value
-
-        return self.value < value
+        if isinstance(value, MemoryUnit):
+            return self._value < value._value  # noqa: SLF001
+        elif is_bitarray(value):
+            return self._value < ba2int(value)
+        return self._value < value
 
     def __gt__(self: Self, value: int | bitarray) -> bool:
         """Greater than comparison with MemoryUnit."""
-        if is_bitarray(value):
-            return self._value > value
-
-        return self.value > value
+        if isinstance(value, MemoryUnit):
+            return self._value > value._value  # noqa: SLF001
+        elif is_bitarray(value):
+            return self._value > ba2int(value)
+        return self._value > value
 
     def __eq__(self: Self, value: int | bitarray) -> bool:
         """Equality comparison with MemoryUnit."""
-        if is_bitarray(value):
-            return self._value == value
-
-        return self.value == value
+        if isinstance(value, MemoryUnit):
+            return self._value == value._value  # noqa: SLF001
+        elif is_bitarray(value):
+            return self._value == ba2int(value)
+        return self._value == value
 
     def __le__(self: Self, value: int | bitarray) -> bool:
         """Less than or equal to comparison with MemoryUnit."""
-        if is_bitarray(value):
-            return self._value <= value
-
-        return self.value <= value
+        if isinstance(value, MemoryUnit):
+            return self._value <= value._value  # noqa: SLF001
+        elif is_bitarray(value):
+            return self._value <= ba2int(value)
+        return self._value <= value
 
     def __ge__(self: Self, value: int | bitarray) -> bool:
         """Greater than or equal to comparison with MemoryUnit."""
-        if is_bitarray(value):
-            return self._value >= value
-
-        return self.value >= value
+        if isinstance(value, MemoryUnit):
+            return self._value >= value._value  # noqa: SLF001
+        elif is_bitarray(value):
+            return self._value >= ba2int(value)
+        return self._value >= value
 
     def __int__(self: Self) -> int:
         """Return this MemoryUnit's value as an integer."""
-        return self.value
+        return self._value
 
     def __format__(self: Self, specifier: str) -> str:
         """Return this MemoryUnit as indicated by the format specifier."""
-        return f"{self.value:{specifier}}"
+        return f"{self._value:{specifier}}"
 
     def __repr__(self: Self) -> str:
         """Describe this MemoryUnit in code."""
         return str(
             f"{self.__class__.__name__}("
-            f"value={self.value:#02x}, "
+            f"value={self._value:#02x}, "
             f"size_bits={self.size_bits}, "
-            f"endianness={self.endianness}"
+            f"endianness={self._endianness}"
             ")",
         )
 
     def __str__(self: Self) -> str:
         """Describe this MemoryUnit as a hexadecimal value."""
-        if is_bitarray(self.value):
-            return str(hex(ba2int(self.value)))
-        else:  # noqa: RET505 (We do some shenanigans)
-            return str(hex(self.value))
+        return str(hex(self._value))
 
     """ Index Operators """
     def __index__(self: Self) -> int:
         """Describe this MemoryUnit as an index."""
-        return self.value
+        return self._value
 
-    def __getitem__(self: Self, index: int) -> bitarray:
-        """
-        Return the specified bit if used as an index.
-
-        Returns: bitarray
-        """
-        if len(self.bits()) >= index:
-            return self.bits()[index]
-
-        return self.bits()
+    def __getitem__(self: Self, index: int) -> int:
+        """Return the specified bit value (0 or 1)."""
+        return (self._value >> index) & 1
 
     def __delitem__(self: Self, index: int) -> None:
         """Not implemented."""
 
     def __setitem__(self: Self, index: int, value: int) -> None:
         """Set a bit on this MemoryUnit."""
-        if isinstance(value, int):
-            self._value[index] = value
+        if isinstance(value, MemoryUnit):
+            bit_value = value._value & 1  # noqa: SLF001
         else:
-            self._value[index] = value._value[index]  # noqa: SLF001
+            bit_value = 1 if value else 0
+
+        if bit_value:
+            self._value |= (1 << index)
+        else:
+            self._value &= ~(1 << index)
 
 
 class Byte(MemoryUnit):
@@ -355,8 +313,7 @@ class Byte(MemoryUnit):
     log: logging.Logger = logging.getLogger("mos6502.memory.Byte")
 
     def __init__(self: Self, value: int = 0, endianness: str = ENDIANNESS) -> None:
-        """
-        Initialize a Byte().
+        """Initialize a Byte().
 
         Arguments:
         ---------
@@ -370,6 +327,11 @@ class Byte(MemoryUnit):
         """Return the size in bits of this MemoryUnit (8 for Byte())."""
         return 8
 
+    @property
+    def _mask(self: Self) -> int:
+        """Return the bit mask for Byte (0xFF)."""
+        return 0xFF
+
 
 class Word(MemoryUnit):
     """Word MemoryUnit()."""
@@ -377,17 +339,13 @@ class Word(MemoryUnit):
     log: logging.Logger = logging.getLogger("mos6502.memory.Word")
 
     def __init__(self: Self, value: int = 0, endianness: str = ENDIANNESS) -> None:
-        """
-        Initialize a Word().
+        """Initialize a Word().
 
         Arguments:
         ---------
             value: a value between -32767 and 65535 (automatically masked to 16 bits)
             endianness: 'big' or 'little' (default: mos6502.memory.ENDIANNESS)
         """
-        # Mask to 16 bits to handle address wrapping (6502 behavior)
-        if isinstance(value, int):
-            value = value & 0xFFFF
         super().__init__(value=value, endianness=endianness)
 
     @property
@@ -395,18 +353,23 @@ class Word(MemoryUnit):
         """Return the size in bits of this MemoryUnit (16 for Word())."""
         return 16
 
+    @property
+    def _mask(self: Self) -> int:
+        """Return the bit mask for Word (0xFFFF)."""
+        return 0xFFFF
+
 
 class RAM(MutableSequence):
-    """mos6502 RAM (64KB; 256 byte zeropage, 256 byte stack, 65023 heap)."""
+    """mos6502 RAM (64KB; 256 byte zeropage, 256 byte stack, 65024 byte heap)."""
 
     log: logging.Logger = logging.getLogger("mos6502.memory.RAM")
 
     def __init__(self: Self, endianness: str = ENDIANNESS, save_state: list[list] = None) -> None:
         """Instantiate a mos6502 RAM bank."""
         super().__init__()
-        self.zeropage = []
-        self.stack = []
-        self.heap = []
+        self.zeropage: list[int] = []
+        self.stack: list[int] = []
+        self.heap: list[int] = []
         self.endianness: str = endianness
         self.memory_handler = None  # Optional external memory handler (for C64 banking, etc.)
         self.initialize()
@@ -421,22 +384,14 @@ class RAM(MutableSequence):
         if self.memory_handler is not None:
             return
 
-        self.zeropage: list[Byte] = [
-            Byte(value=0xFF, endianness=self.endianness),
-        ] * 256
-        self.stack: list[Byte] = [
-            Byte(value=0xFF, endianness=self.endianness),
-        ] * 256
-        self.heap: list[Byte] = [
-            Byte(value=0xFF, endianness=self.endianness),
-        ] * (0x10000 - len(self.zeropage) - len(self.stack))
+        # Store as plain ints for performance
+        self.zeropage: list[int] = [0xFF] * 256
+        self.stack: list[int] = [0xFF] * 256
+        self.heap: list[int] = [0xFF] * (0x10000 - 256 - 256)
 
     def __repr__(self: Self) -> str:
         """Return the code representation of the RAM."""
-        ram: list[Byte] = self.zeropage
-        ram.extend(self.stack)
-        ram.extend(self.heap)
-        return f"<{self.__class__.__name__} {ram}>"
+        return f"<{self.__class__.__name__} {len(self)} bytes>"
 
     def __len__(self: Self) -> int:
         """Return the length of the RAM."""
@@ -448,17 +403,16 @@ class RAM(MutableSequence):
         if self.memory_handler is not None:
             return self.memory_handler.read(index)
 
-        # Default RAM access
+        # Default RAM access - values are already ints
         if index >= 0 and index < 256:
-            return self.zeropage[index].value
+            return self.zeropage[index]
         if index >= 256 and index < 512:
-            return self.stack[index - 256].value
+            return self.stack[index - 256]
         if index <= 65535:
-            return self.heap[index - 512].value
+            return self.heap[index - 512]
 
         raise errors.InvalidMemoryLocationError(
-            f"Invalid memory location: {index} should be between 0 and "
-            f"{len(self.zeropage) + len(self.stack) + len(self.heap) - 1}",
+            f"Invalid memory location: {index} should be between 0 and 65535",
         )
 
     def __delitem__(self: Self, index: int) -> None:
@@ -471,35 +425,22 @@ class RAM(MutableSequence):
             self.memory_handler.write(index, value)
             return
 
-        data_type: type[Byte] = Byte
+        # Extract int value if passed a MemoryUnit
+        if isinstance(value, MemoryUnit):
+            int_value = value._value  # noqa: SLF001
+        else:
+            int_value = int(value) & 0xFF
 
-        if length == 16:
-            data_type: type[Word] = Word
-
-        try:
-            if index >= 0 and index < 256:
-                self.zeropage[index] = Byte(
-                    value=int2ba(value, length=length, endian=self.endianness),
-                    endianness=self.endianness,
-                )
-
-            elif index >= 256 and index < 512:
-                self.stack[index - 256] = data_type(
-                    value=int2ba(value, length=length, endian=self.endianness),
-                    endianness=self.endianness,
-                )
-            elif index <= 65535:
-                self.heap[index - 512] = data_type(
-                    value=int2ba(value, length=length, endian=self.endianness),
-                    endianness=self.endianness,
-                )
-            else:
-                raise errors.InvalidMemoryLocationError(
-                    f"Invalid memory location: {index} should be between 0 and "
-                    f"{len(self.zeropage) + len(self.stack) + len(self.heap) - 1}",
-                )
-        except OverflowError:
-            self.__setitem__(index=index, value=value, length=length + 8)
+        if index >= 0 and index < 256:
+            self.zeropage[index] = int_value
+        elif index >= 256 and index < 512:
+            self.stack[index - 256] = int_value
+        elif index <= 65535:
+            self.heap[index - 512] = int_value
+        else:
+            raise errors.InvalidMemoryLocationError(
+                f"Invalid memory location: {index} should be between 0 and 65535",
+            )
 
     def insert(self: Self, index: int, value: int) -> None:
         """Not implemented."""
@@ -509,12 +450,6 @@ class RAM(MutableSequence):
 
     def memory_section(self: Self, address: int) -> Literal["zeropage", "stack", "heap"]:
         """Return the name of the memory section at location {address}."""
-        # ZEROPAGE
-
-        # STACK
-
-        # HEAP
-
         if address >= 0 and address < 256:
             return "zeropage"
         if address >= 256 and address < 512:
@@ -523,35 +458,30 @@ class RAM(MutableSequence):
             return "heap"
 
         raise errors.InvalidMemoryLocationError(
-            f"Invalid memory location: {address} should be between 0 and "
-            f"{len(self.zeropage) + len(self.stack) + len(self.heap) - 1}",
+            f"Invalid memory location: {address} should be between 0 and 65535",
         )
 
-    def fill(self: Self, data: Byte) -> None:
+    def fill(self: Self, data: int) -> None:
         """Fill the RAM with {data}."""
+        int_data = data._value if isinstance(data, MemoryUnit) else int(data) & 0xFF  # noqa: SLF001
         for i in range(len(self)):
-            self.write(i, data)
+            self[i] = int_data
 
-    def read(self: Self, address: Word, size: int = 1) -> list[Byte]:
-        """Read size Bytes starting from Word(address)."""
-        return [self[address + offset] for offset in range(address, address + size)]
+    def read(self: Self, address: int, size: int = 1) -> list[int]:
+        """Read size Bytes starting from address."""
+        return [self[address + offset] for offset in range(size)]
 
-    def write(self: Self, address: Word, data: int) -> None:
-        """Write Word(data) to Word(address)."""
-        zero_page_start_address: int = 0
-        # STACK
-        stack_start_address: int = 256
-        # HEAP
-        ram_start_address: int = 512
+    def write(self: Self, address: int, data: int) -> None:
+        """Write a byte to address."""
+        # Extract int value if passed a MemoryUnit
+        if isinstance(data, MemoryUnit):
+            int_data = data._value  # noqa: SLF001
+        else:
+            int_data = int(data)
 
-        if (data < -127) or (data > 255):
+        if (int_data < -127) or (int_data > 255):
             raise errors.InvalidMemoryAssignmentError(
-                f"Data must be written one byte at a time, but got data > 1 byte: {data}",
+                f"Data must be written one byte at a time, but got data > 1 byte: {int_data}",
             )
 
-        if address >= zero_page_start_address and address < 256:
-            self.zeropage[address] = data
-        elif address >= stack_start_address and address < 512:
-            self.stack[address - 256] = data
-        elif address >= ram_start_address and address <= 0xFFFF:
-            self.heap[address - 512] = data
+        self[address] = int_data & 0xFF
