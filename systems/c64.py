@@ -10,6 +10,21 @@ from mos6502 import CPU, CPUVariant, errors
 from mos6502.core import INFINITE_CYCLES
 from mos6502.memory import Byte, Word
 
+from systems.cartridge import (
+    Cartridge,
+    StaticROMCartridge,
+    ErrorCartridge,
+    CARTRIDGE_TYPES,
+    ROML_START,
+    ROML_END,
+    ROMH_START,
+    ROMH_END,
+    IO1_START,
+    IO1_END,
+    IO2_START,
+    IO2_END,
+)
+
 logging.basicConfig(level=logging.WARNING)
 log = logging.getLogger("c64")
 
@@ -290,6 +305,98 @@ class C64:
 
     # Cartridge auto-start signature location
     CART_SIGNATURE_ADDR = 0x8004  # "CBM80" signature for auto-start
+
+    # CRT hardware type names (from VICE specification)
+    # Type 0 is the only one we currently support
+    # Source: http://rr.c64.org/wiki/CRT_ID
+    CRT_HARDWARE_TYPES = {
+        0: "Normal cartridge",
+        1: "Action Replay",
+        2: "KCS Power Cartridge",
+        3: "Final Cartridge III",
+        4: "Simons Basic",
+        5: "Ocean type 1",
+        6: "Expert Cartridge",
+        7: "Fun Play, Power Play",
+        8: "Super Games",
+        9: "Atomic Power",
+        10: "Epyx Fastload",
+        11: "Westermann Learning",
+        12: "Rex Utility",
+        13: "Final Cartridge I",
+        14: "Magic Formel",
+        15: "C64 Game System, System 3",
+        16: "WarpSpeed",
+        17: "Dinamic",
+        18: "Zaxxon, Super Zaxxon (SEGA)",
+        19: "Magic Desk, Domark, HES Australia",
+        20: "Super Snapshot V5",
+        21: "Comal-80",
+        22: "Structured Basic",
+        23: "Ross",
+        24: "Dela EP64",
+        25: "Dela EP7x8",
+        26: "Dela EP256",
+        27: "Rex EP256",
+        28: "Mikro Assembler",
+        29: "Final Cartridge Plus",
+        30: "Action Replay 4",
+        31: "StarDOS",
+        32: "EasyFlash",
+        33: "EasyFlash X-Bank",
+        34: "Capture",
+        35: "Action Replay 3",
+        36: "Retro Replay, Nordic Replay",
+        37: "MMC64",
+        38: "MMC Replay",
+        39: "IDE64",
+        40: "Super Snapshot V4",
+        41: "IEEE488",
+        42: "Game Killer",
+        43: "Prophet 64",
+        44: "Exos",
+        45: "Freeze Frame",
+        46: "Freeze Machine",
+        47: "Snapshot64",
+        48: "Super Explode V5",
+        49: "Magic Voice",
+        50: "Action Replay 2",
+        51: "MACH 5",
+        52: "Diashow Maker",
+        53: "Pagefox",
+        54: "Kingsoft Business Basic",
+        55: "Silver Rock 128",
+        56: "Formel 64",
+        57: "RGCD",
+        58: "RR-Net MK3",
+        59: "Easy Calc Result",
+        60: "GMod2",
+        61: "MAX BASIC",
+        62: "GMod3",
+        63: "ZIPP-CODE 48",
+        64: "Blackbox V8",
+        65: "Blackbox V3",
+        66: "Blackbox V4",
+        67: "REX RAM Floppy",
+        68: "BIS Plus",
+        69: "SD Box",
+        70: "MultiMAX",
+        71: "Blackbox V9",
+        72: "LT Kernal",
+        73: "CMD RAMlink",
+        74: "Drean (H.E.R.O. bootleg)",
+        75: "IEEE Flash 64",
+        76: "Turtle Graphics II",
+        77: "Freeze Frame MK2",
+        78: "Partner 64",
+        79: "Hyper-BASIC MK2",
+        80: "Universal Cartridge 1",
+        81: "Universal Cartridge 1.5",
+        82: "Universal Cartridge 2",
+        83: "BMP Data Turbo 2000",
+        84: "Profi-DOS",
+        85: "Magic Desk 16",
+    }
 
     @classmethod
     def args(cls, parser) -> None:
@@ -2349,14 +2456,9 @@ class C64:
             self.port = 0x37  # $0001 default value
 
             # Cartridge support - set by C64.load_cartridge()
-            # ROML: $8000-$9FFF (8KB) - active when EXROM=0
-            # ROMH: $A000-$BFFF (8KB) - active when EXROM=0 and GAME=0 (16KB mode)
-            self.cartridge_roml: Optional[bytes] = None
-            self.cartridge_romh: Optional[bytes] = None
-            # EXROM and GAME are active-low signals from the cartridge port
-            # True = inactive (high), False = active (low)
-            self.exrom: bool = True   # No cartridge by default
-            self.game: bool = True    # No cartridge by default
+            # The Cartridge object handles all banking logic and provides
+            # EXROM/GAME signals and read methods for ROML/ROMH/IO regions
+            self.cartridge: Optional[Cartridge] = None
 
         def _read_ram_direct(self, addr) -> int:
             """Read directly from RAM storage without delegation."""
@@ -2397,6 +2499,16 @@ class C64:
             # CIA2
             if C64.CIA2_START <= addr <= C64.CIA2_END:
                 return self.cia2.read(addr)
+            # Cartridge I/O1 ($DE00-$DEFF)
+            if IO1_START <= addr <= IO1_END:
+                if self.cartridge is not None:
+                    return self.cartridge.read_io1(addr)
+                return 0xFF
+            # Cartridge I/O2 ($DF00-$DFFF)
+            if IO2_START <= addr <= IO2_END:
+                if self.cartridge is not None:
+                    return self.cartridge.read_io2(addr)
+                return 0xFF
             return 0xFF
 
         def read(self, addr) -> int:
@@ -2413,9 +2525,9 @@ class C64:
 
             # Cartridge ROML ($8000-$9FFF) - visible when EXROM=0 (active low)
             # This has priority over RAM in this region
-            if C64.ROML_START <= addr <= C64.ROML_END:
-                if not self.exrom and self.cartridge_roml is not None:
-                    return self.cartridge_roml[addr - C64.ROML_START]
+            if ROML_START <= addr <= ROML_END:
+                if self.cartridge is not None and not self.cartridge.exrom:
+                    return self.cartridge.read_roml(addr)
                 # No cartridge, fall through to RAM
                 return self._read_ram_direct(addr)
 
@@ -2426,9 +2538,9 @@ class C64:
 
             # Cartridge ROMH ($A000-$BFFF) - visible when EXROM=0 AND GAME=0 (16KB mode)
             # Takes priority over BASIC ROM
-            if C64.ROMH_START <= addr <= C64.ROMH_END:
-                if not self.exrom and not self.game and self.cartridge_romh is not None:
-                    return self.cartridge_romh[addr - C64.ROMH_START]
+            if ROMH_START <= addr <= ROMH_END:
+                if self.cartridge is not None and not self.cartridge.exrom and not self.cartridge.game:
+                    return self.cartridge.read_romh(addr)
                 # Fall through to BASIC ROM check
                 if basic_enabled:
                     return self.basic[addr - C64.BASIC_ROM_START]
@@ -2475,6 +2587,16 @@ class C64:
             # CIA2
             if 0xDD00 <= addr <= 0xDDFF:
                 self.cia2.write(addr, value)
+                return
+            # Cartridge I/O1 ($DE00-$DEFF) - bank switching registers for many cartridge types
+            if IO1_START <= addr <= IO1_END:
+                if self.cartridge is not None:
+                    self.cartridge.write_io1(addr, value)
+                return
+            # Cartridge I/O2 ($DF00-$DFFF)
+            if IO2_START <= addr <= IO2_END:
+                if self.cartridge is not None:
+                    self.cartridge.write_io2(addr, value)
                 return
 
         def write(self, addr, value) -> None:
@@ -2588,17 +2710,10 @@ class C64:
         self.cia1: Optional[C64.CIA1] = None
         self.cia2: Optional[C64.CIA2] = None
 
-        # Cartridge support
-        # ROML: $8000-$9FFF (8KB) - active when EXROM=0
-        # ROMH: $A000-$BFFF (8KB) - active when EXROM=0 and GAME=0 (16KB mode)
-        self.cartridge_roml: Optional[bytes] = None
-        self.cartridge_romh: Optional[bytes] = None
-        self.cartridge_type: str = "none"  # "none", "8k", "16k"
-        # EXROM and GAME are accent-low signals from the cartridge port
-        # EXROM=0, GAME=1: 8KB cartridge (ROML at $8000)
-        # EXROM=0, GAME=0: 16KB cartridge (ROML at $8000, ROMH at $A000)
-        self.exrom: bool = True   # True = inactive (active-low, no cartridge)
-        self.game: bool = True    # True = inactive (active-low, no cartridge)
+        # Cartridge support - the Cartridge object handles all banking logic
+        # and provides EXROM/GAME signals. Stored on C64Memory, accessed via self.memory.cartridge
+        # Cartridge type string for display purposes
+        self.cartridge_type: str = "none"  # "none", "8k", "16k", "error"
 
         # Pygame display attributes
         self.pygame_screen = None
@@ -2783,17 +2898,13 @@ class C64:
             # Raw binary format
             self._load_raw_cartridge(data, path, cart_type)
 
-        # Update the memory handler with cartridge info
-        if self.memory is not None:
-            self.memory.cartridge_roml = self.cartridge_roml
-            self.memory.cartridge_romh = self.cartridge_romh
-            self.memory.exrom = self.exrom
-            self.memory.game = self.game
-
-        log.info(
-            f"Cartridge loaded: {path.name} "
-            f"(type: {self.cartridge_type}, EXROM={0 if not self.exrom else 1}, GAME={0 if not self.game else 1})"
-        )
+        # Log cartridge status
+        if self.memory is not None and self.memory.cartridge is not None:
+            cart = self.memory.cartridge
+            log.info(
+                f"Cartridge loaded: {path.name} "
+                f"(type: {self.cartridge_type}, EXROM={0 if not cart.exrom else 1}, GAME={0 if not cart.game else 1})"
+            )
 
     def _load_raw_cartridge(self, data: bytes, path: Path, cart_type: str) -> None:
         """Load a raw binary cartridge file.
@@ -2820,35 +2931,150 @@ class C64:
                     f"size {size} bytes (expected 8192 or 16384)"
                 )
 
-        # Validate size matches specified type
+        # Validate size matches specified type and create Cartridge object
         if cart_type == "8k":
             if size != self.ROML_SIZE:
                 raise ValueError(
                     f"8K cartridge {path.name} has wrong size: "
                     f"{size} bytes (expected {self.ROML_SIZE})"
                 )
-            self.cartridge_roml = data
-            self.cartridge_romh = None
+            cartridge = StaticROMCartridge(
+                roml_data=data,
+                romh_data=None,
+                name=path.stem,
+            )
             self.cartridge_type = "8k"
-            # 8KB cart: EXROM=0, GAME=1
-            self.exrom = False
-            self.game = True
         elif cart_type == "16k":
             if size != self.ROML_SIZE + self.ROMH_SIZE:
                 raise ValueError(
                     f"16K cartridge {path.name} has wrong size: "
                     f"{size} bytes (expected {self.ROML_SIZE + self.ROMH_SIZE})"
                 )
-            self.cartridge_roml = data[:self.ROML_SIZE]
-            self.cartridge_romh = data[self.ROML_SIZE:]
+            cartridge = StaticROMCartridge(
+                roml_data=data[:self.ROML_SIZE],
+                romh_data=data[self.ROML_SIZE:],
+                name=path.stem,
+            )
             self.cartridge_type = "16k"
-            # 16KB cart: EXROM=0, GAME=0
-            self.exrom = False
-            self.game = False
         else:
             raise ValueError(f"Unknown cartridge type: {cart_type}")
 
+        # Attach cartridge to memory handler
+        if self.memory is not None:
+            self.memory.cartridge = cartridge
+
         log.info(f"Loaded raw {cart_type.upper()} cartridge: {path.name} ({size} bytes)")
+
+    def _create_error_cartridge(self, error_lines: list[str]) -> bytes:
+        """Create an 8KB cartridge ROM that displays an error message.
+
+        This is used when an unsupported cartridge type is loaded, to give
+        the user a friendly on-screen message instead of crashing.
+
+        Arguments:
+            error_lines: List of text lines to display (max ~38 chars each)
+
+        Returns:
+            8KB cartridge ROM data
+        """
+        cart = bytearray(self.ROML_SIZE)
+
+        # Cartridge header at $8000-$8008
+        cart[0x0000] = 0x09  # Cold start lo -> $8009
+        cart[0x0001] = 0x80  # Cold start hi
+        cart[0x0002] = 0x09  # Warm start lo -> $8009
+        cart[0x0003] = 0x80  # Warm start hi
+        cart[0x0004] = 0xC3  # 'C' (CBM80 signature)
+        cart[0x0005] = 0xC2  # 'B'
+        cart[0x0006] = 0xCD  # 'M'
+        cart[0x0007] = 0x38  # '8'
+        cart[0x0008] = 0x30  # '0'
+
+        # Code starts at $8009
+        code = []
+
+        # SEI, set up stack
+        code.extend([0x78, 0xA2, 0xFF, 0x9A])  # SEI; LDX #$FF; TXS
+
+        # Clear screen with spaces
+        code.extend([0xA9, 0x20, 0xA2, 0x00])  # LDA #$20; LDX #$00
+        # clear_loop:
+        code.extend([
+            0x9D, 0x00, 0x04,  # STA $0400,X
+            0x9D, 0x00, 0x05,  # STA $0500,X
+            0x9D, 0x00, 0x06,  # STA $0600,X
+            0x9D, 0x00, 0x07,  # STA $0700,X
+            0xE8,              # INX
+            0xD0, 0xF1,        # BNE clear_loop
+        ])
+
+        # Set border/background to red
+        code.extend([
+            0xA9, 0x02,        # LDA #$02 (red)
+            0x8D, 0x20, 0xD0,  # STA $D020
+            0x8D, 0x21, 0xD0,  # STA $D021
+        ])
+
+        # Display each error line
+        for line_num, text in enumerate(error_lines[:20]):  # Max 20 lines
+            text = text[:38]  # Max 38 chars per line
+            screen_addr = 0x0400 + (line_num * 40) + 1  # +1 for margin
+            color_addr = 0xD800 + (line_num * 40) + 1
+
+            for i, ch in enumerate(text):
+                # Convert ASCII to screen code
+                if 'A' <= ch <= 'Z':
+                    sc = ord(ch) - ord('A') + 1
+                elif 'a' <= ch <= 'z':
+                    sc = ord(ch) - ord('a') + 1
+                elif '0' <= ch <= '9':
+                    sc = ord(ch) - ord('0') + 0x30
+                elif ch == ' ':
+                    sc = 0x20
+                elif ch == ':':
+                    sc = 0x3A
+                elif ch == '-':
+                    sc = 0x2D
+                elif ch == ',':
+                    sc = 0x2C
+                elif ch == '.':
+                    sc = 0x2E
+                elif ch == '!':
+                    sc = 0x21
+                elif ch == '?':
+                    sc = 0x3F
+                elif ch == '(':
+                    sc = 0x28
+                elif ch == ')':
+                    sc = 0x29
+                elif ch == '/':
+                    sc = 0x2F
+                elif ch == '_':
+                    sc = 0x64
+                else:
+                    sc = 0x20  # Unknown -> space
+
+                # LDA #sc; STA screen_addr+i
+                code.extend([
+                    0xA9, sc,
+                    0x8D, (screen_addr + i) & 0xFF, (screen_addr + i) >> 8,
+                ])
+                # LDA #$01 (white); STA color_addr+i
+                code.extend([
+                    0xA9, 0x01,
+                    0x8D, (color_addr + i) & 0xFF, (color_addr + i) >> 8,
+                ])
+
+        # Infinite loop
+        loop_addr = self.ROML_START + 0x0009 + len(code)
+        code.extend([0x4C, loop_addr & 0xFF, (loop_addr >> 8) & 0xFF])
+
+        # Copy code into cartridge
+        for i, byte in enumerate(code):
+            if 0x0009 + i < len(cart):
+                cart[0x0009 + i] = byte
+
+        return bytes(cart)
 
     def _load_crt_cartridge(self, data: bytes, path: Path) -> None:
         """Load a CRT format cartridge file.
@@ -2881,21 +3107,80 @@ class C64:
         game_line = data[0x19]
         cart_name = data[0x20:0x40].rstrip(b"\x00").decode("latin-1", errors="replace")
 
+        # Look up hardware type name
+        type_name = self.CRT_HARDWARE_TYPES.get(hardware_type, f"Unknown type {hardware_type}")
+
         log.info(
             f"CRT header: name='{cart_name}', version={version_hi}.{version_lo}, "
-            f"hardware_type={hardware_type}, EXROM={exrom_line}, GAME={game_line}"
+            f"hardware_type={hardware_type} ({type_name}), EXROM={exrom_line}, GAME={game_line}"
         )
 
         # We only support hardware type 0 (standard cartridge) for now
+        # For unsupported types, try to load a pre-generated error cartridge
         if hardware_type != 0:
-            raise ValueError(
-                f"Unsupported cartridge hardware type: {hardware_type} "
-                f"(only type 0 'Generic Cartridge' is supported)"
+            log.warning(
+                f"Unsupported cartridge type {hardware_type} ({type_name}). "
+                f"Loading error display cartridge."
             )
 
-        # Set EXROM/GAME lines (0 = active/low, 1 = inactive/high)
-        self.exrom = exrom_line != 0
-        self.game = game_line != 0
+            # Try to load pre-generated error cartridge from fixtures
+            error_cart_loaded = False
+            safe_name = type_name.lower().replace(" ", "_").replace(",", "").replace("/", "_")
+            error_cart_filename = f"error_type_{hardware_type:02d}_{safe_name}.bin"
+
+            # Search in common locations for the error cartridge
+            search_paths = [
+                Path(__file__).parent.parent / "tests" / "fixtures" / "error_carts" / error_cart_filename,
+                Path("tests/fixtures/error_carts") / error_cart_filename,
+            ]
+
+            # Try to load pre-generated error cartridge ROM
+            error_roml_data = None
+            for error_cart_path in search_paths:
+                if error_cart_path.exists():
+                    try:
+                        error_roml_data = error_cart_path.read_bytes()
+                        log.info(f"Loaded error cartridge: {error_cart_path}")
+                        break
+                    except Exception as e:
+                        log.debug(f"Failed to load error cartridge {error_cart_path}: {e}")
+
+            # Fall back to dynamically generating the error cartridge
+            if error_roml_data is None:
+                log.debug("Pre-generated error cartridge not found, generating dynamically")
+                error_lines = [
+                    "",
+                    "  UNSUPPORTED CARTRIDGE TYPE",
+                    "",
+                    f"  Type: {hardware_type}",
+                    f"  Name: {type_name}",
+                    "",
+                    f"  Cart: {cart_name}",
+                    "",
+                    "  This emulator only supports",
+                    "  standard 8K/16K cartridges",
+                    "  (hardware type 0).",
+                    "",
+                    "  Banked cartridges like",
+                    "  Ocean, EasyFlash, Action",
+                    "  Replay, etc. require bank",
+                    "  switching hardware that is",
+                    "  not yet implemented.",
+                ]
+                error_roml_data = self._create_error_cartridge(error_lines)
+
+            # Create ErrorCartridge object
+            cartridge = ErrorCartridge(
+                roml_data=error_roml_data,
+                original_type=hardware_type,
+                original_name=cart_name,
+            )
+            self.cartridge_type = "error"
+
+            # Attach cartridge to memory handler
+            if self.memory is not None:
+                self.memory.cartridge = cartridge
+            return
 
         # Parse CHIP packets
         offset = header_length
@@ -2937,8 +3222,16 @@ class C64:
             rom_data = data[offset + 16:offset + 16 + rom_size]
 
             if load_address == self.ROML_START:
-                roml_data = rom_data
-                log.info(f"Loaded ROML: ${load_address:04X}-${load_address + rom_size - 1:04X} ({rom_size} bytes)")
+                # Check if this is a 16KB ROM that needs to be split
+                if rom_size > self.ROML_SIZE:
+                    # Split 16KB ROM: first 8KB to ROML, second 8KB to ROMH
+                    roml_data = rom_data[:self.ROML_SIZE]
+                    romh_data = rom_data[self.ROML_SIZE:]
+                    log.info(f"Loaded ROML: ${load_address:04X}-${load_address + self.ROML_SIZE - 1:04X} ({self.ROML_SIZE} bytes)")
+                    log.info(f"Loaded ROMH: ${self.ROMH_START:04X}-${self.ROMH_START + len(romh_data) - 1:04X} ({len(romh_data)} bytes)")
+                else:
+                    roml_data = rom_data
+                    log.info(f"Loaded ROML: ${load_address:04X}-${load_address + rom_size - 1:04X} ({rom_size} bytes)")
             elif load_address == self.ROMH_START:
                 romh_data = rom_data
                 log.info(f"Loaded ROMH: ${load_address:04X}-${load_address + rom_size - 1:04X} ({rom_size} bytes)")
@@ -2951,8 +3244,13 @@ class C64:
         if roml_data is None:
             raise ValueError("CRT file contains no ROML data at $8000")
 
-        self.cartridge_roml = roml_data
-        self.cartridge_romh = romh_data
+        # Create StaticROMCartridge object
+        # Note: The cartridge class handles EXROM/GAME based on whether ROMH is present
+        cartridge = StaticROMCartridge(
+            roml_data=roml_data,
+            romh_data=romh_data,
+            name=cart_name,
+        )
 
         # Determine cartridge type from what we loaded
         if romh_data is not None:
@@ -2960,7 +3258,22 @@ class C64:
         else:
             self.cartridge_type = "8k"
 
+        # Attach cartridge to memory handler
+        if self.memory is not None:
+            self.memory.cartridge = cartridge
+
         log.info(f"Loaded CRT cartridge: '{cart_name}' ({self.cartridge_type.upper()})")
+
+    def get_video_standard(self) -> str:
+        """Get the video standard (PAL or NTSC) based on the current video chip.
+
+        Returns:
+            "PAL" for chip 6569, "NTSC" for chips 6567R8 or 6567R56A
+        """
+        if self.video_chip == "6569":
+            return "PAL"
+        else:  # 6567R8 or 6567R56A
+            return "NTSC"
 
     def init_pygame_display(self) -> bool:
         """Initialize pygame display.
@@ -2986,7 +3299,7 @@ class C64:
             width = total_width * self.scale
             height = total_height * self.scale
             self.pygame_screen = pygame.display.set_mode((width, height))
-            pygame.display.set_caption("C64 Emulator")
+            pygame.display.set_caption(f"C64 Emulator - {self.get_video_standard()} ({self.video_chip})")
 
             # Create the rendering surface (384x270 with border)
             self.pygame_surface = pygame.Surface((total_width, total_height))
@@ -3828,9 +4141,12 @@ class C64:
 
             # Border line
             _sys.stdout.write(border_ansi + " " * 44 + ANSI_RESET + "\r\n")
+            title_text = f" C64 REPL (Ctrl+C to exit) - {self.get_video_standard()} ({self.video_chip}) "
+            # Total width is 44: 1 space + title_text + padding
+            title_padding = max(0, 43 - len(title_text))
             _sys.stdout.write(border_ansi + " " + ANSI_RESET +
-                            " C64 REPL (Ctrl+C to exit) " +
-                            border_ansi + " " * 16 + ANSI_RESET + "\r\n")
+                            title_text +
+                            border_ansi + " " * title_padding + ANSI_RESET + "\r\n")
             _sys.stdout.write(border_ansi + " " * 44 + ANSI_RESET + "\r\n")
 
             for row in range(rows):
