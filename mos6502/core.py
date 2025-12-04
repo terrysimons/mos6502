@@ -95,9 +95,10 @@ class MOS6502CPU(flags.ProcessorStatusFlagsInterface):
         self.irq_pending: bool = False
 
         # Optional callback for periodic system updates (e.g., VIC raster counter)
-        # Called every N instructions to allow external hardware to update state
+        # Called every N cycles to allow external hardware to update state
         self.periodic_callback: callable = None
-        self.periodic_callback_interval: int = 100  # Call every 100 instructions
+        self.periodic_callback_interval: int = 100  # Call every 100 cycles
+        self._last_periodic_callback_cycle: int = 0  # Track last callback cycle
 
         # Optional callback called when PC changes (for breakpoints, monitors, etc.)
         # Signature: pc_callback(new_pc: int) -> None
@@ -1270,8 +1271,13 @@ class MOS6502CPU(flags.ProcessorStatusFlagsInterface):
 
             # Periodically call system update callback (e.g., VIC raster updates)
             # This allows external hardware to check cycle count and trigger IRQs
-            if self.periodic_callback and (self.cycles_executed % self.periodic_callback_interval == 0):
-                self.periodic_callback()
+            # Use threshold check instead of modulo to avoid missing callbacks when
+            # instructions don't land exactly on the interval boundary
+            if self.periodic_callback:
+                cycles_since_last = self.cycles_executed - self._last_periodic_callback_cycle
+                if cycles_since_last >= self.periodic_callback_interval:
+                    self._last_periodic_callback_cycle = self.cycles_executed
+                    self.periodic_callback()
 
             # Check for pending hardware IRQ between instructions (after instruction completes)
             # This is when the real 6502 samples the IRQ line

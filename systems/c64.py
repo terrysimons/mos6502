@@ -27,31 +27,72 @@ DEBUG_BASIC = False    # Enable CPU logging when entering BASIC ROM
 
 
 class VideoTiming(NamedTuple):
-    """Video system timing parameters."""
+    """Video system timing parameters for VIC-II chip variants.
+
+    VIC-II Chip Variants:
+        6569 (PAL)       - Europe, Australia (312 lines, 63 cycles/line, ~50Hz)
+        6567R8 (NTSC)    - North America 1984+ (263 lines, 65 cycles/line, ~60Hz)
+        6567R56A (NTSC)  - North America 1982-1984 (262 lines, 64 cycles/line, ~60Hz)
+
+    Access standard timing configurations via class attributes:
+        VideoTiming.VIC_6569     - PAL chip
+        VideoTiming.VIC_6567R8   - New NTSC chip (default for NTSC)
+        VideoTiming.VIC_6567R56A - Old NTSC chip
+        VideoTiming.PAL          - Alias for VIC_6569
+        VideoTiming.NTSC         - Alias for VIC_6567R8
+    """
+    chip_name: str          # VIC-II chip identifier (6569, 6567R8, 6567R56A)
     cpu_freq: int           # CPU frequency in Hz
     refresh_hz: float       # Screen refresh rate in Hz
     cycles_per_frame: int   # CPU cycles per video frame
+    cycles_per_line: int    # CPU cycles per raster line
     raster_lines: int       # Total raster lines per frame
     render_interval: float  # Seconds between frame renders (1/refresh_hz)
 
 
-# PAL (Europe, Australia) - more compatible with demos/games, slightly slower CPU
-PAL = VideoTiming(
+# VIC-II 6569 (PAL) - Europe, Australia
+# More compatible with demos/games, slightly slower CPU
+VideoTiming.VIC_6569 = VideoTiming(
+    chip_name="6569",
     cpu_freq=985248,           # ~0.985 MHz
     refresh_hz=50.125,         # ~50 Hz
     cycles_per_frame=19656,    # 312 lines × 63 cycles
+    cycles_per_line=63,
     raster_lines=312,
     render_interval=1.0 / 50.125,
 )
 
-# NTSC (North America, Japan) - faster CPU, fewer raster lines
-NTSC = VideoTiming(
+# VIC-II 6567R8 (NTSC) - North America, Japan (1984 onwards)
+# "New" NTSC chip, most common in later C64s
+VideoTiming.VIC_6567R8 = VideoTiming(
+    chip_name="6567R8",
     cpu_freq=1022727,          # ~1.023 MHz
     refresh_hz=59.826,         # ~60 Hz
-    cycles_per_frame=17095,    # 262 lines × 65 cycles
+    cycles_per_frame=17095,    # 263 lines × 65 cycles
+    cycles_per_line=65,
+    raster_lines=263,
+    render_interval=1.0 / 59.826,
+)
+
+# VIC-II 6567R56A (NTSC) - North America (1982-1984)
+# "Old" NTSC chip, found in early C64s
+VideoTiming.VIC_6567R56A = VideoTiming(
+    chip_name="6567R56A",
+    cpu_freq=1022727,          # ~1.023 MHz
+    refresh_hz=59.826,         # ~60 Hz (slightly different in reality)
+    cycles_per_frame=16768,    # 262 lines × 64 cycles
+    cycles_per_line=64,
     raster_lines=262,
     render_interval=1.0 / 59.826,
 )
+
+# Backwards compatibility aliases
+VideoTiming.PAL = VideoTiming.VIC_6569
+VideoTiming.NTSC = VideoTiming.VIC_6567R8  # Default to new NTSC chip
+
+# Module-level constants for backwards compatibility
+PAL = VideoTiming.PAL
+NTSC = VideoTiming.NTSC
 COLORS = [
     (0x00, 0x00, 0x00),   # 0  Black
     (0xFF, 0xFF, 0xFF),   # 1  White
@@ -224,6 +265,17 @@ class C64:
     # C64 BASIC programs typically start here
     BASIC_PROGRAM_START = 0x0801
 
+    # BASIC memory pointers (zero page)
+    # These must be updated when loading a BASIC program for RUN to work
+    TXTTAB = 0x2B   # Start of BASIC program text (2 bytes, little-endian)
+    VARTAB = 0x2D   # Start of BASIC variables / end of program (2 bytes)
+    ARYTAB = 0x2F   # Start of BASIC arrays (2 bytes)
+    STREND = 0x31   # End of BASIC arrays / bottom of strings (2 bytes)
+
+    # KERNAL keyboard buffer (for injecting typed commands)
+    KEYBOARD_BUFFER = 0x0277      # 10-byte keyboard buffer
+    KEYBOARD_BUFFER_SIZE = 0x00C6 # Number of characters in buffer
+
     # Reset vector location
     RESET_VECTOR_ADDR = 0xFFFC
 
@@ -268,11 +320,12 @@ class C64:
             help="Pygame window scaling factor (default: 2 = 640x400)",
         )
         core_group.add_argument(
-            "--video",
-            type=str.lower,
-            choices=["pal", "ntsc"],
-            default="pal",
-            help="Video timing mode: pal (default, ~50Hz, ~0.985MHz) or ntsc (~60Hz, ~1.023MHz)",
+            "--video-chip",
+            type=str.upper,
+            choices=["6569", "6567R8", "6567R56A", "PAL", "NTSC"],
+            default="6569",
+            help="VIC-II chip variant: 6569 (PAL, default), 6567R8 (NTSC 1984+), "
+                 "6567R56A (old NTSC 1982-1984). PAL/NTSC are aliases for 6569/6567R8.",
         )
         core_group.add_argument(
             "--no-irq",
@@ -296,6 +349,11 @@ class C64:
             "--no-roms",
             action="store_true",
             help="Run without C64 ROMs (for testing standalone programs)",
+        )
+        program_group.add_argument(
+            "--run",
+            action="store_true",
+            help="Auto-run program after loading (injects RUN command after boot)",
         )
 
         # Cartridge options
@@ -426,7 +484,7 @@ class C64:
             display_mode=args.display,
             scale=args.scale,
             enable_irq=not getattr(args, 'no_irq', False),
-            video_mode=args.video,
+            video_chip=args.video_chip,
             verbose_cycles=getattr(args, 'verbose_cycles', False),
         )
 
@@ -1641,12 +1699,13 @@ class C64:
         - Light pen registers
         """
 
-        def __init__(self, char_rom, cpu, cia2=None) -> None:
+        def __init__(self, char_rom, cpu, cia2=None, video_timing: VideoTiming = None) -> None:
             self.log = logging.getLogger("c64.vic")
             self.regs = [0] * 0x40
             self.char_rom = char_rom
             self.cpu = cpu
             self.cia2 = cia2  # For VIC bank selection
+            self.video_timing = video_timing if video_timing is not None else PAL
 
             # --- Power-on register defaults (C64 reset state-ish) -----------------
             # Sprite X positions ($D000-$D00F): all 0
@@ -1742,10 +1801,13 @@ class C64:
             self.border_top = (self.total_height - self.text_height) // 2   # 35 pixels
             self.border_bottom = self.total_height - self.border_top - self.text_height  # 35 pixels
 
-            # NTSC-ish timing (match what you already use elsewhere)
-            self.raster_lines = 263
-            self.cycles_per_line = 63
-            self.cycles_per_frame = self.raster_lines * self.cycles_per_line
+            # Video timing from VIC-II chip variant
+            # 6569 (PAL):     312 raster lines, 63 cycles/line, 19656 cycles/frame
+            # 6567R8 (NTSC):  263 raster lines, 65 cycles/line, 17095 cycles/frame
+            # 6567R56A (old): 262 raster lines, 64 cycles/line, 16768 cycles/frame
+            self.raster_lines = self.video_timing.raster_lines
+            self.cycles_per_line = self.video_timing.cycles_per_line
+            self.cycles_per_frame = self.video_timing.cycles_per_frame
 
             # Current raster line
             self.current_raster = 0
@@ -1760,7 +1822,8 @@ class C64:
             self.light_pen_triggered = False
 
             self.log.info(
-                "VIC-II initialized (NTSC-ish: %d lines, %d cycles/line, %d cycles/frame)",
+                "VIC-II %s initialized (%d lines, %d cycles/line, %d cycles/frame)",
+                self.video_timing.chip_name,
                 self.raster_lines,
                 self.cycles_per_line,
                 self.cycles_per_frame,
@@ -1791,18 +1854,23 @@ class C64:
                 compare = self.regs[0x12] | ((self.regs[0x11] & 0x80) << 1)
 
                 if new_raster == compare:
+                    # Always set the raster IRQ flag when raster matches compare value
+                    # This flag is set regardless of whether IRQ is enabled
+                    # (The enable bit only controls whether an actual interrupt fires)
+                    # This is critical for PAL/NTSC detection which reads $D019
+                    self.irq_flags |= 0x01
+
                     log.info(
                         "*** VIC RASTER MATCH: line %d == compare %d, irq_enabled=$%02X "
-                        "(bit0=%s) ***",
+                        "(bit0=%s), irq_flags now=$%02X ***",
                         new_raster,
                         compare,
                         self.irq_enabled,
                         "set" if (self.irq_enabled & 0x01) else "clear",
+                        self.irq_flags,
                     )
 
                     if self.irq_enabled & 0x01:
-                        # Latch raster IRQ
-                        self.irq_flags |= 0x01
                         # Tell CPU an IRQ is pending
                         self.cpu.irq_pending = True
                         log.info(
@@ -2463,7 +2531,7 @@ class C64:
             self._write_ram_direct(addr, value & 0xFF)
 
 
-    def __init__(self, rom_dir: Path = Path("./roms"), display_mode: str = "pygame", scale: int = 2, enable_irq: bool = True, video_mode: str = "pal", verbose_cycles: bool = False) -> None:
+    def __init__(self, rom_dir: Path = Path("./roms"), display_mode: str = "pygame", scale: int = 2, enable_irq: bool = True, video_chip: str = "6569", verbose_cycles: bool = False) -> None:
         """Initialize the C64 emulator.
 
         Arguments:
@@ -2472,15 +2540,27 @@ class C64:
                          If pygame fails to initialize, will automatically fall back to terminal
             scale: Pygame window scaling factor
             enable_irq: Enable IRQ injection (default: True)
-            video_mode: Video timing mode ("pal" or "ntsc", default: "pal")
+            video_chip: VIC-II chip variant ("6569" for PAL, "6567R8" for NTSC,
+                       "6567R56A" for old NTSC). PAL/NTSC are aliases.
             verbose_cycles: Enable per-cycle CPU logging (default: False)
         """
         self.rom_dir = Path(rom_dir)
         self.display_mode = display_mode
         self.scale = scale
         self.enable_irq = enable_irq
-        self.video_timing = PAL if video_mode.lower() == "pal" else NTSC
-        self.video_mode = video_mode.upper()
+
+        # Map video chip selection to VideoTiming
+        video_chip_upper = video_chip.upper()
+        if video_chip_upper in ("6569", "PAL"):
+            self.video_timing = VideoTiming.VIC_6569
+        elif video_chip_upper in ("6567R8", "NTSC"):
+            self.video_timing = VideoTiming.VIC_6567R8
+        elif video_chip_upper == "6567R56A":
+            self.video_timing = VideoTiming.VIC_6567R56A
+        else:
+            raise ValueError(f"Unknown video chip: {video_chip}")
+
+        self.video_chip = self.video_timing.chip_name
 
         # If pygame mode requested, try to initialize it and fall back to terminal if it fails
         if self.display_mode == "pygame":
@@ -2535,6 +2615,10 @@ class C64:
         # BASIC ready detection (set by pc_callback when PC enters BASIC ROM range)
         self._basic_ready = False
         self._stop_on_basic = False
+
+        # KERNAL keyboard input detection (PC at $E5CF-$E5D6 = waiting for input)
+        self._kernal_waiting_for_input = False
+        self._stop_on_kernal_input = False
 
         # Load ROMs during initialization
         # This sets up the memory handler and all peripherals (VIC, CIAs)
@@ -2635,7 +2719,7 @@ class C64:
         # Now set up the CIA1 and CIA2 and VIC
         self.cia1 = C64.CIA1(cpu=self.cpu)
         self.cia2 = C64.CIA2(cpu=self.cpu)
-        self.vic = C64.C64VIC(char_rom=self.char_rom, cpu=self.cpu, cia2=self.cia2)
+        self.vic = C64.C64VIC(char_rom=self.char_rom, cpu=self.cpu, cia2=self.cia2, video_timing=self.video_timing)
 
         # Initialize memory
         self.memory = C64.C64Memory(
@@ -2927,7 +3011,9 @@ class C64:
 
         log.debug(f"Wrote ROM to ${start_addr:04X}-${start_addr + len(rom_data) - 1:04X}")
 
-    def load_program(self, program_path: Path, load_address: Optional[int] = None) -> int:
+    def load_program(
+        self, program_path: Path, load_address: Optional[int] = None
+    ) -> tuple[int, int]:
         """Load a program into memory.
 
         Arguments:
@@ -2936,7 +3022,7 @@ class C64:
                          If None and file has a 2-byte header, use header address
 
         Returns:
-            The actual load address used
+            Tuple of (load_address, end_address) - the address range used
         """
         program_path = Path(program_path)
 
@@ -2964,13 +3050,72 @@ class C64:
         for offset, byte_value in enumerate(program_data):
             self.cpu.ram[load_address + offset] = byte_value
 
+        end_address = load_address + len(program_data)
+
         log.info(
             f"Loaded program: {program_path.name} "
-            f"at ${load_address:04X}-${load_address + len(program_data) - 1:04X} "
+            f"at ${load_address:04X}-${end_address - 1:04X} "
             f"({len(program_data)} bytes)"
         )
 
-        return load_address
+        return load_address, end_address
+
+    def update_basic_pointers(self, program_end: int) -> None:
+        """Update BASIC memory pointers after loading a program.
+
+        When loading a BASIC program at $0801, BASIC's internal pointers
+        must be updated so that RUN knows where the program ends.
+
+        Arguments:
+            program_end: Address immediately after the last byte of the program
+        """
+        # VARTAB, ARYTAB, and STREND should all point to the end of the program
+        # (They get properly set up when BASIC parses the program, but for
+        # directly loaded programs we need to set them manually)
+        lo = program_end & 0xFF
+        hi = (program_end >> 8) & 0xFF
+
+        # Set VARTAB (start of variables = end of program)
+        self.cpu.ram[self.VARTAB] = lo
+        self.cpu.ram[self.VARTAB + 1] = hi
+
+        # Set ARYTAB (start of arrays = end of variables)
+        self.cpu.ram[self.ARYTAB] = lo
+        self.cpu.ram[self.ARYTAB + 1] = hi
+
+        # Set STREND (end of arrays = bottom of strings)
+        self.cpu.ram[self.STREND] = lo
+        self.cpu.ram[self.STREND + 1] = hi
+
+        log.info(f"Updated BASIC pointers: VARTAB/ARYTAB/STREND = ${program_end:04X}")
+
+    def inject_keyboard_buffer(self, text: str) -> None:
+        """Inject a string into the KERNAL keyboard buffer.
+
+        This writes directly to the keyboard buffer at $0277-$0280 and sets
+        the buffer count at $00C6. The KERNAL will process these characters
+        as if they were typed. Maximum 10 characters.
+
+        Arguments:
+            text: String to inject (max 10 chars, typically ending with \\r for RETURN)
+        """
+        # Convert to PETSCII (for simple ASCII chars, it's mostly the same)
+        # RETURN key is 0x0D in PETSCII
+        petscii_text = text.replace('\r', '\x0d').replace('\n', '\x0d')
+
+        # Limit to 10 characters (keyboard buffer size)
+        if len(petscii_text) > 10:
+            log.warning(f"Keyboard buffer overflow: truncating '{text}' to 10 chars")
+            petscii_text = petscii_text[:10]
+
+        # Write characters to buffer at $0277
+        for i, char in enumerate(petscii_text):
+            self.cpu.ram[self.KEYBOARD_BUFFER + i] = ord(char)
+
+        # Set buffer count at $00C6
+        self.cpu.ram[self.KEYBOARD_BUFFER_SIZE] = len(petscii_text)
+
+        log.info(f"Injected '{text.strip()}' into keyboard buffer ({len(petscii_text)} chars)")
 
     def reset(self) -> None:
         """Reset the C64 (CPU reset).
@@ -3024,8 +3169,17 @@ class C64:
         """Return True if BASIC input loop has been reached."""
         return self._basic_ready
 
+    @property
+    def kernal_waiting_for_input(self) -> bool:
+        """Return True if KERNAL is waiting for keyboard input.
+
+        The KERNAL keyboard input loop is at $E5CF-$E5D6.
+        When PC is in this range, the system is waiting for user input.
+        """
+        return self._kernal_waiting_for_input
+
     def _pc_callback(self, new_pc: int) -> None:
-        """PC change callback - detects when BASIC is ready.
+        """PC change callback - detects when BASIC is ready or KERNAL is waiting for input.
 
         This is called by the CPU every time PC changes.
         """
@@ -3035,18 +3189,34 @@ class C64:
             if self._stop_on_basic:
                 raise StopIteration("BASIC is ready")
 
-    def _setup_pc_callback(self, stop_on_basic: bool = False) -> None:
-        """Set up the PC callback for BASIC detection.
+        # Check if PC is in KERNAL keyboard input loop ($E5CF-$E5D6)
+        # This is the GETIN routine that waits for keyboard input
+        if 0xE5CF <= new_pc <= 0xE5D6:
+            self._kernal_waiting_for_input = True
+            if self._stop_on_kernal_input:
+                raise StopIteration("KERNAL waiting for input")
+        else:
+            # Reset when PC leaves the input loop
+            self._kernal_waiting_for_input = False
+
+    def _setup_pc_callback(
+        self, stop_on_basic: bool = False, stop_on_kernal_input: bool = False
+    ) -> None:
+        """Set up the PC callback for BASIC/KERNAL detection.
 
         Arguments:
             stop_on_basic: If True, raise StopIteration when BASIC is ready
+            stop_on_kernal_input: If True, raise StopIteration when KERNAL is waiting for input
         """
         self._stop_on_basic = stop_on_basic
+        self._stop_on_kernal_input = stop_on_kernal_input
         self.cpu.pc_callback = self._pc_callback
 
     def _clear_pc_callback(self) -> None:
-        """Remove the PC callback."""
+        """Remove the PC callback and reset detection flags."""
         self.cpu.pc_callback = None
+        self._stop_on_basic = False
+        self._stop_on_kernal_input = False
 
     def _check_pc_region(self) -> None:
         """Monitor PC and enable detailed logging when entering BASIC or KERNAL ROM."""
@@ -3096,20 +3266,28 @@ class C64:
 
 
 
-    def run(self, max_cycles: int = INFINITE_CYCLES, stop_on_basic: bool = False) -> None:
+    def run(
+        self,
+        max_cycles: int = INFINITE_CYCLES,
+        stop_on_basic: bool = False,
+        stop_on_kernal_input: bool = False,
+    ) -> None:
         """Run the C64 emulator.
 
         Arguments:
             max_cycles: Maximum number of CPU cycles to execute
                        (default: INFINITE_CYCLES for continuous execution)
             stop_on_basic: If True, stop execution when BASIC prompt is ready
+            stop_on_kernal_input: If True, stop execution when KERNAL is waiting for keyboard input
         """
         log.info(f"Starting execution at PC=${self.cpu.PC:04X}")
         log.info("Press Ctrl+C to stop")
 
-        # Set up PC callback for BASIC detection if requested
-        if stop_on_basic:
-            self._setup_pc_callback(stop_on_basic=True)
+        # Set up PC callback for BASIC/KERNAL detection if requested
+        if stop_on_basic or stop_on_kernal_input:
+            self._setup_pc_callback(
+                stop_on_basic=stop_on_basic, stop_on_kernal_input=stop_on_kernal_input
+            )
 
         try:
             # Execute with cycle counter display
@@ -3159,8 +3337,10 @@ class C64:
                 # Main thread handles pygame rendering + terminal input
                 try:
                     while not cpu_done.is_set():
-                        # Check for BASIC ready if requested
+                        # Check for BASIC ready or KERNAL input if requested
                         if stop_on_basic and self.basic_ready:
+                            break
+                        if stop_on_kernal_input and self.kernal_waiting_for_input:
                             break
 
                         # Handle terminal keyboard input if available
@@ -3220,9 +3400,9 @@ class C64:
                     stop_display.set()
                     display_thread.join(timeout=0.5)
 
-        except StopIteration:
-            # PC callback requested stop (e.g., BASIC is ready)
-            log.info(f"Execution stopped at PC=${self.cpu.PC:04X} (BASIC ready)")
+        except StopIteration as e:
+            # PC callback requested stop (e.g., BASIC is ready or KERNAL waiting for input)
+            log.info(f"Execution stopped at PC=${self.cpu.PC:04X} ({e})")
         except errors.CPUCycleExhaustionError as e:
             log.info(f"CPU execution completed: {e}")
         except errors.CPUBreakError as e:
@@ -4365,8 +4545,8 @@ def main() -> int | None:
 
     try:
         # Initialize C64
-        c64 = C64(rom_dir=args.rom_dir, display_mode=args.display, scale=args.scale, enable_irq=not args.no_irq, video_mode=args.video)
-        log.info(f"Video mode: {c64.video_mode} ({c64.video_timing.refresh_hz:.2f}Hz, {c64.video_timing.cpu_freq/1e6:.3f}MHz)")
+        c64 = C64(rom_dir=args.rom_dir, display_mode=args.display, scale=args.scale, enable_irq=not args.no_irq, video_chip=args.video_chip)
+        log.info(f"VIC-II chip: {c64.video_chip} ({c64.video_timing.refresh_hz:.2f}Hz, {c64.video_timing.cpu_freq/1e6:.3f}MHz)")
 
         # Start with minimal logging - will auto-enable when BASIC ROM is entered
         # This avoids flooding the console during KERNAL boot
@@ -4402,8 +4582,11 @@ def main() -> int | None:
             log.info(f"Running in headless mode (no ROMs)")
 
         # Load program AFTER reset (so it doesn't get cleared)
+        program_end_addr = None
         if args.program:
-            actual_load_addr = c64.load_program(args.program, load_address=args.load_address)
+            actual_load_addr, program_end_addr = c64.load_program(
+                args.program, load_address=args.load_address
+            )
             # In no-roms mode, set PC to the program's load address
             if args.no_roms:
                 c64.cpu.PC = actual_load_addr
@@ -4425,8 +4608,29 @@ def main() -> int | None:
             if args.dump_mem:
                 c64.dump_memory(args.dump_mem[0], args.dump_mem[1])
 
-        # Run
-        if args.display == "repl":
+        # Handle --run: boot to BASIC, load program, inject RUN command, then continue
+        if args.run and args.program and not args.no_roms:
+            log.info("Auto-run enabled: booting until KERNAL waits for input...")
+            # Boot until KERNAL is waiting for keyboard input (more reliable than stop_on_basic)
+            c64.run(max_cycles=args.max_cycles, stop_on_kernal_input=True)
+            # Re-load the program AFTER boot (KERNAL clears $0801 during boot)
+            # This is the same as a real C64's LOAD command
+            actual_load_addr, program_end_addr = c64.load_program(
+                args.program, load_address=args.load_address
+            )
+            log.info(f"Program loaded at ${actual_load_addr:04X}-${program_end_addr - 1:04X}")
+            # Update BASIC pointers so RUN knows where the program ends
+            if program_end_addr is not None:
+                c64.update_basic_pointers(program_end_addr)
+            # Inject "RUN" + RETURN into keyboard buffer
+            c64.inject_keyboard_buffer("RUN\r")
+            log.info("RUN command injected, continuing execution...")
+            # Continue running
+            if args.display == "repl":
+                c64.run_repl(max_cycles=args.max_cycles)
+            else:
+                c64.run(max_cycles=args.max_cycles)
+        elif args.display == "repl":
             # REPL mode: interactive terminal with keyboard input
             c64.run_repl(max_cycles=args.max_cycles)
         else:
