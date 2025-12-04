@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-from bitarray.util import int2ba
+from mos6502.bitarray_factory import int2ba
 
 import mos6502
 import mos6502.memory as ram

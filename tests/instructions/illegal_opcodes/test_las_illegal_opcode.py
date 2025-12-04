@@ -40,9 +40,10 @@ class TestLASNMOS:
             nmos_cpu.execute(cycles=4)
 
         # Verify: M & S = 0xAA & 0xFF = 0xAA
+        # S register is 8-bit, compare low byte only (high byte hardwired to 0x01)
         assert nmos_cpu.A == 0xAA
         assert nmos_cpu.X == 0xAA
-        assert nmos_cpu.S == 0xAA
+        assert (nmos_cpu.S & 0xFF) == 0xAA
         assert nmos_cpu.Z == 0
         assert nmos_cpu.N == 1
 
@@ -62,9 +63,10 @@ class TestLASNMOS:
             nmos_cpu.execute(cycles=4)
 
         # Verify: M & S = 0xFF & 0x0F = 0x0F
+        # S register is 8-bit, compare low byte only (high byte hardwired to 0x01)
         assert nmos_cpu.A == 0x0F
         assert nmos_cpu.X == 0x0F
-        assert nmos_cpu.S == 0x0F
+        assert (nmos_cpu.S & 0xFF) == 0x0F
 
     def test_las_sets_zero_flag(self, nmos_cpu) -> None:
         """Test LAS sets zero flag when result is zero."""
@@ -82,9 +84,10 @@ class TestLASNMOS:
             nmos_cpu.execute(cycles=4)
 
         # Verify: M & S = 0xFF & 0x00 = 0x00
+        # S register is 8-bit, compare low byte only (high byte hardwired to 0x01)
         assert nmos_cpu.A == 0x00
         assert nmos_cpu.X == 0x00
-        assert nmos_cpu.S == 0x00
+        assert (nmos_cpu.S & 0xFF) == 0x00
         assert nmos_cpu.Z == 1
         assert nmos_cpu.N == 0
 
@@ -110,8 +113,9 @@ class TestLASCMOS:
             cmos_cpu.execute(cycles=4)
 
         # Verify nothing changed (NOP behavior)
+        # S register is 8-bit, compare low byte only (high byte hardwired to 0x01)
         assert cmos_cpu.A == 0x11
         assert cmos_cpu.X == 0x22
-        assert cmos_cpu.S == 0xFF
+        assert (cmos_cpu.S & 0xFF) == 0xFF
         assert cmos_cpu.Z == 0
         assert cmos_cpu.N == 0

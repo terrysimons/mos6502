@@ -6,7 +6,7 @@ import importlib
 import logging
 from typing import TYPE_CHECKING, Callable, Generator, Literal, Self
 
-from bitarray.util import ba2int
+from mos6502.bitarray_factory import ba2int
 
 from mos6502 import errors
 from mos6502 import flags
@@ -329,7 +329,7 @@ class MOS6502CPU(flags.ProcessorStatusFlagsInterface):
             f"{hex(addr2)}:"
             f"{hex(addr1)}], "
             f"Word: 0x{word:02x} ({word}) "
-            f"highbyte={lowbyte:02x}@0x{addr1:02x} lowbyte={highbyte:02x}@0x{addr2:02x}",
+            f"lowbyte={lowbyte:02x}@0x{addr1:02x} highbyte={highbyte:02x}@0x{addr2:02x}",
         )
 
         return Word(value=word, endianness=self.endianness)
@@ -387,6 +387,10 @@ class MOS6502CPU(flags.ProcessorStatusFlagsInterface):
         -------
             None
         """
+        # DEBUG: Log screen writes
+        addr_int = int(address) if hasattr(address, '__int__') else address
+        if 0x0400 <= addr_int <= 0x07E7:
+            self.log.warning(f"*** write_byte SCREEN: addr=${addr_int:04X}, data=${data & 0xFF:02X} ***")
         self.ram[address] = data & 0xFF
         self.log.info("w")
         self.spend_cpu_cycles(cost=1)
@@ -1449,15 +1453,20 @@ class MOS6502CPU(flags.ProcessorStatusFlagsInterface):
         """
         Set the CPU S register.
 
+        The 6502 stack pointer is 8 bits and always addresses page 1 (0x0100-0x01FF).
+        The low byte wraps at 0xFF boundary, but the high byte is always 0x01.
+
         Arguments:
         ---------
-            S: Byte() or Word() (masked with 0xFF)
+            S: Byte() or Word() (low byte used, always OR'd with 0x0100)
 
         Returns:
         -------
             None
         """
-        self._registers.S = Word(S & 511)
+        # Stack pointer is 8 bits, always in page 1 (0x0100-0x01FF)
+        # Mask to 8 bits and force page 1
+        self._registers.S = Word(0x0100 | (S & 0xFF))
         self.log.info(f"S -> 0x{self._registers.S & 0xFF:02X}")
 
     @property
@@ -1469,7 +1478,7 @@ class MOS6502CPU(flags.ProcessorStatusFlagsInterface):
         -------
             Byte()
         """
-        self.log.debug(f"A <- 0x{self._registers.Y:02X}")
+        self.log.debug(f"A <- 0x{self._registers.A:02X}")
         return self._registers.A
 
     @A.setter

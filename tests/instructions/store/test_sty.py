@@ -4,7 +4,7 @@ import copy
 import logging
 
 import mos6502
-from mos6502 import errors, flags, instructions
+from mos6502 import CPU, errors, flags, instructions
 from mos6502.memory import Byte, Word
 
 log: logging.Logger = logging.getLogger("mos6502")

@@ -4,8 +4,7 @@
 import logging
 from typing import Self
 
-import bitarray
-from bitarray.util import int2ba
+from mos6502.bitarray_factory import bitarray, int2ba
 
 from mos6502.memory import Byte
 
@@ -100,32 +99,32 @@ class ProcessorStatusFlags:
     """Flags for the mos6502 CPU."""
 
     # Simplifies tests
-    SET_ZERO: bitarray.bitarray = bitarray.bitarray([0] * 8, endian="little")
-    SET_ONE: bitarray.bitarray = bitarray.bitarray([1] * 8, endian="little")
+    SET_ZERO = bitarray([0] * 8, endian="little")
+    SET_ONE = bitarray([1] * 8, endian="little")
 
     # Carry Flag - 0 == False, 1 == True
-    C: bitarray.bitarray = int2ba(1 << C, endian="little")
+    C = int2ba(1 << C, endian="little")
 
     # Zero Flag - 0 == Result not zero, 1 == Result zero
-    Z: bitarray.bitarray = int2ba(1 << Z, endian="little")
+    Z = int2ba(1 << Z, endian="little")
 
     # IRQ Disable Flag - 0 == Enable, 1 == Disable
-    I: bitarray.bitarray = int2ba(1 << I, endian="little")   # noqa: E741
+    I = int2ba(1 << I, endian="little")  # noqa: E741
 
     # Decimal Mode Flag - 0 == False, 1 == True
-    D: bitarray.bitarray = int2ba(1 << D, endian="little")
+    D = int2ba(1 << D, endian="little")
 
     # Break Command Flag - 0 == No break, 1 == Break
-    B: bitarray.bitarray = int2ba(1 << B, endian="little")
+    B = int2ba(1 << B, endian="little")
 
     # Unused
-    _: bitarray.bitarray = int2ba(1 << _, endian="little")
+    _ = int2ba(1 << _, endian="little")
 
     # Overflow Flag - 0 == False, 1 == True
-    V: bitarray.bitarray = int2ba(1 << V, endian="little")
+    V = int2ba(1 << V, endian="little")
 
     # Negative Flag - 0 == Positive, 1 == Negative
-    N: bitarray.bitarray = int2ba(1 << N, endian="little")
+    N = int2ba(1 << N, endian="little")
 
 
 class ProcessorStatusFlagsInterface:
@@ -147,7 +146,7 @@ class ProcessorStatusFlagsInterface:
         return self._flags[Z] & ProcessorStatusFlags.Z[Z]
 
     @Z.setter
-    def Z(self: Self, flag: bitarray.bitarray) -> None:  # noqa: N802
+    def Z(self: Self, flag: bitarray) -> None:  # noqa: N802
         """Set the Z flag to {flag}."""
         self._flags[Z] = flag
 
@@ -157,7 +156,7 @@ class ProcessorStatusFlagsInterface:
         return self._flags[I] & ProcessorStatusFlags.I[I]
 
     @I.setter
-    def I(self: Self, flag: bitarray.bitarray) -> None:  # noqa: E743 N802
+    def I(self: Self, flag: bitarray) -> None:  # noqa: E743 N802
         """Set the I flag to {flag}."""
         self._flags[I] = flag
 
@@ -167,7 +166,7 @@ class ProcessorStatusFlagsInterface:
         return self._flags[D] & ProcessorStatusFlags.D[D]
 
     @D.setter
-    def D(self: Self, flag: bitarray.bitarray) -> None:  # noqa: N802
+    def D(self: Self, flag: bitarray) -> None:  # noqa: N802
         """Set the D flag to {flag}."""
         self._flags[D] = flag
 
@@ -177,7 +176,7 @@ class ProcessorStatusFlagsInterface:
         return self._flags[B] & ProcessorStatusFlags.B[B]
 
     @B.setter
-    def B(self: Self, flag: bitarray.bitarray) -> None:  # noqa: N802
+    def B(self: Self, flag: bitarray) -> None:  # noqa: N802
         """Set the B flag to {flag}."""
         self._flags[B] = flag
 
@@ -187,7 +186,7 @@ class ProcessorStatusFlagsInterface:
         return self._flags[V] & ProcessorStatusFlags.V[V]
 
     @V.setter
-    def V(self: Self, flag: bitarray.bitarray) -> None:  # noqa: N802
+    def V(self: Self, flag: bitarray) -> None:  # noqa: N802
         """Set the V flag to {flag}."""
         self._flags[V] = flag
 
@@ -197,6 +196,6 @@ class ProcessorStatusFlagsInterface:
         return self._flags[N] & ProcessorStatusFlags.N[N]
 
     @N.setter
-    def N(self: Self, flag: bitarray.bitarray) -> None:  # noqa: N802
+    def N(self: Self, flag: bitarray) -> None:  # noqa: N802
         """Set the N flag to {flag}."""
         self._flags[N] = flag

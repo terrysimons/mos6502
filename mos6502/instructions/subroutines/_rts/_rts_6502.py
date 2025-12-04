@@ -30,11 +30,17 @@ def rts_implied_0x60(cpu: MOS6502CPU) -> None:
     # 1. Opcode fetch (already done by execute())
     # 2. Read and increment stack pointer (1 cycle)
     cpu.spend_cpu_cycles(cost=1)
-    # 3-4. Read return address from stack (2 cycles, done by read_word())
+    # 3-4. Read return address from stack (2 cycles)
     # RTS pops the return address minus 1 from the stack and adds 1 to get the actual return address
     # JSR pushes PC-1, so RTS must add 1 back
-    return_address = cpu.read_word(address=cpu.S + 1) + 1
-    cpu.S += 2
+    #
+    # IMPORTANT: Stack always wraps within page 1 ($0100-$01FF)
+    # We must read byte-by-byte to ensure proper wrapping at page boundary
+    cpu.S += 1
+    pc_low = cpu.read_byte(address=cpu.S)
+    cpu.S += 1
+    pc_high = cpu.read_byte(address=cpu.S)
+    return_address = ((pc_high << 8) | pc_low) + 1
     # 5. Increment PC (1 cycle)
     cpu.spend_cpu_cycles(cost=1)
     # 6. Final PC increment (1 cycle)

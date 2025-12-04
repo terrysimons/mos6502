@@ -5,12 +5,14 @@ description = ""
 authors = ["Terry Simons <terry.simons@gmail.com>"]
 
 [tool.poetry.dependencies]
-python = ">=3.14,<4.0"
-bitarray = "*"
+python = ">=3.11,<4.0"
+bitarray = {version = "*", optional = true}
 pygame-ce = {version = "*", optional = true}
 
 [tool.poetry.extras]
 display = ["pygame-ce"]
+native = ["bitarray"]
+full = ["bitarray", "pygame-ce"]
 
 
 [tool.poetry.group.test.dependencies]

@@ -4,8 +4,7 @@ import logging
 from collections.abc import MutableSequence
 from typing import Literal, Self
 
-import bitarray
-from bitarray.util import ba2int, int2ba
+from mos6502.bitarray_factory import ba2int, bitarray, int2ba, is_bitarray
 
 from mos6502 import errors
 
@@ -32,7 +31,7 @@ class MemoryUnit:
 
     log: logging.Logger = logging.getLogger("mos6502.memory")
 
-    def __init__(self: Self, value: int | bitarray.bitarray = 0,
+    def __init__(self: Self, value: int | bitarray = 0,
                  endianness: str = ENDIANNESS) -> None:
         """
         Initialize a MemoryUnit.
@@ -48,10 +47,10 @@ class MemoryUnit:
 
         if isinstance(value, type(self)):
             self._value = value._value  # noqa: SLF001
-        elif isinstance(value, bitarray.bitarray):
+        elif is_bitarray(value):
             self._value = value
         else:
-            self._value: bitarray.bitarray = int2ba(value, length=self.size_bits, endian=endianness)
+            self._value: bitarray = int2ba(value, length=self.size_bits, endian=endianness)
 
     @property
     def size_bits(self: Self) -> Literal[0]:
@@ -88,12 +87,12 @@ class MemoryUnit:
         """Set underflow status."""
         self._underflow = underflow
 
-    def bits(self: Self) -> bitarray.bitarray:
-        """Return a bitarray.bitarray of size self.size_bits with endianness self.endianness."""
+    def bits(self: Self) -> bitarray:
+        """Return a bitarray of size self.size_bits with endianness self.endianness."""
         return int2ba(self.value, length=self.size_bits, endian=self.endianness)
 
     @property
-    def lowbyte(self: Self) -> bitarray.bitarray:
+    def lowbyte(self: Self) -> bitarray:
         """Return the low byte as an int."""
         if self.size_bits >= 8:
             return ba2int(self.bits()[0:8])
@@ -101,15 +100,15 @@ class MemoryUnit:
         return ba2int(self.bits())
 
     @property
-    def lowbyte_bits(self: Self) -> bitarray.bitarray:
-        """Return the low byte of this data type as a bitarray.bitarray or None."""
+    def lowbyte_bits(self: Self) -> bitarray:
+        """Return the low byte of this data type as a bitarray or None."""
         if self.size_bits >= 8:
             return self.bits()[0:8]
 
         return self.bits()
 
     @property
-    def highbyte(self: Self) -> bitarray.bitarray:
+    def highbyte(self: Self) -> bitarray:
         """Return the high byte as an int."""
         if self.size_bits > 8:
             return ba2int(self.bits()[8:])
@@ -117,15 +116,15 @@ class MemoryUnit:
         return None
 
     @property
-    def highbyte_bits(self: Self) -> bitarray.bitarray:
-        """Return the high byte of this data type as a bitarray.bitarray or None."""
+    def highbyte_bits(self: Self) -> bitarray:
+        """Return the high byte of this data type as a bitarray or None."""
         if self.size_bits > 8:
             return self.bits()[8:]
 
         return None
 
     """ Math Operators"""
-    def __add__(self: Self, rvalue: int | bitarray.bitarray) -> bitarray.bitarray:
+    def __add__(self: Self, rvalue: int | bitarray) -> bitarray:
         """Add an integer or bitarray to a MemoryUnit."""
         # Early return for adding 0 - saves cycles
         if isinstance(rvalue, int) and rvalue == 0:
@@ -142,7 +141,7 @@ class MemoryUnit:
             # Early return for adding 0
             if local_rvalue == 0:
                 return type(self)(self.value, endianness=self.endianness)
-        elif isinstance(rvalue, bitarray.bitarray):
+        elif is_bitarray(rvalue):
             local_rvalue: int = ba2int(local_rvalue)
             # Early return for adding 0
             if local_rvalue == 0:
@@ -155,11 +154,11 @@ class MemoryUnit:
         # cleaner code overall since it means we don't have to
         # account for it arbitrarily in each relevant instruction
         self.value + local_rvalue
-        initial_msb: bitarray.bitarray = self.highbyte_bits
+        initial_msb: bitarray = self.highbyte_bits
         if isinstance(self, Word):
             result: Word = Word(self.value + local_rvalue, endianness=self.endianness)
 
-            result_msb: bitarray.bitarray = result.highbyte_bits
+            result_msb: bitarray = result.highbyte_bits
 
             if result_msb > initial_msb:
                 result.underflow = False
@@ -189,7 +188,7 @@ class MemoryUnit:
 
         # return int2ba(
 
-    def __sub__(self: Self, rvalue: int | bitarray.bitarray) -> bitarray.bitarray:
+    def __sub__(self: Self, rvalue: int | bitarray) -> bitarray:
         """Subtract an integer or bitarray from a MemoryUnit."""
         # Early return for subtracting 0 - saves cycles
         if isinstance(rvalue, int) and rvalue == 0:
@@ -215,20 +214,20 @@ class MemoryUnit:
         )
 
     """ Bitwise Operators """
-    def __or__(self: Self, rvalue: int | bitarray.bitarray) -> int:
+    def __or__(self: Self, rvalue: int | bitarray) -> int:
         """Bitwise-OR this MemoryUnit with Byte|Word, bitarray, or int types."""
         # bitarrays are a little bit tricky to work with
         # so we're using a super safe option here.
         if isinstance(rvalue, Byte | Word):
             self.log.critical("Byte or Word")
-        elif isinstance(rvalue, bitarray.bitarray):
+        elif is_bitarray(rvalue):
             self.log.critical("Bitarray")
         elif isinstance(rvalue, int):
             self.log.critical("Int")
         return int.from_bytes(self._value.tobytes(), byteorder=self.endianness) | \
             int.from_bytes(rvalue.tobytes(), byteorder=self.endianness)
 
-    def __and__(self: Self, rvalue: int | bitarray.bitarray) -> int:
+    def __and__(self: Self, rvalue: int | bitarray) -> int:
         """Bitwise-AND this MemoryUnit with Byte|Word, bitarray, or int types."""
         # bitarrays are a little bit tricky to work with
         # so we're using a super safe option here.
@@ -237,7 +236,7 @@ class MemoryUnit:
             int_lvalue: int = self.value
             if isinstance(rvalue, Byte | Word):
                 int_rvalue = rvalue.value
-            elif isinstance(rvalue, bitarray.bitarray):
+            elif is_bitarray(rvalue):
                 int_rvalue: int = int.from_bytes(rvalue.tobytes(), byteorder=self.endianness)
             elif isinstance(rvalue, int):
                 int_rvalue = rvalue
@@ -246,54 +245,54 @@ class MemoryUnit:
         else:
             return int_lvalue & int_rvalue
 
-    def __lshift__(self: Self, rvalue: int | bitarray.bitarray) -> bitarray.bitarray:
+    def __lshift__(self: Self, rvalue: int | bitarray) -> bitarray:
         """
         Left-shift rvalue bits.
 
-        Returns: bitarray.bitarray
+        Returns: bitarray
         """
         return self._value << rvalue
 
-    def __rshift__(self: Self, rvalue: int | bitarray.bitarray) -> bitarray.bitarray:
+    def __rshift__(self: Self, rvalue: int | bitarray) -> bitarray:
         """
         Right-shift rvalue bits.
 
-        Returns: bitarray.bitarray
+        Returns: bitarray
         """
         return self._value >> rvalue
 
     """ Equality Operators """
-    def __lt__(self: Self, value: int | bitarray.bitarray) -> bool:
+    def __lt__(self: Self, value: int | bitarray) -> bool:
         """Less than comparison with MemoryUnit."""
-        if isinstance(value, bitarray.bitarray):
+        if is_bitarray(value):
             return self._value < value
 
         return self.value < value
 
-    def __gt__(self: Self, value: int | bitarray.bitarray) -> bool:
+    def __gt__(self: Self, value: int | bitarray) -> bool:
         """Greater than comparison with MemoryUnit."""
-        if isinstance(value, bitarray.bitarray):
+        if is_bitarray(value):
             return self._value > value
 
         return self.value > value
 
-    def __eq__(self: Self, value: int | bitarray.bitarray) -> bool:
+    def __eq__(self: Self, value: int | bitarray) -> bool:
         """Equality comparison with MemoryUnit."""
-        if isinstance(value, bitarray.bitarray):
+        if is_bitarray(value):
             return self._value == value
 
         return self.value == value
 
-    def __le__(self: Self, value: int | bitarray.bitarray) -> bool:
+    def __le__(self: Self, value: int | bitarray) -> bool:
         """Less than or equal to comparison with MemoryUnit."""
-        if isinstance(value, bitarray.bitarray):
+        if is_bitarray(value):
             return self._value <= value
 
         return self.value <= value
 
-    def __ge__(self: Self, value: int | bitarray.bitarray) -> bool:
+    def __ge__(self: Self, value: int | bitarray) -> bool:
         """Greater than or equal to comparison with MemoryUnit."""
-        if isinstance(value, bitarray.bitarray):
+        if is_bitarray(value):
             return self._value >= value
 
         return self.value >= value
@@ -318,7 +317,7 @@ class MemoryUnit:
 
     def __str__(self: Self) -> str:
         """Describe this MemoryUnit as a hexadecimal value."""
-        if isinstance(self.value, bitarray.bitarray):
+        if is_bitarray(self.value):
             return str(hex(ba2int(self.value)))
         else:  # noqa: RET505 (We do some shenanigans)
             return str(hex(self.value))
@@ -328,11 +327,11 @@ class MemoryUnit:
         """Describe this MemoryUnit as an index."""
         return self.value
 
-    def __getitem__(self: Self, index: int) -> bitarray.bitarray:
+    def __getitem__(self: Self, index: int) -> bitarray:
         """
         Return the specified bit if used as an index.
 
-        Returns: bitarray.bitarray
+        Returns: bitarray
         """
         if len(self.bits()) >= index:
             return self.bits()[index]

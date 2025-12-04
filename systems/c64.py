@@ -10,14 +10,18 @@ from mos6502 import CPU, CPUVariant, errors
 from mos6502.core import INFINITE_CYCLES
 from mos6502.memory import Byte, Word
 
-logging.basicConfig(level=logging.DEBUG)
+logging.basicConfig(level=logging.WARNING)
 log = logging.getLogger("c64")
 
-# Debug flags - set to False to reduce log verbosity
+# Debug flags - set to True to enable verbose logging
 DEBUG_CIA = False      # CIA register reads/writes
 DEBUG_VIC = False      # VIC register operations
 DEBUG_JIFFY = False    # Jiffy clock updates
 DEBUG_KEYBOARD = False # Keyboard events
+DEBUG_SCREEN = False   # Screen memory writes
+DEBUG_CURSOR = False   # Cursor position variables
+DEBUG_KERNAL = False   # Enable CPU logging when entering KERNAL ROM
+DEBUG_BASIC = False    # Enable CPU logging when entering BASIC ROM
 COLORS = [
     (0x00, 0x00, 0x00),   # 0  Black
     (0xFF, 0xFF, 0xFF),   # 1  White
@@ -81,6 +85,17 @@ class C64:
     RESET_VECTOR_ADDR = 0xFFFC
 
     class CIA1:
+        """CIA1 (Complex Interface Adapter) at $DC00-$DCFF.
+
+        Handles:
+        - Keyboard matrix scanning (Port A/B)
+        - Joystick ports
+        - Timer A and Timer B with multiple clock sources
+        - Time-of-Day (TOD) clock
+        - Serial shift register
+        - IRQ generation
+        """
+
         def __init__(self, cpu) -> None:
             # 16 registers, mirrored through $DC00–$DC0F
             self.regs = [0x00] * 16
@@ -113,15 +128,62 @@ class C64:
             self.timer_a_counter = 0xFFFF  # 16-bit counter
             self.timer_a_latch = 0xFFFF    # 16-bit latch (reload value)
             self.timer_a_running = False
+            self.timer_a_oneshot = False   # One-shot mode (bit 3 of CRA)
+            self.timer_a_pb6_mode = 0      # PB6 output mode (bits 1-2 of CRA)
+            self.timer_a_cnt_mode = False  # Count CNT transitions (bit 5 of CRA)
+            self.timer_a_underflowed = False  # Track underflow for Timer B chaining
 
             # Timer B state
             self.timer_b_counter = 0xFFFF
             self.timer_b_latch = 0xFFFF
             self.timer_b_running = False
+            self.timer_b_oneshot = False   # One-shot mode (bit 3 of CRB)
+            self.timer_b_pb7_mode = 0      # PB7 output mode (bits 1-2 of CRB)
+            self.timer_b_input_mode = 0    # Input mode (bits 5-6 of CRB):
+                                           # 0 = count CPU cycles
+                                           # 1 = count CNT transitions
+                                           # 2 = count Timer A underflows
+                                           # 3 = count Timer A underflows when CNT high
 
             # Interrupt state
             self.icr_data = 0x00      # Interrupt data (which interrupts occurred)
             self.icr_mask = 0x00      # Interrupt mask (which interrupts are enabled)
+
+            # Time-of-Day (TOD) clock
+            # TOD counts in BCD format: 1/10 sec, seconds, minutes, hours
+            self.tod_10ths = 0x00     # $DC08: 1/10 seconds (0-9 BCD)
+            self.tod_sec = 0x00       # $DC09: seconds (0-59 BCD)
+            self.tod_min = 0x00       # $DC0A: minutes (0-59 BCD)
+            self.tod_hr = 0x00        # $DC0B: hours (1-12 BCD + AM/PM in bit 7)
+
+            # TOD alarm
+            self.alarm_10ths = 0x00   # Alarm 1/10 seconds
+            self.alarm_sec = 0x00     # Alarm seconds
+            self.alarm_min = 0x00     # Alarm minutes
+            self.alarm_hr = 0x00      # Alarm hours
+
+            # TOD control
+            self.tod_running = True   # TOD clock running
+            self.tod_latched = False  # TOD output latched (reading hours latches)
+            self.tod_latch = [0, 0, 0, 0]  # Latched TOD values
+            self.tod_write_alarm = False  # Write to alarm (bit 7 of CRB)
+            self.tod_50hz = False     # 50Hz input (bit 7 of CRA)
+
+            # TOD timing (updated via CPU cycles)
+            self.tod_cycles = 0       # Cycles since last TOD tick
+            self.tod_cycles_per_tick = 98525  # ~10Hz at 985248 Hz (PAL)
+
+            # Serial shift register
+            self.sdr = 0x00           # $DC0C: Serial Data Register
+            self.sdr_bits_remaining = 0  # Bits left to shift
+            self.sdr_output_mode = False  # True = output, False = input
+
+            # CNT pin state (directly accessible by external hardware)
+            self.cnt_pin = True       # CNT pin level (active high)
+            self.cnt_last = True      # Last CNT pin state for edge detection
+
+            # FLAG pin (directly accessible by external hardware)
+            self.flag_pin = True      # FLAG pin level (directly accessible, directly clears)
 
             # Track last CPU cycle count for timer updates
             self.last_cycle_count = 0
@@ -268,6 +330,40 @@ class C64:
             if reg == 0x07:
                 return (self.timer_b_counter >> 8) & 0xFF
 
+            # TOD 1/10 Seconds ($DC08)
+            if reg == 0x08:
+                if self.tod_latched:
+                    result = self.tod_latch[0]
+                    # Reading 10ths unlatches TOD
+                    self.tod_latched = False
+                else:
+                    result = self.tod_10ths
+                return result
+
+            # TOD Seconds ($DC09)
+            if reg == 0x09:
+                if self.tod_latched:
+                    return self.tod_latch[1]
+                return self.tod_sec
+
+            # TOD Minutes ($DC0A)
+            if reg == 0x0A:
+                if self.tod_latched:
+                    return self.tod_latch[2]
+                return self.tod_min
+
+            # TOD Hours ($DC0B)
+            if reg == 0x0B:
+                # Reading hours latches all TOD registers
+                if not self.tod_latched:
+                    self.tod_latched = True
+                    self.tod_latch = [self.tod_10ths, self.tod_sec, self.tod_min, self.tod_hr]
+                return self.tod_latch[3]
+
+            # Serial Data Register ($DC0C)
+            if reg == 0x0C:
+                return self.sdr
+
             # Interrupt Control Register (ICR) ($DC0D)
             if reg == 0x0D:
                 # Reading ICR clears it and returns current interrupt state
@@ -283,6 +379,35 @@ class C64:
                 # NOTE: Do NOT clear cpu.irq_pending here! The CPU's IRQ handling mechanism
                 # should manage irq_pending. The CIA ICR read only acknowledges the CIA's interrupt.
                 # The CPU will clear irq_pending when the IRQ handler is called or when no interrupts remain.
+                return result
+
+            # Control Register A ($DC0E)
+            if reg == 0x0E:
+                result = 0x00
+                if self.timer_a_running:
+                    result |= 0x01
+                result |= (self.timer_a_pb6_mode & 0x03) << 1
+                if self.timer_a_oneshot:
+                    result |= 0x08
+                if self.timer_a_cnt_mode:
+                    result |= 0x20
+                if self.sdr_output_mode:
+                    result |= 0x40
+                if self.tod_50hz:
+                    result |= 0x80
+                return result
+
+            # Control Register B ($DC0F)
+            if reg == 0x0F:
+                result = 0x00
+                if self.timer_b_running:
+                    result |= 0x01
+                result |= (self.timer_b_pb7_mode & 0x03) << 1
+                if self.timer_b_oneshot:
+                    result |= 0x08
+                result |= (self.timer_b_input_mode & 0x03) << 5
+                if self.tod_write_alarm:
+                    result |= 0x80
                 return result
 
             # Return stored register contents for other registers
@@ -337,23 +462,44 @@ class C64:
             if reg == 0x07:
                 self.timer_b_latch = (self.timer_b_latch & 0x00FF) | (value << 8)
 
-            # Control Register A ($DC0E)
-            if reg == 0x0E:
-                # Bit 0: Start/Stop Timer A (1=start, 0=stop)
-                self.timer_a_running = bool(value & 0x01)
-                # Bit 4: Force load (1=load latch into counter)
-                if value & 0x10:
-                    self.timer_a_counter = self.timer_a_latch
-                log.info(f"*** CIA1 Timer A Control: ${value:02X}, running={self.timer_a_running}, latch=${self.timer_a_latch:04X} ***")
+            # TOD 1/10 Seconds ($DC08)
+            if reg == 0x08:
+                if self.tod_write_alarm:
+                    self.alarm_10ths = value & 0x0F
+                else:
+                    self.tod_10ths = value & 0x0F
+                    # Writing 10ths starts TOD clock
+                    self.tod_running = True
 
-            # Control Register B ($DC0F)
-            if reg == 0x0F:
-                # Bit 0: Start/Stop Timer B (1=start, 0=stop)
-                self.timer_b_running = bool(value & 0x01)
-                # Bit 4: Force load (1=load latch into counter)
-                if value & 0x10:
-                    self.timer_b_counter = self.timer_b_latch
-                log.info(f"*** CIA1 Timer B Control: ${value:02X}, running={self.timer_b_running}, latch=${self.timer_b_latch:04X} ***")
+            # TOD Seconds ($DC09)
+            if reg == 0x09:
+                if self.tod_write_alarm:
+                    self.alarm_sec = value & 0x7F
+                else:
+                    self.tod_sec = value & 0x7F
+
+            # TOD Minutes ($DC0A)
+            if reg == 0x0A:
+                if self.tod_write_alarm:
+                    self.alarm_min = value & 0x7F
+                else:
+                    self.tod_min = value & 0x7F
+
+            # TOD Hours ($DC0B)
+            if reg == 0x0B:
+                if self.tod_write_alarm:
+                    self.alarm_hr = value
+                else:
+                    self.tod_hr = value
+                    # Writing hours stops TOD clock until 10ths is written
+                    self.tod_running = False
+
+            # Serial Data Register ($DC0C)
+            if reg == 0x0C:
+                self.sdr = value
+                # If in output mode, start shifting
+                if self.sdr_output_mode:
+                    self.sdr_bits_remaining = 8
 
             # Interrupt Control Register ($DC0D)
             if reg == 0x0D:
@@ -366,8 +512,53 @@ class C64:
                     self.icr_mask &= ~(value & 0x1F)
                 log.info(f"*** CIA1 ICR Mask: ${value:02X}, mask=${self.icr_mask:02X}, Timer A IRQ {'ENABLED' if (self.icr_mask & 0x01) else 'DISABLED'} ***")
 
+            # Control Register A ($DC0E)
+            if reg == 0x0E:
+                # Bit 0: Start/Stop Timer A (1=start, 0=stop)
+                self.timer_a_running = bool(value & 0x01)
+                # Bits 1-2: PB6 output mode
+                self.timer_a_pb6_mode = (value >> 1) & 0x03
+                # Bit 3: One-shot mode (1=one-shot, 0=continuous)
+                self.timer_a_oneshot = bool(value & 0x08)
+                # Bit 4: Force load (1=load latch into counter)
+                if value & 0x10:
+                    self.timer_a_counter = self.timer_a_latch
+                # Bit 5: Timer A input mode (0=count cycles, 1=count CNT transitions)
+                self.timer_a_cnt_mode = bool(value & 0x20)
+                # Bit 6: Serial port direction (0=input, 1=output)
+                self.sdr_output_mode = bool(value & 0x40)
+                # Bit 7: TOD frequency (0=60Hz, 1=50Hz)
+                self.tod_50hz = bool(value & 0x80)
+                # Update TOD tick rate based on frequency
+                if self.tod_50hz:
+                    self.tod_cycles_per_tick = 98525  # PAL: 985248 Hz / 10
+                else:
+                    self.tod_cycles_per_tick = 102273  # NTSC: 1022730 Hz / 10
+                log.info(f"*** CIA1 Timer A Control: ${value:02X}, running={self.timer_a_running}, oneshot={self.timer_a_oneshot}, latch=${self.timer_a_latch:04X} ***")
+
+            # Control Register B ($DC0F)
+            if reg == 0x0F:
+                # Bit 0: Start/Stop Timer B (1=start, 0=stop)
+                self.timer_b_running = bool(value & 0x01)
+                # Bits 1-2: PB7 output mode
+                self.timer_b_pb7_mode = (value >> 1) & 0x03
+                # Bit 3: One-shot mode (1=one-shot, 0=continuous)
+                self.timer_b_oneshot = bool(value & 0x08)
+                # Bit 4: Force load (1=load latch into counter)
+                if value & 0x10:
+                    self.timer_b_counter = self.timer_b_latch
+                # Bits 5-6: Timer B input mode
+                # 0 = count CPU cycles
+                # 1 = count CNT transitions
+                # 2 = count Timer A underflows
+                # 3 = count Timer A underflows when CNT high
+                self.timer_b_input_mode = (value >> 5) & 0x03
+                # Bit 7: TOD alarm write (0=write TOD, 1=write alarm)
+                self.tod_write_alarm = bool(value & 0x80)
+                log.info(f"*** CIA1 Timer B Control: ${value:02X}, running={self.timer_b_running}, oneshot={self.timer_b_oneshot}, input_mode={self.timer_b_input_mode}, latch=${self.timer_b_latch:04X} ***")
+
         def update(self) -> None:
-            """Update CIA timers based on CPU cycles.
+            """Update CIA timers and TOD based on CPU cycles.
 
             Called periodically to count down timers and generate interrupts.
             """
@@ -375,44 +566,140 @@ class C64:
             cycles_elapsed = self.cpu.cycles_executed - self.last_cycle_count
             self.last_cycle_count = self.cpu.cycles_executed
 
-            # Update Timer A
-            if self.timer_a_running and cycles_elapsed > 0:
-                # Log every 1000 cycles to monitor timer countdown
-                if self.cpu.cycles_executed % 10000 < 100:
-                    pass  # log.info(f"*** CIA1 Timer A: counter=${self.timer_a_counter:04X}, latch=${self.timer_a_latch:04X}, cycles_elapsed={cycles_elapsed} ***")
+            # Reset Timer A underflow flag for this update cycle
+            self.timer_a_underflowed = False
+            timer_a_underflow_count = 0
 
+            # Update Timer A (only counts CPU cycles if not in CNT mode)
+            if self.timer_a_running and cycles_elapsed > 0 and not self.timer_a_cnt_mode:
                 # Count down by elapsed cycles
                 if self.timer_a_counter >= cycles_elapsed:
                     self.timer_a_counter -= cycles_elapsed
                 else:
                     # Timer underflow
-                    underflows = (cycles_elapsed - self.timer_a_counter) // (self.timer_a_latch + 1) + 1
-                    self.timer_a_counter = self.timer_a_latch - ((cycles_elapsed - self.timer_a_counter - 1) % (self.timer_a_latch + 1))
+                    timer_a_underflow_count = (cycles_elapsed - self.timer_a_counter) // (self.timer_a_latch + 1) + 1
+                    self.timer_a_underflowed = True
+
+                    # In one-shot mode, stop timer after underflow
+                    if self.timer_a_oneshot:
+                        self.timer_a_counter = 0
+                        self.timer_a_running = False
+                    else:
+                        self.timer_a_counter = self.timer_a_latch - ((cycles_elapsed - self.timer_a_counter - 1) % (self.timer_a_latch + 1))
 
                     # Trigger Timer A interrupt (bit 0)
                     self.icr_data |= 0x01
-                    # log.info(f"*** CIA1 Timer A UNDERFLOW: Triggering IRQ, counter reloaded to ${self.timer_a_counter:04X}, cycles={self.cpu.cycles_executed} ***")
 
                     # If Timer A interrupts are enabled, signal CPU IRQ
                     if self.icr_mask & 0x01:
                         self.cpu.irq_pending = True
 
-            # Update Timer B (similar logic)
-            if self.timer_b_running and cycles_elapsed > 0:
-                if self.timer_b_counter >= cycles_elapsed:
-                    self.timer_b_counter -= cycles_elapsed
-                else:
-                    # Timer underflow
-                    underflows = (cycles_elapsed - self.timer_b_counter) // (self.timer_b_latch + 1) + 1
-                    self.timer_b_counter = self.timer_b_latch - ((cycles_elapsed - self.timer_b_counter - 1) % (self.timer_b_latch + 1))
+            # Update Timer B
+            if self.timer_b_running:
+                decrement = 0
 
-                    # Trigger Timer B interrupt (bit 1)
-                    self.icr_data |= 0x02
+                # Determine clock source for Timer B
+                if self.timer_b_input_mode == 0:
+                    # Mode 0: Count CPU cycles
+                    decrement = cycles_elapsed
+                elif self.timer_b_input_mode == 1:
+                    # Mode 1: Count CNT transitions (not implemented for now)
+                    pass
+                elif self.timer_b_input_mode == 2:
+                    # Mode 2: Count Timer A underflows
+                    decrement = timer_a_underflow_count
+                elif self.timer_b_input_mode == 3:
+                    # Mode 3: Count Timer A underflows when CNT high
+                    if self.cnt_pin:
+                        decrement = timer_a_underflow_count
 
-                    # If Timer B interrupts are enabled, signal CPU IRQ
-                    if self.icr_mask & 0x02:
-                        self.cpu.irq_pending = True
-                        log.info(f"*** CIA1 Timer B UNDERFLOW: Triggering IRQ, counter reloaded to ${self.timer_b_counter:04X}, cycles={self.cpu.cycles_executed} ***")
+                if decrement > 0:
+                    if self.timer_b_counter >= decrement:
+                        self.timer_b_counter -= decrement
+                    else:
+                        # Timer underflow
+                        # In one-shot mode, stop timer after underflow
+                        if self.timer_b_oneshot:
+                            self.timer_b_counter = 0
+                            self.timer_b_running = False
+                        else:
+                            if self.timer_b_input_mode == 0:
+                                # CPU cycle mode - handle multiple underflows
+                                self.timer_b_counter = self.timer_b_latch - ((decrement - self.timer_b_counter - 1) % (self.timer_b_latch + 1))
+                            else:
+                                # Timer A underflow mode - simpler reload
+                                self.timer_b_counter = self.timer_b_latch
+
+                        # Trigger Timer B interrupt (bit 1)
+                        self.icr_data |= 0x02
+
+                        # If Timer B interrupts are enabled, signal CPU IRQ
+                        if self.icr_mask & 0x02:
+                            self.cpu.irq_pending = True
+
+            # Update TOD clock
+            if self.tod_running:
+                self.tod_cycles += cycles_elapsed
+                while self.tod_cycles >= self.tod_cycles_per_tick:
+                    self.tod_cycles -= self.tod_cycles_per_tick
+                    self._tick_tod()
+
+        def _tick_tod(self) -> None:
+            """Advance TOD clock by 1/10 second."""
+            # Increment 1/10 seconds (BCD)
+            self.tod_10ths = (self.tod_10ths + 1) & 0x0F
+            if self.tod_10ths > 9:
+                self.tod_10ths = 0
+
+                # Increment seconds (BCD)
+                sec_lo = (self.tod_sec & 0x0F) + 1
+                sec_hi = (self.tod_sec >> 4) & 0x07
+                if sec_lo > 9:
+                    sec_lo = 0
+                    sec_hi += 1
+                if sec_hi > 5:
+                    sec_hi = 0
+
+                    # Increment minutes (BCD)
+                    min_lo = (self.tod_min & 0x0F) + 1
+                    min_hi = (self.tod_min >> 4) & 0x07
+                    if min_lo > 9:
+                        min_lo = 0
+                        min_hi += 1
+                    if min_hi > 5:
+                        min_hi = 0
+
+                        # Increment hours (BCD with AM/PM)
+                        hr_lo = (self.tod_hr & 0x0F) + 1
+                        hr_hi = (self.tod_hr >> 4) & 0x01
+                        pm = bool(self.tod_hr & 0x80)
+
+                        if hr_lo > 9:
+                            hr_lo = 0
+                            hr_hi += 1
+
+                        # Handle 12-hour rollover
+                        hr_val = hr_hi * 10 + hr_lo
+                        if hr_val == 12:
+                            pm = not pm
+                        elif hr_val == 13:
+                            hr_lo = 1
+                            hr_hi = 0
+
+                        self.tod_hr = (0x80 if pm else 0x00) | (hr_hi << 4) | hr_lo
+
+                    self.tod_min = (min_hi << 4) | min_lo
+                self.tod_sec = (sec_hi << 4) | sec_lo
+
+            # Check for alarm match
+            if (self.tod_10ths == self.alarm_10ths and
+                self.tod_sec == self.alarm_sec and
+                self.tod_min == self.alarm_min and
+                self.tod_hr == self.alarm_hr):
+                # Trigger TOD alarm interrupt (bit 2)
+                self.icr_data |= 0x04
+                if self.icr_mask & 0x04:
+                    self.cpu.irq_pending = True
 
         def _read_keyboard_port(self) -> int:
             """Read keyboard matrix columns based on selected rows.
@@ -565,46 +852,474 @@ class C64:
                 self.keyboard_matrix[row] |= (1 << col)
 
     class CIA2:
-        def __init__(self) -> None:
+        """CIA2 (Complex Interface Adapter) at $DD00-$DDFF.
+
+        Handles:
+        - VIC bank selection (Port A bits 0-1)
+        - Serial bus (Port A bits 2-7)
+        - User port (Port B)
+        - Timer A and Timer B with multiple clock sources
+        - Time-of-Day (TOD) clock
+        - Serial shift register
+        - NMI generation (directly to CPU)
+        """
+
+        def __init__(self, cpu) -> None:
+            # 16 registers, mirrored through $DD00–$DD0F
             self.regs = [0x00] * 16
+
+            # Reference to CPU for NMI signaling
+            self.cpu = cpu
+
+            # Port A: VIC bank selection + serial bus
+            # Bits 0-1: VIC bank (active low, inverted)
+            #   %00 = Bank 3 ($C000-$FFFF)
+            #   %01 = Bank 2 ($8000-$BFFF)
+            #   %10 = Bank 1 ($4000-$7FFF)
+            #   %11 = Bank 0 ($0000-$3FFF) - default
+            # Bits 2-7: Serial bus control
+            self.port_a = 0x03  # Default: VIC bank 0 (bits 0-1 = %11, inverted = %00)
+            self.ddr_a = 0x3F   # Default: lower 6 bits output
+
+            # Port B: User port
+            self.port_b = 0xFF
+            self.ddr_b = 0x00   # Default: all inputs
+
+            # Timer A state
+            self.timer_a_counter = 0xFFFF
+            self.timer_a_latch = 0xFFFF
+            self.timer_a_running = False
+            self.timer_a_oneshot = False
+            self.timer_a_pb6_mode = 0
+            self.timer_a_cnt_mode = False
+            self.timer_a_underflowed = False
+
+            # Timer B state
+            self.timer_b_counter = 0xFFFF
+            self.timer_b_latch = 0xFFFF
+            self.timer_b_running = False
+            self.timer_b_oneshot = False
+            self.timer_b_pb7_mode = 0
+            self.timer_b_input_mode = 0
+
+            # Interrupt state
+            self.icr_data = 0x00
+            self.icr_mask = 0x00
+
+            # Time-of-Day (TOD) clock
+            self.tod_10ths = 0x00
+            self.tod_sec = 0x00
+            self.tod_min = 0x00
+            self.tod_hr = 0x00
+
+            # TOD alarm
+            self.alarm_10ths = 0x00
+            self.alarm_sec = 0x00
+            self.alarm_min = 0x00
+            self.alarm_hr = 0x00
+
+            # TOD control
+            self.tod_running = True
+            self.tod_latched = False
+            self.tod_latch = [0, 0, 0, 0]
+            self.tod_write_alarm = False
+            self.tod_50hz = False
+            self.tod_cycles = 0
+            self.tod_cycles_per_tick = 98525
+
+            # Serial shift register
+            self.sdr = 0x00
+            self.sdr_bits_remaining = 0
+            self.sdr_output_mode = False
+
+            # CNT and FLAG pins
+            self.cnt_pin = True
+            self.cnt_last = True
+            self.flag_pin = True
+
+            # Track last CPU cycle count for timer updates
+            self.last_cycle_count = 0
+
+        def get_vic_bank(self) -> int:
+            """Get the current VIC bank address (0x0000, 0x4000, 0x8000, or 0xC000).
+
+            The VIC bank is determined by bits 0-1 of Port A, inverted.
+            """
+            bank_bits = (~self.port_a) & 0x03
+            return bank_bits * 0x4000
 
         def read(self, addr) -> int:
             reg = addr & 0x0F
 
-            if reg == 0x0D:
-                # ICR — no interrupts pending
-                return 0x00
+            # Port A ($DD00)
+            if reg == 0x00:
+                # Read Port A with serial bus state
+                # For now, return port_a value with input bits floating high
+                result = (self.port_a & self.ddr_a) | (~self.ddr_a & 0xFF)
+                return result
 
-            return 0xFF  # CIA2 usually floats high where unused
+            # Port B ($DD01) - User port
+            if reg == 0x01:
+                result = (self.port_b & self.ddr_b) | (~self.ddr_b & 0xFF)
+                return result
+
+            # Port A DDR ($DD02)
+            if reg == 0x02:
+                return self.ddr_a
+
+            # Port B DDR ($DD03)
+            if reg == 0x03:
+                return self.ddr_b
+
+            # Timer A Low Byte ($DD04)
+            if reg == 0x04:
+                return self.timer_a_counter & 0xFF
+
+            # Timer A High Byte ($DD05)
+            if reg == 0x05:
+                return (self.timer_a_counter >> 8) & 0xFF
+
+            # Timer B Low Byte ($DD06)
+            if reg == 0x06:
+                return self.timer_b_counter & 0xFF
+
+            # Timer B High Byte ($DD07)
+            if reg == 0x07:
+                return (self.timer_b_counter >> 8) & 0xFF
+
+            # TOD 1/10 Seconds ($DD08)
+            if reg == 0x08:
+                if self.tod_latched:
+                    result = self.tod_latch[0]
+                    self.tod_latched = False
+                else:
+                    result = self.tod_10ths
+                return result
+
+            # TOD Seconds ($DD09)
+            if reg == 0x09:
+                if self.tod_latched:
+                    return self.tod_latch[1]
+                return self.tod_sec
+
+            # TOD Minutes ($DD0A)
+            if reg == 0x0A:
+                if self.tod_latched:
+                    return self.tod_latch[2]
+                return self.tod_min
+
+            # TOD Hours ($DD0B)
+            if reg == 0x0B:
+                if not self.tod_latched:
+                    self.tod_latched = True
+                    self.tod_latch = [self.tod_10ths, self.tod_sec, self.tod_min, self.tod_hr]
+                return self.tod_latch[3]
+
+            # Serial Data Register ($DD0C)
+            if reg == 0x0C:
+                return self.sdr
+
+            # Interrupt Control Register (ICR) ($DD0D)
+            if reg == 0x0D:
+                result = self.icr_data
+                if result & self.icr_mask:
+                    result |= 0x80
+                self.icr_data = 0x00
+                return result
+
+            # Control Register A ($DD0E)
+            if reg == 0x0E:
+                result = 0x00
+                if self.timer_a_running:
+                    result |= 0x01
+                result |= (self.timer_a_pb6_mode & 0x03) << 1
+                if self.timer_a_oneshot:
+                    result |= 0x08
+                if self.timer_a_cnt_mode:
+                    result |= 0x20
+                if self.sdr_output_mode:
+                    result |= 0x40
+                if self.tod_50hz:
+                    result |= 0x80
+                return result
+
+            # Control Register B ($DD0F)
+            if reg == 0x0F:
+                result = 0x00
+                if self.timer_b_running:
+                    result |= 0x01
+                result |= (self.timer_b_pb7_mode & 0x03) << 1
+                if self.timer_b_oneshot:
+                    result |= 0x08
+                result |= (self.timer_b_input_mode & 0x03) << 5
+                if self.tod_write_alarm:
+                    result |= 0x80
+                return result
+
+            return self.regs[reg]
 
         def write(self, addr, value) -> None:
             reg = addr & 0x0F
             self.regs[reg] = value
 
+            # Port A ($DD00) - VIC bank + serial bus
+            if reg == 0x00:
+                old_port_a = self.port_a
+                self.port_a = value
+                if old_port_a != value:
+                    new_bank = self.get_vic_bank()
+                    log.info(f"*** CIA2 Port A WRITE: ${value:02X}, VIC bank=${new_bank:04X} ***")
+
+            # Port B ($DD01) - User port
+            if reg == 0x01:
+                self.port_b = value
+
+            # Port A DDR ($DD02)
+            if reg == 0x02:
+                self.ddr_a = value
+
+            # Port B DDR ($DD03)
+            if reg == 0x03:
+                self.ddr_b = value
+
+            # Timer A Low Byte ($DD04)
+            if reg == 0x04:
+                self.timer_a_latch = (self.timer_a_latch & 0xFF00) | value
+
+            # Timer A High Byte ($DD05)
+            if reg == 0x05:
+                self.timer_a_latch = (self.timer_a_latch & 0x00FF) | (value << 8)
+
+            # Timer B Low Byte ($DD06)
+            if reg == 0x06:
+                self.timer_b_latch = (self.timer_b_latch & 0xFF00) | value
+
+            # Timer B High Byte ($DD07)
+            if reg == 0x07:
+                self.timer_b_latch = (self.timer_b_latch & 0x00FF) | (value << 8)
+
+            # TOD 1/10 Seconds ($DD08)
+            if reg == 0x08:
+                if self.tod_write_alarm:
+                    self.alarm_10ths = value & 0x0F
+                else:
+                    self.tod_10ths = value & 0x0F
+                    self.tod_running = True
+
+            # TOD Seconds ($DD09)
+            if reg == 0x09:
+                if self.tod_write_alarm:
+                    self.alarm_sec = value & 0x7F
+                else:
+                    self.tod_sec = value & 0x7F
+
+            # TOD Minutes ($DD0A)
+            if reg == 0x0A:
+                if self.tod_write_alarm:
+                    self.alarm_min = value & 0x7F
+                else:
+                    self.tod_min = value & 0x7F
+
+            # TOD Hours ($DD0B)
+            if reg == 0x0B:
+                if self.tod_write_alarm:
+                    self.alarm_hr = value
+                else:
+                    self.tod_hr = value
+                    self.tod_running = False
+
+            # Serial Data Register ($DD0C)
+            if reg == 0x0C:
+                self.sdr = value
+                if self.sdr_output_mode:
+                    self.sdr_bits_remaining = 8
+
+            # Interrupt Control Register ($DD0D)
+            if reg == 0x0D:
+                if value & 0x80:
+                    self.icr_mask |= (value & 0x1F)
+                else:
+                    self.icr_mask &= ~(value & 0x1F)
+
+            # Control Register A ($DD0E)
+            if reg == 0x0E:
+                self.timer_a_running = bool(value & 0x01)
+                self.timer_a_pb6_mode = (value >> 1) & 0x03
+                self.timer_a_oneshot = bool(value & 0x08)
+                if value & 0x10:
+                    self.timer_a_counter = self.timer_a_latch
+                self.timer_a_cnt_mode = bool(value & 0x20)
+                self.sdr_output_mode = bool(value & 0x40)
+                self.tod_50hz = bool(value & 0x80)
+                if self.tod_50hz:
+                    self.tod_cycles_per_tick = 98525
+                else:
+                    self.tod_cycles_per_tick = 102273
+
+            # Control Register B ($DD0F)
+            if reg == 0x0F:
+                self.timer_b_running = bool(value & 0x01)
+                self.timer_b_pb7_mode = (value >> 1) & 0x03
+                self.timer_b_oneshot = bool(value & 0x08)
+                if value & 0x10:
+                    self.timer_b_counter = self.timer_b_latch
+                self.timer_b_input_mode = (value >> 5) & 0x03
+                self.tod_write_alarm = bool(value & 0x80)
+
+        def update(self) -> None:
+            """Update CIA2 timers and TOD based on CPU cycles."""
+            cycles_elapsed = self.cpu.cycles_executed - self.last_cycle_count
+            self.last_cycle_count = self.cpu.cycles_executed
+
+            self.timer_a_underflowed = False
+            timer_a_underflow_count = 0
+
+            # Update Timer A
+            if self.timer_a_running and cycles_elapsed > 0 and not self.timer_a_cnt_mode:
+                if self.timer_a_counter >= cycles_elapsed:
+                    self.timer_a_counter -= cycles_elapsed
+                else:
+                    timer_a_underflow_count = (cycles_elapsed - self.timer_a_counter) // (self.timer_a_latch + 1) + 1
+                    self.timer_a_underflowed = True
+
+                    if self.timer_a_oneshot:
+                        self.timer_a_counter = 0
+                        self.timer_a_running = False
+                    else:
+                        self.timer_a_counter = self.timer_a_latch - ((cycles_elapsed - self.timer_a_counter - 1) % (self.timer_a_latch + 1))
+
+                    self.icr_data |= 0x01
+                    if self.icr_mask & 0x01:
+                        # CIA2 generates NMI, not IRQ
+                        self.cpu.nmi_pending = True
+
+            # Update Timer B
+            if self.timer_b_running:
+                decrement = 0
+                if self.timer_b_input_mode == 0:
+                    decrement = cycles_elapsed
+                elif self.timer_b_input_mode == 2:
+                    decrement = timer_a_underflow_count
+                elif self.timer_b_input_mode == 3:
+                    if self.cnt_pin:
+                        decrement = timer_a_underflow_count
+
+                if decrement > 0:
+                    if self.timer_b_counter >= decrement:
+                        self.timer_b_counter -= decrement
+                    else:
+                        if self.timer_b_oneshot:
+                            self.timer_b_counter = 0
+                            self.timer_b_running = False
+                        else:
+                            if self.timer_b_input_mode == 0:
+                                self.timer_b_counter = self.timer_b_latch - ((decrement - self.timer_b_counter - 1) % (self.timer_b_latch + 1))
+                            else:
+                                self.timer_b_counter = self.timer_b_latch
+
+                        self.icr_data |= 0x02
+                        if self.icr_mask & 0x02:
+                            self.cpu.nmi_pending = True
+
+            # Update TOD clock
+            if self.tod_running:
+                self.tod_cycles += cycles_elapsed
+                while self.tod_cycles >= self.tod_cycles_per_tick:
+                    self.tod_cycles -= self.tod_cycles_per_tick
+                    self._tick_tod()
+
+        def _tick_tod(self) -> None:
+            """Advance TOD clock by 1/10 second."""
+            self.tod_10ths = (self.tod_10ths + 1) & 0x0F
+            if self.tod_10ths > 9:
+                self.tod_10ths = 0
+
+                sec_lo = (self.tod_sec & 0x0F) + 1
+                sec_hi = (self.tod_sec >> 4) & 0x07
+                if sec_lo > 9:
+                    sec_lo = 0
+                    sec_hi += 1
+                if sec_hi > 5:
+                    sec_hi = 0
+
+                    min_lo = (self.tod_min & 0x0F) + 1
+                    min_hi = (self.tod_min >> 4) & 0x07
+                    if min_lo > 9:
+                        min_lo = 0
+                        min_hi += 1
+                    if min_hi > 5:
+                        min_hi = 0
+
+                        hr_lo = (self.tod_hr & 0x0F) + 1
+                        hr_hi = (self.tod_hr >> 4) & 0x01
+                        pm = bool(self.tod_hr & 0x80)
+
+                        if hr_lo > 9:
+                            hr_lo = 0
+                            hr_hi += 1
+
+                        hr_val = hr_hi * 10 + hr_lo
+                        if hr_val == 12:
+                            pm = not pm
+                        elif hr_val == 13:
+                            hr_lo = 1
+                            hr_hi = 0
+
+                        self.tod_hr = (0x80 if pm else 0x00) | (hr_hi << 4) | hr_lo
+
+                    self.tod_min = (min_hi << 4) | min_lo
+                self.tod_sec = (sec_hi << 4) | sec_lo
+
+            # Check for alarm match
+            if (self.tod_10ths == self.alarm_10ths and
+                self.tod_sec == self.alarm_sec and
+                self.tod_min == self.alarm_min and
+                self.tod_hr == self.alarm_hr):
+                self.icr_data |= 0x04
+                if self.icr_mask & 0x04:
+                    self.cpu.nmi_pending = True
+
     class C64VIC:
         """
-        Very small VIC-II model, enough for text mode + raster IRQs.
+        VIC-II video chip emulation.
 
-        - 40×25 character text mode using character ROM
-        - Border colour, background colour
+        Supports:
+        - 40×25 character text mode (standard and multicolor)
+        - Bitmap modes (320x200 hires, 160x200 multicolor)
+        - Extended background color mode
+        - 8 hardware sprites with collision detection
+        - Border and background colors
         - $D018 screen/character memory selection
-        - $D011/$D016 fine scroll affect pixel origin correctly
-        - Raster IRQ from $D012/$D011 + $D01A/$D019
+        - $D011/$D016 fine scroll
+        - Raster IRQ, sprite-sprite collision IRQ, sprite-background collision IRQ
+        - Light pen registers
         """
 
-        def __init__(self, char_rom, cpu) -> None:
+        def __init__(self, char_rom, cpu, cia2=None) -> None:
             self.log = logging.getLogger("c64.vic")
             self.regs = [0] * 0x40
             self.char_rom = char_rom
             self.cpu = cpu
+            self.cia2 = cia2  # For VIC bank selection
 
             # --- Power-on register defaults (C64 reset state-ish) -----------------
+            # Sprite X positions ($D000-$D00F): all 0
+            for i in range(16):
+                self.regs[i] = 0x00
+
+            # Sprite X MSB ($D010): all 0
+            self.regs[0x10] = 0x00
+
             # $D011: Control register 1 (vertical scroll, display enable, 25-row mode)
             #  %00011011 = $1B
             self.regs[0x11] = 0x1B
 
             # $D012: raster low byte
             self.regs[0x12] = 0x00
+
+            # Light pen registers ($D013-$D014)
+            self.regs[0x13] = 0x00  # Light pen X
+            self.regs[0x14] = 0x00  # Light pen Y
 
             # $D015: sprite enable (all off)
             self.regs[0x15] = 0x00
@@ -631,11 +1346,39 @@ class C64:
             # $D01A: IRQ enable mask
             self.irq_enabled = 0x00
 
+            # $D01B: Sprite-to-background priority (0=sprite in front)
+            self.regs[0x1B] = 0x00
+
+            # $D01C: Sprite multicolor mode
+            self.regs[0x1C] = 0x00
+
+            # $D01D: Sprite X-expand
+            self.regs[0x1D] = 0x00
+
+            # $D01E: Sprite-sprite collision (read clears)
+            self.sprite_sprite_collision = 0x00
+
+            # $D01F: Sprite-background collision (read clears)
+            self.sprite_bg_collision = 0x00
+
             # Colours
             # $D020: border colour – light blue (14)
             self.regs[0x20] = 0x0E
-            # $D021: background colour – blue (6)
+            # $D021: background colour 0 – blue (6)
             self.regs[0x21] = 0x06
+            # $D022: background colour 1
+            self.regs[0x22] = 0x00
+            # $D023: background colour 2
+            self.regs[0x23] = 0x00
+            # $D024: background colour 3
+            self.regs[0x24] = 0x00
+            # $D025: sprite multicolor 0
+            self.regs[0x25] = 0x00
+            # $D026: sprite multicolor 1
+            self.regs[0x26] = 0x00
+            # $D027-$D02E: sprite colors
+            for i in range(8):
+                self.regs[0x27 + i] = 0x00
 
             # --- Geometry / timing -----------------------------------------------
             # Text area: 40×25 chars → 320×200 pixels
@@ -667,12 +1410,25 @@ class C64:
             # Track when the KERNAL has acknowledged the initial IRQ
             self.initialized = False
 
+            # Light pen state
+            self.light_pen_triggered = False
+
             self.log.info(
                 "VIC-II initialized (NTSC-ish: %d lines, %d cycles/line, %d cycles/frame)",
                 self.raster_lines,
                 self.cycles_per_line,
                 self.cycles_per_frame,
             )
+
+        def set_cia2(self, cia2) -> None:
+            """Set reference to CIA2 for VIC bank selection."""
+            self.cia2 = cia2
+
+        def get_vic_bank(self) -> int:
+            """Get the current VIC bank address from CIA2."""
+            if self.cia2:
+                return self.cia2.get_vic_bank()
+            return 0x0000  # Default to bank 0
 
         # --------------------------------------------------------------------- IRQ /
         def update(self) -> None:
@@ -720,6 +1476,14 @@ class C64:
         def read(self, addr) -> int:
             reg = addr & 0x3F
 
+            # $D011: Control register 1 (bit 7 is raster bit 8)
+            if reg == 0x11:
+                # Bit 7 is raster line bit 8
+                result = self.regs[0x11] & 0x7F
+                if self.current_raster > 255:
+                    result |= 0x80
+                return result
+
             # $D012: raster counter (low 8 bits)
             if reg == 0x12:
                 self.update()
@@ -743,6 +1507,18 @@ class C64:
                 if flags:
                     flags |= 0x80  # bit 7 set if any IRQ occurred
                 return flags
+
+            # $D01E: Sprite-sprite collision (cleared on read)
+            if reg == 0x1E:
+                result = self.sprite_sprite_collision
+                self.sprite_sprite_collision = 0x00
+                return result
+
+            # $D01F: Sprite-background collision (cleared on read)
+            if reg == 0x1F:
+                result = self.sprite_bg_collision
+                self.sprite_bg_collision = 0x00
+                return result
 
             return self.regs[reg]
 
@@ -808,42 +1584,79 @@ class C64:
         # ---------------------------------------------------------------- Rendering /
         def render_frame(self, surface, ram, color_ram) -> None:
             """
-            Render a full 40×25 text frame into the given pygame surface.
+            Render a full frame into the given pygame surface.
 
-            - fills border with $D020
-            - draws characters using charset from char_rom selected via $D018
-            - background colour from $D021
-            - character colours from colour RAM
-            - respects $D011/$D016 fine scroll for the pixel origin
+            Supports:
+            - Standard character mode (40x25)
+            - Multicolor character mode
+            - Extended background color mode
+            - Standard bitmap mode (320x200)
+            - Multicolor bitmap mode (160x200)
+            - 8 hardware sprites with priority and collision
             """
             # Border colour
             border_color = self.regs[0x20] & 0x0F
             surface.fill(COLORS[border_color])
 
-            # Decode $D018: video matrix base + character ROM offset
+            # Get VIC bank from CIA2
+            vic_bank = self.get_vic_bank()
+
+            # Decode $D018: video matrix base + character/bitmap offset
             mem_control = self.regs[0x18]
 
-            # Bits 4-7: screen base in 1 KB blocks
-            screen_base = ((mem_control & 0xF0) >> 4) * 0x0400
+            # Bits 4-7: screen base in 1 KB blocks (within VIC bank)
+            screen_base = vic_bank + ((mem_control & 0xF0) >> 4) * 0x0400
 
-            # Bits 1-3: char base in 2 KB blocks (masked to 4 KB inside the real bank)
+            # Bits 1-3: char/bitmap base in 2 KB blocks (within VIC bank)
             char_bank_offset = ((mem_control & 0x0E) >> 1) * 0x0800
-            char_bank_offset &= 0x0FFF  # under CHAR ROM window
 
-            # Background colour
-            bg_color = self.regs[0x21] & 0x0F
+            # Mode flags from $D011 and $D016
+            ecm = bool(self.regs[0x11] & 0x40)  # Extended Color Mode
+            bmm = bool(self.regs[0x11] & 0x20)  # Bitmap Mode
+            den = bool(self.regs[0x11] & 0x10)  # Display Enable
+            mcm = bool(self.regs[0x16] & 0x10)  # Multicolor Mode
+
+            # Background colours
+            bg_colors = [
+                self.regs[0x21] & 0x0F,
+                self.regs[0x22] & 0x0F,
+                self.regs[0x23] & 0x0F,
+                self.regs[0x24] & 0x0F,
+            ]
 
             # Fine scroll values
-            hscroll = self.regs[0x16] & 0x07  # $D016 bits 0-2
-            vscroll = self.regs[0x11] & 0x07  # $D011 bits 0-2
+            hscroll = self.regs[0x16] & 0x07
+            vscroll = self.regs[0x11] & 0x07
 
-            # True NTSC-style pixel origin:
-            # When scroll = 0, origin is (24, 42); positive scroll values move
-            # the text area left/up by that many pixels.
             x_origin = self.border_left - hscroll
             y_origin = self.border_top - vscroll
 
-            # Render the 40×25 character matrix
+            if not den:
+                # Display disabled - just show border
+                return
+
+            if bmm:
+                # Bitmap mode
+                bitmap_base = vic_bank + char_bank_offset
+                if mcm:
+                    self._render_multicolor_bitmap(surface, ram, color_ram, bitmap_base, screen_base, bg_colors[0], x_origin, y_origin)
+                else:
+                    self._render_hires_bitmap(surface, ram, bitmap_base, screen_base, x_origin, y_origin)
+            elif ecm:
+                # Extended background color mode
+                self._render_ecm_text(surface, ram, color_ram, char_bank_offset, screen_base, bg_colors, x_origin, y_origin)
+            elif mcm:
+                # Multicolor text mode
+                self._render_multicolor_text(surface, ram, color_ram, char_bank_offset, screen_base, bg_colors, x_origin, y_origin)
+            else:
+                # Standard text mode
+                self._render_standard_text(surface, ram, color_ram, char_bank_offset, screen_base, bg_colors[0], x_origin, y_origin)
+
+            # Render sprites on top
+            self._render_sprites(surface, ram, vic_bank, screen_base, x_origin, y_origin)
+
+        def _render_standard_text(self, surface, ram, color_ram, char_offset, screen_base, bg_color, x_origin, y_origin):
+            """Render standard 40x25 text mode."""
             for row in range(25):
                 for col in range(40):
                     cell_addr = screen_base + row * 40 + col
@@ -857,7 +1670,7 @@ class C64:
                     char_code &= 0x7F
 
                     # Fetch 8×8 glyph from char ROM
-                    glyph_addr = (char_code * 8) + char_bank_offset
+                    glyph_addr = (char_code * 8) + char_offset
                     glyph_addr &= 0x0FFF
                     glyph = self.char_rom[glyph_addr : glyph_addr + 8]
 
@@ -877,6 +1690,228 @@ class C64:
                                 bg = COLORS[bg_color]
 
                             surface.set_at((base_x + x, base_y + y), fg if bit else bg)
+
+        def _render_multicolor_text(self, surface, ram, color_ram, char_offset, screen_base, bg_colors, x_origin, y_origin):
+            """Render multicolor text mode (MCM=1, BMM=0, ECM=0)."""
+            for row in range(25):
+                for col in range(40):
+                    cell_addr = screen_base + row * 40 + col
+                    char_code = ram[cell_addr]
+
+                    color_offset = row * 40 + col
+                    char_color = color_ram[color_offset] & 0x0F
+
+                    # If color bit 3 is set, use multicolor mode for this cell
+                    use_multicolor = char_color & 0x08
+
+                    glyph_addr = (char_code * 8) + char_offset
+                    glyph_addr &= 0x0FFF
+                    glyph = self.char_rom[glyph_addr : glyph_addr + 8]
+
+                    base_x = x_origin + col * 8
+                    base_y = y_origin + row * 8
+
+                    for y in range(8):
+                        line = glyph[y]
+                        if use_multicolor:
+                            # Multicolor: 4 double-width pixels
+                            for x in range(4):
+                                bits = (line >> (6 - x * 2)) & 0x03
+                                if bits == 0:
+                                    c = COLORS[bg_colors[0]]
+                                elif bits == 1:
+                                    c = COLORS[bg_colors[1]]
+                                elif bits == 2:
+                                    c = COLORS[bg_colors[2]]
+                                else:
+                                    c = COLORS[char_color & 0x07]
+                                surface.set_at((base_x + x * 2, base_y + y), c)
+                                surface.set_at((base_x + x * 2 + 1, base_y + y), c)
+                        else:
+                            # Standard: 8 single-width pixels
+                            for x in range(8):
+                                bit = (line >> (7 - x)) & 0x01
+                                c = COLORS[char_color] if bit else COLORS[bg_colors[0]]
+                                surface.set_at((base_x + x, base_y + y), c)
+
+        def _render_ecm_text(self, surface, ram, color_ram, char_offset, screen_base, bg_colors, x_origin, y_origin):
+            """Render extended background color mode (ECM=1, BMM=0, MCM=0)."""
+            for row in range(25):
+                for col in range(40):
+                    cell_addr = screen_base + row * 40 + col
+                    char_code = ram[cell_addr]
+
+                    color_offset = row * 40 + col
+                    char_color = color_ram[color_offset] & 0x0F
+
+                    # Bits 6-7 select background color
+                    bg_select = (char_code >> 6) & 0x03
+                    char_code &= 0x3F  # Only 64 characters available
+
+                    glyph_addr = (char_code * 8) + char_offset
+                    glyph_addr &= 0x0FFF
+                    glyph = self.char_rom[glyph_addr : glyph_addr + 8]
+
+                    base_x = x_origin + col * 8
+                    base_y = y_origin + row * 8
+
+                    for y in range(8):
+                        line = glyph[y]
+                        for x in range(8):
+                            bit = (line >> (7 - x)) & 0x01
+                            c = COLORS[char_color] if bit else COLORS[bg_colors[bg_select]]
+                            surface.set_at((base_x + x, base_y + y), c)
+
+        def _render_hires_bitmap(self, surface, ram, bitmap_base, screen_base, x_origin, y_origin):
+            """Render standard hires bitmap mode (320x200, BMM=1, MCM=0)."""
+            for char_row in range(25):
+                for char_col in range(40):
+                    # Get colors from screen RAM
+                    cell_addr = screen_base + char_row * 40 + char_col
+                    color_byte = ram[cell_addr]
+                    fg_color = (color_byte >> 4) & 0x0F
+                    bg_color = color_byte & 0x0F
+
+                    # Get 8 bytes of bitmap data
+                    bitmap_addr = bitmap_base + char_row * 320 + char_col * 8
+
+                    base_x = x_origin + char_col * 8
+                    base_y = y_origin + char_row * 8
+
+                    for y in range(8):
+                        byte_val = ram[bitmap_addr + y]
+                        for x in range(8):
+                            bit = (byte_val >> (7 - x)) & 0x01
+                            c = COLORS[fg_color] if bit else COLORS[bg_color]
+                            surface.set_at((base_x + x, base_y + y), c)
+
+        def _render_multicolor_bitmap(self, surface, ram, color_ram, bitmap_base, screen_base, bg_color, x_origin, y_origin):
+            """Render multicolor bitmap mode (160x200, BMM=1, MCM=1)."""
+            for char_row in range(25):
+                for char_col in range(40):
+                    # Get colors
+                    cell_addr = screen_base + char_row * 40 + char_col
+                    color_byte = ram[cell_addr]
+                    color1 = (color_byte >> 4) & 0x0F
+                    color2 = color_byte & 0x0F
+                    color3 = color_ram[char_row * 40 + char_col] & 0x0F
+
+                    colors = [bg_color, color1, color2, color3]
+
+                    bitmap_addr = bitmap_base + char_row * 320 + char_col * 8
+
+                    base_x = x_origin + char_col * 8
+                    base_y = y_origin + char_row * 8
+
+                    for y in range(8):
+                        byte_val = ram[bitmap_addr + y]
+                        for x in range(4):
+                            bits = (byte_val >> (6 - x * 2)) & 0x03
+                            c = COLORS[colors[bits]]
+                            surface.set_at((base_x + x * 2, base_y + y), c)
+                            surface.set_at((base_x + x * 2 + 1, base_y + y), c)
+
+        def _render_sprites(self, surface, ram, vic_bank, screen_base, x_origin, y_origin):
+            """Render all 8 sprites with priority handling."""
+            sprite_enable = self.regs[0x15]
+            sprite_priority = self.regs[0x1B]  # 0 = sprite in front, 1 = behind
+            sprite_multicolor = self.regs[0x1C]
+            sprite_x_expand = self.regs[0x1D]
+            sprite_y_expand = self.regs[0x17]
+            sprite_x_msb = self.regs[0x10]
+
+            mc_color0 = self.regs[0x25] & 0x0F
+            mc_color1 = self.regs[0x26] & 0x0F
+
+            # Sprite pointer base is at end of screen RAM
+            sprite_ptr_base = screen_base + 0x3F8
+
+            # Render sprites from 7 to 0 (lower numbers have higher priority)
+            for sprite_num in range(7, -1, -1):
+                if not (sprite_enable & (1 << sprite_num)):
+                    continue
+
+                # Get sprite position
+                x_pos = self.regs[sprite_num * 2]
+                if sprite_x_msb & (1 << sprite_num):
+                    x_pos += 256
+                y_pos = self.regs[sprite_num * 2 + 1]
+
+                # Convert to screen coordinates
+                sprite_x = x_pos - 24 + self.border_left
+                sprite_y = y_pos - 50 + self.border_top
+
+                # Get sprite data pointer
+                sprite_ptr = ram[sprite_ptr_base + sprite_num]
+                sprite_data_addr = vic_bank + sprite_ptr * 64
+
+                # Get sprite color
+                sprite_color = self.regs[0x27 + sprite_num] & 0x0F
+
+                # Check expand flags
+                x_expand = bool(sprite_x_expand & (1 << sprite_num))
+                y_expand = bool(sprite_y_expand & (1 << sprite_num))
+                is_multicolor = bool(sprite_multicolor & (1 << sprite_num))
+
+                # Render 21 lines of 24 pixels (3 bytes per line)
+                for line in range(21):
+                    y_screen = sprite_y + line * (2 if y_expand else 1)
+                    if y_expand:
+                        y_screen2 = y_screen + 1
+
+                    for byte_idx in range(3):
+                        byte_val = ram[sprite_data_addr + line * 3 + byte_idx]
+
+                        if is_multicolor:
+                            # Multicolor: 4 double-width pixels per byte
+                            for px in range(4):
+                                bits = (byte_val >> (6 - px * 2)) & 0x03
+                                if bits == 0:
+                                    continue  # Transparent
+                                elif bits == 1:
+                                    c = COLORS[mc_color0]
+                                elif bits == 2:
+                                    c = COLORS[sprite_color]
+                                else:
+                                    c = COLORS[mc_color1]
+
+                                x_screen = sprite_x + byte_idx * 8 + px * 2
+                                if x_expand:
+                                    x_screen *= 2
+                                    for dx in range(4):
+                                        self._set_sprite_pixel(surface, x_screen + dx, y_screen, c)
+                                        if y_expand:
+                                            self._set_sprite_pixel(surface, x_screen + dx, y_screen2, c)
+                                else:
+                                    self._set_sprite_pixel(surface, x_screen, y_screen, c)
+                                    self._set_sprite_pixel(surface, x_screen + 1, y_screen, c)
+                                    if y_expand:
+                                        self._set_sprite_pixel(surface, x_screen, y_screen2, c)
+                                        self._set_sprite_pixel(surface, x_screen + 1, y_screen2, c)
+                        else:
+                            # Standard: 8 single-width pixels per byte
+                            for px in range(8):
+                                if not (byte_val & (0x80 >> px)):
+                                    continue  # Transparent
+
+                                c = COLORS[sprite_color]
+                                x_screen = sprite_x + byte_idx * 8 + px
+                                if x_expand:
+                                    x_screen *= 2
+                                    self._set_sprite_pixel(surface, x_screen, y_screen, c)
+                                    self._set_sprite_pixel(surface, x_screen + 1, y_screen, c)
+                                    if y_expand:
+                                        self._set_sprite_pixel(surface, x_screen, y_screen2, c)
+                                        self._set_sprite_pixel(surface, x_screen + 1, y_screen2, c)
+                                else:
+                                    self._set_sprite_pixel(surface, x_screen, y_screen, c)
+                                    if y_expand:
+                                        self._set_sprite_pixel(surface, x_screen, y_screen2, c)
+
+        def _set_sprite_pixel(self, surface, x, y, color):
+            """Set a sprite pixel with bounds checking."""
+            if 0 <= x < self.total_width and 0 <= y < self.total_height:
+                surface.set_at((x, y), color)
 
     class C64Memory:
         def __init__(self, ram, *, basic_rom, kernal_rom, char_rom, cia1, cia2, vic) -> None:
@@ -996,6 +2031,9 @@ class C64:
 
         def write(self, addr, value) -> None:
             """Write to C64 memory with banking logic."""
+            # Temporary debug: log ALL write calls
+            if DEBUG_SCREEN and 0x0400 <= addr <= 0x07E7:
+                log.info(f"*** C64Memory.write() CALLED: addr=${addr:04X}, value=${value:02X} ***")
             # CPU internal port
             if addr == 0x0000:
                 self.ddr = value & 0xFF
@@ -1010,6 +2048,21 @@ class C64:
                 # Log writes to jiffy clock ($A0-$A2)
                 if 0xA0 <= addr <= 0xA2 and DEBUG_JIFFY:
                     log.info(f"*** JIFFY CLOCK WRITE: addr=${addr:04X}, value=${value:02X} ***")
+                # Log writes to screen RAM ($0400-$07E7)
+                if 0x0400 <= addr <= 0x07E7 and DEBUG_SCREEN:
+                    log.info(f"*** SCREEN WRITE: addr=${addr:04X}, value=${value:02X} (char={chr(value) if 32 <= value < 127 else '?'}) ***")
+                # Log writes to cursor position variables ($D1-$D6)
+                if 0xD1 <= addr <= 0xD6 and DEBUG_CURSOR:
+                    var_names = {0xD1: "PNT_LO", 0xD2: "PNT_HI", 0xD3: "PNTR(col)", 0xD4: "QTSW", 0xD5: "LNMX", 0xD6: "TBLX(row)"}
+                    addr_int = int(addr) if hasattr(addr, '__int__') else addr
+                    val_int = int(value) if hasattr(value, '__int__') else value
+                    log.info(f"*** CURSOR VAR: {var_names.get(addr_int, '?')} (${addr_int:02X}) = ${val_int:02X} ({val_int}) ***")
+                # Log writes to screen line table ($D9-$F1)
+                if 0xD9 <= addr <= 0xF1 and DEBUG_CURSOR:
+                    addr_int = int(addr) if hasattr(addr, '__int__') else addr
+                    val_int = int(value) if hasattr(value, '__int__') else value
+                    row = addr_int - 0xD9
+                    log.info(f"*** SCREEN LINE TABLE: row {row} (${addr_int:02X}) = ${val_int:02X} ***")
                 self._write_ram_direct(addr, value & 0xFF)
                 return
 
@@ -1174,8 +2227,8 @@ class C64:
 
         # Now set up the CIA1 and CIA2 and VIC
         self.cia1 = C64.CIA1(cpu=self.cpu)
-        self.cia2 = C64.CIA2()
-        self.vic = C64.C64VIC(char_rom=self.char_rom, cpu=self.cpu)
+        self.cia2 = C64.CIA2(cpu=self.cpu)
+        self.vic = C64.C64VIC(char_rom=self.char_rom, cpu=self.cpu, cia2=self.cia2)
 
         # Initialize memory
         self.memory = C64.C64Memory(
@@ -1190,12 +2243,14 @@ class C64:
         # Hook up the memory handler so CPU RAM accesses go through C64Memory
         self.cpu.ram.memory_handler = self.memory
 
-        # Set up periodic update callback for both VIC and CIA1
+        # Set up periodic update callback for VIC, CIA1, and CIA2
         # VIC checks cycle count and triggers raster IRQs
         # CIA1 counts down timers and triggers timer IRQs
+        # CIA2 counts down timers and triggers NMIs
         def update_peripherals():
             self.vic.update()
             self.cia1.update()
+            self.cia2.update()
 
         self.cpu.periodic_callback = update_peripherals
         self.cpu.periodic_callback_interval = self.vic.cycles_per_line   # Update every raster line
@@ -1369,29 +2424,27 @@ class C64:
                 log.info(f"*** Still in KERNAL idle loop at ${pc:04X} (count={self._e5cf_count}) ***")
 
         # Enable logging when entering KERNAL for the first time (for debugging)
-        # TEMPORARILY DISABLED
-        # if region == "KERNAL" and self.last_pc_region != "KERNAL":
-        #     logging.getLogger("mos6502").setLevel(logging.DEBUG)
-        #     logging.getLogger("mos6502.cpu").setLevel(logging.DEBUG)
-        #     logging.getLogger("mos6502.cpu.flags").setLevel(logging.DEBUG)
-        #     logging.getLogger("mos6502.memory").setLevel(logging.DEBUG)
-        #     logging.getLogger("mos6502.memory.RAM").setLevel(logging.DEBUG)
-        #     logging.getLogger("mos6502.memory.Byte").setLevel(logging.DEBUG)
-        #     logging.getLogger("mos6502.memory.Word").setLevel(logging.DEBUG)
-        #     log.info(f"*** ENTERING KERNAL ROM at ${self.cpu.PC:04X} - Enabling detailed CPU logging ***")
+        if DEBUG_KERNAL and region == "KERNAL" and self.last_pc_region != "KERNAL":
+            logging.getLogger("mos6502").setLevel(logging.DEBUG)
+            logging.getLogger("mos6502.cpu").setLevel(logging.DEBUG)
+            logging.getLogger("mos6502.cpu.flags").setLevel(logging.DEBUG)
+            logging.getLogger("mos6502.memory").setLevel(logging.DEBUG)
+            logging.getLogger("mos6502.memory.RAM").setLevel(logging.DEBUG)
+            logging.getLogger("mos6502.memory.Byte").setLevel(logging.DEBUG)
+            logging.getLogger("mos6502.memory.Word").setLevel(logging.DEBUG)
+            log.info(f"*** ENTERING KERNAL ROM at ${self.cpu.PC:04X} - Enabling detailed CPU logging ***")
 
         # Enable logging when entering BASIC for the first time
-        # TEMPORARILY DISABLED
-        # if region == "BASIC" and not self.basic_logging_enabled:
-        #     self.basic_logging_enabled = True
-        #     logging.getLogger("mos6502").setLevel(logging.DEBUG)
-        #     logging.getLogger("mos6502.cpu").setLevel(logging.DEBUG)
-        #     logging.getLogger("mos6502.cpu.flags").setLevel(logging.DEBUG)
-        #     logging.getLogger("mos6502.memory").setLevel(logging.DEBUG)
-        #     logging.getLogger("mos6502.memory.RAM").setLevel(logging.DEBUG)
-        #     logging.getLogger("mos6502.memory.Byte").setLevel(logging.DEBUG)
-        #     logging.getLogger("mos6502.memory.Word").setLevel(logging.DEBUG)
-        #     log.info(f"*** ENTERING BASIC ROM at ${self.cpu.PC:04X} - Enabling detailed CPU logging ***")
+        if DEBUG_BASIC and region == "BASIC" and not self.basic_logging_enabled:
+            self.basic_logging_enabled = True
+            logging.getLogger("mos6502").setLevel(logging.DEBUG)
+            logging.getLogger("mos6502.cpu").setLevel(logging.DEBUG)
+            logging.getLogger("mos6502.cpu.flags").setLevel(logging.DEBUG)
+            logging.getLogger("mos6502.memory").setLevel(logging.DEBUG)
+            logging.getLogger("mos6502.memory.RAM").setLevel(logging.DEBUG)
+            logging.getLogger("mos6502.memory.Byte").setLevel(logging.DEBUG)
+            logging.getLogger("mos6502.memory.Word").setLevel(logging.DEBUG)
+            log.info(f"*** ENTERING BASIC ROM at ${self.cpu.PC:04X} - Enabling detailed CPU logging ***")
 
         self.last_pc_region = region
 
@@ -2116,10 +3169,72 @@ def main() -> int | None:
         help="Disable IRQ injection (for debugging; system will hang waiting for IRQs)",
     )
 
+    # Debug flag arguments
+    parser.add_argument(
+        "--debug-cia",
+        action="store_true",
+        help="Enable CIA register read/write logging",
+    )
+    parser.add_argument(
+        "--debug-vic",
+        action="store_true",
+        help="Enable VIC register operation logging",
+    )
+    parser.add_argument(
+        "--debug-jiffy",
+        action="store_true",
+        help="Enable jiffy clock update logging",
+    )
+    parser.add_argument(
+        "--debug-keyboard",
+        action="store_true",
+        help="Enable keyboard event logging",
+    )
+    parser.add_argument(
+        "--debug-screen",
+        action="store_true",
+        help="Enable screen memory write logging",
+    )
+    parser.add_argument(
+        "--debug-cursor",
+        action="store_true",
+        help="Enable cursor position variable logging",
+    )
+    parser.add_argument(
+        "--debug-kernal",
+        action="store_true",
+        help="Enable CPU logging when entering KERNAL ROM",
+    )
+    parser.add_argument(
+        "--debug-basic",
+        action="store_true",
+        help="Enable CPU logging when entering BASIC ROM",
+    )
+
     args = parser.parse_args()
 
     if args.verbose:
         logging.getLogger().setLevel(logging.DEBUG)
+
+    # Set debug flags from command-line arguments
+    global DEBUG_CIA, DEBUG_VIC, DEBUG_JIFFY, DEBUG_KEYBOARD
+    global DEBUG_SCREEN, DEBUG_CURSOR, DEBUG_KERNAL, DEBUG_BASIC
+    if args.debug_cia:
+        DEBUG_CIA = True
+    if args.debug_vic:
+        DEBUG_VIC = True
+    if args.debug_jiffy:
+        DEBUG_JIFFY = True
+    if args.debug_keyboard:
+        DEBUG_KEYBOARD = True
+    if args.debug_screen:
+        DEBUG_SCREEN = True
+    if args.debug_cursor:
+        DEBUG_CURSOR = True
+    if args.debug_kernal:
+        DEBUG_KERNAL = True
+    if args.debug_basic:
+        DEBUG_BASIC = True
 
     try:
         # Initialize C64
