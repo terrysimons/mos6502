@@ -378,6 +378,11 @@ class C64:
             action="store_true",
             help="Enable CPU logging when entering BASIC ROM",
         )
+        debug_group.add_argument(
+            "--verbose-cycles",
+            action="store_true",
+            help="Enable per-cycle CPU logging (f/r/w/o markers) - very slow, for debugging only",
+        )
 
     @classmethod
     def from_args(cls, args) -> "C64":
@@ -395,6 +400,7 @@ class C64:
             scale=args.scale,
             enable_irq=not getattr(args, 'no_irq', False),
             video_mode=args.video,
+            verbose_cycles=getattr(args, 'verbose_cycles', False),
         )
 
     class CIA1:
@@ -2403,7 +2409,7 @@ class C64:
             self._write_ram_direct(addr, value & 0xFF)
 
 
-    def __init__(self, rom_dir: Path = Path("./roms"), display_mode: str = "pygame", scale: int = 2, enable_irq: bool = True, video_mode: str = "pal") -> None:
+    def __init__(self, rom_dir: Path = Path("./roms"), display_mode: str = "pygame", scale: int = 2, enable_irq: bool = True, video_mode: str = "pal", verbose_cycles: bool = False) -> None:
         """Initialize the C64 emulator.
 
         Arguments:
@@ -2413,6 +2419,7 @@ class C64:
             scale: Pygame window scaling factor
             enable_irq: Enable IRQ injection (default: True)
             video_mode: Video timing mode ("pal" or "ntsc", default: "pal")
+            verbose_cycles: Enable per-cycle CPU logging (default: False)
         """
         self.rom_dir = Path(rom_dir)
         self.display_mode = display_mode
@@ -2435,7 +2442,7 @@ class C64:
 
         # Initialize CPU (6510 is essentially a 6502 with I/O ports)
         # We'll use NMOS 6502 as the base
-        self.cpu = CPU(cpu_variant=CPUVariant.NMOS_6502)
+        self.cpu = CPU(cpu_variant=CPUVariant.NMOS_6502, verbose_cycles=verbose_cycles)
 
         log.info(f"Initialized CPU: {self.cpu.variant_name}")
 

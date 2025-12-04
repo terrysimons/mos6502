@@ -54,6 +54,7 @@ class MOS6502CPU(flags.ProcessorStatusFlagsInterface):
     def __init__(
         self: Self,
         cpu_variant: str | variants.CPUVariant = variants.CPUVariant.NMOS_6502,
+        verbose_cycles: bool = False,
     ) -> Self:
         """Instantiate a mos6502 CPU core.
 
@@ -63,6 +64,8 @@ class MOS6502CPU(flags.ProcessorStatusFlagsInterface):
                 - CPUVariant enum value
                 - String: "6502", "6502A", "6502C", "65C02"
                 Defaults to NMOS 6502 for backward compatibility.
+            verbose_cycles: If True, emit per-cycle log messages (slow).
+                Defaults to False for performance.
         """
         super().__init__()
 
@@ -72,6 +75,7 @@ class MOS6502CPU(flags.ProcessorStatusFlagsInterface):
         else:
             self._variant = cpu_variant
 
+        self.verbose_cycles: bool = verbose_cycles
         self.endianness: str = "little"
 
         # As a convenience for code simplification we can set the default endianness
@@ -229,6 +233,26 @@ class MOS6502CPU(flags.ProcessorStatusFlagsInterface):
         -------
             The number of cycles remaining.
         """
+        # Fast path: batch update when not doing per-cycle logging
+        if not self.verbose_cycles:
+            if self.cycles != INFINITE_CYCLES:
+                # Consume available cycles (partial consumption is allowed)
+                cycles_to_use = min(cycles, self.cycles)
+                self.cycles -= cycles_to_use
+                self.cycles_executed += cycles_to_use
+
+                # If we couldn't consume all requested cycles, throw after partial use
+                if cycles_to_use < cycles:
+                    raise errors.CPUCycleExhaustionError(
+                        "Exhausted available CPU cycles after "
+                        f"{self.cycles_executed} "
+                        f"executed cycles with {self.cycles} remaining.",
+                    )
+            else:
+                self.cycles_executed += cycles
+            return self.cycles
+
+        # Verbose path: per-cycle logging for debugging
         for _i in range(cycles):
             if self.cycles <= 0:
                 raise errors.CPUCycleExhaustionError(
@@ -267,8 +291,8 @@ class MOS6502CPU(flags.ProcessorStatusFlagsInterface):
         -------
             None
         """
-        for _i in range(cost):
-            self.log.info("*")
+        if self.verbose_cycles:
+            self.log.info("*" * cost)
         self.tick(cost)
 
     def fetch_byte(self: Self) -> Byte:
@@ -291,14 +315,15 @@ class MOS6502CPU(flags.ProcessorStatusFlagsInterface):
             self.PC = self.PC + 1
         else:
             self.PC = 0
-        self.log.info("f")
         self.spend_cpu_cycles(cost=1)
 
-        self.log.debug(
-            f"Fetch Byte: [{hex(addr)}:{hex(addr)}] "
-            f"Byte: 0x{byte:02x} ({byte}) "
-            f"lowbyte=0x{byte:02x}@0x{addr:02x} highbyte={None}",
-        )
+        if self.verbose_cycles:
+            self.log.info("f")
+            self.log.debug(
+                f"Fetch Byte: [{hex(addr)}:{hex(addr)}] "
+                f"Byte: 0x{byte:02x} ({byte}) "
+                f"lowbyte=0x{byte:02x}@0x{addr:02x} highbyte={None}",
+            )
 
         return Byte(value=byte, endianness=self.endianness)
 
@@ -316,26 +341,26 @@ class MOS6502CPU(flags.ProcessorStatusFlagsInterface):
         """
         addr1: Word = self.PC
         lowbyte: Byte = self.ram[self.PC]
-        self.log.info("f")
         self.spend_cpu_cycles(cost=1)
 
         self.PC = self.PC + 1
         addr2: Word = self.PC
         highbyte: Byte = self.ram[self.PC]
-        self.log.info("f")
         self.spend_cpu_cycles(cost=1)
 
         self.PC = self.PC + 1
 
         word = (highbyte << 8) + lowbyte
 
-        self.log.debug(
-            "Fetch Word: ["
-            f"{hex(addr2)}:"
-            f"{hex(addr1)}], "
-            f"Word: 0x{word:02x} ({word}) "
-            f"lowbyte={lowbyte:02x}@0x{addr1:02x} highbyte={highbyte:02x}@0x{addr2:02x}",
-        )
+        if self.verbose_cycles:
+            self.log.info("ff")
+            self.log.debug(
+                "Fetch Word: ["
+                f"{hex(addr2)}:"
+                f"{hex(addr1)}], "
+                f"Word: 0x{word:02x} ({word}) "
+                f"lowbyte={lowbyte:02x}@0x{addr1:02x} highbyte={highbyte:02x}@0x{addr2:02x}",
+            )
 
         return Word(value=word, endianness=self.endianness)
 
@@ -353,11 +378,12 @@ class MOS6502CPU(flags.ProcessorStatusFlagsInterface):
         -------
             a Byte() set to the value located in memory at RAM[address]
         """
-        memory_section = self.ram.memory_section(address=address)
         data: Byte = self.ram[int(address)]
-        self.log.info("r")
         self.spend_cpu_cycles(cost=1)
-        self.log.debug(f"read_byte({memory_section}[0x{address:02x}]): {data}")
+        if self.verbose_cycles:
+            memory_section = self.ram.memory_section(address=address)
+            self.log.info("r")
+            self.log.debug(f"read_byte({memory_section}[0x{address:02x}]): {data}")
         return data
 
     def peek_byte(self: Self, address: Word) -> Byte:
@@ -392,13 +418,14 @@ class MOS6502CPU(flags.ProcessorStatusFlagsInterface):
         -------
             None
         """
-        # DEBUG: Log screen writes
-        addr_int = int(address) if hasattr(address, '__int__') else address
-        if 0x0400 <= addr_int <= 0x07E7:
-            self.log.warning(f"*** write_byte SCREEN: addr=${addr_int:04X}, data=${data & 0xFF:02X} ***")
         self.ram[address] = data & 0xFF
-        self.log.info("w")
         self.spend_cpu_cycles(cost=1)
+        if self.verbose_cycles:
+            # DEBUG: Log screen writes
+            addr_int = int(address) if hasattr(address, '__int__') else address
+            if 0x0400 <= addr_int <= 0x07E7:
+                self.log.warning(f"*** write_byte SCREEN: addr=${addr_int:04X}, data=${data & 0xFF:02X} ***")
+            self.log.info("w")
 
     def read_word(self: Self, address: Word) -> Word:
         """
@@ -414,15 +441,15 @@ class MOS6502CPU(flags.ProcessorStatusFlagsInterface):
         -------
             a Byte() set to the value located in memory at RAM[address]
         """
-        memory_section = self.ram.memory_section(address=address)
         lowbyte: Byte = self.ram[int(address)]
-        self.log.info("r")
         self.spend_cpu_cycles(cost=1)
         highbyte: Byte = self.ram[int(address) + 1]
-        self.log.info("r")
         self.spend_cpu_cycles(cost=1)
         data = (int(highbyte) << 8) + int(lowbyte)
-        self.log.debug(f"read_word({memory_section}[0x{address:02x}]): 0x{data:04X} ({data})")
+        if self.verbose_cycles:
+            memory_section = self.ram.memory_section(address=address)
+            self.log.info("rr")
+            self.log.debug(f"read_word({memory_section}[0x{address:02x}]): 0x{data:04X} ({data})")
         return Word(data, endianness=self.endianness)
 
     def read_word_zeropage(self: Self, address: Byte) -> Word:
@@ -446,13 +473,13 @@ class MOS6502CPU(flags.ProcessorStatusFlagsInterface):
             a Word() set to the value located in memory at RAM[address:address+1]
         """
         lowbyte: Byte = self.ram[int(address) & 0xFF]
-        self.log.info("r")
         self.spend_cpu_cycles(cost=1)
         highbyte: Byte = self.ram[(int(address) + 1) & 0xFF]
-        self.log.info("r")
         self.spend_cpu_cycles(cost=1)
         data = (int(highbyte) << 8) + int(lowbyte)
-        self.log.debug(f"read_word(zeropage[0x{address & 0xFF:02x}]): 0x{data:04X} ({data})")
+        if self.verbose_cycles:
+            self.log.info("rr")
+            self.log.debug(f"read_word(zeropage[0x{address & 0xFF:02x}]): 0x{data:04X} ({data})")
         return Word(data, endianness=self.endianness)
 
     def peek_word(self: Self, address: Word) -> Word:
@@ -496,11 +523,11 @@ class MOS6502CPU(flags.ProcessorStatusFlagsInterface):
             lowbyte: int = ba2int(data.lowbyte_bits)
             highbyte: int = ba2int(data.highbyte_bits)
         self.ram[address] = lowbyte
-        self.log.info("w")
         self.spend_cpu_cycles(cost=1)
         self.ram[address + 1] = highbyte
-        self.log.info("w")
         self.spend_cpu_cycles(cost=1)
+        if self.verbose_cycles:
+            self.log.info("ww")
 
     def read_register(self: Self, register_name: str) -> Byte | Word:
         """
@@ -692,7 +719,8 @@ class MOS6502CPU(flags.ProcessorStatusFlagsInterface):
             address: Word = address + offset_register_value
 
             if address.overflow:
-                self.log.info("o")
+                if self.verbose_cycles:
+                    self.log.info("o")
                 self.spend_cpu_cycles(1)
 
         return address
@@ -748,7 +776,8 @@ class MOS6502CPU(flags.ProcessorStatusFlagsInterface):
         address: Word = Word(absolute_address) + Byte(offset_register_value)
 
         if address.overflow:
-            self.log.info("o")
+            if self.verbose_cycles:
+                self.log.info("o")
             self.spend_cpu_cycles(1)
 
         return address
