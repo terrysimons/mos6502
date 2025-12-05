@@ -45,7 +45,7 @@ def isc_zeropage_0xe7(cpu: MOS6502CPU) -> None:
     address: int = cpu.fetch_zeropage_mode_address(offset_register_name=None)
 
     # Read value from memory
-    value: int = int(cpu.read_byte(address=address))
+    value: int = cpu.read_byte(address=address)
 
     # Increment value
     incremented: int = (value + 1) & 0xFF
@@ -97,7 +97,7 @@ def isc_zeropage_x_0xf7(cpu: MOS6502CPU) -> None:
     address: int = cpu.fetch_zeropage_mode_address(offset_register_name="X")
 
     # Read value from memory
-    value: int = int(cpu.read_byte(address=address))
+    value: int = cpu.read_byte(address=address)
 
     # Increment value
     incremented: int = (value + 1) & 0xFF
@@ -149,7 +149,7 @@ def isc_indexed_indirect_x_0xe3(cpu: MOS6502CPU) -> None:
     address: int = cpu.fetch_indexed_indirect_mode_address()
 
     # Read value from memory
-    value: int = int(cpu.read_byte(address=address))
+    value: int = cpu.read_byte(address=address)
 
     # Increment value
     incremented: int = (value + 1) & 0xFF
@@ -201,7 +201,7 @@ def isc_indirect_indexed_y_0xf3(cpu: MOS6502CPU) -> None:
     address: int = cpu.fetch_indirect_indexed_mode_address()
 
     # Read value from memory
-    value: int = int(cpu.read_byte(address=address))
+    value: int = cpu.read_byte(address=address)
 
     # Increment value
     incremented: int = (value + 1) & 0xFF
@@ -253,7 +253,7 @@ def isc_absolute_0xef(cpu: MOS6502CPU) -> None:
     address: int = cpu.fetch_absolute_mode_address(offset_register_name=None)
 
     # Read value from memory
-    value: int = int(cpu.read_byte(address=address))
+    value: int = cpu.read_byte(address=address)
 
     # Increment value
     incremented: int = (value + 1) & 0xFF
@@ -308,7 +308,7 @@ def isc_absolute_x_0xff(cpu: MOS6502CPU) -> None:
     cpu.spend_cpu_cycles(1)
 
     # Read value from memory
-    value: int = int(cpu.read_byte(address=address))
+    value: int = cpu.read_byte(address=address)
 
     # Internal processing cycle for RMW operation
     cpu.spend_cpu_cycles(1)
@@ -365,7 +365,7 @@ def isc_absolute_y_0xfb(cpu: MOS6502CPU) -> None:
     cpu.spend_cpu_cycles(1)
 
     # Read value from memory
-    value: int = int(cpu.read_byte(address=address & 0xFFFF))
+    value: int = cpu.read_byte(address=address & 0xFFFF)
 
     # Internal processing cycle for RMW operation
     cpu.spend_cpu_cycles(1)

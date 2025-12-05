@@ -25,7 +25,7 @@ def and_immediate_0x29(cpu: MOS6502CPU) -> None:
     ---------
         cpu: The CPU instance to operate on
     """
-    value: int = int(cpu.fetch_byte())
+    value: int = cpu.fetch_byte()
     cpu.A = cpu.A & value
     cpu.set_load_status_flags(register_name="A")
     cpu.log.info("i")
@@ -48,7 +48,7 @@ def and_zeropage_0x25(cpu: MOS6502CPU) -> None:
         cpu: The CPU instance to operate on
     """
     address: int = cpu.fetch_zeropage_mode_address(offset_register_name=None)
-    value: int = int(cpu.read_byte(address=address))
+    value: int = cpu.read_byte(address=address)
     cpu.A = cpu.A & value
     cpu.set_load_status_flags(register_name="A")
     cpu.log.info("i")
@@ -71,7 +71,7 @@ def and_zeropage_x_0x35(cpu: MOS6502CPU) -> None:
         cpu: The CPU instance to operate on
     """
     address: int = cpu.fetch_zeropage_mode_address(offset_register_name="X")
-    value: int = int(cpu.read_byte(address=address))
+    value: int = cpu.read_byte(address=address)
     cpu.A = cpu.A & value
     cpu.set_load_status_flags(register_name="A")
     cpu.log.info("i")
@@ -94,7 +94,7 @@ def and_absolute_0x2d(cpu: MOS6502CPU) -> None:
         cpu: The CPU instance to operate on
     """
     address: int = cpu.fetch_absolute_mode_address(offset_register_name=None)
-    value: int = int(cpu.read_byte(address=address))
+    value: int = cpu.read_byte(address=address)
     cpu.A = cpu.A & value
     cpu.set_load_status_flags(register_name="A")
     cpu.log.info("i")
@@ -117,7 +117,7 @@ def and_absolute_x_0x3d(cpu: MOS6502CPU) -> None:
         cpu: The CPU instance to operate on
     """
     address: int = cpu.fetch_absolute_mode_address(offset_register_name="X")
-    value: int = int(cpu.read_byte(address=address))
+    value: int = cpu.read_byte(address=address)
     cpu.A = cpu.A & value
     cpu.set_load_status_flags(register_name="A")
     cpu.log.info("i")
@@ -140,7 +140,7 @@ def and_absolute_y_0x39(cpu: MOS6502CPU) -> None:
         cpu: The CPU instance to operate on
     """
     address: int = cpu.fetch_absolute_mode_address(offset_register_name="Y")
-    value: int = int(cpu.read_byte(address=address))
+    value: int = cpu.read_byte(address=address)
     cpu.A = cpu.A & value
     cpu.set_load_status_flags(register_name="A")
     cpu.log.info("i")
@@ -163,7 +163,7 @@ def and_indexed_indirect_x_0x21(cpu: MOS6502CPU) -> None:
         cpu: The CPU instance to operate on
     """
     address: int = cpu.fetch_indexed_indirect_mode_address()
-    value: int = int(cpu.read_byte(address=address))
+    value: int = cpu.read_byte(address=address)
     cpu.A = cpu.A & value
     cpu.set_load_status_flags(register_name="A")
     cpu.log.info("i")
@@ -186,7 +186,7 @@ def and_indirect_indexed_y_0x31(cpu: MOS6502CPU) -> None:
         cpu: The CPU instance to operate on
     """
     address: int = cpu.fetch_indirect_indexed_mode_address()
-    value: int = int(cpu.read_byte(address=address))
+    value: int = cpu.read_byte(address=address)
     cpu.A = cpu.A & value
     cpu.set_load_status_flags(register_name="A")
     cpu.log.info("i")

@@ -40,7 +40,7 @@ def anc_immediate_0x0b(cpu: MOS6502CPU) -> None:
     """
     from mos6502 import flags
 
-    value: int = int(cpu.fetch_byte())
+    value: int = cpu.fetch_byte()
 
     # AND with accumulator
     cpu.A = int(cpu.A) & value
@@ -78,7 +78,7 @@ def anc_immediate_0x2b(cpu: MOS6502CPU) -> None:
     """
     from mos6502 import flags
 
-    value: int = int(cpu.fetch_byte())
+    value: int = cpu.fetch_byte()
 
     cpu.A = int(cpu.A) & value
 

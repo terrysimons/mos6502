@@ -40,7 +40,7 @@ def alr_immediate_0x4b(cpu: MOS6502CPU) -> None:
     """
     from mos6502 import flags
 
-    value: int = int(cpu.fetch_byte())
+    value: int = cpu.fetch_byte()
 
     # AND with accumulator
     result: int = int(cpu.A) & value

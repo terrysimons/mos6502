@@ -188,6 +188,8 @@ class ProcessorStatusFlagsInterface:
     Provides property access to individual flags via the CPU's _flags attribute.
     """
 
+    __slots__ = ()  # No instance attributes - just property accessors
+
     @property
     def C(self: Self) -> bool:  # noqa: N802
         """C is True if the Carry flag is set."""

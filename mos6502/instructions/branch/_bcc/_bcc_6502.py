@@ -28,7 +28,7 @@ def bcc_relative_0x90(cpu: MOS6502CPU) -> None:
     from mos6502 import flags
 
     # Branch on Carry Clear (C = 0)
-    offset: int = int(cpu.fetch_byte())  # Signed byte offset
+    offset: int = cpu.fetch_byte()  # Signed byte offset
 
     # Convert to signed byte (-128 to +127)
     if offset > 127:

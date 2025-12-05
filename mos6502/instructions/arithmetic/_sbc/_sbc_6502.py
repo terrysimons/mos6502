@@ -25,7 +25,7 @@ def sbc_immediate_0xe9(cpu: MOS6502CPU) -> None:
     """
     from mos6502 import flags
 
-    value: int = int(cpu.fetch_byte())
+    value: int = cpu.fetch_byte()
 
     if cpu.flags[flags.D]:
         # BCD (Decimal) mode subtraction
@@ -67,7 +67,7 @@ def sbc_zeropage_0xe5(cpu: MOS6502CPU) -> None:
     from mos6502 import flags
 
     address: int = cpu.fetch_zeropage_mode_address(offset_register_name=None)
-    value: int = int(cpu.read_byte(address=address))
+    value: int = cpu.read_byte(address=address)
 
     if cpu.flags[flags.D]:
         result, carry_out, overflow, _ = cpu._sbc_bcd(cpu.A, value, cpu.flags[flags.C])
@@ -99,7 +99,7 @@ def sbc_zeropage_x_0xf5(cpu: MOS6502CPU) -> None:
     from mos6502 import flags
 
     address: int = cpu.fetch_zeropage_mode_address(offset_register_name="X")
-    value: int = int(cpu.read_byte(address=address))
+    value: int = cpu.read_byte(address=address)
 
     if cpu.flags[flags.D]:
         result, carry_out, overflow, _ = cpu._sbc_bcd(cpu.A, value, cpu.flags[flags.C])
@@ -131,7 +131,7 @@ def sbc_absolute_0xed(cpu: MOS6502CPU) -> None:
     from mos6502 import flags
 
     address: int = cpu.fetch_absolute_mode_address(offset_register_name=None)
-    value: int = int(cpu.read_byte(address=address))
+    value: int = cpu.read_byte(address=address)
 
     if cpu.flags[flags.D]:
         result, carry_out, overflow, _ = cpu._sbc_bcd(cpu.A, value, cpu.flags[flags.C])
@@ -163,7 +163,7 @@ def sbc_absolute_x_0xfd(cpu: MOS6502CPU) -> None:
     from mos6502 import flags
 
     address: int = cpu.fetch_absolute_mode_address(offset_register_name="X")
-    value: int = int(cpu.read_byte(address=address))
+    value: int = cpu.read_byte(address=address)
 
     if cpu.flags[flags.D]:
         result, carry_out, overflow, _ = cpu._sbc_bcd(cpu.A, value, cpu.flags[flags.C])
@@ -195,7 +195,7 @@ def sbc_absolute_y_0xf9(cpu: MOS6502CPU) -> None:
     from mos6502 import flags
 
     address: int = cpu.fetch_absolute_mode_address(offset_register_name="Y")
-    value: int = int(cpu.read_byte(address=address))
+    value: int = cpu.read_byte(address=address)
 
     if cpu.flags[flags.D]:
         result, carry_out, overflow, _ = cpu._sbc_bcd(cpu.A, value, cpu.flags[flags.C])
@@ -227,7 +227,7 @@ def sbc_indexed_indirect_x_0xe1(cpu: MOS6502CPU) -> None:
     from mos6502 import flags
 
     address: int = cpu.fetch_indexed_indirect_mode_address()
-    value: int = int(cpu.read_byte(address=address))
+    value: int = cpu.read_byte(address=address)
 
     if cpu.flags[flags.D]:
         result, carry_out, overflow, _ = cpu._sbc_bcd(cpu.A, value, cpu.flags[flags.C])
@@ -259,7 +259,7 @@ def sbc_indirect_indexed_y_0xf1(cpu: MOS6502CPU) -> None:
     from mos6502 import flags
 
     address: int = cpu.fetch_indirect_indexed_mode_address()
-    value: int = int(cpu.read_byte(address=address))
+    value: int = cpu.read_byte(address=address)
 
     if cpu.flags[flags.D]:
         result, carry_out, overflow, _ = cpu._sbc_bcd(cpu.A, value, cpu.flags[flags.C])

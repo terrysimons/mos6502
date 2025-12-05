@@ -49,7 +49,7 @@ def asl_zeropage_0x06(cpu: MOS6502CPU) -> None:
     from mos6502 import flags
 
     address: int = cpu.fetch_zeropage_mode_address(offset_register_name=None)
-    value: int = int(cpu.read_byte(address=address))
+    value: int = cpu.read_byte(address=address)
 
     # Bit 7 goes to carry flag
     cpu.flags[flags.C] = 1 if (value & 0x80) else 0
@@ -74,7 +74,7 @@ def asl_zeropage_x_0x16(cpu: MOS6502CPU) -> None:
     from mos6502 import flags
 
     address: int = cpu.fetch_zeropage_mode_address(offset_register_name="X")
-    value: int = int(cpu.read_byte(address=address))
+    value: int = cpu.read_byte(address=address)
 
     # Bit 7 goes to carry flag
     cpu.flags[flags.C] = 1 if (value & 0x80) else 0
@@ -99,7 +99,7 @@ def asl_absolute_0x0e(cpu: MOS6502CPU) -> None:
     from mos6502 import flags
 
     address: int = cpu.fetch_absolute_mode_address(offset_register_name=None)
-    value: int = int(cpu.read_byte(address=address))
+    value: int = cpu.read_byte(address=address)
 
     # Read-Modify-Write operations have an internal processing cycle
     cpu.spend_cpu_cycles(1)
@@ -131,7 +131,7 @@ def asl_absolute_x_0x1e(cpu: MOS6502CPU) -> None:
     # Read-Modify-Write with Absolute,X always does a dummy read regardless of page crossing
     cpu.spend_cpu_cycles(1)
 
-    value: int = int(cpu.read_byte(address=address))
+    value: int = cpu.read_byte(address=address)
 
     # Internal processing cycle for RMW operation
     cpu.spend_cpu_cycles(1)

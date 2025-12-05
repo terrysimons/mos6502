@@ -43,7 +43,7 @@ def las_absolute_y_0xbb(cpu: MOS6502CPU) -> None:
     from mos6502 import flags
 
     address: int = cpu.fetch_absolute_mode_address(offset_register_name="Y")
-    value: int = int(cpu.read_byte(address=address))
+    value: int = cpu.read_byte(address=address)
 
     # Perform M & S
     result: int = value & int(cpu.S)

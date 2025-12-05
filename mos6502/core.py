@@ -49,6 +49,28 @@ BYTE_BIT_7_MASK: int = 0x80  # Bit 7 mask
 class MOS6502CPU(flags.ProcessorStatusFlagsInterface):
     """mos6502CPU Core."""
 
+    __slots__ = (
+        '_variant',
+        'verbose_cycles',
+        'endianness',
+        '_registers',
+        '_flags',
+        'ram',
+        'cycles',
+        'cycles_executed',
+        'instructions_executed',
+        'instructions_remaining',
+        'irq_pending',
+        'nmi_pending',
+        '_nmi_line_previous',
+        'periodic_callback',
+        'periodic_callback_interval',
+        '_last_periodic_callback_cycle',
+        'pc_callback',
+        'pre_instruction_callback',
+        'post_instruction_callback',
+    )
+
     log: logging.Logger = logging.getLogger("mos6502.cpu")
 
     def __init__(
@@ -273,9 +295,9 @@ class MOS6502CPU(flags.ProcessorStatusFlagsInterface):
             self.log.info("*" * cost)
         self.tick(cost)
 
-    def fetch_byte(self: Self) -> Byte:
+    def fetch_byte(self: Self) -> int:
         """
-        Fetch a Byte() from RAM[self.PC].
+        Fetch a byte from RAM[self.PC].
 
         Increments self.PC by 1.
 
@@ -283,10 +305,9 @@ class MOS6502CPU(flags.ProcessorStatusFlagsInterface):
 
         Returns
         -------
-            a Byte() set to the value located in memory at self.PC
+            int: the byte value located in memory at self.PC
         """
-        addr: Word = self.PC
-        byte: Byte = self.ram[self.PC]
+        byte: int = self.ram[self.PC]
 
         # Use explicit assignment to trigger PC setter (for pc_callback)
         # Setter handles 16-bit wrap via & 0xFFFF masking
@@ -294,6 +315,7 @@ class MOS6502CPU(flags.ProcessorStatusFlagsInterface):
         self.spend_cpu_cycles(cost=1)
 
         if self.verbose_cycles:
+            addr = self.PC - 1
             self.log.info("f")
             self.log.debug(
                 f"Fetch Byte: [{hex(addr)}:{hex(addr)}] "
@@ -301,11 +323,11 @@ class MOS6502CPU(flags.ProcessorStatusFlagsInterface):
                 f"lowbyte=0x{byte:02x}@0x{addr:02x} highbyte={None}",
             )
 
-        return Byte(value=byte, endianness=self.endianness)
+        return byte
 
-    def fetch_word(self: Self) -> Word:
+    def fetch_word(self: Self) -> int:
         """
-        Fetch a Word() from RAM[self.PC].
+        Fetch a word from RAM[self.PC].
 
         Increments self.PC by 2.
 
@@ -313,20 +335,20 @@ class MOS6502CPU(flags.ProcessorStatusFlagsInterface):
 
         Returns
         -------
-            a Word() set to the value located in memory at RAM[self.PC:self.PC + 1]
+            int: the 16-bit word value located in memory at RAM[self.PC:self.PC + 1]
         """
-        addr1: Word = self.PC
-        lowbyte: Byte = self.ram[self.PC]
+        addr1: int = self.PC
+        lowbyte: int = self.ram[self.PC]
         self.spend_cpu_cycles(cost=1)
 
         self.PC = self.PC + 1
-        addr2: Word = self.PC
-        highbyte: Byte = self.ram[self.PC]
+        addr2: int = self.PC
+        highbyte: int = self.ram[self.PC]
         self.spend_cpu_cycles(cost=1)
 
         self.PC = self.PC + 1
 
-        word = (highbyte << 8) + lowbyte
+        word: int = (highbyte << 8) | lowbyte
 
         if self.verbose_cycles:
             self.log.info("ff")
@@ -338,11 +360,11 @@ class MOS6502CPU(flags.ProcessorStatusFlagsInterface):
                 f"lowbyte={lowbyte:02x}@0x{addr1:02x} highbyte={highbyte:02x}@0x{addr2:02x}",
             )
 
-        return Word(value=word, endianness=self.endianness)
+        return word
 
-    def read_byte(self: Self, address: Word) -> Byte:
+    def read_byte(self: Self, address: int) -> int:
         """
-        Read a Byte() from RAM at location RAM[address].
+        Read a byte from RAM at location RAM[address].
 
         Costs 1 CPU cycle.
 
@@ -352,9 +374,9 @@ class MOS6502CPU(flags.ProcessorStatusFlagsInterface):
 
         Returns:
         -------
-            a Byte() set to the value located in memory at RAM[address]
+            int: the byte value located in memory at RAM[address]
         """
-        data: Byte = self.ram[int(address)]
+        data: int = self.ram[address]
         self.spend_cpu_cycles(cost=1)
         if self.verbose_cycles:
             memory_section = self.ram.memory_section(address=address)
@@ -623,13 +645,13 @@ class MOS6502CPU(flags.ProcessorStatusFlagsInterface):
         self.N = flags.ProcessorStatusFlags.N[flags.N] \
             if (register & 128) else not flags.ProcessorStatusFlags.N[flags.N]
 
-    def fetch_zeropage_mode_address(self: Self, offset_register_name: str) -> Byte:
+    def fetch_zeropage_mode_address(self: Self, offset_register_name: str) -> int:
         """
         Read from RAM @ RAM:ZEROPAGE[PC].
 
-        Increases PC by 2.
+        Increases PC by 1.
 
-        Costs 2 CPU cycles.
+        Costs 1 CPU cycle.
 
         Arguments:
         ---------
@@ -637,42 +659,34 @@ class MOS6502CPU(flags.ProcessorStatusFlagsInterface):
 
         Returns:
         -------
-            a Word()
+            int: the zeropage address (0x00-0xFF)
         """
-        zeropage_address: Byte = self.fetch_byte()
-
-        offset_register_value: Literal[0] = 0
-        address: Byte = zeropage_address + offset_register_value
+        zeropage_address: int = self.fetch_byte()
 
         if offset_register_name is not None:
-            offset_register_value: Literal[0] = getattr(self, offset_register_name)
+            offset_register_value: int = getattr(self, offset_register_name)
+            # Zeropage addressing wraps at 0xFF boundary
+            zeropage_address = (zeropage_address + offset_register_value) & 0xFF
 
-            # This needs to wrap, so mask by 0xFF
-            address: Byte = zeropage_address + offset_register_value
+        return zeropage_address
 
-        return address
-
-    def fetch_immediate_mode_address(self: Self) -> Byte:
+    def fetch_immediate_mode_address(self: Self) -> int:
         """
         Read from RAM @ RAM[PC].
 
         Increases PC by 1.
 
-        Costs 1 CPU cycles.
-
-        Arguments:
-        ---------
-            register_name: the name of the register to fetch
+        Costs 1 CPU cycle.
 
         Returns:
         -------
-            a Word()
+            int: the byte value at PC
         """
-        data: Byte = self.fetch_byte()
+        data: int = self.fetch_byte()
 
         return data
 
-    def fetch_absolute_mode_address(self: Self, offset_register_name: str) -> Word:
+    def fetch_absolute_mode_address(self: Self, offset_register_name: str) -> int:
         """
         Read from RAM @ RAM[(PC:PC + 1)].
 
@@ -686,22 +700,24 @@ class MOS6502CPU(flags.ProcessorStatusFlagsInterface):
 
         Returns:
         -------
-            a Word()
+            int: the computed address
         """
-        address: Word = self.fetch_word()
+        address: int = self.fetch_word()
 
         if offset_register_name is not None:
-            offset_register_value: Byte = getattr(self, offset_register_name)
-            address: Word = address + offset_register_value
+            offset_register_value: int = getattr(self, offset_register_name)
+            # Check for page boundary crossing (extra cycle if high byte changes)
+            page_crossed = (address & 0xFF) + offset_register_value > 0xFF
+            address = (address + offset_register_value) & 0xFFFF
 
-            if address.overflow:
+            if page_crossed:
                 if self.verbose_cycles:
                     self.log.info("o")
                 self.spend_cpu_cycles(1)
 
         return address
 
-    def fetch_indexed_indirect_mode_address(self: Self) -> Word:
+    def fetch_indexed_indirect_mode_address(self: Self) -> int:
         """
         Read from RAM @ RAM[(PC:PC + 1) + X].
 
@@ -715,17 +731,17 @@ class MOS6502CPU(flags.ProcessorStatusFlagsInterface):
 
         Returns:
         -------
-            a Word()
+            int: the computed address
         """
-        indirect_address: Byte = self.fetch_byte()
-        offset_register_value: Byte = self.X
+        indirect_address: int = self.fetch_byte()
+        offset_register_value: int = self.X
 
         # Use read_word_zeropage to handle zero page wrap at 0xFF boundary
-        address: Word = self.read_word_zeropage((indirect_address + offset_register_value) & 0xFF)
+        address: int = self.read_word_zeropage((indirect_address + offset_register_value) & 0xFF)
 
         return address
 
-    def fetch_indirect_indexed_mode_address(self: Self) -> Word:
+    def fetch_indirect_indexed_mode_address(self: Self) -> int:
         """
         Read from RAM @ RAM:[ZEROPAGE[PC] << 8 + ZEROPAGE[PC + 1] + Y.
 
@@ -739,19 +755,19 @@ class MOS6502CPU(flags.ProcessorStatusFlagsInterface):
 
         Returns:
         -------
-            a Word()
+            int: the computed address
         """
-        indirect_address: Byte = self.fetch_byte()
-        offset_register_value: Byte = self.Y
+        indirect_address: int = self.fetch_byte()
+        offset_register_value: int = self.Y
 
         # Use read_word_zeropage to handle zero page wrap at 0xFF boundary
-        absolute_address: Word = self.read_word_zeropage(indirect_address)
+        absolute_address: int = self.read_word_zeropage(indirect_address)
 
-        # Note: We add these together this way to ensure
-        # an overflow condition
-        address: Word = Word(absolute_address) + Byte(offset_register_value)
+        # Check for page boundary crossing (extra cycle if high byte changes)
+        page_crossed = (absolute_address & 0xFF) + offset_register_value > 0xFF
+        address: int = (absolute_address + offset_register_value) & 0xFFFF
 
-        if address.overflow:
+        if page_crossed:
             if self.verbose_cycles:
                 self.log.info("o")
             self.spend_cpu_cycles(1)

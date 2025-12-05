@@ -45,7 +45,7 @@ def slo_zeropage_0x07(cpu: MOS6502CPU) -> None:
     address: int = cpu.fetch_zeropage_mode_address(offset_register_name=None)
 
     # Read value from memory
-    value: int = int(cpu.read_byte(address=address))
+    value: int = cpu.read_byte(address=address)
 
     # Shift left (bit 7 goes to carry)
     cpu.flags[flags.C] = 1 if (value & 0x80) else 0
@@ -90,7 +90,7 @@ def slo_zeropage_x_0x17(cpu: MOS6502CPU) -> None:
     address: int = cpu.fetch_zeropage_mode_address(offset_register_name="X")
 
     # Read value from memory
-    value: int = int(cpu.read_byte(address=address))
+    value: int = cpu.read_byte(address=address)
 
     # Shift left (bit 7 goes to carry)
     cpu.flags[flags.C] = 1 if (value & 0x80) else 0
@@ -135,7 +135,7 @@ def slo_indexed_indirect_x_0x03(cpu: MOS6502CPU) -> None:
     address: int = cpu.fetch_indexed_indirect_mode_address()
 
     # Read value from memory
-    value: int = int(cpu.read_byte(address=address))
+    value: int = cpu.read_byte(address=address)
 
     # Shift left (bit 7 goes to carry)
     cpu.flags[flags.C] = 1 if (value & 0x80) else 0
@@ -180,7 +180,7 @@ def slo_indirect_indexed_y_0x13(cpu: MOS6502CPU) -> None:
     address: int = cpu.fetch_indirect_indexed_mode_address()
 
     # Read value from memory
-    value: int = int(cpu.read_byte(address=address))
+    value: int = cpu.read_byte(address=address)
 
     # Shift left (bit 7 goes to carry)
     cpu.flags[flags.C] = 1 if (value & 0x80) else 0
@@ -225,7 +225,7 @@ def slo_absolute_0x0f(cpu: MOS6502CPU) -> None:
     address: int = cpu.fetch_absolute_mode_address(offset_register_name=None)
 
     # Read value from memory
-    value: int = int(cpu.read_byte(address=address))
+    value: int = cpu.read_byte(address=address)
 
     # Shift left (bit 7 goes to carry)
     cpu.flags[flags.C] = 1 if (value & 0x80) else 0
@@ -273,7 +273,7 @@ def slo_absolute_x_0x1f(cpu: MOS6502CPU) -> None:
     cpu.spend_cpu_cycles(1)
 
     # Read value from memory
-    value: int = int(cpu.read_byte(address=address))
+    value: int = cpu.read_byte(address=address)
 
     # Internal processing cycle for RMW operation
     cpu.spend_cpu_cycles(1)
@@ -323,7 +323,7 @@ def slo_absolute_y_0x1b(cpu: MOS6502CPU) -> None:
     cpu.spend_cpu_cycles(1)
 
     # Read value from memory
-    value: int = int(cpu.read_byte(address=address & 0xFFFF))
+    value: int = cpu.read_byte(address=address & 0xFFFF)
 
     # Internal processing cycle for RMW operation
     cpu.spend_cpu_cycles(1)

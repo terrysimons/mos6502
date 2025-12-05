@@ -51,7 +51,7 @@ def rol_zeropage_0x26(cpu: MOS6502CPU) -> None:
     from mos6502 import flags
 
     address: int = cpu.fetch_zeropage_mode_address(offset_register_name=None)
-    value: int = int(cpu.read_byte(address=address))
+    value: int = cpu.read_byte(address=address)
     carry_in: int = cpu.flags[flags.C]
 
     # Bit 7 goes to carry flag
@@ -78,7 +78,7 @@ def rol_zeropage_x_0x36(cpu: MOS6502CPU) -> None:
     from mos6502 import flags
 
     address: int = cpu.fetch_zeropage_mode_address(offset_register_name="X")
-    value: int = int(cpu.read_byte(address=address))
+    value: int = cpu.read_byte(address=address)
     carry_in: int = cpu.flags[flags.C]
 
     # Bit 7 goes to carry flag
@@ -105,7 +105,7 @@ def rol_absolute_0x2e(cpu: MOS6502CPU) -> None:
     from mos6502 import flags
 
     address: int = cpu.fetch_absolute_mode_address(offset_register_name=None)
-    value: int = int(cpu.read_byte(address=address))
+    value: int = cpu.read_byte(address=address)
     carry_in: int = cpu.flags[flags.C]
 
     # Read-Modify-Write operations have an internal processing cycle
@@ -139,7 +139,7 @@ def rol_absolute_x_0x3e(cpu: MOS6502CPU) -> None:
     # Read-Modify-Write with Absolute,X always does a dummy read regardless of page crossing
     cpu.spend_cpu_cycles(1)
 
-    value: int = int(cpu.read_byte(address=address))
+    value: int = cpu.read_byte(address=address)
     carry_in: int = cpu.flags[flags.C]
 
     # Internal processing cycle for RMW operation

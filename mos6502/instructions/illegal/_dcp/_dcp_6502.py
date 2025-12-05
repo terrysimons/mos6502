@@ -45,7 +45,7 @@ def dcp_zeropage_0xc7(cpu: MOS6502CPU) -> None:
     address: int = cpu.fetch_zeropage_mode_address(offset_register_name=None)
 
     # Read value from memory
-    value: int = int(cpu.read_byte(address=address))
+    value: int = cpu.read_byte(address=address)
 
     # Decrement value
     decremented: int = (value - 1) & 0xFF
@@ -88,7 +88,7 @@ def dcp_zeropage_x_0xd7(cpu: MOS6502CPU) -> None:
     address: int = cpu.fetch_zeropage_mode_address(offset_register_name="X")
 
     # Read value from memory
-    value: int = int(cpu.read_byte(address=address))
+    value: int = cpu.read_byte(address=address)
 
     # Decrement value
     decremented: int = (value - 1) & 0xFF
@@ -131,7 +131,7 @@ def dcp_indexed_indirect_x_0xc3(cpu: MOS6502CPU) -> None:
     address: int = cpu.fetch_indexed_indirect_mode_address()
 
     # Read value from memory
-    value: int = int(cpu.read_byte(address=address))
+    value: int = cpu.read_byte(address=address)
 
     # Decrement value
     decremented: int = (value - 1) & 0xFF
@@ -174,7 +174,7 @@ def dcp_indirect_indexed_y_0xd3(cpu: MOS6502CPU) -> None:
     address: int = cpu.fetch_indirect_indexed_mode_address()
 
     # Read value from memory
-    value: int = int(cpu.read_byte(address=address))
+    value: int = cpu.read_byte(address=address)
 
     # Decrement value
     decremented: int = (value - 1) & 0xFF
@@ -217,7 +217,7 @@ def dcp_absolute_0xcf(cpu: MOS6502CPU) -> None:
     address: int = cpu.fetch_absolute_mode_address(offset_register_name=None)
 
     # Read value from memory
-    value: int = int(cpu.read_byte(address=address))
+    value: int = cpu.read_byte(address=address)
 
     # Decrement value
     decremented: int = (value - 1) & 0xFF
@@ -263,7 +263,7 @@ def dcp_absolute_x_0xdf(cpu: MOS6502CPU) -> None:
     cpu.spend_cpu_cycles(1)
 
     # Read value from memory
-    value: int = int(cpu.read_byte(address=address))
+    value: int = cpu.read_byte(address=address)
 
     # Internal processing cycle for RMW operation
     cpu.spend_cpu_cycles(1)
@@ -311,7 +311,7 @@ def dcp_absolute_y_0xdb(cpu: MOS6502CPU) -> None:
     cpu.spend_cpu_cycles(1)
 
     # Read value from memory
-    value: int = int(cpu.read_byte(address=address & 0xFFFF))
+    value: int = cpu.read_byte(address=address & 0xFFFF)
 
     # Internal processing cycle for RMW operation
     cpu.spend_cpu_cycles(1)

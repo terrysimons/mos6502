@@ -43,7 +43,7 @@ def arr_immediate_0x6b(cpu: MOS6502CPU) -> None:
     """
     from mos6502 import flags
 
-    value: int = int(cpu.fetch_byte())
+    value: int = cpu.fetch_byte()
     carry_in: int = cpu.flags[flags.C]
 
     # AND with accumulator

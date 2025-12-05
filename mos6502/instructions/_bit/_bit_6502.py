@@ -34,7 +34,7 @@ def bit_zeropage_0x24(cpu: MOS6502CPU) -> None:
 
     # Bit Test - AND A with memory, set flags but don't store result
     address: int = cpu.fetch_zeropage_mode_address(offset_register_name=None)
-    value: int = int(cpu.read_byte(address=address))
+    value: int = cpu.read_byte(address=address)
 
     # Z flag set based on A AND memory
     result: int = cpu.A & value
@@ -69,7 +69,7 @@ def bit_absolute_0x2c(cpu: MOS6502CPU) -> None:
 
     # Bit Test - AND A with memory, set flags but don't store result
     address: int = cpu.fetch_absolute_mode_address(offset_register_name=None)
-    value: int = int(cpu.read_byte(address=address))
+    value: int = cpu.read_byte(address=address)
 
     # Z flag set based on A AND memory
     result: int = cpu.A & value

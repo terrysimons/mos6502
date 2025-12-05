@@ -52,7 +52,7 @@ def ldy_zeropage_0xa4(cpu: MOS6502CPU) -> None:
     from mos6502 import flags
 
     address: int = cpu.fetch_zeropage_mode_address(offset_register_name=None)
-    data: int = int(cpu.read_byte(address=address))
+    data: int = cpu.read_byte(address=address)
     cpu.Y = data
     cpu.set_load_status_flags(register_name="Y")
     cpu.log.info("i")
@@ -77,7 +77,7 @@ def ldy_zeropage_x_0xb4(cpu: MOS6502CPU) -> None:
     from mos6502 import flags
 
     address: int = cpu.fetch_zeropage_mode_address(offset_register_name="X")
-    data: int = int(cpu.read_byte(address=address))
+    data: int = cpu.read_byte(address=address)
     cpu.Y = data
     cpu.set_load_status_flags(register_name="Y")
     cpu.log.info("i")
@@ -102,7 +102,7 @@ def ldy_absolute_0xac(cpu: MOS6502CPU) -> None:
     from mos6502 import flags
 
     address: int = cpu.fetch_absolute_mode_address(offset_register_name=None)
-    data: int = int(cpu.read_byte(address=address))
+    data: int = cpu.read_byte(address=address)
     cpu.Y = data
     cpu.set_load_status_flags(register_name="Y")
     cpu.log.info("i")
@@ -127,7 +127,7 @@ def ldy_absolute_x_0xbc(cpu: MOS6502CPU) -> None:
     from mos6502 import flags
 
     address: int = cpu.fetch_absolute_mode_address(offset_register_name="X")
-    data: int = int(cpu.read_byte(address=address))
+    data: int = cpu.read_byte(address=address)
     cpu.Y = data
     cpu.set_load_status_flags(register_name="Y")
     cpu.log.info("i")

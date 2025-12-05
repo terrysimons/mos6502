@@ -25,7 +25,7 @@ def adc_immediate_0x69(cpu: MOS6502CPU) -> None:
     """
     from mos6502 import flags
 
-    value: int = int(cpu.fetch_byte())
+    value: int = cpu.fetch_byte()
 
     if cpu.flags[flags.D]:
         # BCD (Decimal) mode addition
@@ -71,7 +71,7 @@ def adc_zeropage_0x65(cpu: MOS6502CPU) -> None:
     from mos6502 import flags
 
     address: int = cpu.fetch_zeropage_mode_address(offset_register_name=None)
-    value: int = int(cpu.read_byte(address=address))
+    value: int = cpu.read_byte(address=address)
 
     if cpu.flags[flags.D]:
         result, carry_out, overflow, binary_result = cpu._adc_bcd(cpu.A, value, cpu.flags[flags.C])
@@ -104,7 +104,7 @@ def adc_zeropage_x_0x75(cpu: MOS6502CPU) -> None:
     from mos6502 import flags
 
     address: int = cpu.fetch_zeropage_mode_address(offset_register_name="X")
-    value: int = int(cpu.read_byte(address=address))
+    value: int = cpu.read_byte(address=address)
 
     if cpu.flags[flags.D]:
         result, carry_out, overflow, binary_result = cpu._adc_bcd(cpu.A, value, cpu.flags[flags.C])
@@ -137,7 +137,7 @@ def adc_absolute_0x6d(cpu: MOS6502CPU) -> None:
     from mos6502 import flags
 
     address: int = cpu.fetch_absolute_mode_address(offset_register_name=None)
-    value: int = int(cpu.read_byte(address=address))
+    value: int = cpu.read_byte(address=address)
 
     if cpu.flags[flags.D]:
         result, carry_out, overflow, binary_result = cpu._adc_bcd(cpu.A, value, cpu.flags[flags.C])
@@ -170,7 +170,7 @@ def adc_absolute_x_0x7d(cpu: MOS6502CPU) -> None:
     from mos6502 import flags
 
     address: int = cpu.fetch_absolute_mode_address(offset_register_name="X")
-    value: int = int(cpu.read_byte(address=address))
+    value: int = cpu.read_byte(address=address)
 
     if cpu.flags[flags.D]:
         result, carry_out, overflow, binary_result = cpu._adc_bcd(cpu.A, value, cpu.flags[flags.C])
@@ -203,7 +203,7 @@ def adc_absolute_y_0x79(cpu: MOS6502CPU) -> None:
     from mos6502 import flags
 
     address: int = cpu.fetch_absolute_mode_address(offset_register_name="Y")
-    value: int = int(cpu.read_byte(address=address))
+    value: int = cpu.read_byte(address=address)
 
     if cpu.flags[flags.D]:
         result, carry_out, overflow, binary_result = cpu._adc_bcd(cpu.A, value, cpu.flags[flags.C])
@@ -236,7 +236,7 @@ def adc_indexed_indirect_x_0x61(cpu: MOS6502CPU) -> None:
     from mos6502 import flags
 
     address: int = cpu.fetch_indexed_indirect_mode_address()
-    value: int = int(cpu.read_byte(address=address))
+    value: int = cpu.read_byte(address=address)
 
     if cpu.flags[flags.D]:
         result, carry_out, overflow, binary_result = cpu._adc_bcd(cpu.A, value, cpu.flags[flags.C])
@@ -269,7 +269,7 @@ def adc_indirect_indexed_y_0x71(cpu: MOS6502CPU) -> None:
     from mos6502 import flags
 
     address: int = cpu.fetch_indirect_indexed_mode_address()
-    value: int = int(cpu.read_byte(address=address))
+    value: int = cpu.read_byte(address=address)
 
     if cpu.flags[flags.D]:
         result, carry_out, overflow, binary_result = cpu._adc_bcd(cpu.A, value, cpu.flags[flags.C])

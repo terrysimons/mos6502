@@ -27,7 +27,7 @@ def beq_relative_0xf0(cpu: MOS6502CPU) -> None:
     """
     from mos6502 import flags
 
-    offset: int = int(cpu.fetch_byte())
+    offset: int = cpu.fetch_byte()
 
     if offset > 127:
         offset = offset - 256
