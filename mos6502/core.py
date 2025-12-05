@@ -96,6 +96,13 @@ class MOS6502CPU(flags.ProcessorStatusFlagsInterface):
         # Checked by CPU between instructions
         self.irq_pending: bool = False
 
+        # Non-maskable interrupt (NMI pin)
+        # Set by external hardware (CIA2 on C64) to request a non-maskable interrupt
+        # NMI is edge-triggered: fires on transition from high to low (falling edge)
+        # Unlike IRQ, NMI cannot be disabled by the I flag
+        self.nmi_pending: bool = False
+        self._nmi_line_previous: bool = False  # For edge detection
+
         # Optional callback for periodic system updates (e.g., VIC raster counter)
         # Called every N cycles to allow external hardware to update state
         self.periodic_callback: callable = None
@@ -1298,6 +1305,15 @@ class MOS6502CPU(flags.ProcessorStatusFlagsInterface):
                     self._last_periodic_callback_cycle = self.cycles_executed
                     self.periodic_callback()
 
+            # Check for pending NMI between instructions (after instruction completes)
+            # NMI is edge-triggered and cannot be masked by the I flag
+            # NMI has higher priority than IRQ
+            if self.nmi_pending and not self._nmi_line_previous:
+                self._nmi_line_previous = True  # Remember we've seen the edge
+                self._handle_nmi()
+            elif not self.nmi_pending:
+                self._nmi_line_previous = False  # Reset edge detection when line goes high
+
             # Check for pending hardware IRQ between instructions (after instruction completes)
             # This is when the real 6502 samples the IRQ line
             if self.irq_pending and not self.I:
@@ -1311,12 +1327,14 @@ class MOS6502CPU(flags.ProcessorStatusFlagsInterface):
         2. Push P (status register) to stack with B flag clear
         3. Set I flag to disable further interrupts
         4. Load PC from IRQ vector at $FFFE/$FFFF
-        5. Clear the irq_pending flag
 
         Total: 7 cycles
+
+        Note: irq_pending is NOT cleared here. IRQ is level-triggered, meaning
+        the /IRQ line stays asserted until the interrupt source (e.g., CIA)
+        clears it when its ICR is read. The I flag being set prevents re-entry
+        until RTI clears it. Software MUST acknowledge the interrupt.
         """
-        # Clear the pending flag first
-        self.irq_pending = False
 
         # Push PC to stack (high byte first)
         pc_high = (self.PC >> 8) & 0xFF
@@ -1331,7 +1349,8 @@ class MOS6502CPU(flags.ProcessorStatusFlagsInterface):
         self.spend_cpu_cycles(1)
 
         # Push status register with B flag CLEAR (hardware IRQ, not BRK)
-        status = self._flags.value & ~0x10
+        # Bit 5 (unused) is always set to 1 when pushed
+        status = (self._flags.value | 0x20) & ~0x10
         self.ram[self.S] = status
         self.S -= 1
         self.spend_cpu_cycles(1)
@@ -1345,6 +1364,55 @@ class MOS6502CPU(flags.ProcessorStatusFlagsInterface):
         self.PC = irq_vector
 
         self.log.info(f"*** IRQ HANDLER CALLED: PC ${old_pc:04X} -> ${irq_vector:04X}, I flag now set ***")
+
+    def _handle_nmi(self: Self) -> None:
+        """Handle a pending NMI (Non-Maskable Interrupt).
+
+        This implements the 6502 NMI sequence:
+        1. Push PC (2 bytes) to stack
+        2. Push P (status register) to stack with B flag clear
+        3. Set I flag to disable further IRQ interrupts
+        4. Load PC from NMI vector at $FFFA/$FFFB
+
+        Unlike IRQ:
+        - NMI uses vector $FFFA/$FFFB (not $FFFE/$FFFF)
+        - NMI cannot be masked by the I flag
+        - NMI is edge-triggered (handled by execute loop)
+
+        Total: 7 cycles
+        """
+        # Clear the pending flag
+        self.nmi_pending = False
+
+        # Push PC to stack (high byte first)
+        pc_high = (self.PC >> 8) & 0xFF
+        pc_low = self.PC & 0xFF
+
+        self.ram[self.S] = pc_high
+        self.S -= 1
+        self.spend_cpu_cycles(1)
+
+        self.ram[self.S] = pc_low
+        self.S -= 1
+        self.spend_cpu_cycles(1)
+
+        # Push status register with B flag CLEAR (hardware interrupt, not BRK)
+        # Bit 5 (unused) is always set to 1 when pushed
+        status = (self._flags.value | 0x20) & ~0x10
+        self.ram[self.S] = status
+        self.S -= 1
+        self.spend_cpu_cycles(1)
+
+        # Set I flag to disable further IRQ interrupts
+        # (Note: This doesn't prevent another NMI, which is non-maskable)
+        self.I = 1
+
+        # Load PC from NMI vector at $FFFA/$FFFB
+        nmi_vector = self.read_word(0xFFFA)
+        old_pc = self.PC
+        self.PC = nmi_vector
+
+        self.log.info(f"*** NMI HANDLER CALLED: PC ${old_pc:04X} -> ${nmi_vector:04X}, I flag now set ***")
 
     def push_pc_to_stack(self: Self) -> None:
         """Push the PC to the stack."""

@@ -1,0 +1,416 @@
+#!/usr/bin/env python3
+"""C64 Memory management and banking logic.
+
+This module contains:
+- Memory map constants for the C64
+- C64Memory class that implements the C64's memory banking and I/O mapping
+"""
+
+from __future__ import annotations
+
+import logging
+from typing import TYPE_CHECKING, Optional
+
+from c64.cartridges import (
+    Cartridge,
+    ROML_START,
+    ROML_END,
+    ROMH_START,
+    ROMH_END,
+    IO1_START,
+    IO1_END,
+    IO2_START,
+    IO2_END,
+)
+
+if TYPE_CHECKING:
+    from c64.cia1 import CIA1
+    from c64.cia2 import CIA2
+    from c64.sid import SID
+    from c64.vic import C64VIC, ScreenDirtyTracker
+
+log = logging.getLogger("c64")
+
+# Debug flags - imported from parent module at runtime to avoid circular imports
+DEBUG_SCREEN = False
+DEBUG_JIFFY = False
+DEBUG_CURSOR = False
+
+
+# =============================================================================
+# Memory Map Constants
+# =============================================================================
+
+# ROM regions
+BASIC_ROM_START = 0xA000
+BASIC_ROM_END = 0xBFFF
+BASIC_ROM_SIZE = 0x2000  # 8KB
+
+KERNAL_ROM_START = 0xE000
+KERNAL_ROM_END = 0xFFFF
+KERNAL_ROM_SIZE = 0x2000  # 8KB
+
+CHAR_ROM_START = 0xD000
+CHAR_ROM_END = 0xDFFF
+CHAR_ROM_SIZE = 0x1000  # 4KB
+
+# I/O regions within $D000-$DFFF
+VIC_START = 0xD000
+VIC_END = 0xD3FF
+SID_START = 0xD400
+SID_END = 0xD7FF
+COLOR_RAM_START = 0xD800
+COLOR_RAM_END = 0xDBFF
+CIA1_START = 0xDC00
+CIA1_END = 0xDCFF
+CIA2_START = 0xDD00
+CIA2_END = 0xDDFF
+
+# C64 BASIC programs typically start here
+BASIC_PROGRAM_START = 0x0801
+
+
+class C64Memory:
+    """C64 memory handler with banking logic.
+
+    Implements the C64's complex memory banking scheme:
+    - Zero page CPU I/O port ($0000-$0001) controls ROM/IO visibility
+    - BASIC ROM ($A000-$BFFF) switchable with RAM
+    - KERNAL ROM ($E000-$FFFF) switchable with RAM
+    - Character ROM / I/O ($D000-$DFFF) switchable
+    - Cartridge ROM support (ROML, ROMH, Ultimax mode)
+    """
+
+    def __init__(self, ram, *, basic_rom, kernal_rom, char_rom, cia1, cia2, vic, sid, dirty_tracker=None) -> None:
+        # Store references to actual RAM storage for direct access (avoids delegation loop)
+        self.ram_zeropage = ram.zeropage
+        self.ram_stack = ram.stack
+        self.ram_heap = ram.heap
+        self.basic = basic_rom
+        self.kernal = kernal_rom
+        self.char = char_rom
+        self.cia1 = cia1
+        self.cia2 = cia2
+        self.vic = vic
+        self.sid = sid
+        self.dirty_tracker = dirty_tracker
+
+        # Color RAM - 1000 bytes ($D800-$DBE7), only low 4 bits used
+        self.ram_color = bytearray(1024)
+
+        # CPU I/O port
+        self.ddr = 0x00  # $0000
+        self.port = 0x37  # $0001 default value
+
+        # Cartridge support - set by C64.load_cartridge()
+        # The Cartridge object handles all banking logic and provides
+        # EXROM/GAME signals and read methods for ROML/ROMH/IO regions
+        self.cartridge: Optional[Cartridge] = None
+
+    def _read_ram_direct(self, addr) -> int:
+        """Read directly from RAM storage without delegation."""
+        # RAM lists now store plain ints, not Byte objects
+        if 0 <= addr < 256:
+            return self.ram_zeropage[addr]
+        elif 256 <= addr < 512:
+            return self.ram_stack[addr - 256]
+        elif addr <= 65535:
+            return self.ram_heap[addr - 512]
+        return 0
+
+    def _write_ram_direct(self, addr, value) -> None:
+        """Write directly to RAM storage without delegation."""
+        # RAM lists now store plain ints, not Byte objects
+        int_value = int(value) & 0xFF
+        if 0 <= addr < 256:
+            self.ram_zeropage[addr] = int_value
+        elif 256 <= addr < 512:
+            self.ram_stack[addr - 256] = int_value
+        elif addr <= 65535:
+            self.ram_heap[addr - 512] = int_value
+
+    def snapshot_ram(self) -> bytes:
+        """Create a fast RAM snapshot by directly accessing underlying storage.
+
+        This bypasses the memory handler to avoid triggering VIC/CIA reads
+        and the infinite recursion that would cause. The snapshot captures
+        the raw RAM state, not the banked view the CPU sees.
+
+        Returns:
+            65536 bytes representing the full 64KB RAM.
+        """
+        # Concatenate the three RAM regions directly - no memory handler involved
+        # This is O(n) but avoids 65536 individual memory handler calls
+        return bytes(self.ram_zeropage) + bytes(self.ram_stack) + bytes(self.ram_heap)
+
+    def snapshot_vic_bank(self, vic_bank: int) -> bytes:
+        """Create a fast snapshot of only the 16KB VIC bank the VIC can see.
+
+        The VIC can only see 16KB of RAM at a time, selected by CIA2:
+        - Bank 0: $0000-$3FFF (includes screen at $0400)
+        - Bank 1: $4000-$7FFF
+        - Bank 2: $8000-$BFFF
+        - Bank 3: $C000-$FFFF
+
+        Arguments:
+            vic_bank: Base address of VIC bank (0x0000, 0x4000, 0x8000, or 0xC000)
+
+        Returns:
+            16384 bytes representing the 16KB VIC bank.
+        """
+        # Use slice operations for speed instead of byte-by-byte copy
+        # RAM layout: zeropage[0:256], stack[256:512], heap[512:65536]
+        bank_size = 0x4000  # 16KB
+
+        if vic_bank == 0x0000:
+            # Bank 0: $0000-$3FFF (zeropage + stack + heap[0:0x3E00])
+            return (bytes(self.ram_zeropage) +
+                    bytes(self.ram_stack) +
+                    bytes(self.ram_heap[:bank_size - 512]))
+        elif vic_bank == 0x4000:
+            # Bank 1: $4000-$7FFF (all from heap)
+            heap_start = vic_bank - 512
+            return bytes(self.ram_heap[heap_start:heap_start + bank_size])
+        elif vic_bank == 0x8000:
+            # Bank 2: $8000-$BFFF (all from heap)
+            heap_start = vic_bank - 512
+            return bytes(self.ram_heap[heap_start:heap_start + bank_size])
+        else:  # vic_bank == 0xC000
+            # Bank 3: $C000-$FFFF (all from heap)
+            heap_start = vic_bank - 512
+            return bytes(self.ram_heap[heap_start:heap_start + bank_size])
+
+    def snapshot_screen_area(self, screen_base: int, bitmap_mode: bool = False) -> bytes:
+        """Create a minimal snapshot of just the video memory the VIC needs.
+
+        For text mode: Just 1024 bytes at screen_base (1000 chars + sprite ptrs)
+        For bitmap mode: 8192 bytes of bitmap data + 1024 bytes screen/color info
+
+        Arguments:
+            screen_base: Starting address of screen RAM (e.g., 0x0400)
+            bitmap_mode: If True, snapshot includes 8KB bitmap data
+
+        Returns:
+            Snapshot of just the visible screen area.
+        """
+        # Screen RAM is 1000 bytes (40*25), but we grab 1024 to include
+        # sprite pointers at screen+$3F8 (8 bytes)
+        size = 0x2400 if bitmap_mode else 0x0400  # 9KB or 1KB
+
+        return self._snapshot_range(screen_base, size)
+
+    def _snapshot_range(self, start: int, size: int) -> bytes:
+        """Snapshot a specific memory range directly from RAM storage.
+
+        Arguments:
+            start: Starting address
+            size: Number of bytes to snapshot
+
+        Returns:
+            bytes object containing the memory range
+        """
+        end = start + size
+
+        # Fast path: entire range is in heap (addresses >= 512)
+        # This is the common case for screen RAM at $0400, $0800, etc.
+        if start >= 512:
+            heap_start = start - 512
+            heap_end = end - 512
+            return bytes(self.ram_heap[heap_start:heap_end])
+
+        # Slow path: range spans multiple regions (rare)
+        result = bytearray(size)
+        for addr in range(start, end):
+            offset = addr - start
+            if addr < 256:
+                result[offset] = self.ram_zeropage[addr]
+            elif addr < 512:
+                result[offset] = self.ram_stack[addr - 256]
+            else:
+                result[offset] = self.ram_heap[addr - 512]
+
+        return bytes(result)
+
+    def _read_io_area(self, addr: int) -> int:
+        """Read from I/O area ($D000-$DFFF)."""
+        # VIC registers
+        if VIC_START <= addr <= VIC_END:
+            return self.vic.read(addr)
+        # SID registers
+        if SID_START <= addr <= SID_END:
+            return self.sid.read(addr)
+        # Color RAM
+        if COLOR_RAM_START <= addr <= COLOR_RAM_END:
+            return self.ram_color[addr - COLOR_RAM_START] | 0xF0
+        # CIA1
+        if CIA1_START <= addr <= CIA1_END:
+            return self.cia1.read(addr)
+        # CIA2
+        if CIA2_START <= addr <= CIA2_END:
+            return self.cia2.read(addr)
+        # Cartridge I/O1 ($DE00-$DEFF)
+        if IO1_START <= addr <= IO1_END:
+            if self.cartridge is not None:
+                return self.cartridge.read_io1(addr)
+            return 0xFF
+        # Cartridge I/O2 ($DF00-$DFFF)
+        if IO2_START <= addr <= IO2_END:
+            if self.cartridge is not None:
+                return self.cartridge.read_io2(addr)
+            return 0xFF
+        return 0xFF
+
+    def read(self, addr) -> int:
+        # CPU internal port
+        if addr == 0x0000:
+            return self.ddr
+        if addr == 0x0001:
+            # Bits with DDR=0 read as 1
+            return (self.port | (~self.ddr)) & 0xFF
+
+        # $0002-$7FFF is ALWAYS RAM (never banked on C64)
+        # This includes zero page, stack, KERNAL/BASIC working storage, and screen RAM
+        if 0x0002 <= addr <= 0x7FFF:
+            return self._read_ram_direct(addr)
+
+        # Cartridge ROML ($8000-$9FFF)
+        # Visible when EXROM=0 (8KB/16KB modes) or in Ultimax mode (EXROM=1, GAME=0)
+        # This has priority over RAM in this region
+        if ROML_START <= addr <= ROML_END:
+            if self.cartridge is not None:
+                # ROML visible in 8KB mode (EXROM=0, GAME=1)
+                # ROML visible in 16KB mode (EXROM=0, GAME=0)
+                # ROML visible in Ultimax mode (EXROM=1, GAME=0) if present
+                if not self.cartridge.exrom or (self.cartridge.exrom and not self.cartridge.game):
+                    return self.cartridge.read_roml(addr)
+            # No cartridge or ROML not visible, fall through to RAM
+            return self._read_ram_direct(addr)
+
+        # Memory banking logic (only applies to $A000-$FFFF)
+        io_enabled = self.port & 0b00000100
+        basic_enabled = self.port & 0b00000001
+        kernal_enabled = self.port & 0b00000010
+
+        # Cartridge ROMH ($A000-$BFFF) - visible when EXROM=0 AND GAME=0 (16KB mode)
+        # Takes priority over BASIC ROM
+        if ROMH_START <= addr <= ROMH_END:
+            if self.cartridge is not None and not self.cartridge.exrom and not self.cartridge.game:
+                return self.cartridge.read_romh(addr)
+            # Fall through to BASIC ROM check
+            if basic_enabled:
+                return self.basic[addr - BASIC_ROM_START]
+            # RAM fallback
+            return self._read_ram_direct(addr)
+
+        # KERNAL ROM ($E000-$FFFF)
+        # In Ultimax mode (EXROM=1, GAME=0), cartridge ROM replaces KERNAL
+        if KERNAL_ROM_START <= addr <= KERNAL_ROM_END:
+            if self.cartridge is not None and self.cartridge.exrom and not self.cartridge.game:
+                # Ultimax mode: cartridge ROM at $E000-$FFFF
+                return self.cartridge.read_ultimax_romh(addr)
+            if kernal_enabled:
+                return self.kernal[addr - KERNAL_ROM_START]
+            # RAM fallback when KERNAL disabled
+            return self._read_ram_direct(addr)
+
+        # I/O or CHAR ROM ($D000-$DFFF)
+        if CHAR_ROM_START <= addr <= CHAR_ROM_END:
+            if io_enabled:
+                return self._read_io_area(addr)
+            else:
+                return self.char[addr - CHAR_ROM_START]
+
+        # RAM fallback (for $C000-$CFFF and $A000-$FFFF when banking is off)
+        return self._read_ram_direct(addr)
+
+    def _write_io_area(self, addr: int, value: int) -> None:
+        """Write to I/O area ($D000-$DFFF)."""
+        # VIC registers
+        if 0xD000 <= addr <= 0xD3FF:
+            self.vic.write(addr, value)
+            # Track VIC register changes (may affect global rendering)
+            if self.dirty_tracker is not None and addr <= 0xD02E:
+                self.dirty_tracker.mark_vic_dirty()
+            return
+        # SID registers
+        if 0xD400 <= addr <= 0xD7FF:
+            self.sid.write(addr, value)
+            return
+        # Color RAM
+        if 0xD800 <= addr <= 0xDBFF:
+            self.ram_color[addr - 0xD800] = value & 0x0F  # Only 4 bits
+            # Track color RAM changes
+            if self.dirty_tracker is not None:
+                self.dirty_tracker.mark_color_dirty(addr)
+            return
+        # CIA1
+        if 0xDC00 <= addr <= 0xDCFF:
+            self.cia1.write(addr, value)
+            return
+        # CIA2
+        if 0xDD00 <= addr <= 0xDDFF:
+            self.cia2.write(addr, value)
+            return
+        # Cartridge I/O1 ($DE00-$DEFF) - bank switching registers for many cartridge types
+        if IO1_START <= addr <= IO1_END:
+            if self.cartridge is not None:
+                self.cartridge.write_io1(addr, value)
+            return
+        # Cartridge I/O2 ($DF00-$DFFF)
+        if IO2_START <= addr <= IO2_END:
+            if self.cartridge is not None:
+                self.cartridge.write_io2(addr, value)
+            return
+
+    def write(self, addr, value) -> None:
+        """Write to C64 memory with banking logic."""
+        # Temporary debug: log ALL write calls
+        if DEBUG_SCREEN and 0x0400 <= addr <= 0x07E7:
+            log.info(f"*** C64Memory.write() CALLED: addr=${addr:04X}, value=${value:02X} ***")
+        # CPU internal port
+        if addr == 0x0000:
+            self.ddr = value & 0xFF
+            return
+        if addr == 0x0001:
+            self.port = value & 0xFF
+            return
+
+        # $0002-$9FFF is ALWAYS RAM (never banked on C64)
+        # This includes zero page, stack, KERNAL/BASIC working storage, and screen RAM
+        if 0x0002 <= addr <= 0x9FFF:
+            # Log writes to jiffy clock ($A0-$A2)
+            if 0xA0 <= addr <= 0xA2 and DEBUG_JIFFY:
+                log.info(f"*** JIFFY CLOCK WRITE: addr=${addr:04X}, value=${value:02X} ***")
+            # Log writes to screen RAM ($0400-$07E7)
+            if 0x0400 <= addr <= 0x07E7:
+                if DEBUG_SCREEN:
+                    log.info(f"*** SCREEN WRITE: addr=${addr:04X}, value=${value:02X} (char={chr(value) if 32 <= value < 127 else '?'}) ***")
+                # Track dirty screen cells for optimized rendering
+                if self.dirty_tracker is not None:
+                    self.dirty_tracker.mark_screen_dirty(addr)
+            # Log writes to cursor position variables ($D1-$D6)
+            if 0xD1 <= addr <= 0xD6 and DEBUG_CURSOR:
+                var_names = {0xD1: "PNT_LO", 0xD2: "PNT_HI", 0xD3: "PNTR(col)", 0xD4: "QTSW", 0xD5: "LNMX", 0xD6: "TBLX(row)"}
+                addr_int = int(addr) if hasattr(addr, '__int__') else addr
+                val_int = int(value) if hasattr(value, '__int__') else value
+                log.info(f"*** CURSOR VAR: {var_names.get(addr_int, '?')} (${addr_int:02X}) = ${val_int:02X} ({val_int}) ***")
+            # Log writes to screen line table ($D9-$F1)
+            if 0xD9 <= addr <= 0xF1 and DEBUG_CURSOR:
+                addr_int = int(addr) if hasattr(addr, '__int__') else addr
+                val_int = int(value) if hasattr(value, '__int__') else value
+                row = addr_int - 0xD9
+                log.info(f"*** SCREEN LINE TABLE: row {row} (${addr_int:02X}) = ${val_int:02X} ***")
+            self._write_ram_direct(addr, value & 0xFF)
+            return
+
+        # Memory banking logic (only applies to $A000-$FFFF)
+        io_enabled = self.port & 0b00000100
+
+        # I/O area ($D000-$DFFF)
+        if CHAR_ROM_START <= addr <= CHAR_ROM_END and io_enabled:
+            self._write_io_area(addr, value)
+            return
+
+        # Writes to $A000-$FFFF always go to underlying RAM
+        # (Even if ROM/I/O is visible for reads, writes always go to RAM)
+        self._write_ram_direct(addr, value & 0xFF)

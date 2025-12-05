@@ -44,4 +44,4 @@ def rti_implied_0x40(cpu: MOS6502CPU) -> None:
     cpu.PC = return_pc
 
     cpu.log.info(f"*** RTI: Returning to ${return_pc:04X}, I flag={'1' if cpu.I else '0'} ***")
-    cpu.spend_cpu_cycles(4)
+    cpu.spend_cpu_cycles(6)
