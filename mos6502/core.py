@@ -88,6 +88,8 @@ class MOS6502CPU(flags.ProcessorStatusFlagsInterface):
         self.ram: RAM = RAM(endianness=self.endianness)
         self.cycles = 0
         self.cycles_executed: Literal[0] = 0
+        self.instructions_executed: int = 0  # Total instructions executed
+        self.instructions_remaining: int = 0  # Instructions left to execute
 
         # Hardware interrupt request line (IRQ pin)
         # Set by external hardware (VIC, CIA, etc.) to request an interrupt
@@ -205,50 +207,31 @@ class MOS6502CPU(flags.ProcessorStatusFlagsInterface):
         """
         Tick {cycles} cycles.
 
-        Raises mos6502.errors.CPUCycleExhaustionError if the cycles parameter passed
-        into the execute function is exhausted.
+        Instructions are atomic - they always consume all cycles needed.
+        Cycle exhaustion is checked at instruction boundaries (in execute()).
 
         Infinite cycles can be used by setting this to mos6502.core.INFINITE_CYCLES
 
         self.cycles_executed will have the # of executed cycles added to it.
-        self.cycles will have {cycles} subtracted from it.
+        self.cycles will have {cycles} subtracted from it (can go negative).
 
         Arguments:
         ---------
-            cycles: the number of CPU cycles to execute before raising an exception.
+            cycles: the number of CPU cycles to consume.
 
         Returns:
         -------
-            The number of cycles remaining.
+            The number of cycles remaining (can be negative).
         """
         # Fast path: batch update when not doing per-cycle logging
         if not self.verbose_cycles:
+            self.cycles_executed += cycles
             if self.cycles != INFINITE_CYCLES:
-                # Consume available cycles (partial consumption is allowed)
-                cycles_to_use = min(cycles, self.cycles)
-                self.cycles -= cycles_to_use
-                self.cycles_executed += cycles_to_use
-
-                # If we couldn't consume all requested cycles, throw after partial use
-                if cycles_to_use < cycles:
-                    raise errors.CPUCycleExhaustionError(
-                        "Exhausted available CPU cycles after "
-                        f"{self.cycles_executed} "
-                        f"executed cycles with {self.cycles} remaining.",
-                    )
-            else:
-                self.cycles_executed += cycles
+                self.cycles -= cycles
             return self.cycles
 
         # Verbose path: per-cycle logging for debugging
         for _i in range(cycles):
-            if self.cycles <= 0:
-                raise errors.CPUCycleExhaustionError(
-                    "Exhausted available CPU cycles after "
-                    f"{self.cycles_executed} "
-                    f"executed cycles with {self.cycles} remaining.",
-                )
-
             self.cycles_executed += 1
 
             if self.cycles != INFINITE_CYCLES:
@@ -1170,20 +1153,43 @@ class MOS6502CPU(flags.ProcessorStatusFlagsInterface):
 
         return result, carry_out, overflow, binary_result
 
-    def execute(self: Self, cycles: int = 1) -> int:  # noqa: C901
+    def execute(self: Self, cycles: int = None, max_instructions: int = None) -> int:  # noqa: C901
         """
-        Fetch and execute a CPU instruction.
+        Fetch and execute CPU instructions.
+
+        Can be controlled by either cycle count or instruction count:
+        - cycles: Run until approximately this many cycles consumed (may overshoot
+          by up to one instruction's worth to maintain atomicity)
+        - max_instructions: Run at most this many instructions (precise control)
+
+        If both are specified, stops when either limit is reached.
+        If neither is specified, runs 1 instruction.
+        Instructions are always atomic - they complete fully before checking limits.
 
         Arguments:
         ---------
-            cycles: the number of cycles to execute.  Used for testing.
-                Use mos6502.core.INFINITE_CYCLES for long running programs.
+            cycles: the number of cycles to execute. Use mos6502.core.INFINITE_CYCLES
+                for long running programs.
+            max_instructions: the maximum number of instructions to execute.
 
         Returns:
         -------
             The number of cycles executed.
         """
-        self.cycles: int = cycles
+        # Determine execution mode
+        use_instruction_limit = False
+        if max_instructions is not None:
+            # Instruction-based control - set cycles to infinite so timing still works
+            # but cycle exhaustion won't trigger
+            self.instructions_remaining = max_instructions
+            self.cycles = INFINITE_CYCLES
+            use_instruction_limit = True
+        elif cycles is not None:
+            # Cycle-based control - set cycles (instructions are atomic, may overshoot)
+            self.cycles = cycles
+        else:
+            # Default: run 1 cycle (backward compatible)
+            self.cycles = 1
 
         while True:
             # Check for cycle exhaustion BEFORE fetching the next instruction
@@ -1193,6 +1199,12 @@ class MOS6502CPU(flags.ProcessorStatusFlagsInterface):
                 raise errors.CPUCycleExhaustionError(
                     f"Exhausted available CPU cycles after {self.cycles_executed} "
                     f"executed cycles with {self.cycles} remaining.",
+                )
+
+            # Check instruction limit if using instruction-based control
+            if use_instruction_limit and self.instructions_remaining <= 0:
+                raise errors.CPUCycleExhaustionError(
+                    f"Executed requested instructions after {self.cycles_executed} cycles.",
                 )
 
             instruction_byte: Byte = self.fetch_byte()
@@ -1268,6 +1280,13 @@ class MOS6502CPU(flags.ProcessorStatusFlagsInterface):
                 raise errors.IllegalCPUInstructionError(
                     f"Illegal instruction: 0x{int(instruction):02X}"
                 )
+
+            # Track total instructions executed
+            self.instructions_executed += 1
+
+            # Decrement instruction counter (for instruction-based execution control)
+            if use_instruction_limit:
+                self.instructions_remaining -= 1
 
             # Periodically call system update callback (e.g., VIC raster updates)
             # This allows external hardware to check cycle count and trigger IRQs
@@ -1350,8 +1369,9 @@ class MOS6502CPU(flags.ProcessorStatusFlagsInterface):
         """
         self.log.info("Reset")
 
-        # Initialize RAM first (before reading reset vector)
-        self.ram.initialize()
+        # Note: Real 6502 does NOT clear RAM on reset - RAM retains its contents
+        # RAM initialization (if needed) should be done before calling reset()
+        # or during power-on in the system emulator (e.g., C64.__init__)
 
         # VARIANT: 6502 - Stack pointer set to 0xFD during reset
         # VARIANT: 65C02 - Same behavior as 6502

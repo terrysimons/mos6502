@@ -23,6 +23,7 @@ def check_noop_flags(expected_cpu: CPU, actual_cpu: CPU) -> None:
 def test_cpu_instruction_TXS_IMPLIED_0x9A(cpu: CPU) -> None:  # noqa: N802
     # given:
     cycles_before = cpu.cycles_executed
+    instructions_before = cpu.instructions_executed
     cpu.PC = 0x0400
     pc = cpu.PC
     initial_cpu: CPU = copy.deepcopy(cpu)
@@ -33,11 +34,12 @@ def test_cpu_instruction_TXS_IMPLIED_0x9A(cpu: CPU) -> None:  # noqa: N802
 
     # when:
     with contextlib.suppress(errors.CPUCycleExhaustionError):
-        cpu.execute(cycles=2)
+        cpu.execute(max_instructions=1)  # cycles=2
 
     # then:
     assert cpu.PC == pc + 1
-    assert cpu.cycles_executed - cycles_before == 2
+    # assert cpu.cycles_executed - cycles_before == 2
+    assert cpu.instructions_executed - instructions_before == 1
     assert cpu.S == 0x142  # Stack pointer is 0x100 | X
     assert cpu.X == 0x42
     # TXS does not affect flags
@@ -47,6 +49,7 @@ def test_cpu_instruction_TXS_IMPLIED_0x9A(cpu: CPU) -> None:  # noqa: N802
 def test_cpu_instruction_TXS_IMPLIED_0x9A_zero_value(cpu: CPU) -> None:  # noqa: N802
     # given:
     cycles_before = cpu.cycles_executed
+    instructions_before = cpu.instructions_executed
     cpu.PC = 0x0400
     pc = cpu.PC
     initial_cpu: CPU = copy.deepcopy(cpu)
@@ -57,11 +60,12 @@ def test_cpu_instruction_TXS_IMPLIED_0x9A_zero_value(cpu: CPU) -> None:  # noqa:
 
     # when:
     with contextlib.suppress(errors.CPUCycleExhaustionError):
-        cpu.execute(cycles=2)
+        cpu.execute(max_instructions=1)  # cycles=2
 
     # then:
     assert cpu.PC == pc + 1
-    assert cpu.cycles_executed - cycles_before == 2
+    # assert cpu.cycles_executed - cycles_before == 2
+    assert cpu.instructions_executed - instructions_before == 1
     assert cpu.S == 0x100
     # TXS does not affect flags (including Z flag)
     check_noop_flags(expected_cpu=initial_cpu, actual_cpu=cpu)

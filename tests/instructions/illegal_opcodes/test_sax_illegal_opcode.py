@@ -36,7 +36,7 @@ class TestSAXNMOS:
         nmos_cpu.ram[nmos_cpu.PC + 1] = 0x10
 
         with contextlib.suppress(errors.CPUCycleExhaustionError):
-            nmos_cpu.execute(cycles=3)
+            nmos_cpu.execute(max_instructions=1)  # cycles=3
 
         # Verify A & X (0xFF & 0x0F = 0x0F) stored to memory
         assert nmos_cpu.ram[0x10] == 0x0F
@@ -59,7 +59,7 @@ class TestSAXNMOS:
         nmos_cpu.ram[nmos_cpu.PC + 1] = 0x20
 
         with contextlib.suppress(errors.CPUCycleExhaustionError):
-            nmos_cpu.execute(cycles=3)
+            nmos_cpu.execute(max_instructions=1)  # cycles=3
 
         # Verify A & X (0xF0 & 0x0F = 0x00) stored to memory
         assert nmos_cpu.ram[0x20] == 0x00
@@ -77,7 +77,7 @@ class TestSAXNMOS:
         nmos_cpu.ram[nmos_cpu.PC + 1] = 0x30
 
         with contextlib.suppress(errors.CPUCycleExhaustionError):
-            nmos_cpu.execute(cycles=3)
+            nmos_cpu.execute(max_instructions=1)  # cycles=3
 
         # Verify A & X (0xFF & 0xFF = 0xFF) stored to memory
         assert nmos_cpu.ram[0x30] == 0xFF
@@ -94,7 +94,7 @@ class TestSAXNMOS:
         nmos_cpu.ram[nmos_cpu.PC + 1] = 0x10
 
         with contextlib.suppress(errors.CPUCycleExhaustionError):
-            nmos_cpu.execute(cycles=4)
+            nmos_cpu.execute(max_instructions=1)  # cycles=4
 
         # Verify A & X (0xAA & 0x55 = 0x00) stored at $10 + $05 = $15
         assert nmos_cpu.ram[0x15] == 0x00
@@ -112,7 +112,7 @@ class TestSAXNMOS:
         nmos_cpu.ram[nmos_cpu.PC + 2] = 0x45
 
         with contextlib.suppress(errors.CPUCycleExhaustionError):
-            nmos_cpu.execute(cycles=4)
+            nmos_cpu.execute(max_instructions=1)  # cycles=4
 
         # Verify A & X (0xF0 & 0xCC = 0xC0) stored to $4567
         assert nmos_cpu.ram[0x4567] == 0xC0
@@ -134,7 +134,7 @@ class TestSAXCMOS:
         cmos_cpu.ram[cmos_cpu.PC + 1] = 0x10
 
         with contextlib.suppress(errors.CPUCycleExhaustionError):
-            cmos_cpu.execute(cycles=3)
+            cmos_cpu.execute(max_instructions=1)  # cycles=3
 
         # Verify memory is unchanged (NOP behavior)
         assert cmos_cpu.ram[0x10] == 0x42

@@ -48,7 +48,7 @@ class TestJSRStackBehavior:
         cpu.ram[0x0402] = 0x12  # High byte of target
 
         with contextlib.suppress(errors.CPUCycleExhaustionError):
-            cpu.execute(cycles=6)
+            cpu.execute(max_instructions=1)  # cycles=6
 
         # Verify PC jumped to target
         assert cpu.PC == 0x1234
@@ -84,7 +84,7 @@ class TestJSRStackBehavior:
         cpu.ram[0x0402] = 0x80  # Target high ($8000)
 
         with contextlib.suppress(errors.CPUCycleExhaustionError):
-            cpu.execute(cycles=6)
+            cpu.execute(max_instructions=1)  # cycles=6
 
         # Return address should be $0402
         # High byte ($04) at $01FF, low byte ($02) at $01FE
@@ -110,7 +110,7 @@ class TestJSRStackBehavior:
             cpu.ram[(jsr_addr + 2) & 0xFFFF] = (target_addr >> 8) & 0xFF
 
             with contextlib.suppress(errors.CPUCycleExhaustionError):
-                cpu.execute(cycles=6)
+                cpu.execute(max_instructions=1)  # cycles=6
 
             # Verify return address on stack
             pushed_high = cpu.ram[0x01FF]
@@ -148,7 +148,7 @@ class TestRTSStackBehavior:
         cpu.ram[0x8000] = instructions.RTS_IMPLIED_0x60
 
         with contextlib.suppress(errors.CPUCycleExhaustionError):
-            cpu.execute(cycles=6)
+            cpu.execute(max_instructions=1)  # cycles=6
 
         # RTS adds 1 to popped address: $0402 + 1 = $0403
         assert cpu.PC == 0x0403
@@ -173,7 +173,7 @@ class TestRTSStackBehavior:
         cpu.ram[0x5000] = instructions.RTS_IMPLIED_0x60
 
         with contextlib.suppress(errors.CPUCycleExhaustionError):
-            cpu.execute(cycles=6)
+            cpu.execute(max_instructions=1)  # cycles=6
 
         # $ABCC + 1 = $ABCD
         assert cpu.PC == 0xABCD
@@ -193,13 +193,13 @@ class TestRTSStackBehavior:
 
         # Execute JSR
         with contextlib.suppress(errors.CPUCycleExhaustionError):
-            cpu.execute(cycles=6)
+            cpu.execute(max_instructions=1)  # cycles=6
 
         assert cpu.PC == 0x8000
 
         # Execute RTS
         with contextlib.suppress(errors.CPUCycleExhaustionError):
-            cpu.execute(cycles=6)
+            cpu.execute(max_instructions=1)  # cycles=6
 
         # Should return to instruction after JSR ($0403)
         assert cpu.PC == 0x0403
@@ -227,22 +227,22 @@ class TestRTSStackBehavior:
 
         # Execute: JSR $1000
         with contextlib.suppress(errors.CPUCycleExhaustionError):
-            cpu.execute(cycles=6)
+            cpu.execute(max_instructions=1)  # cycles=6
         assert cpu.PC == 0x1000
 
         # Execute: JSR $2000
         with contextlib.suppress(errors.CPUCycleExhaustionError):
-            cpu.execute(cycles=6)
+            cpu.execute(max_instructions=1)  # cycles=6
         assert cpu.PC == 0x2000
 
         # Execute: RTS (return to $1003)
         with contextlib.suppress(errors.CPUCycleExhaustionError):
-            cpu.execute(cycles=6)
+            cpu.execute(max_instructions=1)  # cycles=6
         assert cpu.PC == 0x1003
 
         # Execute: RTS (return to $0403)
         with contextlib.suppress(errors.CPUCycleExhaustionError):
-            cpu.execute(cycles=6)
+            cpu.execute(max_instructions=1)  # cycles=6
         assert cpu.PC == 0x0403
 
 
@@ -277,7 +277,7 @@ class TestRTIStackBehavior:
         cpu.ram[0x8000] = instructions.RTI_IMPLIED_0x40
 
         with contextlib.suppress(errors.CPUCycleExhaustionError):
-            cpu.execute(cycles=6)
+            cpu.execute(max_instructions=1)  # cycles=6
 
         # RTI returns to exact address, no +1
         assert cpu.PC == 0x1234
@@ -300,7 +300,7 @@ class TestRTIStackBehavior:
         cpu.ram[0x8000] = instructions.RTI_IMPLIED_0x40
 
         with contextlib.suppress(errors.CPUCycleExhaustionError):
-            cpu.execute(cycles=6)
+            cpu.execute(max_instructions=1)  # cycles=6
 
         # Status should be restored
         assert cpu.flags.value == 0xFF
@@ -321,7 +321,7 @@ class TestRTIStackBehavior:
         cpu.ram[0x8000] = instructions.RTS_IMPLIED_0x60
 
         with contextlib.suppress(errors.CPUCycleExhaustionError):
-            cpu.execute(cycles=6)
+            cpu.execute(max_instructions=1)  # cycles=6
 
         rts_result = cpu.PC
 
@@ -335,7 +335,7 @@ class TestRTIStackBehavior:
         cpu.ram[0x8000] = instructions.RTI_IMPLIED_0x40
 
         with contextlib.suppress(errors.CPUCycleExhaustionError):
-            cpu.execute(cycles=6)
+            cpu.execute(max_instructions=1)  # cycles=6
 
         rti_result = cpu.PC
 
@@ -368,7 +368,7 @@ class TestStackBoundaryWrapping:
         cpu.ram[0x0402] = 0x80
 
         with contextlib.suppress(errors.CPUCycleExhaustionError):
-            cpu.execute(cycles=6)
+            cpu.execute(max_instructions=1)  # cycles=6
 
         # Verify wrapping occurred
         assert cpu.ram[0x0101] == 0x04  # High byte at $0101
@@ -393,7 +393,7 @@ class TestStackBoundaryWrapping:
         cpu.ram[0x0402] = 0x80
 
         with contextlib.suppress(errors.CPUCycleExhaustionError):
-            cpu.execute(cycles=6)
+            cpu.execute(max_instructions=1)  # cycles=6
 
         # After first push: high byte to $0100, S wraps to $FF
         # After second push: low byte to $01FF, S becomes $FE
@@ -419,7 +419,7 @@ class TestStackBoundaryWrapping:
         cpu.ram[0x8000] = instructions.RTS_IMPLIED_0x60
 
         with contextlib.suppress(errors.CPUCycleExhaustionError):
-            cpu.execute(cycles=6)
+            cpu.execute(max_instructions=1)  # cycles=6
 
         # Return address = $0402 + 1 = $0403
         assert cpu.PC == 0x0403
@@ -442,7 +442,7 @@ class TestStackBoundaryWrapping:
         cpu.ram[0x8000] = instructions.RTS_IMPLIED_0x60
 
         with contextlib.suppress(errors.CPUCycleExhaustionError):
-            cpu.execute(cycles=6)
+            cpu.execute(max_instructions=1)  # cycles=6
 
         assert cpu.PC == 0x0403
         assert (cpu.S & 0xFF) == 0x01
@@ -461,7 +461,7 @@ class TestStackBoundaryWrapping:
         cpu.ram[0x8000] = instructions.RTI_IMPLIED_0x40
 
         with contextlib.suppress(errors.CPUCycleExhaustionError):
-            cpu.execute(cycles=6)
+            cpu.execute(max_instructions=1)  # cycles=6
 
         assert cpu.PC == 0x1234
         assert (cpu.S & 0xFF) == 0x00
@@ -480,7 +480,7 @@ class TestStackBoundaryWrapping:
         cpu.ram[0x8000] = instructions.RTI_IMPLIED_0x40
 
         with contextlib.suppress(errors.CPUCycleExhaustionError):
-            cpu.execute(cycles=6)
+            cpu.execute(max_instructions=1)  # cycles=6
 
         assert cpu.PC == 0xABCD
         assert cpu.flags.value == 0xAA
@@ -502,13 +502,13 @@ class TestStackBoundaryWrapping:
 
         # Execute JSR
         with contextlib.suppress(errors.CPUCycleExhaustionError):
-            cpu.execute(cycles=6)
+            cpu.execute(max_instructions=1)  # cycles=6
 
         assert cpu.PC == 0x8000
 
         # Execute RTS - should correctly unwrap and return
         with contextlib.suppress(errors.CPUCycleExhaustionError):
-            cpu.execute(cycles=6)
+            cpu.execute(max_instructions=1)  # cycles=6
 
         # Should return to $0403 even with wrapping
         assert cpu.PC == 0x0403
@@ -544,7 +544,7 @@ class TestIRQStackBehavior:
         cpu.ram[0x1234] = 0xEA  # NOP
 
         with contextlib.suppress(errors.CPUCycleExhaustionError):
-            cpu.execute(cycles=10)
+            cpu.execute(max_instructions=1)  # cycles=10
 
         # Verify PC was pushed correctly
         # IRQ fires AFTER NOP completes, so PC is $1235 (not $1234)
@@ -571,7 +571,7 @@ class TestIRQStackBehavior:
         cpu.ram[0x1234] = 0xEA  # NOP
 
         with contextlib.suppress(errors.CPUCycleExhaustionError):
-            cpu.execute(cycles=10)
+            cpu.execute(max_instructions=1)  # cycles=10
 
         # IRQ pushes 3 bytes: PC high, PC low, status
         # PC is $1235 when IRQ fires (after NOP)

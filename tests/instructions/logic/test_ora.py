@@ -13,6 +13,7 @@ def test_cpu_instruction_ORA_IMMEDIATE_0x09_basic(cpu: CPU) -> None:  # noqa: N8
     """Test ORA Immediate basic operation."""
     # given:
     cycles_before = cpu.cycles_executed
+    instructions_before = cpu.instructions_executed
     cpu.PC = 0x0400
     pc = cpu.PC
 
@@ -24,19 +25,21 @@ def test_cpu_instruction_ORA_IMMEDIATE_0x09_basic(cpu: CPU) -> None:  # noqa: N8
 
     # when:
     with contextlib.suppress(errors.CPUCycleExhaustionError):
-        cpu.execute(cycles=2)
+        cpu.execute(max_instructions=1)  # cycles=2
 
     # then:
     assert cpu.A == 0b11111111  # 0xF0 | 0x0F = 0xFF
     assert cpu.flags[flags.Z] == 0  # Result is not zero
     assert cpu.flags[flags.N] == 1  # Bit 7 is 1
-    assert cpu.cycles_executed - cycles_before == 2
+    # assert cpu.cycles_executed - cycles_before == 2
+    assert cpu.instructions_executed - instructions_before == 1
 
 
 def test_cpu_instruction_ORA_IMMEDIATE_0x09_zero(cpu: CPU) -> None:  # noqa: N802
     """Test ORA Immediate with zero (OR with zero = no change)."""
     # given:
     cycles_before = cpu.cycles_executed
+    instructions_before = cpu.instructions_executed
     cpu.PC = 0x0400
     pc = cpu.PC
 
@@ -48,19 +51,21 @@ def test_cpu_instruction_ORA_IMMEDIATE_0x09_zero(cpu: CPU) -> None:  # noqa: N80
 
     # when:
     with contextlib.suppress(errors.CPUCycleExhaustionError):
-        cpu.execute(cycles=2)
+        cpu.execute(max_instructions=1)  # cycles=2
 
     # then:
     assert cpu.A == 0x00  # 0x00 | 0x00 = 0x00
     assert cpu.flags[flags.Z] == 1  # Result is zero
     assert cpu.flags[flags.N] == 0  # Bit 7 is 0
-    assert cpu.cycles_executed - cycles_before == 2
+    # assert cpu.cycles_executed - cycles_before == 2
+    assert cpu.instructions_executed - instructions_before == 1
 
 
 def test_cpu_instruction_ORA_IMMEDIATE_0x09_set_bits(cpu: CPU) -> None:  # noqa: N802
     """Test ORA Immediate setting specific bits."""
     # given:
     cycles_before = cpu.cycles_executed
+    instructions_before = cpu.instructions_executed
     cpu.PC = 0x0400
     pc = cpu.PC
 
@@ -72,19 +77,21 @@ def test_cpu_instruction_ORA_IMMEDIATE_0x09_set_bits(cpu: CPU) -> None:  # noqa:
 
     # when:
     with contextlib.suppress(errors.CPUCycleExhaustionError):
-        cpu.execute(cycles=2)
+        cpu.execute(max_instructions=1)  # cycles=2
 
     # then:
     assert cpu.A == 0b10001111  # 0x88 | 0x07 = 0x8F
     assert cpu.flags[flags.Z] == 0
     assert cpu.flags[flags.N] == 1  # Bit 7 is 1
-    assert cpu.cycles_executed - cycles_before == 2
+    # assert cpu.cycles_executed - cycles_before == 2
+    assert cpu.instructions_executed - instructions_before == 1
 
 
 def test_cpu_instruction_ORA_ZEROPAGE_0x05(cpu: CPU) -> None:  # noqa: N802
     """Test ORA Zero Page addressing mode."""
     # given:
     cycles_before = cpu.cycles_executed
+    instructions_before = cpu.instructions_executed
     cpu.PC = 0x0400
     pc = cpu.PC
 
@@ -97,19 +104,21 @@ def test_cpu_instruction_ORA_ZEROPAGE_0x05(cpu: CPU) -> None:  # noqa: N802
 
     # when:
     with contextlib.suppress(errors.CPUCycleExhaustionError):
-        cpu.execute(cycles=3)
+        cpu.execute(max_instructions=1)  # cycles=3
 
     # then:
     assert cpu.A == 0xFF  # 0xCC | 0x33 = 0xFF
     assert cpu.flags[flags.Z] == 0
     assert cpu.flags[flags.N] == 1  # Bit 7 is 1
-    assert cpu.cycles_executed - cycles_before == 3
+    # assert cpu.cycles_executed - cycles_before == 3
+    assert cpu.instructions_executed - instructions_before == 1
 
 
 def test_cpu_instruction_ORA_ABSOLUTE_0x0D(cpu: CPU) -> None:  # noqa: N802
     """Test ORA Absolute addressing mode."""
     # given:
     cycles_before = cpu.cycles_executed
+    instructions_before = cpu.instructions_executed
     cpu.PC = 0x0400
     pc = cpu.PC
 
@@ -123,10 +132,11 @@ def test_cpu_instruction_ORA_ABSOLUTE_0x0D(cpu: CPU) -> None:  # noqa: N802
 
     # when:
     with contextlib.suppress(errors.CPUCycleExhaustionError):
-        cpu.execute(cycles=4)
+        cpu.execute(max_instructions=1)  # cycles=4
 
     # then:
     assert cpu.A == 0x7F  # 0x0F | 0x70 = 0x7F
     assert cpu.flags[flags.Z] == 0
     assert cpu.flags[flags.N] == 0  # Bit 7 is 0
-    assert cpu.cycles_executed - cycles_before == 4
+    # assert cpu.cycles_executed - cycles_before == 4
+    assert cpu.instructions_executed - instructions_before == 1

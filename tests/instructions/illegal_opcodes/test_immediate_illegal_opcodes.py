@@ -32,7 +32,7 @@ class TestANCNMOS:
         nmos_cpu.ram[nmos_cpu.PC + 1] = 0x0F
 
         with contextlib.suppress(errors.CPUCycleExhaustionError):
-            nmos_cpu.execute(cycles=2)
+            nmos_cpu.execute(max_instructions=1)  # cycles=2
 
         # Verify AND: A = 0xF0 & 0x0F = 0x00
         assert nmos_cpu.A == 0x00
@@ -52,7 +52,7 @@ class TestANCNMOS:
         nmos_cpu.ram[nmos_cpu.PC + 1] = 0x80
 
         with contextlib.suppress(errors.CPUCycleExhaustionError):
-            nmos_cpu.execute(cycles=2)
+            nmos_cpu.execute(max_instructions=1)  # cycles=2
 
         # Verify AND: A = 0xFF & 0x80 = 0x80
         assert nmos_cpu.A == 0x80
@@ -72,7 +72,7 @@ class TestANCNMOS:
         nmos_cpu.ram[nmos_cpu.PC + 1] = 0x55
 
         with contextlib.suppress(errors.CPUCycleExhaustionError):
-            nmos_cpu.execute(cycles=2)
+            nmos_cpu.execute(max_instructions=1)  # cycles=2
 
         # Verify AND: A = 0xAA & 0x55 = 0x00
         assert nmos_cpu.A == 0x00
@@ -92,7 +92,7 @@ class TestALRNMOS:
         nmos_cpu.ram[nmos_cpu.PC + 1] = 0x0F
 
         with contextlib.suppress(errors.CPUCycleExhaustionError):
-            nmos_cpu.execute(cycles=2)
+            nmos_cpu.execute(max_instructions=1)  # cycles=2
 
         # Verify AND then shift: (0xFF & 0x0F) >> 1 = 0x0F >> 1 = 0x07
         assert nmos_cpu.A == 0x07
@@ -110,7 +110,7 @@ class TestALRNMOS:
         nmos_cpu.ram[nmos_cpu.PC + 1] = 0x55
 
         with contextlib.suppress(errors.CPUCycleExhaustionError):
-            nmos_cpu.execute(cycles=2)
+            nmos_cpu.execute(max_instructions=1)  # cycles=2
 
         # Verify: (0xAA & 0x55) >> 1 = 0x00 >> 1 = 0x00
         assert nmos_cpu.A == 0x00
@@ -127,7 +127,7 @@ class TestALRNMOS:
         nmos_cpu.ram[nmos_cpu.PC + 1] = 0x01
 
         with contextlib.suppress(errors.CPUCycleExhaustionError):
-            nmos_cpu.execute(cycles=2)
+            nmos_cpu.execute(max_instructions=1)  # cycles=2
 
         # Verify: (0x01 & 0x01) >> 1 = 0x01 >> 1 = 0x00
         assert nmos_cpu.A == 0x00
@@ -149,7 +149,7 @@ class TestARRNMOS:
         nmos_cpu.ram[nmos_cpu.PC + 1] = 0xFF
 
         with contextlib.suppress(errors.CPUCycleExhaustionError):
-            nmos_cpu.execute(cycles=2)
+            nmos_cpu.execute(max_instructions=1)  # cycles=2
 
         # Verify: (0x7F & 0xFF) ROR with C=1 = 0x7F ROR = 0xBF
         assert nmos_cpu.A == 0xBF
@@ -167,7 +167,7 @@ class TestARRNMOS:
         nmos_cpu.ram[nmos_cpu.PC + 1] = 0xFF
 
         with contextlib.suppress(errors.CPUCycleExhaustionError):
-            nmos_cpu.execute(cycles=2)
+            nmos_cpu.execute(max_instructions=1)  # cycles=2
 
         # Verify: (0xFF & 0xFF) ROR with C=0 = 0xFF ROR = 0x7F
         assert nmos_cpu.A == 0x7F
@@ -185,7 +185,7 @@ class TestARRNMOS:
         nmos_cpu.ram[nmos_cpu.PC + 1] = 0xC0  # 11000000
 
         with contextlib.suppress(errors.CPUCycleExhaustionError):
-            nmos_cpu.execute(cycles=2)
+            nmos_cpu.execute(max_instructions=1)  # cycles=2
 
         # Verify: (0xFF & 0xC0) ROR with C=0 = 0xC0 ROR = 0x60
         assert nmos_cpu.A == 0x60  # 01100000
@@ -203,7 +203,7 @@ class TestARRNMOS:
         nmos_cpu.ram[nmos_cpu.PC + 1] = 0x40  # 01000000
 
         with contextlib.suppress(errors.CPUCycleExhaustionError):
-            nmos_cpu.execute(cycles=2)
+            nmos_cpu.execute(max_instructions=1)  # cycles=2
 
         # Verify: (0xFF & 0x40) ROR with C=1 = 0x40 ROR = 0xA0
         assert nmos_cpu.A == 0xA0  # 10100000
@@ -225,7 +225,7 @@ class TestSBXNMOS:
         nmos_cpu.ram[nmos_cpu.PC + 1] = 0x0F
 
         with contextlib.suppress(errors.CPUCycleExhaustionError):
-            nmos_cpu.execute(cycles=2)
+            nmos_cpu.execute(max_instructions=1)  # cycles=2
 
         # Verify: (0xFF & 0xFF) - 0x0F = 0xFF - 0x0F = 0xF0
         assert nmos_cpu.X == 0xF0
@@ -244,7 +244,7 @@ class TestSBXNMOS:
         nmos_cpu.ram[nmos_cpu.PC + 1] = 0xFF
 
         with contextlib.suppress(errors.CPUCycleExhaustionError):
-            nmos_cpu.execute(cycles=2)
+            nmos_cpu.execute(max_instructions=1)  # cycles=2
 
         # Verify: (0x0F & 0x0F) - 0xFF = 0x0F - 0xFF = -240 = 0x10 (wrapped)
         assert nmos_cpu.X == 0x10
@@ -261,7 +261,7 @@ class TestSBXNMOS:
         nmos_cpu.ram[nmos_cpu.PC + 1] = 0xFF
 
         with contextlib.suppress(errors.CPUCycleExhaustionError):
-            nmos_cpu.execute(cycles=2)
+            nmos_cpu.execute(max_instructions=1)  # cycles=2
 
         # Verify: (0xFF & 0xFF) - 0xFF = 0xFF - 0xFF = 0x00
         assert nmos_cpu.X == 0x00
@@ -280,7 +280,7 @@ class TestSBXNMOS:
         nmos_cpu.ram[nmos_cpu.PC + 1] = 0x00
 
         with contextlib.suppress(errors.CPUCycleExhaustionError):
-            nmos_cpu.execute(cycles=2)
+            nmos_cpu.execute(max_instructions=1)  # cycles=2
 
         # Verify: (0xAA & 0x55) - 0x00 = 0x00 - 0x00 = 0x00
         assert nmos_cpu.X == 0x00
@@ -301,7 +301,7 @@ class TestImmediateCMOS:
         cmos_cpu.ram[cmos_cpu.PC + 1] = 0x0F
 
         with contextlib.suppress(errors.CPUCycleExhaustionError):
-            cmos_cpu.execute(cycles=2)
+            cmos_cpu.execute(max_instructions=1)  # cycles=2
 
         assert cmos_cpu.A == 0xF0
         assert cmos_cpu.C == 0
@@ -316,7 +316,7 @@ class TestImmediateCMOS:
         cmos_cpu.ram[cmos_cpu.PC + 1] = 0x0F
 
         with contextlib.suppress(errors.CPUCycleExhaustionError):
-            cmos_cpu.execute(cycles=2)
+            cmos_cpu.execute(max_instructions=1)  # cycles=2
 
         assert cmos_cpu.A == 0xFF
 
@@ -331,7 +331,7 @@ class TestImmediateCMOS:
         cmos_cpu.ram[cmos_cpu.PC + 1] = 0xFF
 
         with contextlib.suppress(errors.CPUCycleExhaustionError):
-            cmos_cpu.execute(cycles=2)
+            cmos_cpu.execute(max_instructions=1)  # cycles=2
 
         assert cmos_cpu.A == 0x7F
         assert cmos_cpu.C == 1
@@ -347,6 +347,6 @@ class TestImmediateCMOS:
         cmos_cpu.ram[cmos_cpu.PC + 1] = 0x0F
 
         with contextlib.suppress(errors.CPUCycleExhaustionError):
-            cmos_cpu.execute(cycles=2)
+            cmos_cpu.execute(max_instructions=1)  # cycles=2
 
         assert cmos_cpu.X == 0xFF

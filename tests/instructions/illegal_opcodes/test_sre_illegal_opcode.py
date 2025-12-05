@@ -40,7 +40,7 @@ class TestSRENMOS:
         nmos_cpu.ram[nmos_cpu.PC + 1] = 0x10
 
         with contextlib.suppress(errors.CPUCycleExhaustionError):
-            nmos_cpu.execute(cycles=5)
+            nmos_cpu.execute(max_instructions=1)  # cycles=5
 
         # Verify memory was shifted: 0xAA >> 1 = 0x55
         assert nmos_cpu.ram[0x10] == 0x55
@@ -63,7 +63,7 @@ class TestSRENMOS:
         nmos_cpu.ram[nmos_cpu.PC + 1] = 0x20
 
         with contextlib.suppress(errors.CPUCycleExhaustionError):
-            nmos_cpu.execute(cycles=5)
+            nmos_cpu.execute(max_instructions=1)  # cycles=5
 
         # Verify memory was shifted: 0x81 >> 1 = 0x40
         assert nmos_cpu.ram[0x20] == 0x40
@@ -85,7 +85,7 @@ class TestSRENMOS:
         nmos_cpu.ram[nmos_cpu.PC + 1] = 0x30
 
         with contextlib.suppress(errors.CPUCycleExhaustionError):
-            nmos_cpu.execute(cycles=5)
+            nmos_cpu.execute(max_instructions=1)  # cycles=5
 
         # Verify memory was shifted: 0x00 >> 1 = 0x00
         assert nmos_cpu.ram[0x30] == 0x00
@@ -107,7 +107,7 @@ class TestSRENMOS:
         nmos_cpu.ram[nmos_cpu.PC + 1] = 0x40
 
         with contextlib.suppress(errors.CPUCycleExhaustionError):
-            nmos_cpu.execute(cycles=5)
+            nmos_cpu.execute(max_instructions=1)  # cycles=5
 
         # Verify memory was shifted: 0x06 >> 1 = 0x03
         assert nmos_cpu.ram[0x40] == 0x03
@@ -127,7 +127,7 @@ class TestSRENMOS:
         nmos_cpu.ram[nmos_cpu.PC + 1] = 0x50
 
         with contextlib.suppress(errors.CPUCycleExhaustionError):
-            nmos_cpu.execute(cycles=5)
+            nmos_cpu.execute(max_instructions=1)  # cycles=5
 
         # Verify shift: 0xFF >> 1 = 0x7F (with carry out)
         assert nmos_cpu.ram[0x50] == 0x7F
@@ -146,7 +146,7 @@ class TestSRENMOS:
         nmos_cpu.ram[nmos_cpu.PC + 1] = 0x60
 
         with contextlib.suppress(errors.CPUCycleExhaustionError):
-            nmos_cpu.execute(cycles=5)
+            nmos_cpu.execute(max_instructions=1)  # cycles=5
 
         # Verify shift: 0xFE >> 1 = 0x7F
         assert nmos_cpu.ram[0x60] == 0x7F
@@ -168,7 +168,7 @@ class TestSRENMOS:
         nmos_cpu.ram[nmos_cpu.PC + 1] = 0x10
 
         with contextlib.suppress(errors.CPUCycleExhaustionError):
-            nmos_cpu.execute(cycles=6)
+            nmos_cpu.execute(max_instructions=1)  # cycles=6
 
         # Verify memory at $15 was shifted
         assert nmos_cpu.ram[0x15] == 0x04
@@ -188,7 +188,7 @@ class TestSRENMOS:
         nmos_cpu.ram[nmos_cpu.PC + 2] = 0x45
 
         with contextlib.suppress(errors.CPUCycleExhaustionError):
-            nmos_cpu.execute(cycles=6)
+            nmos_cpu.execute(max_instructions=1)  # cycles=6
 
         # Verify memory was shifted
         assert nmos_cpu.ram[0x4567] == 0x22
@@ -209,7 +209,7 @@ class TestSRENMOS:
         nmos_cpu.ram[nmos_cpu.PC + 2] = 0x12
 
         with contextlib.suppress(errors.CPUCycleExhaustionError):
-            nmos_cpu.execute(cycles=7)
+            nmos_cpu.execute(max_instructions=1)  # cycles=7
 
         # Verify memory was shifted
         assert nmos_cpu.ram[0x1244] == 0x05
@@ -230,7 +230,7 @@ class TestSRENMOS:
         nmos_cpu.ram[nmos_cpu.PC + 2] = 0x20
 
         with contextlib.suppress(errors.CPUCycleExhaustionError):
-            nmos_cpu.execute(cycles=7)
+            nmos_cpu.execute(max_instructions=1)  # cycles=7
 
         # Verify memory was shifted
         assert nmos_cpu.ram[0x2020] == 0x20
@@ -255,7 +255,7 @@ class TestSRENMOS:
         nmos_cpu.ram[nmos_cpu.PC + 1] = 0x10
 
         with contextlib.suppress(errors.CPUCycleExhaustionError):
-            nmos_cpu.execute(cycles=8)
+            nmos_cpu.execute(max_instructions=1)  # cycles=8
 
         # Verify memory was shifted
         assert nmos_cpu.ram[0x3000] == 0x02
@@ -279,7 +279,7 @@ class TestSRENMOS:
         nmos_cpu.ram[nmos_cpu.PC + 1] = 0x20
 
         with contextlib.suppress(errors.CPUCycleExhaustionError):
-            nmos_cpu.execute(cycles=8)
+            nmos_cpu.execute(max_instructions=1)  # cycles=8
 
         # Verify memory was shifted
         assert nmos_cpu.ram[0x4010] == 0x41
@@ -302,7 +302,7 @@ class TestSRECMOS:
         cmos_cpu.ram[cmos_cpu.PC + 1] = 0x10
 
         with contextlib.suppress(errors.CPUCycleExhaustionError):
-            cmos_cpu.execute(cycles=5)
+            cmos_cpu.execute(max_instructions=1)  # cycles=5
 
         # Verify memory is unchanged (NOP behavior)
         assert cmos_cpu.ram[0x10] == 0xAA

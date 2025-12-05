@@ -41,7 +41,7 @@ class TestLAXNMOS:
         nmos_cpu.ram[nmos_cpu.PC + 1] = 0x10
 
         with contextlib.suppress(errors.CPUCycleExhaustionError):
-            nmos_cpu.execute(cycles=3)
+            nmos_cpu.execute(max_instructions=1)  # cycles=3
 
         assert nmos_cpu.A == 0x42
         assert nmos_cpu.X == 0x42
@@ -59,7 +59,7 @@ class TestLAXNMOS:
         nmos_cpu.ram[nmos_cpu.PC + 1] = 0x20
 
         with contextlib.suppress(errors.CPUCycleExhaustionError):
-            nmos_cpu.execute(cycles=3)
+            nmos_cpu.execute(max_instructions=1)  # cycles=3
 
         assert nmos_cpu.A == 0x00
         assert nmos_cpu.X == 0x00
@@ -76,7 +76,7 @@ class TestLAXNMOS:
         nmos_cpu.ram[nmos_cpu.PC + 1] = 0x30
 
         with contextlib.suppress(errors.CPUCycleExhaustionError):
-            nmos_cpu.execute(cycles=3)
+            nmos_cpu.execute(max_instructions=1)  # cycles=3
 
         assert nmos_cpu.A == 0xFF
         assert nmos_cpu.X == 0xFF
@@ -94,7 +94,7 @@ class TestLAXNMOS:
         nmos_cpu.ram[nmos_cpu.PC + 2] = 0x45
 
         with contextlib.suppress(errors.CPUCycleExhaustionError):
-            nmos_cpu.execute(cycles=4)
+            nmos_cpu.execute(max_instructions=1)  # cycles=4
 
         assert nmos_cpu.A == 0x77
         assert nmos_cpu.X == 0x77
@@ -111,7 +111,7 @@ class TestLAXNMOS:
         nmos_cpu.ram[nmos_cpu.PC + 1] = 0x10
 
         with contextlib.suppress(errors.CPUCycleExhaustionError):
-            nmos_cpu.execute(cycles=4)
+            nmos_cpu.execute(max_instructions=1)  # cycles=4
 
         assert nmos_cpu.A == 0x55
         assert nmos_cpu.X == 0x55
@@ -133,7 +133,7 @@ class TestLAXCMOS:
         cmos_cpu.ram[cmos_cpu.PC + 1] = 0x10
 
         with contextlib.suppress(errors.CPUCycleExhaustionError):
-            cmos_cpu.execute(cycles=3)
+            cmos_cpu.execute(max_instructions=1)  # cycles=3
 
         # Verify A and X are unchanged (NOP behavior)
         assert cmos_cpu.A == 0x11

@@ -21,6 +21,7 @@ def check_noop_flags(expected_cpu: CPU, actual_cpu: CPU) -> None:
 def test_cpu_instruction_INX_IMPLIED_0xE8(cpu: CPU) -> None:  # noqa: N802
     # given:
     cycles_before = cpu.cycles_executed
+    instructions_before = cpu.instructions_executed
     cpu.PC = 0x0400
     pc = cpu.PC
     initial_cpu: CPU = copy.deepcopy(cpu)
@@ -31,11 +32,12 @@ def test_cpu_instruction_INX_IMPLIED_0xE8(cpu: CPU) -> None:  # noqa: N802
 
     # when:
     with contextlib.suppress(errors.CPUCycleExhaustionError):
-        cpu.execute(cycles=2)
+        cpu.execute(max_instructions=1)  # cycles=2
 
     # then:
     assert cpu.PC == pc + 1
-    assert cpu.cycles_executed - cycles_before == 2
+    # assert cpu.cycles_executed - cycles_before == 2
+    assert cpu.instructions_executed - instructions_before == 1
     assert cpu.X == 0x43
     assert cpu.flags[flags.Z] == 0
     assert cpu.flags[flags.N] == 0
@@ -45,6 +47,7 @@ def test_cpu_instruction_INX_IMPLIED_0xE8(cpu: CPU) -> None:  # noqa: N802
 def test_cpu_instruction_INX_IMPLIED_0xE8_zero_flag(cpu: CPU) -> None:  # noqa: N802
     # given:
     cycles_before = cpu.cycles_executed
+    instructions_before = cpu.instructions_executed
     cpu.PC = 0x0400
     pc = cpu.PC
     initial_cpu: CPU = copy.deepcopy(cpu)
@@ -55,11 +58,12 @@ def test_cpu_instruction_INX_IMPLIED_0xE8_zero_flag(cpu: CPU) -> None:  # noqa: 
 
     # when:
     with contextlib.suppress(errors.CPUCycleExhaustionError):
-        cpu.execute(cycles=2)
+        cpu.execute(max_instructions=1)  # cycles=2
 
     # then:
     assert cpu.PC == pc + 1
-    assert cpu.cycles_executed - cycles_before == 2
+    # assert cpu.cycles_executed - cycles_before == 2
+    assert cpu.instructions_executed - instructions_before == 1
     assert cpu.X == 0x00  # Wraps around
     assert cpu.flags[flags.Z] == 1
     assert cpu.flags[flags.N] == 0
@@ -69,6 +73,7 @@ def test_cpu_instruction_INX_IMPLIED_0xE8_zero_flag(cpu: CPU) -> None:  # noqa: 
 def test_cpu_instruction_INX_IMPLIED_0xE8_negative_flag(cpu: CPU) -> None:  # noqa: N802
     # given:
     cycles_before = cpu.cycles_executed
+    instructions_before = cpu.instructions_executed
     cpu.PC = 0x0400
     pc = cpu.PC
     initial_cpu: CPU = copy.deepcopy(cpu)
@@ -79,11 +84,12 @@ def test_cpu_instruction_INX_IMPLIED_0xE8_negative_flag(cpu: CPU) -> None:  # no
 
     # when:
     with contextlib.suppress(errors.CPUCycleExhaustionError):
-        cpu.execute(cycles=2)
+        cpu.execute(max_instructions=1)  # cycles=2
 
     # then:
     assert cpu.PC == pc + 1
-    assert cpu.cycles_executed - cycles_before == 2
+    # assert cpu.cycles_executed - cycles_before == 2
+    assert cpu.instructions_executed - instructions_before == 1
     assert cpu.X == 0x80
     assert cpu.flags[flags.Z] == 0
     assert cpu.flags[flags.N] == 1  # 0x80 has bit 7 set

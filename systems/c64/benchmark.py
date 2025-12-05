@@ -8,6 +8,7 @@ from pathlib import Path
 from c64 import C64, PAL, NTSC, c64_to_ansi_fg, c64_to_ansi_bg, ANSI_RESET
 from mos6502 import errors
 from mos6502.core import INFINITE_CYCLES
+from mos6502.timing import FrameGovernor
 
 # BASIC ROM address range
 BASIC_ROM_START = 0xA000
@@ -21,7 +22,7 @@ for logger_name in ['c64', 'c64.vic', 'mos6502', 'mos6502.cpu', 'mos6502.cpu.fla
     logging.getLogger(logger_name).setLevel(logging.CRITICAL)
 
 
-def benchmark_c64(rom_dir: str, max_cycles: int, video_chip: str = "6569", verbose_cycles: bool = False) -> tuple[float, int]:
+def benchmark_c64(rom_dir: str, max_cycles: int, video_chip: str = "6569", verbose_cycles: bool = False, throttle: bool = False) -> tuple[float, int]:
     """Benchmark C64 execution.
 
     Args:
@@ -29,6 +30,7 @@ def benchmark_c64(rom_dir: str, max_cycles: int, video_chip: str = "6569", verbo
         max_cycles: Maximum cycles to execute
         video_chip: VIC-II chip variant ("6569", "6567R8", "6567R56A", "PAL", "NTSC")
         verbose_cycles: Enable per-cycle CPU logging
+        throttle: If True, throttle to real-time speed
 
     Returns:
         (elapsed_seconds, cycles_executed)
@@ -37,16 +39,36 @@ def benchmark_c64(rom_dir: str, max_cycles: int, video_chip: str = "6569", verbo
     c64.cpu.reset()
 
     start_time = time.perf_counter()
-    try:
-        c64.cpu.execute(cycles=max_cycles)
-    except errors.CPUCycleExhaustionError:
-        pass
+
+    if throttle:
+        # Use frame governor to throttle to real-time
+        governor = FrameGovernor(
+            fps=c64.video_timing.refresh_hz,
+            enabled=True
+        )
+        cycles_per_frame = c64.video_timing.cycles_per_frame
+        cycles_remaining = max_cycles
+
+        while cycles_remaining > 0:
+            cycles_this_frame = min(cycles_per_frame, cycles_remaining)
+            try:
+                c64.cpu.execute(cycles=cycles_this_frame)
+            except errors.CPUCycleExhaustionError:
+                pass
+            cycles_remaining -= cycles_this_frame
+            governor.throttle()
+    else:
+        # Run at maximum speed
+        try:
+            c64.cpu.execute(cycles=max_cycles)
+        except errors.CPUCycleExhaustionError:
+            pass
 
     elapsed = time.perf_counter() - start_time
     return elapsed, c64.cpu.cycles_executed
 
 
-def benchmark_boot(rom_dir: str, video_chip: str = "6569", debug: bool = False, verbose_cycles: bool = False) -> tuple[float, int, int, str]:
+def benchmark_boot(rom_dir: str, video_chip: str = "6569", debug: bool = False, verbose_cycles: bool = False, throttle: bool = False) -> tuple[float, int, int, str]:
     """Benchmark C64 boot time until BASIC is ready.
 
     Args:
@@ -54,6 +76,7 @@ def benchmark_boot(rom_dir: str, video_chip: str = "6569", debug: bool = False, 
         video_chip: VIC-II chip variant ("6569", "6567R8", "6567R56A", "PAL", "NTSC")
         debug: If True, print debug info about PC locations
         verbose_cycles: Enable per-cycle CPU logging
+        throttle: If True, throttle to real-time speed
 
     Returns:
         (elapsed_seconds, cycles_executed, entry_address, screen_capture)
@@ -63,30 +86,67 @@ def benchmark_boot(rom_dir: str, video_chip: str = "6569", debug: bool = False, 
 
     # State for detecting when we first enter BASIC ROM
     basic_entry_pc = [0]
+    stop_requested = [False]
 
     # Set up callback to detect first BASIC ROM entry
-    def detect_basic(pc: int) -> None:
+    # For throttled mode, we use a flag; for non-throttled, we raise StopIteration
+    def detect_basic_throttled(pc: int) -> None:
+        if basic_entry_pc[0] == 0 and BASIC_ROM_START <= pc <= BASIC_ROM_END:
+            basic_entry_pc[0] = pc
+            stop_requested[0] = True
+
+    def detect_basic_immediate(pc: int) -> None:
         if basic_entry_pc[0] == 0 and BASIC_ROM_START <= pc <= BASIC_ROM_END:
             basic_entry_pc[0] = pc
             raise StopIteration
 
-    c64.cpu.pc_callback = detect_basic
-
     start_time = time.perf_counter()
-    try:
-        c64.cpu.execute(cycles=INFINITE_CYCLES)
-    except (errors.CPUCycleExhaustionError, StopIteration):
-        pass
+
+    if throttle:
+        # Use frame governor to throttle to real-time
+        c64.cpu.pc_callback = detect_basic_throttled
+        governor = FrameGovernor(
+            fps=c64.video_timing.refresh_hz,
+            enabled=True
+        )
+        cycles_per_frame = c64.video_timing.cycles_per_frame
+
+        # Run until BASIC entry detected
+        while not stop_requested[0]:
+            try:
+                c64.cpu.execute(cycles=cycles_per_frame)
+            except errors.CPUCycleExhaustionError:
+                pass
+            governor.throttle()
+    else:
+        # Run at maximum speed until BASIC entry
+        c64.cpu.pc_callback = detect_basic_immediate
+        try:
+            c64.cpu.execute(cycles=INFINITE_CYCLES)
+        except (errors.CPUCycleExhaustionError, StopIteration):
+            pass
 
     boot_cycles = c64.cpu.cycles_executed
 
     # Run additional cycles to let screen render the BASIC prompt
     extra_cycles = 100_000
     c64.cpu.pc_callback = None  # Disable callback
-    try:
-        c64.cpu.execute(cycles=extra_cycles)
-    except errors.CPUCycleExhaustionError:
-        pass
+
+    if throttle:
+        cycles_remaining = extra_cycles
+        while cycles_remaining > 0:
+            cycles_this_frame = min(cycles_per_frame, cycles_remaining)
+            try:
+                c64.cpu.execute(cycles=cycles_this_frame)
+            except errors.CPUCycleExhaustionError:
+                pass
+            cycles_remaining -= cycles_this_frame
+            governor.throttle()
+    else:
+        try:
+            c64.cpu.execute(cycles=extra_cycles)
+        except errors.CPUCycleExhaustionError:
+            pass
 
     elapsed = time.perf_counter() - start_time
 
@@ -163,7 +223,10 @@ def main():
     else:
         timing = NTSC
 
-    print(f"\nBenchmarking CPU execution speed (VIC-II {timing.chip_name})...\n")
+    throttle = args.throttle
+    throttle_status = "enabled" if throttle else "disabled"
+    region = "PAL" if timing.chip_name == "6569" else "NTSC"
+    print(f"\nBenchmarking CPU execution speed (VIC-II {timing.chip_name} {region}, throttle {throttle_status})...\n")
 
     # Benchmark different cycle counts
     test_cycles = [100_000, 500_000, 1_000_000, 5_000_000]
@@ -171,7 +234,7 @@ def main():
     verbose_cycles = getattr(args, 'verbose_cycles', False)
 
     for cycles in test_cycles:
-        elapsed, executed = benchmark_c64(str(args.rom_dir), cycles, video_chip, verbose_cycles)
+        elapsed, executed = benchmark_c64(str(args.rom_dir), cycles, video_chip, verbose_cycles, throttle=throttle)
         cycles_per_sec = executed / elapsed
         speed_ratio = cycles_per_sec / timing.cpu_freq
         print(f"{executed:,} cycles: {elapsed:.2f}s ({cycles_per_sec:,.0f} cycles/sec, {speed_ratio:.1%})")
@@ -182,7 +245,7 @@ def main():
 
     # Boot time benchmark - run until BASIC prompt is ready
     print("Boot benchmark (running until BASIC prompt)...")
-    elapsed, executed, entry_pc, screen = benchmark_boot(str(args.rom_dir), video_chip, debug=args.debug, verbose_cycles=verbose_cycles)
+    elapsed, executed, entry_pc, screen = benchmark_boot(str(args.rom_dir), video_chip, debug=args.debug, verbose_cycles=verbose_cycles, throttle=throttle)
     cycles_per_sec = executed / elapsed if elapsed > 0 else 0
     speed_ratio = cycles_per_sec / timing.cpu_freq
     print(f"Cycles to boot to BASIC @ ${entry_pc:04X}: {executed:,} ({elapsed:.2f}s, {cycles_per_sec:,.0f} cycles/sec, {speed_ratio:.1%})")

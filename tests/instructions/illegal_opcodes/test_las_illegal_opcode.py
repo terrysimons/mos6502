@@ -37,7 +37,7 @@ class TestLASNMOS:
         nmos_cpu.ram[nmos_cpu.PC + 2] = 0x12
 
         with contextlib.suppress(errors.CPUCycleExhaustionError):
-            nmos_cpu.execute(cycles=4)
+            nmos_cpu.execute(max_instructions=1)  # cycles=4
 
         # Verify: M & S = 0xAA & 0xFF = 0xAA
         # S register is 8-bit, compare low byte only (high byte hardwired to 0x01)
@@ -60,7 +60,7 @@ class TestLASNMOS:
         nmos_cpu.ram[nmos_cpu.PC + 2] = 0x10
 
         with contextlib.suppress(errors.CPUCycleExhaustionError):
-            nmos_cpu.execute(cycles=4)
+            nmos_cpu.execute(max_instructions=1)  # cycles=4
 
         # Verify: M & S = 0xFF & 0x0F = 0x0F
         # S register is 8-bit, compare low byte only (high byte hardwired to 0x01)
@@ -81,7 +81,7 @@ class TestLASNMOS:
         nmos_cpu.ram[nmos_cpu.PC + 2] = 0x20
 
         with contextlib.suppress(errors.CPUCycleExhaustionError):
-            nmos_cpu.execute(cycles=4)
+            nmos_cpu.execute(max_instructions=1)  # cycles=4
 
         # Verify: M & S = 0xFF & 0x00 = 0x00
         # S register is 8-bit, compare low byte only (high byte hardwired to 0x01)
@@ -110,7 +110,7 @@ class TestLASCMOS:
         cmos_cpu.ram[cmos_cpu.PC + 2] = 0x12
 
         with contextlib.suppress(errors.CPUCycleExhaustionError):
-            cmos_cpu.execute(cycles=4)
+            cmos_cpu.execute(max_instructions=1)  # cycles=4
 
         # Verify nothing changed (NOP behavior)
         # S register is 8-bit, compare low byte only (high byte hardwired to 0x01)

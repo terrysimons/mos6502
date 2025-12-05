@@ -22,6 +22,7 @@ def test_cpu_instruction_BNE_preserves_flags_when_branch_taken(cpu: CPU) -> None
     """
     # given:
     cycles_before = cpu.cycles_executed
+    instructions_before = cpu.instructions_executed
     cpu.PC = 0x0400
     pc = cpu.PC
     # Set flags to 0x50: N=0, V=1, unused=1, B=0, D=1, I=0, Z=0, C=0
@@ -40,7 +41,7 @@ def test_cpu_instruction_BNE_preserves_flags_when_branch_taken(cpu: CPU) -> None
 
     # when:
     with contextlib.suppress(errors.CPUCycleExhaustionError):
-        cpu.execute(cycles=3)
+        cpu.execute(max_instructions=1)  # cycles=3
 
     # then:
     # BNE should NOT modify any flags
@@ -53,6 +54,7 @@ def test_cpu_instruction_BNE_preserves_flags_when_branch_not_taken(cpu: CPU) -> 
     """Test that BNE preserves all flags when branch is not taken (Z=1)."""
     # given:
     cycles_before = cpu.cycles_executed
+    instructions_before = cpu.instructions_executed
     cpu.PC = 0x0400
     pc = cpu.PC
     # Set flags to 0x50
@@ -70,7 +72,7 @@ def test_cpu_instruction_BNE_preserves_flags_when_branch_not_taken(cpu: CPU) -> 
 
     # when:
     with contextlib.suppress(errors.CPUCycleExhaustionError):
-        cpu.execute(cycles=2)
+        cpu.execute(max_instructions=1)  # cycles=2
 
     # then:
     # BNE should NOT modify any flags
@@ -97,7 +99,7 @@ def test_cpu_instruction_BNE_preserves_all_flag_combinations(cpu: CPU) -> None: 
 
         # when:
         with contextlib.suppress(errors.CPUCycleExhaustionError):
-            cpu.execute(cycles=3)
+            cpu.execute(max_instructions=1)  # cycles=3
 
         # then:
         final_flags = cpu._flags.value
@@ -124,7 +126,7 @@ def test_cpu_instruction_BNE_page_boundary_crossing_preserves_flags(cpu: CPU) ->
 
     # when:
     with contextlib.suppress(errors.CPUCycleExhaustionError):
-        cpu.execute(cycles=4)  # +1 for page crossing
+        cpu.execute(max_instructions=1)  # cycles=4  # +1 for page crossing
 
     # then:
     final_flags = cpu._flags.value
@@ -150,7 +152,7 @@ def test_cpu_instruction_BNE_backward_branch_preserves_flags(cpu: CPU) -> None: 
 
     # when:
     with contextlib.suppress(errors.CPUCycleExhaustionError):
-        cpu.execute(cycles=3)
+        cpu.execute(max_instructions=1)  # cycles=3
 
     # then:
     final_flags = cpu._flags.value

@@ -12,10 +12,12 @@ from mos6502.memory import Byte, Word
 
 from c64.cartridges import (
     Cartridge,
+    CartridgeTestResults,
     StaticROMCartridge,
     ErrorCartridge,
     CARTRIDGE_TYPES,
     create_cartridge,
+    create_error_cartridge_rom,
     ROML_START,
     ROML_END,
     ROML_SIZE,
@@ -27,7 +29,7 @@ from c64.cartridges import (
     IO2_END,
 )
 
-logging.basicConfig(level=logging.WARNING)
+logging.basicConfig(level=logging.CRITICAL)
 log = logging.getLogger("c64")
 
 # Debug flags - set to True to enable verbose logging
@@ -440,6 +442,18 @@ class C64:
             "--no-irq",
             action="store_true",
             help="Disable IRQ injection (for debugging; system will hang waiting for IRQs)",
+        )
+        core_group.add_argument(
+            "--throttle",
+            action="store_true",
+            default=True,
+            help="Throttle emulation to real-time speed (default: enabled)",
+        )
+        core_group.add_argument(
+            "--no-throttle",
+            action="store_false",
+            dest="throttle",
+            help="Disable throttling - run at maximum speed (for benchmarks)",
         )
 
         # Program loading options
@@ -1990,6 +2004,11 @@ class C64:
                         self.ram_snapshot = self.c64_memory.snapshot_vic_bank(vic_bank)
                         self.ram_snapshot_bank = vic_bank  # Remember bank offset for rendering
                         self.color_snapshot = bytes(self.c64_memory.ram_color)
+                    # Warn if frame_complete is still set (render thread falling behind)
+                    if self.frame_complete.is_set():
+                        log.warning(
+                            "VIC: frame_complete still set at VBlank - render thread falling behind"
+                        )
                     # Signal frame complete - pygame will use the snapshot
                     self.frame_complete.set()
                 # 9-bit raster compare value: low byte in $D012, bit 8 in $D011 bit 7
@@ -3168,104 +3187,31 @@ class C64:
         Returns:
             8KB cartridge ROM data
         """
-        cart = bytearray(self.ROML_SIZE)
+        # Use the shared function from cartridges module (single source of truth)
+        return create_error_cartridge_rom(error_lines, border_color=0x02)
 
-        # Cartridge header at $8000-$8008
-        cart[0x0000] = 0x09  # Cold start lo -> $8009
-        cart[0x0001] = 0x80  # Cold start hi
-        cart[0x0002] = 0x09  # Warm start lo -> $8009
-        cart[0x0003] = 0x80  # Warm start hi
-        cart[0x0004] = 0xC3  # 'C' (CBM80 signature)
-        cart[0x0005] = 0xC2  # 'B'
-        cart[0x0006] = 0xCD  # 'M'
-        cart[0x0007] = 0x38  # '8'
-        cart[0x0008] = 0x30  # '0'
+    def _load_error_cartridge_with_results(self, results: CartridgeTestResults) -> None:
+        """Generate and load an error cartridge displaying test results.
 
-        # Code starts at $8009
-        code = []
+        Arguments:
+            results: CartridgeTestResults with current pass/fail state
+        """
+        error_lines = results.to_display_lines()
+        error_roml_data = self._create_error_cartridge(error_lines)
 
-        # SEI, set up stack
-        code.extend([0x78, 0xA2, 0xFF, 0x9A])  # SEI; LDX #$FF; TXS
+        # Create ErrorCartridge object
+        cartridge = ErrorCartridge(
+            roml_data=error_roml_data,
+            original_type=results.hardware_type,
+            original_name=results.cart_name,
+        )
+        self.cartridge_type = "error"
 
-        # Clear screen with spaces
-        code.extend([0xA9, 0x20, 0xA2, 0x00])  # LDA #$20; LDX #$00
-        # clear_loop:
-        code.extend([
-            0x9D, 0x00, 0x04,  # STA $0400,X
-            0x9D, 0x00, 0x05,  # STA $0500,X
-            0x9D, 0x00, 0x06,  # STA $0600,X
-            0x9D, 0x00, 0x07,  # STA $0700,X
-            0xE8,              # INX
-            0xD0, 0xF1,        # BNE clear_loop
-        ])
+        # Attach cartridge to memory handler
+        if self.memory is not None:
+            self.memory.cartridge = cartridge
 
-        # Set border/background to red
-        code.extend([
-            0xA9, 0x02,        # LDA #$02 (red)
-            0x8D, 0x20, 0xD0,  # STA $D020
-            0x8D, 0x21, 0xD0,  # STA $D021
-        ])
-
-        # Display each error line
-        for line_num, text in enumerate(error_lines[:20]):  # Max 20 lines
-            text = text[:38]  # Max 38 chars per line
-            screen_addr = 0x0400 + (line_num * 40) + 1  # +1 for margin
-            color_addr = 0xD800 + (line_num * 40) + 1
-
-            for i, ch in enumerate(text):
-                # Convert ASCII to screen code
-                if 'A' <= ch <= 'Z':
-                    sc = ord(ch) - ord('A') + 1
-                elif 'a' <= ch <= 'z':
-                    sc = ord(ch) - ord('a') + 1
-                elif '0' <= ch <= '9':
-                    sc = ord(ch) - ord('0') + 0x30
-                elif ch == ' ':
-                    sc = 0x20
-                elif ch == ':':
-                    sc = 0x3A
-                elif ch == '-':
-                    sc = 0x2D
-                elif ch == ',':
-                    sc = 0x2C
-                elif ch == '.':
-                    sc = 0x2E
-                elif ch == '!':
-                    sc = 0x21
-                elif ch == '?':
-                    sc = 0x3F
-                elif ch == '(':
-                    sc = 0x28
-                elif ch == ')':
-                    sc = 0x29
-                elif ch == '/':
-                    sc = 0x2F
-                elif ch == '_':
-                    sc = 0x64
-                else:
-                    sc = 0x20  # Unknown -> space
-
-                # LDA #sc; STA screen_addr+i
-                code.extend([
-                    0xA9, sc,
-                    0x8D, (screen_addr + i) & 0xFF, (screen_addr + i) >> 8,
-                ])
-                # LDA #$01 (white); STA color_addr+i
-                code.extend([
-                    0xA9, 0x01,
-                    0x8D, (color_addr + i) & 0xFF, (color_addr + i) >> 8,
-                ])
-
-        # Infinite loop
-        loop_addr = self.ROML_START + 0x0009 + len(code)
-        code.extend([0x4C, loop_addr & 0xFF, (loop_addr >> 8) & 0xFF])
-
-        # Copy code into cartridge
-        for i, byte in enumerate(code):
-            if 0x0009 + i < len(cart):
-                cart[0x0009 + i] = byte
-
-        return bytes(cart)
+        log.info(f"Loaded error cartridge with test results for type {results.hardware_type}")
 
     def _load_crt_cartridge(self, data: bytes, path: Path) -> None:
         """Load a CRT format cartridge file.
@@ -3281,13 +3227,25 @@ class C64:
         Raises:
             ValueError: If CRT format is invalid or unsupported
         """
-        # Validate CRT header
-        if len(data) < 64:
-            raise ValueError(f"CRT file too small: {len(data)} bytes (minimum 64)")
+        # Create test results - starts with all FAILs
+        results = CartridgeTestResults()
 
+        # Validate CRT header size
+        if len(data) < 64:
+            # Generate error cart with current results (all FAIL)
+            self._load_error_cartridge_with_results(results)
+            return
+
+        results.header_size_valid = True
+
+        # Check signature
         signature = data[:16]
         if signature != b"C64 CARTRIDGE   ":
-            raise ValueError(f"Invalid CRT signature: {signature!r}")
+            # Generate error cart with current results
+            self._load_error_cartridge_with_results(results)
+            return
+
+        results.signature_valid = True
 
         # Parse header (big-endian values)
         header_length = int.from_bytes(data[0x10:0x14], "big")
@@ -3298,76 +3256,30 @@ class C64:
         game_line = data[0x19]
         cart_name = data[0x20:0x40].rstrip(b"\x00").decode("latin-1", errors="replace")
 
-        # Look up hardware type name
-        type_name = self.CRT_HARDWARE_TYPES.get(hardware_type, f"Unknown type {hardware_type}")
+        # Update results with parsed values
+        results.version_valid = True  # We parsed it successfully
+        results.hardware_type = hardware_type
+        results.hardware_name = self.CRT_HARDWARE_TYPES.get(hardware_type, f"Unknown type {hardware_type}")
+        results.exrom_line = exrom_line
+        results.game_line = game_line
+        results.cart_name = cart_name
 
         log.info(
             f"CRT header: name='{cart_name}', version={version_hi}.{version_lo}, "
-            f"hardware_type={hardware_type} ({type_name}), EXROM={exrom_line}, GAME={game_line}"
+            f"hardware_type={hardware_type} ({results.hardware_name}), EXROM={exrom_line}, GAME={game_line}"
         )
 
         # Check if hardware type is supported
-        if hardware_type not in CARTRIDGE_TYPES:
+        mapper_supported = hardware_type in CARTRIDGE_TYPES
+        if mapper_supported:
+            results.mapper_supported = True
+        else:
             log.warning(
-                f"Unsupported cartridge type {hardware_type} ({type_name}). "
-                f"Loading error display cartridge."
+                f"Unsupported cartridge type {hardware_type} ({results.hardware_name}). "
+                f"Will parse CHIP packets for diagnostics."
             )
 
-            # Try to load pre-generated error cartridge from package
-            safe_name = type_name.lower().replace(" ", "_").replace(",", "").replace("/", "_")
-            error_cart_filename = f"error_type_{hardware_type:02d}_{safe_name}.bin"
-
-            # Error carts live in the c64.cartridges.error_cartridges directory
-            search_paths = [
-                Path(__file__).parent / "cartridges" / "error_cartridges" / error_cart_filename,
-            ]
-
-            # Try to load pre-generated error cartridge ROM
-            error_roml_data = None
-            for error_cart_path in search_paths:
-                if error_cart_path.exists():
-                    try:
-                        error_roml_data = error_cart_path.read_bytes()
-                        log.info(f"Loaded error cartridge: {error_cart_path}")
-                        break
-                    except Exception as e:
-                        log.debug(f"Failed to load error cartridge {error_cart_path}: {e}")
-
-            # Fall back to dynamically generating the error cartridge
-            if error_roml_data is None:
-                log.debug("Pre-generated error cartridge not found, generating dynamically")
-                error_lines = [
-                    "",
-                    "  UNSUPPORTED CARTRIDGE TYPE",
-                    "",
-                    f"  Type: {hardware_type}",
-                    f"  Name: {type_name}",
-                    "",
-                    f"  Cart: {cart_name}",
-                    "",
-                    "  This emulator does not yet",
-                    "  support this cartridge type.",
-                    "",
-                    "  Supported types:",
-                    "  - Type 0: Normal (8K/16K)",
-                    "  - Type 1: Action Replay",
-                ]
-                error_roml_data = self._create_error_cartridge(error_lines)
-
-            # Create ErrorCartridge object
-            cartridge = ErrorCartridge(
-                roml_data=error_roml_data,
-                original_type=hardware_type,
-                original_name=cart_name,
-            )
-            self.cartridge_type = "error"
-
-            # Attach cartridge to memory handler
-            if self.memory is not None:
-                self.memory.cartridge = cartridge
-            return
-
-        # Parse CHIP packets
+        # Parse CHIP packets (even for unsupported types, for diagnostics)
         offset = header_length
 
         # For Type 0 (standard cartridge)
@@ -3388,7 +3300,9 @@ class C64:
 
             chip_sig = data[offset:offset + 4]
             if chip_sig != b"CHIP":
-                raise ValueError(f"Invalid CHIP signature at offset {offset}: {chip_sig!r}")
+                # Invalid CHIP signature - generate error cart with results so far
+                self._load_error_cartridge_with_results(results)
+                return
 
             packet_length = int.from_bytes(data[offset + 4:offset + 8], "big")
             chip_type = int.from_bytes(data[offset + 8:offset + 10], "big")
@@ -3400,6 +3314,10 @@ class C64:
                 f"CHIP packet: type={chip_type}, bank={bank_number}, "
                 f"load=${load_address:04X}, size={rom_size}"
             )
+
+            # Track that we found a CHIP packet
+            results.chip_count += 1
+            results.chip_packets_found = True
 
             # Only handle ROM chips (type 0) for now
             if chip_type != 0:
@@ -3423,17 +3341,22 @@ class C64:
                         # Split 16KB ROM: first 8KB to ROML, second 8KB to ROMH
                         roml_data = rom_data[:self.ROML_SIZE]
                         romh_data = rom_data[self.ROML_SIZE:]
+                        results.roml_valid = True
+                        results.romh_valid = True
                         log.info(f"Loaded ROML: ${load_address:04X}-${load_address + self.ROML_SIZE - 1:04X} ({self.ROML_SIZE} bytes)")
                         log.info(f"Loaded ROMH: ${self.ROMH_START:04X}-${self.ROMH_START + len(romh_data) - 1:04X} ({len(romh_data)} bytes)")
                     else:
                         roml_data = rom_data
+                        results.roml_valid = True
                         log.info(f"Loaded ROML: ${load_address:04X}-${load_address + rom_size - 1:04X} ({rom_size} bytes)")
                 elif load_address == self.ROMH_START:
                     romh_data = rom_data
+                    results.romh_valid = True
                     log.info(f"Loaded ROMH: ${load_address:04X}-${load_address + rom_size - 1:04X} ({rom_size} bytes)")
                 elif load_address == self.KERNAL_ROM_START:
                     # Ultimax mode: ROM at $E000-$FFFF replaces KERNAL
                     ultimax_romh_data = rom_data
+                    results.ultimax_romh_valid = True
                     log.info(f"Loaded Ultimax ROMH: ${load_address:04X}-${load_address + rom_size - 1:04X} ({rom_size} bytes)")
                 else:
                     log.warning(f"Unknown CHIP load address: ${load_address:04X}")
@@ -3442,17 +3365,26 @@ class C64:
                 # For Action Replay, each bank is 8KB at $8000
                 if load_address == self.ROML_START:
                     banks[bank_number] = rom_data
+                    results.roml_valid = True  # At least one bank loaded to ROML region
+                    results.bank_switching_valid = len(banks) > 1  # Multiple banks = bank switching works
                     log.info(f"Loaded bank {bank_number}: ${load_address:04X}-${load_address + rom_size - 1:04X} ({rom_size} bytes)")
                 else:
                     log.warning(f"Unexpected load address ${load_address:04X} for bank {bank_number}")
 
             offset += packet_length
 
+        # If mapper not supported, generate error cart with diagnostics
+        if not mapper_supported:
+            self._load_error_cartridge_with_results(results)
+            return
+
         # Create appropriate cartridge object based on hardware type
         if hardware_type == 0:
             # Validate we got valid ROM data for Type 0
             if ultimax_romh_data is None and roml_data is None:
-                raise ValueError("CRT file contains no usable ROM data")
+                # No usable ROM data - generate error cart
+                self._load_error_cartridge_with_results(results)
+                return
 
             cartridge = create_cartridge(
                 hardware_type=0,
@@ -3472,7 +3404,9 @@ class C64:
         else:
             # Banked cartridges - convert bank dict to sorted list
             if not banks:
-                raise ValueError(f"CRT file contains no bank data for type {hardware_type}")
+                # No bank data - generate error cart
+                self._load_error_cartridge_with_results(results)
+                return
 
             # Create sorted list of banks (fill missing banks with empty data)
             max_bank = max(banks.keys())
@@ -3490,13 +3424,16 @@ class C64:
                 banks=bank_list,
                 name=cart_name,
             )
-            self.cartridge_type = type_name.lower().replace(" ", "_")
+            self.cartridge_type = results.hardware_name.lower().replace(" ", "_")
+
+        # Mark as fully loaded
+        results.fully_loaded = True
 
         # Attach cartridge to memory handler
         if self.memory is not None:
             self.memory.cartridge = cartridge
 
-        log.info(f"Loaded CRT cartridge: '{cart_name}' (type {hardware_type}: {type_name})")
+        log.info(f"Loaded CRT cartridge: '{cart_name}' (type {hardware_type}: {results.hardware_name})")
 
     def get_video_standard(self) -> str:
         """Get the video standard (PAL or NTSC) based on the current video chip.
@@ -3818,6 +3755,7 @@ class C64:
         max_cycles: int = INFINITE_CYCLES,
         stop_on_basic: bool = False,
         stop_on_kernal_input: bool = False,
+        throttle: bool = True,
     ) -> None:
         """Run the C64 emulator.
 
@@ -3826,6 +3764,8 @@ class C64:
                        (default: INFINITE_CYCLES for continuous execution)
             stop_on_basic: If True, stop execution when BASIC prompt is ready
             stop_on_kernal_input: If True, stop execution when KERNAL is waiting for keyboard input
+            throttle: If True, throttle emulation to real-time speed (default: True)
+                     Use --no-throttle for benchmarks to run at maximum speed
         """
         log.info(f"Starting execution at PC=${self.cpu.PC:04X}")
         log.info("Press Ctrl+C to stop")
@@ -3844,6 +3784,7 @@ class C64:
             import threading
             import time
             import sys as _sys
+            from mos6502.timing import FrameGovernor
 
             # Check if we're in a TTY (terminal) for interactive display
             is_tty = _sys.stdout.isatty()
@@ -3854,13 +3795,33 @@ class C64:
                 # Pygame mode: CPU in background, rendering + input in main thread
                 cpu_done = threading.Event()
                 cpu_error = None
+                stop_cpu = threading.Event()
+
+                # Create frame governor for real-time throttling
+                governor = FrameGovernor(
+                    fps=self.video_timing.refresh_hz,
+                    enabled=throttle
+                )
+                cycles_per_frame = self.video_timing.cycles_per_frame
 
                 def cpu_thread() -> None:
                     nonlocal cpu_error
                     try:
-                        # IRQs are now handled automatically by the CPU based on irq_pending flag
-                        # No need for separate execute_with_irqs method
-                        self.cpu.execute(cycles=max_cycles)
+                        # Execute frame-by-frame with optional throttling
+                        # This allows the governor to maintain real-time speed
+                        cycles_remaining = max_cycles
+                        while cycles_remaining > 0 and not stop_cpu.is_set():
+                            # Execute one frame's worth of cycles
+                            cycles_this_frame = min(cycles_per_frame, cycles_remaining)
+                            try:
+                                self.cpu.execute(cycles=cycles_this_frame)
+                            except errors.CPUCycleExhaustionError:
+                                pass  # Normal - frame completed
+                            cycles_remaining -= cycles_this_frame
+
+                            # Throttle to real-time (governor.throttle() returns
+                            # immediately if throttling is disabled)
+                            governor.throttle()
                     except Exception as e:
                         cpu_error = e
                     finally:
@@ -3885,6 +3846,7 @@ class C64:
                     pass  # Terminal input not available (Windows, etc.)
 
                 # Main thread handles pygame rendering + terminal input
+                # Use blocking wait on frame_complete to avoid burning CPU
                 try:
                     while not cpu_done.is_set():
                         # Check for BASIC ready or KERNAL input if requested
@@ -3896,14 +3858,22 @@ class C64:
                         # Handle terminal keyboard input if available
                         if terminal_input_available:
                             import select
-                            if select.select([_sys.stdin], [], [], 0.01)[0]:
+                            if select.select([_sys.stdin], [], [], 0)[0]:
                                 char = _sys.stdin.read(1)
                                 if self._handle_terminal_input(char):
                                     break  # Ctrl+C pressed
 
-                        # Render as fast as possible
-                        self._render_pygame()
+                        # Wait for frame_complete (blocking) or timeout
+                        # This efficiently waits without burning CPU
+                        if self.vic.frame_complete.wait(timeout=0.02):
+                            # Frame ready - render it
+                            self._render_pygame()
+                        else:
+                            # Timeout - pump pygame events to stay responsive
+                            self._pump_pygame_events()
                 finally:
+                    # Signal CPU thread to stop and wait for it
+                    stop_cpu.set()
                     cpu_done.set()
                     cpu_thread_obj.join(timeout=0.5)
 
@@ -3920,12 +3890,19 @@ class C64:
                         except Exception:
                             pass
 
+                    # Log governor stats if throttling was enabled
+                    if throttle:
+                        stats = governor.stats()
+                        log.info(f"Governor stats: {stats['frame_count']} frames, "
+                                f"avg sleep {stats['avg_sleep_per_frame']*1000:.1f}ms/frame, "
+                                f"dropped {stats['frames_dropped']}")
+
                 # Re-raise CPU thread exception if any
                 if cpu_error:
                     raise cpu_error
 
             else:
-                # Terminal or none mode: display in background, CPU in main thread
+                # Terminal or headless mode: display in background, CPU in main thread
                 stop_display = threading.Event()
 
                 def display_cycles() -> None:
@@ -3942,13 +3919,39 @@ class C64:
                 display_thread = threading.Thread(target=display_cycles, daemon=True)
                 display_thread.start()
 
+                # Create frame governor for real-time throttling (terminal/headless modes)
+                governor = FrameGovernor(
+                    fps=self.video_timing.refresh_hz,
+                    enabled=throttle
+                )
+                cycles_per_frame = self.video_timing.cycles_per_frame
+
                 try:
-                    # Run CPU - if stop_on_basic, pc_callback will raise StopIteration
-                    self.cpu.execute(cycles=max_cycles)
+                    if throttle:
+                        # Execute frame-by-frame with throttling
+                        cycles_remaining = max_cycles
+                        while cycles_remaining > 0:
+                            cycles_this_frame = min(cycles_per_frame, cycles_remaining)
+                            try:
+                                self.cpu.execute(cycles=cycles_this_frame)
+                            except errors.CPUCycleExhaustionError:
+                                pass  # Normal - frame completed
+                            cycles_remaining -= cycles_this_frame
+                            governor.throttle()
+                    else:
+                        # Run CPU at full speed - if stop_on_basic, pc_callback will raise StopIteration
+                        self.cpu.execute(cycles=max_cycles)
                 finally:
                     # Stop the display thread
                     stop_display.set()
                     display_thread.join(timeout=0.5)
+
+                    # Log governor stats if throttling was enabled
+                    if throttle:
+                        stats = governor.stats()
+                        log.info(f"Governor stats: {stats['frame_count']} frames, "
+                                f"avg sleep {stats['avg_sleep_per_frame']*1000:.1f}ms/frame, "
+                                f"dropped {stats['frames_dropped']}")
 
         except StopIteration as e:
             # PC callback requested stop (e.g., BASIC is ready or KERNAL waiting for input)
@@ -4717,6 +4720,32 @@ class C64:
         except Exception as e:
             log.error(f"Error rendering pygame display: {e}")
 
+    def _pump_pygame_events(self) -> None:
+        """Process pygame events without rendering.
+
+        Called when the frame_complete wait times out to keep the UI
+        responsive (handle window close, keyboard input, etc.).
+        """
+        if not self.pygame_available or self.pygame_screen is None:
+            return
+
+        try:
+            import pygame
+
+            for event in pygame.event.get():
+                if event.type == pygame.QUIT:
+                    import sys
+                    sys.exit(0)
+                elif event.type == pygame.KEYDOWN:
+                    if DEBUG_KEYBOARD:
+                        log.info(f"*** PYGAME KEYDOWN EVENT: key={event.key} ***")
+                    self._handle_pygame_keyboard(event, pygame)
+                elif event.type == pygame.KEYUP:
+                    self._handle_pygame_keyboard(event, pygame)
+
+        except Exception as e:
+            log.error(f"Error pumping pygame events: {e}")
+
     # ASCII to C64 keyboard matrix mapping
     # Maps ASCII characters to (row, col) positions in the C64 keyboard matrix
     # Some characters require SHIFT to be pressed
@@ -5189,7 +5218,7 @@ def main() -> int | None:
         if args.run and args.program and not args.no_roms:
             log.info("Auto-run enabled: booting until KERNAL waits for input...")
             # Boot until KERNAL is waiting for keyboard input (more reliable than stop_on_basic)
-            c64.run(max_cycles=args.max_cycles, stop_on_kernal_input=True)
+            c64.run(max_cycles=args.max_cycles, stop_on_kernal_input=True, throttle=args.throttle)
             # Re-load the program AFTER boot (KERNAL clears $0801 during boot)
             # This is the same as a real C64's LOAD command
             actual_load_addr, program_end_addr = c64.load_program(
@@ -5206,12 +5235,12 @@ def main() -> int | None:
             if args.display == "repl":
                 c64.run_repl(max_cycles=args.max_cycles)
             else:
-                c64.run(max_cycles=args.max_cycles)
+                c64.run(max_cycles=args.max_cycles, throttle=args.throttle)
         elif args.display == "repl":
             # REPL mode: interactive terminal with keyboard input
             c64.run_repl(max_cycles=args.max_cycles)
         else:
-            c64.run(max_cycles=args.max_cycles, stop_on_basic=args.stop_on_basic)
+            c64.run(max_cycles=args.max_cycles, stop_on_basic=args.stop_on_basic, throttle=args.throttle)
 
         # Dump final state
         c64.dump_registers()

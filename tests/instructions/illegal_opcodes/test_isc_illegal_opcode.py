@@ -41,7 +41,7 @@ class TestISCNMOS:
         nmos_cpu.ram[nmos_cpu.PC + 1] = 0x10
 
         with contextlib.suppress(errors.CPUCycleExhaustionError):
-            nmos_cpu.execute(cycles=5)
+            nmos_cpu.execute(max_instructions=1)  # cycles=5
 
         # Verify memory was incremented: 0x2F + 1 = 0x30
         assert nmos_cpu.ram[0x10] == 0x30
@@ -66,7 +66,7 @@ class TestISCNMOS:
         nmos_cpu.ram[nmos_cpu.PC + 1] = 0x20
 
         with contextlib.suppress(errors.CPUCycleExhaustionError):
-            nmos_cpu.execute(cycles=5)
+            nmos_cpu.execute(max_instructions=1)  # cycles=5
 
         # Verify memory was incremented
         assert nmos_cpu.ram[0x20] == 0x30
@@ -86,7 +86,7 @@ class TestISCNMOS:
         nmos_cpu.ram[nmos_cpu.PC + 1] = 0x30
 
         with contextlib.suppress(errors.CPUCycleExhaustionError):
-            nmos_cpu.execute(cycles=5)
+            nmos_cpu.execute(max_instructions=1)  # cycles=5
 
         # Verify memory was incremented
         assert nmos_cpu.ram[0x30] == 0x50
@@ -108,7 +108,7 @@ class TestISCNMOS:
         nmos_cpu.ram[nmos_cpu.PC + 1] = 0x40
 
         with contextlib.suppress(errors.CPUCycleExhaustionError):
-            nmos_cpu.execute(cycles=5)
+            nmos_cpu.execute(max_instructions=1)  # cycles=5
 
         # Verify memory was incremented
         assert nmos_cpu.ram[0x40] == 0x31
@@ -130,7 +130,7 @@ class TestISCNMOS:
         nmos_cpu.ram[nmos_cpu.PC + 1] = 0x50
 
         with contextlib.suppress(errors.CPUCycleExhaustionError):
-            nmos_cpu.execute(cycles=5)
+            nmos_cpu.execute(max_instructions=1)  # cycles=5
 
         # Verify memory was incremented
         assert nmos_cpu.ram[0x50] == 0xA0
@@ -149,7 +149,7 @@ class TestISCNMOS:
         nmos_cpu.ram[nmos_cpu.PC + 1] = 0x60
 
         with contextlib.suppress(errors.CPUCycleExhaustionError):
-            nmos_cpu.execute(cycles=5)
+            nmos_cpu.execute(max_instructions=1)  # cycles=5
 
         # Verify memory wrapped: 0xFF + 1 = 0x00
         assert nmos_cpu.ram[0x60] == 0x00
@@ -171,7 +171,7 @@ class TestISCNMOS:
         nmos_cpu.ram[nmos_cpu.PC + 1] = 0x10
 
         with contextlib.suppress(errors.CPUCycleExhaustionError):
-            nmos_cpu.execute(cycles=6)
+            nmos_cpu.execute(max_instructions=1)  # cycles=6
 
         # Verify memory at $15 was incremented
         assert nmos_cpu.ram[0x15] == 0x20
@@ -192,7 +192,7 @@ class TestISCNMOS:
         nmos_cpu.ram[nmos_cpu.PC + 2] = 0x45
 
         with contextlib.suppress(errors.CPUCycleExhaustionError):
-            nmos_cpu.execute(cycles=6)
+            nmos_cpu.execute(max_instructions=1)  # cycles=6
 
         # Verify memory was incremented
         assert nmos_cpu.ram[0x4567] == 0x30
@@ -214,7 +214,7 @@ class TestISCNMOS:
         nmos_cpu.ram[nmos_cpu.PC + 2] = 0x12
 
         with contextlib.suppress(errors.CPUCycleExhaustionError):
-            nmos_cpu.execute(cycles=7)
+            nmos_cpu.execute(max_instructions=1)  # cycles=7
 
         # Verify memory was incremented
         assert nmos_cpu.ram[0x1244] == 0x10
@@ -236,7 +236,7 @@ class TestISCNMOS:
         nmos_cpu.ram[nmos_cpu.PC + 2] = 0x20
 
         with contextlib.suppress(errors.CPUCycleExhaustionError):
-            nmos_cpu.execute(cycles=7)
+            nmos_cpu.execute(max_instructions=1)  # cycles=7
 
         # Verify memory was incremented
         assert nmos_cpu.ram[0x2020] == 0x20
@@ -261,7 +261,7 @@ class TestISCNMOS:
         nmos_cpu.ram[nmos_cpu.PC + 1] = 0x10
 
         with contextlib.suppress(errors.CPUCycleExhaustionError):
-            nmos_cpu.execute(cycles=8)
+            nmos_cpu.execute(max_instructions=1)  # cycles=8
 
         # Verify memory was incremented
         assert nmos_cpu.ram[0x3000] == 0x30
@@ -286,7 +286,7 @@ class TestISCNMOS:
         nmos_cpu.ram[nmos_cpu.PC + 1] = 0x20
 
         with contextlib.suppress(errors.CPUCycleExhaustionError):
-            nmos_cpu.execute(cycles=8)
+            nmos_cpu.execute(max_instructions=1)  # cycles=8
 
         # Verify memory was incremented
         assert nmos_cpu.ram[0x4010] == 0x40
@@ -310,7 +310,7 @@ class TestISCCMOS:
         cmos_cpu.ram[cmos_cpu.PC + 1] = 0x10
 
         with contextlib.suppress(errors.CPUCycleExhaustionError):
-            cmos_cpu.execute(cycles=5)
+            cmos_cpu.execute(max_instructions=1)  # cycles=5
 
         # Verify memory is unchanged (NOP behavior)
         assert cmos_cpu.ram[0x10] == 0x2F

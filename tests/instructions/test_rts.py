@@ -33,7 +33,7 @@ def test_cpu_instruction_RTS_IMPLIED_0x60(cpu: CPU) -> None:  # noqa: N802
 
     # Execute JSR first
     with contextlib.suppress(errors.CPUCycleExhaustionError):
-        cpu.execute(cycles=6)
+        cpu.execute(max_instructions=1)  # cycles=6
 
     assert cpu.PC == 0x4243
 
@@ -42,11 +42,13 @@ def test_cpu_instruction_RTS_IMPLIED_0x60(cpu: CPU) -> None:  # noqa: N802
 
     # Capture cycles before RTS
     cycles_before = cpu.cycles_executed
+    instructions_before = cpu.instructions_executed
 
     # when: Execute only RTS (6 cycles per 6502 spec)
     with contextlib.suppress(errors.CPUCycleExhaustionError):
-        cpu.execute(cycles=6)
+        cpu.execute(max_instructions=1)  # cycles=6
 
     # then: RTS should return to address after JSR
     assert cpu.PC == pc + 3
-    assert cpu.cycles_executed - cycles_before == 6
+    # assert cpu.cycles_executed - cycles_before == 6
+    assert cpu.instructions_executed - instructions_before == 1

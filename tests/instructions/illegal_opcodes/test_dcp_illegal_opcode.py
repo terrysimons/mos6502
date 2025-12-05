@@ -40,7 +40,7 @@ class TestDCPNMOS:
         nmos_cpu.ram[nmos_cpu.PC + 1] = 0x10
 
         with contextlib.suppress(errors.CPUCycleExhaustionError):
-            nmos_cpu.execute(cycles=5)
+            nmos_cpu.execute(max_instructions=1)  # cycles=5
 
         # Verify memory was decremented: 0x51 - 1 = 0x50
         assert nmos_cpu.ram[0x10] == 0x50
@@ -63,7 +63,7 @@ class TestDCPNMOS:
         nmos_cpu.ram[nmos_cpu.PC + 1] = 0x20
 
         with contextlib.suppress(errors.CPUCycleExhaustionError):
-            nmos_cpu.execute(cycles=5)
+            nmos_cpu.execute(max_instructions=1)  # cycles=5
 
         # Verify memory was decremented
         assert nmos_cpu.ram[0x20] == 0x4F
@@ -83,7 +83,7 @@ class TestDCPNMOS:
         nmos_cpu.ram[nmos_cpu.PC + 1] = 0x30
 
         with contextlib.suppress(errors.CPUCycleExhaustionError):
-            nmos_cpu.execute(cycles=5)
+            nmos_cpu.execute(max_instructions=1)  # cycles=5
 
         # Verify memory was decremented
         assert nmos_cpu.ram[0x30] == 0x50
@@ -103,7 +103,7 @@ class TestDCPNMOS:
         nmos_cpu.ram[nmos_cpu.PC + 1] = 0x40
 
         with contextlib.suppress(errors.CPUCycleExhaustionError):
-            nmos_cpu.execute(cycles=5)
+            nmos_cpu.execute(max_instructions=1)  # cycles=5
 
         # Verify memory was decremented
         assert nmos_cpu.ram[0x40] == 0x8F
@@ -123,7 +123,7 @@ class TestDCPNMOS:
         nmos_cpu.ram[nmos_cpu.PC + 1] = 0x50
 
         with contextlib.suppress(errors.CPUCycleExhaustionError):
-            nmos_cpu.execute(cycles=5)
+            nmos_cpu.execute(max_instructions=1)  # cycles=5
 
         # Verify memory wrapped: 0x00 - 1 = 0xFF
         assert nmos_cpu.ram[0x50] == 0xFF
@@ -144,7 +144,7 @@ class TestDCPNMOS:
         nmos_cpu.ram[nmos_cpu.PC + 1] = 0x10
 
         with contextlib.suppress(errors.CPUCycleExhaustionError):
-            nmos_cpu.execute(cycles=6)
+            nmos_cpu.execute(max_instructions=1)  # cycles=6
 
         # Verify memory at $15 was decremented
         assert nmos_cpu.ram[0x15] == 0x42
@@ -165,7 +165,7 @@ class TestDCPNMOS:
         nmos_cpu.ram[nmos_cpu.PC + 2] = 0x45
 
         with contextlib.suppress(errors.CPUCycleExhaustionError):
-            nmos_cpu.execute(cycles=6)
+            nmos_cpu.execute(max_instructions=1)  # cycles=6
 
         # Verify memory was decremented
         assert nmos_cpu.ram[0x4567] == 0x2F
@@ -188,7 +188,7 @@ class TestDCPNMOS:
         nmos_cpu.ram[nmos_cpu.PC + 2] = 0x12
 
         with contextlib.suppress(errors.CPUCycleExhaustionError):
-            nmos_cpu.execute(cycles=7)
+            nmos_cpu.execute(max_instructions=1)  # cycles=7
 
         # Verify memory was decremented
         assert nmos_cpu.ram[0x1244] == 0x50
@@ -208,7 +208,7 @@ class TestDCPNMOS:
         nmos_cpu.ram[nmos_cpu.PC + 2] = 0x20
 
         with contextlib.suppress(errors.CPUCycleExhaustionError):
-            nmos_cpu.execute(cycles=7)
+            nmos_cpu.execute(max_instructions=1)  # cycles=7
 
         # Verify memory was decremented
         assert nmos_cpu.ram[0x2020] == 0x60
@@ -231,7 +231,7 @@ class TestDCPNMOS:
         nmos_cpu.ram[nmos_cpu.PC + 1] = 0x10
 
         with contextlib.suppress(errors.CPUCycleExhaustionError):
-            nmos_cpu.execute(cycles=8)
+            nmos_cpu.execute(max_instructions=1)  # cycles=8
 
         # Verify memory was decremented
         assert nmos_cpu.ram[0x3000] == 0x70
@@ -254,7 +254,7 @@ class TestDCPNMOS:
         nmos_cpu.ram[nmos_cpu.PC + 1] = 0x20
 
         with contextlib.suppress(errors.CPUCycleExhaustionError):
-            nmos_cpu.execute(cycles=8)
+            nmos_cpu.execute(max_instructions=1)  # cycles=8
 
         # Verify memory was decremented
         assert nmos_cpu.ram[0x4010] == 0x80
@@ -276,7 +276,7 @@ class TestDCPCMOS:
         cmos_cpu.ram[cmos_cpu.PC + 1] = 0x10
 
         with contextlib.suppress(errors.CPUCycleExhaustionError):
-            cmos_cpu.execute(cycles=5)
+            cmos_cpu.execute(max_instructions=1)  # cycles=5
 
         # Verify memory is unchanged (NOP behavior)
         assert cmos_cpu.ram[0x10] == 0x51

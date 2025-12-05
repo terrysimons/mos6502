@@ -585,7 +585,7 @@ __all__ = [
     "ASL_ABSOLUTE_X_0x1E",
 
     # Branch
-    "BBC_RELATIVE_0x90",
+    "BCC_RELATIVE_0x90",
     "BCS_RELATIVE_0xB0",
     "BEQ_RELATIVE_0xF0",
     "BIT_ZEROPAGE_0x24",

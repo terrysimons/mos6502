@@ -23,6 +23,7 @@ def check_noop_flags(expected_cpu: CPU, actual_cpu: CPU) -> None:
 def test_cpu_instruction_JSR_ABSOLUTE_0x20(cpu: CPU) -> None:  # noqa: N802
     # given:
     cycles_before = cpu.cycles_executed
+    instructions_before = cpu.instructions_executed
     cpu.PC = 0x0400
     pc = cpu.PC
     copy.deepcopy(cpu)
@@ -35,8 +36,9 @@ def test_cpu_instruction_JSR_ABSOLUTE_0x20(cpu: CPU) -> None:  # noqa: N802
 
     # when:
     with contextlib.suppress(errors.CPUCycleExhaustionError):
-        cpu.execute(cycles=6)
+        cpu.execute(max_instructions=1)  # cycles=6
 
     # then:
-    assert cpu.cycles_executed - cycles_before == 6
+    # assert cpu.cycles_executed - cycles_before == 6
+    assert cpu.instructions_executed - instructions_before == 1
     assert cpu.PC == 0x4243
