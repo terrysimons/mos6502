@@ -1276,11 +1276,11 @@ class MOS6502CPU(flags.ProcessorStatusFlagsInterface):
                     )
 
             # This automatically invokes the correct opcode handler based on the configured CPU variant.
-            # Legal instructions have metadata (package/function), illegal ones don't
-            if hasattr(instruction, "package") and hasattr(instruction, "function"):
+            # Legal instructions are InstructionOpcode objects with package/function metadata
+            if isinstance(instruction, instructions.InstructionOpcode):
                 self._execute_instruction(instruction)
             else:
-                # Illegal instruction - no metadata found
+                # Illegal instruction - not in OPCODE_LOOKUP, just a raw byte
                 self.log.error(f"ILLEGAL INSTRUCTION: {instruction} ({instruction:02X})")
                 raise errors.IllegalCPUInstructionError(
                     f"Illegal instruction: 0x{int(instruction):02X}"
