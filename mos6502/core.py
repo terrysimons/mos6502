@@ -289,10 +289,8 @@ class MOS6502CPU(flags.ProcessorStatusFlagsInterface):
         byte: Byte = self.ram[self.PC]
 
         # Use explicit assignment to trigger PC setter (for pc_callback)
-        if self.PC < 65535:
-            self.PC = self.PC + 1
-        else:
-            self.PC = 0
+        # Setter handles 16-bit wrap via & 0xFFFF masking
+        self.PC = self.PC + 1
         self.spend_cpu_cycles(cost=1)
 
         if self.verbose_cycles:
@@ -1219,63 +1217,63 @@ class MOS6502CPU(flags.ProcessorStatusFlagsInterface):
             # Convert to InstructionOpcode if available for variant dispatch
             instruction = instructions.OPCODE_LOOKUP.get(int(instruction_byte), instruction_byte)
 
-            # self.log.debug(
+            # Verbose instruction tracing (only when verbose_cycles is enabled)
+            # This entire block is for debug output and NOT needed for execution
+            if self.verbose_cycles:
+                instruction_bytes: int = 0
+                machine_code = []
+                operand: memory.MemoryUnit = 0
+                assembly = ""
+                instruction_cycle_count: int = 0
+                if int(instruction) in instructions.InstructionSet.map:
+                    instruction_map: int = instructions.InstructionSet.map[int(instruction)]
 
-            instruction_bytes: int = 0
+                    instruction_bytes: int = int(instruction_map["bytes"])
 
-            machine_code = []
-            operand: memory.MemoryUnit = 0
-            assembly = ""
-            instruction_cycle_count: int = 0
-            if int(instruction) in instructions.InstructionSet.map:
-                instruction_map: int = instructions.InstructionSet.map[int(instruction)]
+                    instruction_cycle_count = instruction_map["cycles"]
 
-                instruction_bytes: int = int(instruction_map["bytes"])
+                    with contextlib.suppress(ValueError):
+                        instruction_cycle_count: int = int(instruction_map["cycles"])
 
-                instruction_cycle_count = instruction_map["cycles"]
+                    # Subtract 1 for the instruction
+                    for i in range(instruction_bytes - 1):
+                        # Wrap address to stay within 16-bit address space (0-65535)
+                        machine_code.append(int(self.ram[(self.PC + i) & 0xFFFF]))
 
-                with contextlib.suppress(ValueError):
-                    instruction_cycle_count: int = int(instruction_map["cycles"])
+                    if len(machine_code) > 2:
+                        raise errors.MachineCodeExecutionException(
+                            f"Unsure how to handle: {machine_code}",
+                        )
 
-                # Subtract 1 for the instruction
-                for i in range(instruction_bytes - 1):
-                    # Wrap address to stay within 16-bit address space (0-65535)
-                    machine_code.append(int(self.ram[(self.PC + i) & 0xFFFF]))
+                    if len(machine_code) == 0:
+                        assembly: str = instruction_map["assembler"]
+                        operand: memory.MemoryUnit = None
 
-                if len(machine_code) > 2:
-                    raise errors.MachineCodeExecutionException(
-                        f"Unsure how to handle: {machine_code}",
+                    if len(machine_code) == 1:
+                        operand: memory.MemoryUnit = Byte(
+                            value=machine_code[0],
+                            endianness=self.endianness,
+                        )
+                        assembly = instruction_map["assembler"].format(oper=f"0x{operand:02X}")
+
+                    if len(machine_code) == 2:
+                        low_byte: memory.MemoryUnit = machine_code[0]
+                        high_byte: memory.MemoryUnit = machine_code[1]
+
+                        operand: memory.MemoryUnit = Word((high_byte << 8) + low_byte)
+
+                        assembly: str = instruction_map["assembler"].format(oper=f"0x{operand:02X}")
+
+                if operand is not None:
+                    self.log.info(
+                        f"0x{self.PC - 1:02X}: 0x{instruction:02X} "
+                        f"0x{operand:02X} \t\t\t {assembly} \t\t\t {instruction_cycle_count}",
                     )
-
-                if len(machine_code) == 0:
-                    assembly: str = instruction_map["assembler"]
-                    operand: memory.MemoryUnit = None
-
-                if len(machine_code) == 1:
-                    operand: memory.MemoryUnit = Byte(
-                        value=machine_code[0],
-                        endianness=self.endianness,
+                else:
+                    self.log.info(
+                        f"0x{self.PC - 1:02X}: 0x{instruction:02X} ---- "
+                        f"\t\t\t {assembly} \t\t\t {instruction_cycle_count}",
                     )
-                    assembly = instruction_map["assembler"].format(oper=f"0x{operand:02X}")
-
-                if len(machine_code) == 2:
-                    low_byte: memory.MemoryUnit = machine_code[0]
-                    high_byte: memory.MemoryUnit = machine_code[1]
-
-                    operand: memory.MemoryUnit = Word((high_byte << 8) + low_byte)
-
-                    assembly: str = instruction_map["assembler"].format(oper=f"0x{operand:02X}")
-
-            if operand is not None:
-                self.log.info(
-                    f"0x{self.PC - 1:02X}: 0x{instruction:02X} "
-                    f"0x{operand:02X} \t\t\t {assembly} \t\t\t {instruction_cycle_count}",
-                )
-            else:
-                self.log.info(
-                    f"0x{self.PC - 1:02X}: 0x{instruction:02X} ---- "
-                    f"\t\t\t {assembly} \t\t\t {instruction_cycle_count}",
-                )
 
             # This automatically invokes the correct opcode handler based on the configured CPU variant.
             # Legal instructions have metadata (package/function), illegal ones don't
@@ -1515,7 +1513,8 @@ class MOS6502CPU(flags.ProcessorStatusFlagsInterface):
         -------
             None
         """
-        self.log.debug(f"Flags <- 0x{self._flags.flags:02X}")
+        if self.verbose_cycles:
+            self.log.debug(f"Flags <- 0x{self._flags.flags:02X}")
 
         setattr(self._flags, flags)
     @property
@@ -1527,7 +1526,8 @@ class MOS6502CPU(flags.ProcessorStatusFlagsInterface):
         -------
             int (16-bit value)
         """
-        self.log.debug(f"PC <- 0x{self._registers.PC:04X}")
+        if self.verbose_cycles:
+            self.log.debug(f"PC <- 0x{self._registers.PC:04X}")
         return self._registers.PC
 
     @PC.setter
@@ -1544,7 +1544,8 @@ class MOS6502CPU(flags.ProcessorStatusFlagsInterface):
             None
         """
         self._registers.PC = PC & 0xFFFF
-        self.log.info(f"PC -> 0x{self._registers.PC:04X}")
+        if self.verbose_cycles:
+            self.log.info(f"PC -> 0x{self._registers.PC:04X}")
 
         # Call PC change callback if set
         if self.pc_callback is not None:
@@ -1563,7 +1564,8 @@ class MOS6502CPU(flags.ProcessorStatusFlagsInterface):
         -------
             int (9-bit value: 0x0100-0x01FF)
         """
-        self.log.debug(f"S <- 0x{self._registers.S:02X} ")
+        if self.verbose_cycles:
+            self.log.debug(f"S <- 0x{self._registers.S:02X} ")
         return self._registers.S
 
     @S.setter
@@ -1585,7 +1587,8 @@ class MOS6502CPU(flags.ProcessorStatusFlagsInterface):
         # Stack pointer is 8 bits, always in page 1 (0x0100-0x01FF)
         # Mask to 8 bits and force page 1
         self._registers.S = 0x0100 | (S & 0xFF)
-        self.log.info(f"S -> 0x{self._registers.S & 0xFF:02X}")
+        if self.verbose_cycles:
+            self.log.info(f"S -> 0x{self._registers.S & 0xFF:02X}")
 
     @property
     def A(self: Self) -> int:  # noqa: N802
@@ -1596,7 +1599,8 @@ class MOS6502CPU(flags.ProcessorStatusFlagsInterface):
         -------
             int (8-bit value)
         """
-        self.log.debug(f"A <- 0x{self._registers.A:02X}")
+        if self.verbose_cycles:
+            self.log.debug(f"A <- 0x{self._registers.A:02X}")
         return self._registers.A
 
     @A.setter
@@ -1613,7 +1617,8 @@ class MOS6502CPU(flags.ProcessorStatusFlagsInterface):
             None
         """
         self._registers.A = A & 0xFF
-        self.log.info(f"A -> 0x{self._registers.A:02X}")
+        if self.verbose_cycles:
+            self.log.info(f"A -> 0x{self._registers.A:02X}")
 
     @property
     def X(self: Self) -> int:  # noqa: N802
@@ -1624,7 +1629,8 @@ class MOS6502CPU(flags.ProcessorStatusFlagsInterface):
         -------
             int (8-bit value)
         """
-        self.log.debug(f"X <- 0x{self._registers.X:02X}")
+        if self.verbose_cycles:
+            self.log.debug(f"X <- 0x{self._registers.X:02X}")
         return self._registers.X
 
     @X.setter
@@ -1641,7 +1647,8 @@ class MOS6502CPU(flags.ProcessorStatusFlagsInterface):
             None
         """
         self._registers.X = X & 0xFF
-        self.log.info(f"X -> 0x{self._registers.X:02X}")
+        if self.verbose_cycles:
+            self.log.info(f"X -> 0x{self._registers.X:02X}")
 
     @property
     def Y(self: Self) -> int:  # noqa: N802
@@ -1652,7 +1659,8 @@ class MOS6502CPU(flags.ProcessorStatusFlagsInterface):
         -------
             int (8-bit value)
         """
-        self.log.debug(f"Y <- 0x{self._registers.Y:02X}")
+        if self.verbose_cycles:
+            self.log.debug(f"Y <- 0x{self._registers.Y:02X}")
         return self._registers.Y
 
     @Y.setter
@@ -1669,7 +1677,8 @@ class MOS6502CPU(flags.ProcessorStatusFlagsInterface):
             None
         """
         self._registers.Y = Y & 0xFF
-        self.log.info(f"Y -> 0x{self._registers.Y:02X}")
+        if self.verbose_cycles:
+            self.log.info(f"Y -> 0x{self._registers.Y:02X}")
 
     def __str__(self: Self) -> str:
         """Return the CPU status."""
