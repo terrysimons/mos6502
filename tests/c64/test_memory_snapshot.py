@@ -5,27 +5,10 @@ The snapshot methods bypass the memory handler to avoid infinite recursion
 while providing consistent frame data for the display thread.
 """
 
-from pathlib import Path
-
 import pytest
 from systems.c64 import C64
 
-# Use the same ROM directory pattern as other C64 tests
-FIXTURES_DIR = Path(__file__).parent.parent / "fixtures"
-C64_ROMS_DIR = FIXTURES_DIR / "roms" / "c64"
-
-# Check if C64 ROMs are available
-C64_ROMS_AVAILABLE = (
-    C64_ROMS_DIR.exists()
-    and (C64_ROMS_DIR / "basic.901226-01.bin").exists()
-    and (C64_ROMS_DIR / "kernal.901227-03.bin").exists()
-    and (C64_ROMS_DIR / "characters.901225-01.bin").exists()
-)
-
-requires_c64_roms = pytest.mark.skipif(
-    not C64_ROMS_AVAILABLE,
-    reason=f"C64 ROMs not found in {C64_ROMS_DIR}"
-)
+from .conftest import C64_ROMS_DIR, requires_c64_roms
 
 
 @requires_c64_roms

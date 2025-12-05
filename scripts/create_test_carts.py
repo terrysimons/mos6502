@@ -5,14 +5,14 @@ Usage:
     python scripts/create_test_carts.py
 
 Creates:
-    tests/fixtures/cartridge_types/  - All test cartridges (CRT and BIN formats)
+    tests/fixtures/c64/cartridge_types/  - All test cartridges (CRT and BIN formats)
     systems/c64/cartridges/error_cartridges/ - Pre-generated error display cartridges (if enabled)
 """
 
 # Configuration flags
 # Error cartridges are now generated dynamically at runtime, so pre-built files
 # are no longer needed. Set to True only if you need to regenerate them for testing.
-GENERATE_ERROR_CARTS = False
+GENERATE_ERROR_CARTS = True
 import sys
 from pathlib import Path
 
@@ -1793,8 +1793,12 @@ def main():
     fixtures_dir = project_root / "tests" / "fixtures"
     fixtures_dir.mkdir(parents=True, exist_ok=True)
 
+    # Create C64-specific fixtures directory structure
+    c64_fixtures_dir = fixtures_dir / "c64"
+    c64_fixtures_dir.mkdir(parents=True, exist_ok=True)
+
     # Create cartridge_types directory for all cartridge test fixtures
-    cartridge_types_dir = fixtures_dir / "cartridge_types"
+    cartridge_types_dir = c64_fixtures_dir / "cartridge_types"
     cartridge_types_dir.mkdir(parents=True, exist_ok=True)
 
     # Create 8KB cartridge
@@ -1903,7 +1907,7 @@ def main():
         print("\nSkipping error cartridge generation (GENERATE_ERROR_CARTS=False)")
         print("  Error cartridges are generated dynamically at runtime.")
 
-    # Create test CRT files for each mapper type in tests/fixtures/cartridge_types/
+    # Create test CRT files for each mapper type in tests/fixtures/c64/cartridge_types/
     # All cartridge test files go here - both supported and unsupported types
     # (cartridge_types_dir was already created above)
     print("\nCreating test cartridges for all hardware types...")

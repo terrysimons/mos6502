@@ -3,6 +3,7 @@ systems/roms/
 
 # Test ROMs
 tests/fixtures/roms/
+tests/fixtures/c64/roms/
 
 # Python
 *.pyc

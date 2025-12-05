@@ -29,53 +29,41 @@ from c64.cartridges import (
     ULTIMAX_ROMH_SIZE,
 )
 
-
-# Path to test fixtures
-FIXTURES_DIR = Path(__file__).parent.parent / "fixtures"
-CARTRIDGE_TYPES_DIR = FIXTURES_DIR / "cartridge_types"
-C64_ROMS_DIR = FIXTURES_DIR / "roms" / "c64"
-
-# Check if C64 ROMs are available for integration tests
-C64_ROMS_AVAILABLE = (
-    C64_ROMS_DIR.exists()
-    and (C64_ROMS_DIR / "basic.901226-01.bin").exists()
-    and (C64_ROMS_DIR / "kernal.901227-03.bin").exists()
-    and (C64_ROMS_DIR / "characters.901225-01.bin").exists()
-)
-
-# Skip marker for tests requiring C64 ROMs
-requires_c64_roms = pytest.mark.skipif(
-    not C64_ROMS_AVAILABLE,
-    reason=f"C64 ROMs not found in {C64_ROMS_DIR}"
-)
+from .conftest import CARTRIDGE_TYPES_DIR, C64_ROMS_DIR, requires_c64_roms
 
 
 class TestCartridgeModule:
     """Tests for the cartridge module classes and functions."""
 
+    @requires_c64_roms
     def test_cartridge_types_registry_contains_type_0(self):
         """Type 0 (Normal cartridge) should be in the registry."""
         assert StaticROMCartridge.HARDWARE_TYPE in CARTRIDGE_TYPES
         assert CARTRIDGE_TYPES[StaticROMCartridge.HARDWARE_TYPE] == StaticROMCartridge
 
+    @requires_c64_roms
     def test_cartridge_types_registry_contains_type_1(self):
         """Type 1 (Action Replay) should be in the registry."""
         assert ActionReplayCartridge.HARDWARE_TYPE in CARTRIDGE_TYPES
         assert CARTRIDGE_TYPES[ActionReplayCartridge.HARDWARE_TYPE] == ActionReplayCartridge
 
+    @requires_c64_roms
     def test_action_replay_cartridge_hardware_type(self):
         """ActionReplayCartridge should have hardware type 1."""
         assert ActionReplayCartridge.HARDWARE_TYPE == 1
 
+    @requires_c64_roms
     def test_static_rom_cartridge_hardware_type(self):
         """StaticROMCartridge should have hardware type 0."""
         assert StaticROMCartridge.HARDWARE_TYPE == 0
 
+    @requires_c64_roms
     def test_error_cartridge_hardware_type(self):
         """ErrorCartridge should have hardware type -1 (not a real type)."""
         assert ErrorCartridge.HARDWARE_TYPE == -1
 
 
+@requires_c64_roms
 class TestStaticROMCartridge:
     """Tests for StaticROMCartridge (Type 0)."""
 
@@ -186,6 +174,7 @@ class TestStaticROMCartridge:
         assert cart.read_io2(0xDFFF) == 0xFF
 
 
+@requires_c64_roms
 class TestErrorCartridge:
     """Tests for ErrorCartridge."""
 
@@ -205,6 +194,7 @@ class TestErrorCartridge:
         assert cart.name.startswith("Error:")
 
 
+@requires_c64_roms
 class TestCreateCartridgeFactory:
     """Tests for the create_cartridge factory function."""
 
@@ -937,6 +927,7 @@ class TestC64CartridgeLoading:
 class TestCRTHeaderParsing:
     """Tests for CRT header parsing."""
 
+    @requires_c64_roms
     def test_hardware_type_correctly_parsed(self):
         """Hardware type should be correctly extracted from CRT header."""
         for hw_type in [0, 1, 5, 32, 85]:
@@ -944,6 +935,7 @@ class TestCRTHeaderParsing:
             parsed_type = int.from_bytes(crt_data[0x16:0x18], "big")
             assert parsed_type == hw_type
 
+    @requires_c64_roms
     def test_exrom_game_correctly_parsed(self):
         """EXROM and GAME lines should be correctly extracted from CRT header."""
         # Test various EXROM/GAME combinations
@@ -952,6 +944,7 @@ class TestCRTHeaderParsing:
             assert crt_data[0x18] == exrom
             assert crt_data[0x19] == game
 
+    @requires_c64_roms
     def test_cart_name_correctly_parsed(self):
         """Cartridge name should be correctly extracted from CRT header."""
         crt_data = self._create_minimal_crt(name="MY TEST CART")
@@ -1002,6 +995,7 @@ class TestErrorCartridgeFiles:
         / "error_cartridges"
     )
 
+    @requires_c64_roms
     @pytest.mark.parametrize("hw_type", range(1, 86))
     def test_error_cartridge_file_exists(self, hw_type):
         """Each unsupported type should have a pre-generated error cartridge."""
@@ -1012,6 +1006,7 @@ class TestErrorCartridgeFiles:
 
         assert path.exists(), f"Error cartridge missing for type {hw_type}: {filename}"
 
+    @requires_c64_roms
     @pytest.mark.parametrize("hw_type", range(1, 86))
     def test_error_cartridge_file_size(self, hw_type):
         """Error cartridge files should be exactly 8KB."""
@@ -1026,6 +1021,7 @@ class TestErrorCartridgeFiles:
         size = path.stat().st_size
         assert size == ROML_SIZE, f"Error cart {filename} should be {ROML_SIZE} bytes, got {size}"
 
+    @requires_c64_roms
     @pytest.mark.parametrize("hw_type", range(1, 86))
     def test_error_cartridge_has_cbm80_signature(self, hw_type):
         """Error cartridge ROMs should have valid CBM80 signature."""
@@ -1054,6 +1050,7 @@ class TestMapperTestCartridgeFiles:
     # Type 0 has three variants (8k, 16k, ultimax) instead of a single file
     TYPE_0_VARIANTS = ["type_00_8k.crt", "type_00_16k.crt", "type_00_ultimax.crt"]
 
+    @requires_c64_roms
     @pytest.mark.parametrize("hw_type", range(0, 86))
     def test_mapper_test_cartridge_exists(self, hw_type):
         """Each hardware type should have a test CRT file."""
@@ -1079,6 +1076,7 @@ class TestMapperTestCartridgeFiles:
 
         assert path.exists(), f"Mapper test CRT missing for type {hw_type}: {filename}"
 
+    @requires_c64_roms
     @pytest.mark.parametrize("hw_type", range(0, 86))
     def test_mapper_test_cartridge_has_correct_hardware_type(self, hw_type):
         """Mapper test CRT files should have correct hardware type in header."""
