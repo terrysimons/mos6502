@@ -82,10 +82,9 @@ class C64Memory:
     """
 
     def __init__(self, ram, *, basic_rom, kernal_rom, char_rom, cia1, cia2, vic, sid, dirty_tracker=None) -> None:
-        # Store references to actual RAM storage for direct access (avoids delegation loop)
-        self.ram_zeropage = ram.zeropage
-        self.ram_stack = ram.stack
-        self.ram_heap = ram.heap
+        # Store reference to flat RAM array for direct access (avoids delegation loop)
+        # This eliminates branching on every RAM access
+        self._ram = ram.data  # Direct reference to flat bytearray
         self.basic = basic_rom
         self.kernal = kernal_rom
         self.char = char_rom
@@ -109,25 +108,13 @@ class C64Memory:
 
     def _read_ram_direct(self, addr) -> int:
         """Read directly from RAM storage without delegation."""
-        # RAM lists now store plain ints, not Byte objects
-        if 0 <= addr < 256:
-            return self.ram_zeropage[addr]
-        elif 256 <= addr < 512:
-            return self.ram_stack[addr - 256]
-        elif addr <= 65535:
-            return self.ram_heap[addr - 512]
-        return 0
+        # Direct flat array access - no branching
+        return self._ram[addr]
 
     def _write_ram_direct(self, addr, value) -> None:
         """Write directly to RAM storage without delegation."""
-        # RAM lists now store plain ints, not Byte objects
-        int_value = int(value) & 0xFF
-        if 0 <= addr < 256:
-            self.ram_zeropage[addr] = int_value
-        elif 256 <= addr < 512:
-            self.ram_stack[addr - 256] = int_value
-        elif addr <= 65535:
-            self.ram_heap[addr - 512] = int_value
+        # Direct flat array access - no branching
+        self._ram[addr] = int(value) & 0xFF
 
     def snapshot_ram(self) -> bytes:
         """Create a fast RAM snapshot by directly accessing underlying storage.
@@ -139,9 +126,8 @@ class C64Memory:
         Returns:
             65536 bytes representing the full 64KB RAM.
         """
-        # Concatenate the three RAM regions directly - no memory handler involved
-        # This is O(n) but avoids 65536 individual memory handler calls
-        return bytes(self.ram_zeropage) + bytes(self.ram_stack) + bytes(self.ram_heap)
+        # Direct copy of flat RAM array - no memory handler involved
+        return bytes(self._ram)
 
     def snapshot_vic_bank(self, vic_bank: int) -> bytes:
         """Create a fast snapshot of only the 16KB VIC bank the VIC can see.
@@ -158,27 +144,9 @@ class C64Memory:
         Returns:
             16384 bytes representing the 16KB VIC bank.
         """
-        # Use slice operations for speed instead of byte-by-byte copy
-        # RAM layout: zeropage[0:256], stack[256:512], heap[512:65536]
+        # Direct slice of flat RAM array - simple and fast
         bank_size = 0x4000  # 16KB
-
-        if vic_bank == 0x0000:
-            # Bank 0: $0000-$3FFF (zeropage + stack + heap[0:0x3E00])
-            return (bytes(self.ram_zeropage) +
-                    bytes(self.ram_stack) +
-                    bytes(self.ram_heap[:bank_size - 512]))
-        elif vic_bank == 0x4000:
-            # Bank 1: $4000-$7FFF (all from heap)
-            heap_start = vic_bank - 512
-            return bytes(self.ram_heap[heap_start:heap_start + bank_size])
-        elif vic_bank == 0x8000:
-            # Bank 2: $8000-$BFFF (all from heap)
-            heap_start = vic_bank - 512
-            return bytes(self.ram_heap[heap_start:heap_start + bank_size])
-        else:  # vic_bank == 0xC000
-            # Bank 3: $C000-$FFFF (all from heap)
-            heap_start = vic_bank - 512
-            return bytes(self.ram_heap[heap_start:heap_start + bank_size])
+        return bytes(self._ram[vic_bank:vic_bank + bank_size])
 
     def snapshot_screen_area(self, screen_base: int, bitmap_mode: bool = False) -> bytes:
         """Create a minimal snapshot of just the video memory the VIC needs.
@@ -209,27 +177,8 @@ class C64Memory:
         Returns:
             bytes object containing the memory range
         """
-        end = start + size
-
-        # Fast path: entire range is in heap (addresses >= 512)
-        # This is the common case for screen RAM at $0400, $0800, etc.
-        if start >= 512:
-            heap_start = start - 512
-            heap_end = end - 512
-            return bytes(self.ram_heap[heap_start:heap_end])
-
-        # Slow path: range spans multiple regions (rare)
-        result = bytearray(size)
-        for addr in range(start, end):
-            offset = addr - start
-            if addr < 256:
-                result[offset] = self.ram_zeropage[addr]
-            elif addr < 512:
-                result[offset] = self.ram_stack[addr - 256]
-            else:
-                result[offset] = self.ram_heap[addr - 512]
-
-        return bytes(result)
+        # Direct slice of flat RAM array - simple and fast
+        return bytes(self._ram[start:start + size])
 
     def _read_io_area(self, addr: int) -> int:
         """Read from I/O area ($D000-$DFFF)."""

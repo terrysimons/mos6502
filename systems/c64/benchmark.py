@@ -2,6 +2,7 @@
 """Benchmark C64 CPU execution speed."""
 import argparse
 import logging
+import sys
 import time
 from pathlib import Path
 
@@ -226,10 +227,19 @@ def main():
     throttle = args.throttle
     throttle_status = "enabled" if throttle else "disabled"
     region = "PAL" if timing.chip_name == "6569" else "NTSC"
-    print(f"\nBenchmarking CPU execution speed (VIC-II {timing.chip_name} {region}, throttle {throttle_status})...\n")
+
+    # Detect Python implementation
+    impl = sys.implementation.name.capitalize()  # "Cpython" or "Pypy"
+    py_version = f"{sys.version_info.major}.{sys.version_info.minor}.{sys.version_info.micro}"
+
+    print(f"\nBenchmarking C64 CPU execution speed ({impl} {py_version}, VIC-II {timing.chip_name} {region}, throttle {throttle_status})...\n")
 
     # Benchmark different cycle counts
-    test_cycles = [100_000, 500_000, 1_000_000, 5_000_000]
+    test_cycles = [
+        100_000, 500_000, 1_000_000, 5_000_000,
+        10_000_000, 20_000_000, 50_000_000,
+        100_000_000, 200_000_000, 400_000_000, 800_000_000, 1_600_000_000,
+    ]
 
     verbose_cycles = getattr(args, 'verbose_cycles', False)
 

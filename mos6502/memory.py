@@ -367,15 +367,13 @@ class RAM(MutableSequence):
     def __init__(self: Self, endianness: str = ENDIANNESS, save_state: list[list] = None) -> None:
         """Instantiate a mos6502 RAM bank."""
         super().__init__()
-        self.zeropage: list[int] = []
-        self.stack: list[int] = []
-        self.heap: list[int] = []
         self.endianness: str = endianness
         self.memory_handler = None  # Optional external memory handler (for C64 banking, etc.)
+        self._data: bytearray = bytearray()  # Will be initialized in initialize()
         self.initialize()
 
     def initialize(self: Self) -> None:
-        """Initialize the zeropage, stack, and heap to 0xFF (typical power-on state)."""
+        """Initialize RAM to 0xFF (typical power-on state)."""
         # Real 6502 RAM contains unpredictable values on power-up
         # Using 0xFF avoids accidental BRK (0x00) execution
 
@@ -384,10 +382,28 @@ class RAM(MutableSequence):
         if self.memory_handler is not None:
             return
 
-        # Store as plain ints for performance
-        self.zeropage: list[int] = [0xFF] * 256
-        self.stack: list[int] = [0xFF] * 256
-        self.heap: list[int] = [0xFF] * (0x10000 - 256 - 256)
+        # Flat bytearray for performance - eliminates branching on every access
+        self._data: bytearray = bytearray([0xFF] * 0x10000)
+
+    @property
+    def zeropage(self: Self) -> memoryview:
+        """Zero page ($0000-$00FF) as a view into the flat RAM array."""
+        return memoryview(self._data)[0x0000:0x0100]
+
+    @property
+    def stack(self: Self) -> memoryview:
+        """Stack page ($0100-$01FF) as a view into the flat RAM array."""
+        return memoryview(self._data)[0x0100:0x0200]
+
+    @property
+    def heap(self: Self) -> memoryview:
+        """Main memory ($0200-$FFFF) as a view into the flat RAM array."""
+        return memoryview(self._data)[0x0200:0x10000]
+
+    @property
+    def data(self: Self) -> bytearray:
+        """Direct access to flat RAM array for performance-critical code."""
+        return self._data
 
     def __repr__(self: Self) -> str:
         """Return the code representation of the RAM."""
@@ -395,7 +411,7 @@ class RAM(MutableSequence):
 
     def __len__(self: Self) -> int:
         """Return the length of the RAM."""
-        return len(self.zeropage) + len(self.stack) + len(self.heap)
+        return 0x10000  # 64KB
 
     def __getitem__(self: Self, index: int) -> int:
         """Get the RAM item at index {index}."""
@@ -403,17 +419,8 @@ class RAM(MutableSequence):
         if self.memory_handler is not None:
             return self.memory_handler.read(index)
 
-        # Default RAM access - values are already ints
-        if index >= 0 and index < 256:
-            return self.zeropage[index]
-        if index >= 256 and index < 512:
-            return self.stack[index - 256]
-        if index <= 65535:
-            return self.heap[index - 512]
-
-        raise errors.InvalidMemoryLocationError(
-            f"Invalid memory location: {index} should be between 0 and 65535",
-        )
+        # Direct flat array access - no branching
+        return self._data[index]
 
     def __delitem__(self: Self, index: int) -> None:
         """Not implemented."""
@@ -431,16 +438,8 @@ class RAM(MutableSequence):
         else:
             int_value = int(value) & 0xFF
 
-        if index >= 0 and index < 256:
-            self.zeropage[index] = int_value
-        elif index >= 256 and index < 512:
-            self.stack[index - 256] = int_value
-        elif index <= 65535:
-            self.heap[index - 512] = int_value
-        else:
-            raise errors.InvalidMemoryLocationError(
-                f"Invalid memory location: {index} should be between 0 and 65535",
-            )
+        # Direct flat array access - no branching
+        self._data[index] = int_value
 
     def insert(self: Self, index: int, value: int) -> None:
         """Not implemented."""
@@ -464,8 +463,8 @@ class RAM(MutableSequence):
     def fill(self: Self, data: int) -> None:
         """Fill the RAM with {data}."""
         int_data = data._value if isinstance(data, MemoryUnit) else int(data) & 0xFF  # noqa: SLF001
-        for i in range(len(self)):
-            self[i] = int_data
+        # Use efficient slice assignment instead of per-byte loop
+        self._data[:] = bytes([int_data]) * 0x10000
 
     def read(self: Self, address: int, size: int = 1) -> list[int]:
         """Read size Bytes starting from address."""
