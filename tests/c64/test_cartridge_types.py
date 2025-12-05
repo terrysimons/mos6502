@@ -324,7 +324,7 @@ class TestC64CartridgeLoading:
     @requires_c64_roms
     def test_type_00_normal_8kb_bin_cartridge_loads(self, c64):
         """Type 0: Normal 8KB cartridge (raw .bin, EXROM=0, GAME=1)."""
-        bin_path = FIXTURES_DIR / "test_cart_8k.bin"
+        bin_path = CARTRIDGE_TYPES_DIR / "test_cart_8k.bin"
         if not bin_path.exists():
             pytest.skip(f"Test fixture not found: {bin_path}")
 
@@ -339,7 +339,7 @@ class TestC64CartridgeLoading:
     @requires_c64_roms
     def test_type_00_normal_8kb_crt_cartridge_loads(self, c64):
         """Type 0: Normal 8KB cartridge (.crt, EXROM=0, GAME=1)."""
-        crt_path = FIXTURES_DIR / "test_cart_8k.crt"
+        crt_path = CARTRIDGE_TYPES_DIR / "test_cart_8k.crt"
         if not crt_path.exists():
             pytest.skip(f"Test fixture not found: {crt_path}")
 
@@ -367,7 +367,7 @@ class TestC64CartridgeLoading:
     @requires_c64_roms
     def test_type_00_normal_16kb_bin_cartridge_loads(self, c64):
         """Type 0: Normal 16KB cartridge (raw .bin, EXROM=0, GAME=0)."""
-        bin_path = FIXTURES_DIR / "test_cart_16k.bin"
+        bin_path = CARTRIDGE_TYPES_DIR / "test_cart_16k.bin"
         if not bin_path.exists():
             pytest.skip(f"Test fixture not found: {bin_path}")
 
@@ -385,7 +385,7 @@ class TestC64CartridgeLoading:
 
         CRT structure: One 16KB CHIP at $8000, split into ROML and ROMH.
         """
-        crt_path = FIXTURES_DIR / "test_cart_16k_single_chip.crt"
+        crt_path = CARTRIDGE_TYPES_DIR / "test_cart_16k_single_chip.crt"
         if not crt_path.exists():
             pytest.skip(f"Test fixture not found: {crt_path}")
 
@@ -405,7 +405,7 @@ class TestC64CartridgeLoading:
 
         CRT structure: Two separate 8KB CHIPs at $8000 (ROML) and $A000 (ROMH).
         """
-        crt_path = FIXTURES_DIR / "test_cart_16k.crt"
+        crt_path = CARTRIDGE_TYPES_DIR / "test_cart_16k.crt"
         if not crt_path.exists():
             pytest.skip(f"Test fixture not found: {crt_path}")
 
@@ -434,7 +434,7 @@ class TestC64CartridgeLoading:
     @requires_c64_roms
     def test_type_00_ultimax_bin_cartridge_loads(self, c64):
         """Type 0: Ultimax cartridge (raw .bin with explicit type, EXROM=1, GAME=0)."""
-        bin_path = FIXTURES_DIR / "test_cart_ultimax.bin"
+        bin_path = CARTRIDGE_TYPES_DIR / "test_cart_ultimax.bin"
         if not bin_path.exists():
             pytest.skip(f"Test fixture not found: {bin_path}")
 
@@ -454,7 +454,7 @@ class TestC64CartridgeLoading:
         When an 8KB .bin file doesn't have CBM80 signature but has a reset
         vector pointing to $E000-$FFFF, it should be auto-detected as Ultimax.
         """
-        bin_path = FIXTURES_DIR / "test_cart_ultimax.bin"
+        bin_path = CARTRIDGE_TYPES_DIR / "test_cart_ultimax.bin"
         if not bin_path.exists():
             pytest.skip(f"Test fixture not found: {bin_path}")
 
@@ -471,7 +471,7 @@ class TestC64CartridgeLoading:
     @requires_c64_roms
     def test_type_00_ultimax_crt_cartridge_loads(self, c64):
         """Type 0: Ultimax cartridge (.crt, EXROM=1, GAME=0)."""
-        crt_path = FIXTURES_DIR / "test_cart_ultimax.crt"
+        crt_path = CARTRIDGE_TYPES_DIR / "test_cart_ultimax.crt"
         if not crt_path.exists():
             pytest.skip(f"Test fixture not found: {crt_path}")
 
