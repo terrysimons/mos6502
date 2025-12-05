@@ -106,6 +106,69 @@ class C64Memory:
         # EXROM/GAME signals and read methods for ROML/ROMH/IO regions
         self.cartridge: Optional[Cartridge] = None
 
+        # Build read dispatch table indexed by top 4 bits of address (addr >> 12)
+        # This eliminates linear if-chain for memory region detection
+        self._read_dispatch = (
+            self._read_region_0,    # $0xxx - CPU port + RAM
+            self._read_ram_direct,  # $1xxx - RAM
+            self._read_ram_direct,  # $2xxx - RAM
+            self._read_ram_direct,  # $3xxx - RAM
+            self._read_ram_direct,  # $4xxx - RAM
+            self._read_ram_direct,  # $5xxx - RAM
+            self._read_ram_direct,  # $6xxx - RAM
+            self._read_ram_direct,  # $7xxx - RAM
+            self._read_region_8_9,  # $8xxx - ROML or RAM
+            self._read_region_8_9,  # $9xxx - ROML or RAM
+            self._read_region_A_B,  # $Axxx - BASIC/ROMH or RAM
+            self._read_region_A_B,  # $Bxxx - BASIC/ROMH or RAM
+            self._read_ram_direct,  # $Cxxx - RAM
+            self._read_region_D,    # $Dxxx - I/O or CHAR ROM
+            self._read_region_E_F,  # $Exxx - KERNAL or RAM
+            self._read_region_E_F,  # $Fxxx - KERNAL or RAM
+        )
+
+    def _read_region_0(self, addr: int) -> int:
+        """Read from $0xxx region - CPU port or RAM."""
+        if addr == 0x0000:
+            return self.ddr
+        if addr == 0x0001:
+            return (self.port | (~self.ddr)) & 0xFF
+        return self._ram[addr]
+
+    def _read_region_8_9(self, addr: int) -> int:
+        """Read from $8xxx-$9xxx - ROML cartridge or RAM."""
+        if self.cartridge is not None:
+            # ROML visible when EXROM=0, or in Ultimax mode (EXROM=1, GAME=0)
+            if not self.cartridge.exrom or not self.cartridge.game:
+                return self.cartridge.read_roml(addr)
+        return self._ram[addr]
+
+    def _read_region_A_B(self, addr: int) -> int:
+        """Read from $Axxx-$Bxxx - ROMH cartridge, BASIC ROM, or RAM."""
+        # Cartridge ROMH takes priority (16KB mode: EXROM=0, GAME=0)
+        if self.cartridge is not None and not self.cartridge.exrom and not self.cartridge.game:
+            return self.cartridge.read_romh(addr)
+        # BASIC ROM enabled?
+        if self.port & 0b00000001:
+            return self.basic[addr - BASIC_ROM_START]
+        return self._ram[addr]
+
+    def _read_region_D(self, addr: int) -> int:
+        """Read from $Dxxx - I/O area or CHAR ROM."""
+        if self.port & 0b00000100:  # I/O enabled
+            return self._read_io_area(addr)
+        return self.char[addr - CHAR_ROM_START]
+
+    def _read_region_E_F(self, addr: int) -> int:
+        """Read from $Exxx-$Fxxx - KERNAL ROM, Ultimax cartridge, or RAM."""
+        # Ultimax mode: cartridge replaces KERNAL
+        if self.cartridge is not None and self.cartridge.exrom and not self.cartridge.game:
+            return self.cartridge.read_ultimax_romh(addr)
+        # KERNAL ROM enabled?
+        if self.port & 0b00000010:
+            return self.kernal[addr - KERNAL_ROM_START]
+        return self._ram[addr]
+
     def _read_ram_direct(self, addr) -> int:
         """Read directly from RAM storage without delegation."""
         # Direct flat array access - no branching
@@ -210,67 +273,10 @@ class C64Memory:
         return 0xFF
 
     def read(self, addr) -> int:
-        # CPU internal port
-        if addr == 0x0000:
-            return self.ddr
-        if addr == 0x0001:
-            # Bits with DDR=0 read as 1
-            return (self.port | (~self.ddr)) & 0xFF
-
-        # $0002-$7FFF is ALWAYS RAM (never banked on C64)
-        # This includes zero page, stack, KERNAL/BASIC working storage, and screen RAM
-        if 0x0002 <= addr <= 0x7FFF:
-            return self._read_ram_direct(addr)
-
-        # Cartridge ROML ($8000-$9FFF)
-        # Visible when EXROM=0 (8KB/16KB modes) or in Ultimax mode (EXROM=1, GAME=0)
-        # This has priority over RAM in this region
-        if ROML_START <= addr <= ROML_END:
-            if self.cartridge is not None:
-                # ROML visible in 8KB mode (EXROM=0, GAME=1)
-                # ROML visible in 16KB mode (EXROM=0, GAME=0)
-                # ROML visible in Ultimax mode (EXROM=1, GAME=0) if present
-                if not self.cartridge.exrom or (self.cartridge.exrom and not self.cartridge.game):
-                    return self.cartridge.read_roml(addr)
-            # No cartridge or ROML not visible, fall through to RAM
-            return self._read_ram_direct(addr)
-
-        # Memory banking logic (only applies to $A000-$FFFF)
-        io_enabled = self.port & 0b00000100
-        basic_enabled = self.port & 0b00000001
-        kernal_enabled = self.port & 0b00000010
-
-        # Cartridge ROMH ($A000-$BFFF) - visible when EXROM=0 AND GAME=0 (16KB mode)
-        # Takes priority over BASIC ROM
-        if ROMH_START <= addr <= ROMH_END:
-            if self.cartridge is not None and not self.cartridge.exrom and not self.cartridge.game:
-                return self.cartridge.read_romh(addr)
-            # Fall through to BASIC ROM check
-            if basic_enabled:
-                return self.basic[addr - BASIC_ROM_START]
-            # RAM fallback
-            return self._read_ram_direct(addr)
-
-        # KERNAL ROM ($E000-$FFFF)
-        # In Ultimax mode (EXROM=1, GAME=0), cartridge ROM replaces KERNAL
-        if KERNAL_ROM_START <= addr <= KERNAL_ROM_END:
-            if self.cartridge is not None and self.cartridge.exrom and not self.cartridge.game:
-                # Ultimax mode: cartridge ROM at $E000-$FFFF
-                return self.cartridge.read_ultimax_romh(addr)
-            if kernal_enabled:
-                return self.kernal[addr - KERNAL_ROM_START]
-            # RAM fallback when KERNAL disabled
-            return self._read_ram_direct(addr)
-
-        # I/O or CHAR ROM ($D000-$DFFF)
-        if CHAR_ROM_START <= addr <= CHAR_ROM_END:
-            if io_enabled:
-                return self._read_io_area(addr)
-            else:
-                return self.char[addr - CHAR_ROM_START]
-
-        # RAM fallback (for $C000-$CFFF and $A000-$FFFF when banking is off)
-        return self._read_ram_direct(addr)
+        """Read from C64 memory using dispatch table for fast region lookup."""
+        # Single table lookup replaces 8+ conditional checks
+        # addr >> 12 gives top 4 bits (0-15), indexing into 16-entry dispatch table
+        return self._read_dispatch[addr >> 12](addr)
 
     def _write_io_area(self, addr: int, value: int) -> None:
         """Write to I/O area ($D000-$DFFF)."""
