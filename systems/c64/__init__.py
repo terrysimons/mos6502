@@ -635,6 +635,17 @@ class C64:
             # 0 = key pressed (active low), 1 = key released
             self.keyboard_matrix = [0xFF] * 8
 
+            # Thread-safe keyboard access
+            # Main thread (pygame/terminal) writes key presses
+            # CPU thread reads during CIA register access
+            import threading
+            self._keyboard_lock = threading.Lock()
+
+            # Track key press times for minimum hold duration
+            # Key: (row, col), Value: press timestamp
+            self._key_press_times: dict = {}
+            self._min_key_hold = 0.012  # 12ms minimum hold (~0.7 frames at 60Hz)
+
             # Joystick state (active low: 0 = pressed, 1 = released)
             # Port A bits 0-4 (when input): Joystick 2
             # Port B bits 0-4 (when input): Joystick 1
@@ -718,6 +729,14 @@ class C64:
         def read(self, addr) -> int:
             reg = addr & 0x0F
 
+            # Take thread-safe snapshot of keyboard matrix for registers that need it
+            # This ensures consistent reads within a single operation
+            if reg in (0x00, 0x01):
+                with self._keyboard_lock:
+                    kb_matrix = self.keyboard_matrix.copy()
+            else:
+                kb_matrix = None
+
             # Port A ($DC00) — keyboard matrix row selection
             # WRITE: KERNAL writes row selection bits (active low)
             # READ: Returns row bits, with input rows pulled low if keys pressed
@@ -730,10 +749,10 @@ class C64:
                 for row in range(8):
                     row_is_input = not bool(self.ddr_a & (1 << row))
                     if row_is_input:
-                        # Check if any key in this row is pressed
-                        if self.keyboard_matrix[row] != 0xFF:  # Some key pressed in this row
+                        # Check if any key in this row is pressed (using thread-safe snapshot)
+                        if kb_matrix[row] != 0xFF:  # Some key pressed in this row
                             port_a_ext &= ~(1 << row)  # Pull this row bit LOW
-                            log.info(f"*** PORT A INPUT ROW: row={row} has key pressed, pulling Port A bit {row} LOW, matrix[{row}]=${self.keyboard_matrix[row]:02X} ***")
+                            log.info(f"*** PORT A INPUT ROW: row={row} has key pressed, pulling Port A bit {row} LOW, matrix[{row}]=${kb_matrix[row]:02X} ***")
 
                 # Reading Port A respects DDR:
                 # - Output bits (ddr_a=1): return port_a value (software-controlled)
@@ -788,9 +807,9 @@ class C64:
                     if row_selected:
                         # For each column in this row
                         for col in range(8):
-                            # Check if key at [row][col] is pressed
-                            # keyboard_matrix[row] is a byte: 0 bit = pressed, 1 bit = released
-                            if not (self.keyboard_matrix[row] & (1 << col)):  # Key is pressed (bit=0)
+                            # Check if key at [row][col] is pressed (using thread-safe snapshot)
+                            # kb_matrix[row] is a byte: 0 bit = pressed, 1 bit = released
+                            if not (kb_matrix[row] & (1 << col)):  # Key is pressed (bit=0)
                                 # Pressed key pulls that column line low
                                 keyboard_ext &= ~(1 << col)
 
@@ -799,7 +818,7 @@ class C64:
                                     key_name = self._get_key_name(row, col)
 
                                     if row_is_output:
-                                        log.info(f"*** MATRIX: row={row}, col={col} ({key_name}), matrix[{row}]=${self.keyboard_matrix[row]:02X}, keyboard_ext now=${keyboard_ext:02X} ***")
+                                        log.info(f"*** MATRIX: row={row}, col={col} ({key_name}), matrix[{row}]=${kb_matrix[row]:02X}, keyboard_ext now=${keyboard_ext:02X} ***")
                                     else:
                                         log.info(f"*** MATRIX (INPUT ROW): row={row}, col={col} ({key_name}), keyboard_ext now=${keyboard_ext:02X} ***")
 
@@ -1229,7 +1248,7 @@ class C64:
                     self.cpu.irq_pending = True
 
         def _read_keyboard_port(self) -> int:
-            """Read keyboard matrix columns based on selected rows.
+            """Read keyboard matrix columns based on selected rows (thread-safe).
 
             The C64 keyboard is an 8x8 matrix:
             - KERNAL writes to Port A ($DC00) to select row(s) - active low
@@ -1246,12 +1265,16 @@ class C64:
             # Start with all columns high (no keys)
             result = 0xFF
 
+            # Take thread-safe snapshot of keyboard matrix
+            with self._keyboard_lock:
+                kb_matrix = self.keyboard_matrix.copy()
+
             # Check each row
             for row in range(8):
                 if selected_rows & (1 << row):
                     # This row is selected, AND its columns into result
                     # If any key in this row is pressed (bit=0), it will pull the result low
-                    result &= self.keyboard_matrix[row]
+                    result &= kb_matrix[row]
 
             return result
 
@@ -1353,30 +1376,50 @@ class C64:
             return key_map.get((row, col), f"?({row},{col})?")
 
         def press_key(self, row: int, col: int) -> None:
-            """Press a key at the given matrix position.
+            """Press a key at the given matrix position (thread-safe).
 
             Args:
                 row: Row index (0-7)
                 col: Column index (0-7)
             """
+            import time
             if 0 <= row < 8 and 0 <= col < 8:
-                # Clear the bit (active low = pressed)
-                old_value = self.keyboard_matrix[row]
-                self.keyboard_matrix[row] &= ~(1 << col)
-                new_value = self.keyboard_matrix[row]
-                if DEBUG_KEYBOARD:
-                    log.info(f"*** PRESS_KEY: row={row}, col={col}, matrix[{row}]: ${old_value:02X} -> ${new_value:02X} ***")
+                with self._keyboard_lock:
+                    # Clear the bit (active low = pressed)
+                    old_value = self.keyboard_matrix[row]
+                    self.keyboard_matrix[row] &= ~(1 << col)
+                    new_value = self.keyboard_matrix[row]
+                    # Track press time for minimum hold duration
+                    self._key_press_times[(row, col)] = time.perf_counter()
+                    if DEBUG_KEYBOARD:
+                        log.info(f"*** PRESS_KEY: row={row}, col={col}, matrix[{row}]: ${old_value:02X} -> ${new_value:02X} ***")
 
         def release_key(self, row: int, col: int) -> None:
-            """Release a key at the given matrix position.
+            """Release a key at the given matrix position (thread-safe).
 
             Args:
                 row: Row index (0-7)
                 col: Column index (0-7)
             """
             if 0 <= row < 8 and 0 <= col < 8:
-                # Set the bit (active low = released)
-                self.keyboard_matrix[row] |= (1 << col)
+                with self._keyboard_lock:
+                    # Set the bit (active low = released)
+                    self.keyboard_matrix[row] |= (1 << col)
+                    # Clear press time tracking
+                    self._key_press_times.pop((row, col), None)
+
+        def get_key_press_time(self, row: int, col: int) -> float | None:
+            """Get when a key was pressed, or None if not pressed.
+
+            Used to enforce minimum key hold duration for fast typists.
+            """
+            with self._keyboard_lock:
+                return self._key_press_times.get((row, col))
+
+        def get_keyboard_matrix_snapshot(self) -> list:
+            """Get a thread-safe snapshot of the keyboard matrix."""
+            with self._keyboard_lock:
+                return self.keyboard_matrix.copy()
 
     class CIA2:
         """CIA2 (Complex Interface Adapter) at $DD00-$DDFF.
@@ -3467,9 +3510,16 @@ class C64:
             total_height = self.vic.total_height
 
             # Create window with scaled dimensions
+            # Disable pygame vsync - we do our own frame timing via VIC
+            # This prevents pygame.display.flip() from blocking
             width = total_width * self.scale
             height = total_height * self.scale
-            self.pygame_screen = pygame.display.set_mode((width, height))
+            try:
+                # pygame 2.0+ supports vsync parameter
+                self.pygame_screen = pygame.display.set_mode((width, height), vsync=0)
+            except TypeError:
+                # Older pygame doesn't support vsync parameter
+                self.pygame_screen = pygame.display.set_mode((width, height))
             pygame.display.set_caption(f"C64 Emulator - {self.get_video_standard()} ({self.video_chip})")
 
             # Create the rendering surface (384x270 with border)
@@ -3789,169 +3839,140 @@ class C64:
             # Check if we're in a TTY (terminal) for interactive display
             is_tty = _sys.stdout.isatty()
 
-            # For pygame mode, run CPU in background thread and pygame in main thread
-            # For other modes, run display in background and CPU in main thread
-            if self.display_mode == "pygame" and self.pygame_available:
-                # Pygame mode: CPU in background, rendering + input in main thread
-                cpu_done = threading.Event()
-                cpu_error = None
-                stop_cpu = threading.Event()
+            # All modes: CPU in background thread, display + input in main thread
+            # This ensures responsive input handling regardless of display mode
+            pygame_mode = self.display_mode == "pygame" and self.pygame_available
 
-                # Create frame governor for real-time throttling
-                governor = FrameGovernor(
-                    fps=self.video_timing.refresh_hz,
-                    enabled=throttle
-                )
-                cycles_per_frame = self.video_timing.cycles_per_frame
+            cpu_done = threading.Event()
+            cpu_error = None
+            stop_cpu = threading.Event()
 
-                def cpu_thread() -> None:
-                    nonlocal cpu_error
-                    try:
-                        # Execute frame-by-frame with optional throttling
-                        # This allows the governor to maintain real-time speed
-                        cycles_remaining = max_cycles
-                        while cycles_remaining > 0 and not stop_cpu.is_set():
-                            # Execute one frame's worth of cycles
-                            cycles_this_frame = min(cycles_per_frame, cycles_remaining)
-                            try:
-                                self.cpu.execute(cycles=cycles_this_frame)
-                            except errors.CPUCycleExhaustionError:
-                                pass  # Normal - frame completed
-                            cycles_remaining -= cycles_this_frame
+            # Create frame governor for real-time throttling
+            governor = FrameGovernor(
+                fps=self.video_timing.refresh_hz,
+                enabled=throttle
+            )
+            cycles_per_frame = self.video_timing.cycles_per_frame
 
-                            # Throttle to real-time (governor.throttle() returns
-                            # immediately if throttling is disabled)
-                            governor.throttle()
-                    except Exception as e:
-                        cpu_error = e
-                    finally:
-                        cpu_done.set()
-
-                # Start CPU thread
-                cpu_thread_obj = threading.Thread(target=cpu_thread, daemon=True)
-                cpu_thread_obj.start()
-
-                # Try to set up terminal input (REPL-style) alongside pygame
-                terminal_input_available = False
-                old_settings = None
+            def cpu_thread() -> None:
+                nonlocal cpu_error
                 try:
-                    import select
-                    import termios
-                    import tty
-                    if _sys.stdin.isatty():
-                        old_settings = termios.tcgetattr(_sys.stdin)
-                        tty.setcbreak(_sys.stdin.fileno())
-                        terminal_input_available = True
-                except ImportError:
-                    pass  # Terminal input not available (Windows, etc.)
+                    # Execute frame-by-frame with optional throttling
+                    # This allows the governor to maintain real-time speed
+                    cycles_remaining = max_cycles
+                    while cycles_remaining > 0 and not stop_cpu.is_set():
+                        # Execute one frame's worth of cycles
+                        cycles_this_frame = min(cycles_per_frame, cycles_remaining)
+                        try:
+                            self.cpu.execute(cycles=cycles_this_frame)
+                        except errors.CPUCycleExhaustionError:
+                            pass  # Normal - frame completed
+                        cycles_remaining -= cycles_this_frame
 
-                # Main thread handles pygame rendering + terminal input
-                # Use blocking wait on frame_complete to avoid burning CPU
-                try:
-                    while not cpu_done.is_set():
-                        # Check for BASIC ready or KERNAL input if requested
-                        if stop_on_basic and self.basic_ready:
-                            break
-                        if stop_on_kernal_input and self.kernal_waiting_for_input:
-                            break
+                        # Throttle to real-time (governor.throttle() returns
+                        # immediately if throttling is disabled)
+                        governor.throttle()
+                except Exception as e:
+                    cpu_error = e
+                finally:
+                    cpu_done.set()
 
-                        # Handle terminal keyboard input if available
-                        if terminal_input_available:
-                            import select
-                            if select.select([_sys.stdin], [], [], 0)[0]:
-                                char = _sys.stdin.read(1)
-                                if self._handle_terminal_input(char):
-                                    break  # Ctrl+C pressed
+            # Start CPU thread
+            cpu_thread_obj = threading.Thread(target=cpu_thread, daemon=True)
+            cpu_thread_obj.start()
 
-                        # Wait for frame_complete (blocking) or timeout
-                        # This efficiently waits without burning CPU
-                        if self.vic.frame_complete.wait(timeout=0.02):
-                            # Frame ready - render it
+            # Set up terminal input (works for all modes)
+            terminal_input_available = False
+            old_settings = None
+            try:
+                import select
+                import termios
+                import tty
+                if _sys.stdin.isatty():
+                    old_settings = termios.tcgetattr(_sys.stdin)
+                    tty.setcbreak(_sys.stdin.fileno())
+                    terminal_input_available = True
+            except ImportError:
+                pass  # Terminal input not available (Windows, etc.)
+
+            # Main thread handles display + input
+            try:
+                last_terminal_render = time.perf_counter()
+                TERMINAL_RENDER_INTERVAL = 0.1  # 100ms between terminal renders
+
+                while not cpu_done.is_set():
+                    # Check stop conditions
+                    if stop_on_basic and self.basic_ready:
+                        break
+                    if stop_on_kernal_input and self.kernal_waiting_for_input:
+                        break
+
+                    # Handle terminal keyboard input (all modes)
+                    if terminal_input_available:
+                        import select
+                        if select.select([_sys.stdin], [], [], 0)[0]:
+                            char = _sys.stdin.read(1)
+                            if self._handle_terminal_input(char):
+                                break  # Ctrl+C pressed
+
+                    # Process any pending key releases (non-blocking)
+                    self._process_pending_key_releases()
+
+                    # Pump pygame events every iteration (outside of draw loop)
+                    if pygame_mode:
+                        self._pump_pygame_events()
+                        self._process_pygame_key_buffer()
+
+                    # Mode-specific rendering
+                    # Use half frame time as timeout - ensures we check twice per frame
+                    # even if CPU is slow, while not wasting CPU on excessive polling
+                    frame_timeout = 0.5 / self.video_timing.refresh_hz  # ~10ms PAL, ~8ms NTSC
+
+                    if pygame_mode:
+                        # Render when VIC has a new frame ready (both pygame and terminal)
+                        if self.vic.frame_complete.is_set():
                             self._render_pygame()
                         else:
-                            # Timeout - pump pygame events to stay responsive
-                            self._pump_pygame_events()
-                finally:
-                    # Signal CPU thread to stop and wait for it
-                    stop_cpu.set()
-                    cpu_done.set()
-                    cpu_thread_obj.join(timeout=0.5)
-
-                    # Restore terminal settings if we changed them
-                    if old_settings is not None:
-                        import termios
-                        termios.tcsetattr(_sys.stdin, termios.TCSADRAIN, old_settings)
-
-                    # Cleanup pygame
-                    if self.pygame_available:
-                        try:
-                            import pygame
-                            pygame.quit()
-                        except Exception:
-                            pass
-
-                    # Log governor stats if throttling was enabled
-                    if throttle:
-                        stats = governor.stats()
-                        log.info(f"Governor stats: {stats['frame_count']} frames, "
-                                f"avg sleep {stats['avg_sleep_per_frame']*1000:.1f}ms/frame, "
-                                f"dropped {stats['frames_dropped']}")
-
-                # Re-raise CPU thread exception if any
-                if cpu_error:
-                    raise cpu_error
-
-            else:
-                # Terminal or headless mode: display in background, CPU in main thread
-                stop_display = threading.Event()
-
-                def display_cycles() -> None:
-                    """Display cycle count, CPU state, and C64 screen."""
-                    while not stop_display.is_set():
-                        # Check PC region for all modes (enables debug logging when entering BASIC)
-                        self._check_pc_region()
-                        if self.display_mode == "terminal" and is_tty:
-                            self._render_terminal()
-                        # "headless" mode: just checks PC region
-                        time.sleep(0.1)  # Update 10 times per second
-
-                # Start the display thread for all modes (including headless for PC region checking)
-                display_thread = threading.Thread(target=display_cycles, daemon=True)
-                display_thread.start()
-
-                # Create frame governor for real-time throttling (terminal/headless modes)
-                governor = FrameGovernor(
-                    fps=self.video_timing.refresh_hz,
-                    enabled=throttle
-                )
-                cycles_per_frame = self.video_timing.cycles_per_frame
-
-                try:
-                    if throttle:
-                        # Execute frame-by-frame with throttling
-                        cycles_remaining = max_cycles
-                        while cycles_remaining > 0:
-                            cycles_this_frame = min(cycles_per_frame, cycles_remaining)
-                            try:
-                                self.cpu.execute(cycles=cycles_this_frame)
-                            except errors.CPUCycleExhaustionError:
-                                pass  # Normal - frame completed
-                            cycles_remaining -= cycles_this_frame
-                            governor.throttle()
+                            # Tiny sleep to prevent busy-spinning when no frame ready
+                            time.sleep(0.001)  # 1ms
                     else:
-                        # Run CPU at full speed - if stop_on_basic, pc_callback will raise StopIteration
-                        self.cpu.execute(cycles=max_cycles)
-                finally:
-                    # Stop the display thread
-                    stop_display.set()
-                    display_thread.join(timeout=0.5)
+                        # Terminal/headless: render when VIC has a new frame ready
+                        if self.vic.frame_complete.is_set():
+                            self.vic.frame_complete.clear()
+                            self._check_pc_region()
+                            self._render_terminal()
+                        else:
+                            time.sleep(0.001)  # 1ms
 
-                    # Log governor stats if throttling was enabled
-                    if throttle:
-                        stats = governor.stats()
-                        log.info(f"Governor stats: {stats['frame_count']} frames, "
-                                f"avg sleep {stats['avg_sleep_per_frame']*1000:.1f}ms/frame, "
-                                f"dropped {stats['frames_dropped']}")
+            finally:
+                # Signal CPU thread to stop and wait for it
+                stop_cpu.set()
+                cpu_done.set()
+                cpu_thread_obj.join(timeout=0.5)
+
+                # Restore terminal settings if we changed them
+                if old_settings is not None:
+                    import termios
+                    termios.tcsetattr(_sys.stdin, termios.TCSADRAIN, old_settings)
+
+                # Cleanup pygame if used
+                if pygame_mode:
+                    try:
+                        import pygame
+                        pygame.quit()
+                    except Exception:
+                        pass
+
+                # Log governor stats if throttling was enabled
+                if throttle:
+                    stats = governor.stats()
+                    log.info(f"Governor stats: {stats['frame_count']} frames, "
+                            f"avg sleep {stats['avg_sleep_per_frame']*1000:.1f}ms/frame, "
+                            f"dropped {stats['frames_dropped']}")
+
+            # Re-raise CPU thread exception if any
+            if cpu_error:
+                raise cpu_error
 
         except StopIteration as e:
             # PC callback requested stop (e.g., BASIC is ready or KERNAL waiting for input)
@@ -3976,7 +3997,7 @@ class C64:
         finally:
             # Clean up PC callback
             self._clear_pc_callback()
-            # Always show screen buffer on termination
+            # Show screen buffer on termination
             self.show_screen()
 
     def dump_memory(self, start: int, end: int, bytes_per_line: int = 16) -> None:
@@ -4580,6 +4601,14 @@ class C64:
             pygame.K_ESCAPE: (7, 7),     # RUN/STOP (mapped to ESC)
         }
 
+        # Keys that should be held directly (not buffered) - modifiers and control keys
+        # These affect the state of other keys and need real-time response
+        direct_keys = {
+            pygame.K_LSHIFT, pygame.K_RSHIFT,  # SHIFT modifiers
+            pygame.K_LCTRL, pygame.K_RCTRL,    # CTRL
+            pygame.K_ESCAPE,                    # RUN/STOP
+        }
+
         if event.type == pygame.KEYDOWN:
             # Log all key presses with key code and name
             key_name = pygame.key.name(event.key) if hasattr(pygame.key, 'name') else str(event.key)
@@ -4595,40 +4624,41 @@ class C64:
             if event.key in key_map:
                 row, col = key_map[event.key]
 
-                # Special handling for quote keys - also press SHIFT
-                if event.key == pygame.K_QUOTE:
-                    # Press LEFT SHIFT (row 1, col 7) along with the key
-                    self.cia1.press_key(1, 7)  # SHIFT
-                    self.cia1.press_key(row, col)  # '7' key
-                elif event.key == pygame.K_QUOTEDBL:
-                    # Press LEFT SHIFT (row 1, col 7) along with the key
-                    self.cia1.press_key(1, 7)  # SHIFT
-                    self.cia1.press_key(row, col)  # '2' key
-                else:
+                # Track physical key state
+                self._pygame_keys_currently_pressed.add(event.key)
+
+                # Direct keys (modifiers) are pressed immediately for real-time feel
+                if event.key in direct_keys:
                     self.cia1.press_key(row, col)
+                else:
+                    # Buffer the key for injection with proper timing
+                    needs_shift = (event.key == pygame.K_QUOTE or
+                                   event.key == pygame.K_QUOTEDBL)
+                    self._buffer_pygame_key(row, col, needs_shift)
 
                 if DEBUG_KEYBOARD:
                     petscii_key = self.cia1._get_key_name(row, col)
-                    log.info(f"*** KEYDOWN: pygame='{key_name}' (code={event.key}), ASCII='{ascii_char}' (0x{ascii_code:02X}), matrix position=({row},{col}), PETSCII={petscii_key} ***")
+                    buffered = "BUFFERED" if event.key not in direct_keys else "DIRECT"
+                    log.info(f"*** KEYDOWN [{buffered}]: pygame='{key_name}' (code={event.key}), ASCII='{ascii_char}' (0x{ascii_code:02X}), matrix=({row},{col}), PETSCII={petscii_key}, buffer_len={len(self._pygame_key_buffer)} ***")
             else:
                 if DEBUG_KEYBOARD:
                     log.info(f"*** UNMAPPED KEYDOWN: pygame='{key_name}' (code={event.key}), ASCII='{ascii_char}' ***")
+
         elif event.type == pygame.KEYUP:
             if event.key in key_map:
                 row, col = key_map[event.key]
 
-                # Special handling for quote keys - also release SHIFT
-                if event.key == pygame.K_QUOTE:
-                    self.cia1.release_key(1, 7)  # SHIFT
-                    self.cia1.release_key(row, col)  # '7' key
-                elif event.key == pygame.K_QUOTEDBL:
-                    self.cia1.release_key(1, 7)  # SHIFT
-                    self.cia1.release_key(row, col)  # '2' key
-                else:
+                # Track physical key state
+                self._pygame_keys_currently_pressed.discard(event.key)
+
+                # Direct keys are released immediately
+                if event.key in direct_keys:
                     self.cia1.release_key(row, col)
 
+                # Buffered keys don't need explicit release - buffer handles timing
+
                 if DEBUG_KEYBOARD:
-                    log.info(f"*** KEY RELEASED: pygame key {event.key}, row={row}, col={col} ***")
+                    log.info(f"*** KEYUP: pygame key {event.key}, row={row}, col={col} ***")
 
     def _render_pygame(self) -> None:
         """Render C64 screen to pygame window with dirty region optimization."""
@@ -4691,31 +4721,252 @@ class C64:
                         return wrapper_self.snapshot[index] & 0x0F
                     return wrapper_self.live_color[index] & 0x0F
 
-            ram_wrapper = RAMWrapper(
-                self.vic.ram_snapshot,
-                self.vic.ram_snapshot_bank,
-                self.cpu.ram
-            )
-            color_wrapper = ColorRAMWrapper(
-                self.vic.color_snapshot,
-                self.memory.ram_color
-            )
+            # Initialize glyph cache if needed
+            if not hasattr(self, '_glyph_cache'):
+                self._glyph_cache = {}
 
-            # Let VIC render the complete frame (border + text)
-            self.vic.render_frame(self.pygame_surface, ram_wrapper, color_wrapper)
+            vic = self.vic
+            ram_snapshot = vic.ram_snapshot
+            ram_snapshot_bank = vic.ram_snapshot_bank
+            color_snapshot = vic.color_snapshot
+
+            def read_ram(addr):
+                if ram_snapshot is not None:
+                    rel = addr - ram_snapshot_bank
+                    if 0 <= rel < len(ram_snapshot):
+                        return ram_snapshot[rel]
+                return int(self.cpu.ram[addr])
+
+            def read_color(idx):
+                if color_snapshot is not None:
+                    return color_snapshot[idx] & 0x0F
+                return self.memory.ram_color[idx] & 0x0F
+
+            surface = self.pygame_surface
+
+            # --- Display-side rendering ---
+            border_color = vic.regs[0x20] & 0x0F
+            surface.fill(COLORS[border_color])
+
+            vic_bank = vic.get_vic_bank()
+            mem_control = vic.regs[0x18]
+            screen_base = vic_bank + ((mem_control & 0xF0) >> 4) * 0x0400
+            char_bank_offset = ((mem_control & 0x0E) >> 1) * 0x0800
+
+            ecm = bool(vic.regs[0x11] & 0x40)
+            bmm = bool(vic.regs[0x11] & 0x20)
+            den = bool(vic.regs[0x11] & 0x10)
+            mcm = bool(vic.regs[0x16] & 0x10)
+            bg_color = vic.regs[0x21] & 0x0F
+
+            hscroll = vic.regs[0x16] & 0x07
+            vscroll = vic.regs[0x11] & 0x07
+            x_origin = vic.border_left - hscroll
+            y_origin = vic.border_top - vscroll
+
+            if den and not bmm and not ecm and not mcm:
+                # Standard text mode - cached glyph rendering
+                char_rom = vic.char_rom
+                for row in range(25):
+                    for col in range(40):
+                        cell_addr = screen_base + row * 40 + col
+                        char_code = read_ram(cell_addr)
+                        color = read_color(row * 40 + col)
+
+                        reverse = bool(char_code & 0x80)
+                        char_code &= 0x7F
+
+                        glyph_addr = (char_code * 8) + char_bank_offset
+                        glyph_addr &= 0x0FFF
+                        glyph = char_rom[glyph_addr : glyph_addr + 8]
+
+                        if reverse:
+                            fg, bg = bg_color, color
+                        else:
+                            fg, bg = color, bg_color
+
+                        cache_key = (tuple(glyph), fg, bg)
+                        if cache_key not in self._glyph_cache:
+                            glyph_surf = pygame.Surface((8, 8))
+                            fg_rgb = COLORS[fg]
+                            bg_rgb = COLORS[bg]
+                            for y in range(8):
+                                line = glyph[y]
+                                for x in range(8):
+                                    bit = (line >> (7 - x)) & 0x01
+                                    glyph_surf.set_at((x, y), fg_rgb if bit else bg_rgb)
+                            self._glyph_cache[cache_key] = glyph_surf
+
+                        base_x = x_origin + col * 8
+                        base_y = y_origin + row * 8
+                        surface.blit(self._glyph_cache[cache_key], (base_x, base_y))
+            elif den:
+                # Other modes - fall back to VIC for now
+                ram_wrapper = RAMWrapper(ram_snapshot, ram_snapshot_bank, self.cpu.ram)
+                color_wrapper = ColorRAMWrapper(color_snapshot, self.memory.ram_color)
+                vic.render_frame(surface, ram_wrapper, color_wrapper)
 
             # Scale and blit to screen
             scaled_surface = pygame.transform.scale(
-                self.pygame_surface,
-                (self.vic.total_width * self.scale, self.vic.total_height * self.scale)
+                surface,
+                (vic.total_width * self.scale, vic.total_height * self.scale)
             )
             self.pygame_screen.blit(scaled_surface, (0, 0))
             pygame.display.flip()
 
             # Also render terminal repl output (screen with colors)
             # Force full redraw since pygame already handled the dirty tracking
+            # DO NOT REMOVE - useful for debugging pygame mode via terminal
             self.dirty_tracker.force_redraw()
             self._render_terminal_repl()
+
+        except Exception as e:
+            log.error(f"Error rendering pygame display: {e}")
+
+    def _render_pygame_only(self) -> None:
+        """Render C64 screen to pygame window.
+
+        All pygame rendering happens here in the display loop, not in the VIC core.
+        Uses glyph caching for fast text mode rendering.
+        """
+        if not self.pygame_available or self.pygame_screen is None:
+            return
+
+        try:
+            import pygame
+            import time as _time
+
+            render_start = _time.perf_counter()
+
+            # Check if VIC has a new frame ready (VBlank)
+            new_frame = self.vic.frame_complete.is_set()
+            if new_frame:
+                self.vic.frame_complete.clear()
+                self._frame_count = getattr(self, '_frame_count', 0) + 1
+
+            # Initialize glyph cache if needed
+            if not hasattr(self, '_glyph_cache'):
+                self._glyph_cache = {}
+
+            # Get RAM snapshot or live RAM
+            vic = self.vic
+            ram_snapshot = vic.ram_snapshot
+            ram_snapshot_bank = vic.ram_snapshot_bank
+            color_snapshot = vic.color_snapshot
+
+            # Helper to read RAM
+            def read_ram(addr):
+                if ram_snapshot is not None:
+                    rel = addr - ram_snapshot_bank
+                    if 0 <= rel < len(ram_snapshot):
+                        return ram_snapshot[rel]
+                return int(self.cpu.ram[addr])
+
+            def read_color(idx):
+                if color_snapshot is not None:
+                    return color_snapshot[idx] & 0x0F
+                return self.memory.ram_color[idx] & 0x0F
+
+            surface = self.pygame_surface
+
+            # --- Render frame (display-side, no VIC pygame code) ---
+
+            # Border colour
+            border_color = vic.regs[0x20] & 0x0F
+            surface.fill(COLORS[border_color])
+
+            # Get VIC bank from CIA2
+            vic_bank = vic.get_vic_bank()
+
+            # Decode $D018
+            mem_control = vic.regs[0x18]
+            screen_base = vic_bank + ((mem_control & 0xF0) >> 4) * 0x0400
+            char_bank_offset = ((mem_control & 0x0E) >> 1) * 0x0800
+
+            # Mode flags
+            ecm = bool(vic.regs[0x11] & 0x40)
+            bmm = bool(vic.regs[0x11] & 0x20)
+            den = bool(vic.regs[0x11] & 0x10)
+            mcm = bool(vic.regs[0x16] & 0x10)
+
+            bg_color = vic.regs[0x21] & 0x0F
+
+            hscroll = vic.regs[0x16] & 0x07
+            vscroll = vic.regs[0x11] & 0x07
+            x_origin = vic.border_left - hscroll
+            y_origin = vic.border_top - vscroll
+
+            if den and not bmm and not ecm and not mcm:
+                # Standard text mode - use cached glyph rendering
+                char_rom = vic.char_rom
+
+                for row in range(25):
+                    for col in range(40):
+                        cell_addr = screen_base + row * 40 + col
+                        char_code = read_ram(cell_addr)
+
+                        color = read_color(row * 40 + col)
+
+                        reverse = bool(char_code & 0x80)
+                        char_code &= 0x7F
+
+                        glyph_addr = (char_code * 8) + char_bank_offset
+                        glyph_addr &= 0x0FFF
+                        glyph = char_rom[glyph_addr : glyph_addr + 8]
+
+                        if reverse:
+                            fg, bg = bg_color, color
+                        else:
+                            fg, bg = color, bg_color
+
+                        # Cache lookup
+                        cache_key = (tuple(glyph), fg, bg)
+                        if cache_key not in self._glyph_cache:
+                            # Render glyph to cache
+                            glyph_surf = pygame.Surface((8, 8))
+                            fg_rgb = COLORS[fg]
+                            bg_rgb = COLORS[bg]
+                            for y in range(8):
+                                line = glyph[y]
+                                for x in range(8):
+                                    bit = (line >> (7 - x)) & 0x01
+                                    glyph_surf.set_at((x, y), fg_rgb if bit else bg_rgb)
+                            self._glyph_cache[cache_key] = glyph_surf
+
+                        # Blit cached glyph
+                        base_x = x_origin + col * 8
+                        base_y = y_origin + row * 8
+                        surface.blit(self._glyph_cache[cache_key], (base_x, base_y))
+
+            elif den:
+                # Other modes - fall back to VIC renderer for now
+                # TODO: Move bitmap/multicolor/ECM rendering here too
+                class RAMWrapper:
+                    def __getitem__(wrapper_self, index):
+                        return read_ram(index)
+
+                class ColorWrapper:
+                    def __getitem__(wrapper_self, index):
+                        return read_color(index)
+
+                vic.render_frame(surface, RAMWrapper(), ColorWrapper())
+
+            # Scale and blit to screen
+            scaled_surface = pygame.transform.scale(
+                surface,
+                (vic.total_width * self.scale, vic.total_height * self.scale)
+            )
+            self.pygame_screen.blit(scaled_surface, (0, 0))
+            pygame.display.flip()
+
+            # Log render time periodically
+            render_time = _time.perf_counter() - render_start
+            if self._frame_count <= 5 or self._frame_count % 60 == 0:
+                cache_size = len(self._glyph_cache)
+                log.critical(
+                    f"*** RENDER: {render_time*1000:.1f}ms "
+                    f"(frame {self._frame_count}, cache={cache_size}) ***"
+                )
 
         except Exception as e:
             log.error(f"Error rendering pygame display: {e}")
@@ -4877,11 +5128,102 @@ class C64:
         for char in text:
             self.type_character(char, hold_cycles)
 
+    # Pending key releases for non-blocking terminal input
+    # Each entry is (release_time, row, col)
+    _pending_key_releases: list = []
+
+    # Pygame keyboard buffer for type-ahead
+    # Stores (row, col, needs_shift) tuples for keys waiting to be injected
+    _pygame_key_buffer: list = []
+    _pygame_keys_currently_pressed: set = set()  # Track physical key state
+    _pygame_current_injection: tuple | None = None  # (row, col, needs_shift, start_cycles, released)
+    # Timing in CPU cycles (not wall-clock) so keys inject faster when emulator runs fast
+    # KERNAL scans keyboard once per frame (~17000-20000 cycles). We need to span one scan.
+    # At ~1MHz: 20000 cycles = ~20ms (one full frame), 2000 cycles = ~2ms
+    _pygame_injection_hold_cycles: int = 20000  # ~20ms - one full frame, guarantees KERNAL sees it
+    _pygame_injection_gap_cycles: int = 2000    # ~2ms gap between keys
+
+    def _queue_key_release(self, row: int, col: int, delay_seconds: float = 0.03) -> None:
+        """Queue a key for release after a delay (non-blocking).
+
+        Args:
+            row: Keyboard matrix row
+            col: Keyboard matrix column
+            delay_seconds: How long to hold key (default 30ms = 1.5 frames)
+        """
+        import time
+        release_time = time.perf_counter() + delay_seconds
+        self._pending_key_releases.append((release_time, row, col))
+
+    def _process_pending_key_releases(self) -> None:
+        """Process any pending key releases (call from main loop)."""
+        import time
+        if not self._pending_key_releases:
+            return
+
+        now = time.perf_counter()
+        still_pending = []
+        for release_time, row, col in self._pending_key_releases:
+            if now >= release_time:
+                self.cia1.release_key(row, col)
+            else:
+                still_pending.append((release_time, row, col))
+        self._pending_key_releases = still_pending
+
+    def _buffer_pygame_key(self, row: int, col: int, needs_shift: bool = False) -> None:
+        """Buffer a keypress from pygame for injection into CIA.
+
+        Keys are buffered and injected one at a time with proper timing
+        to ensure the KERNAL sees every keypress.
+        """
+        self._pygame_key_buffer.append((row, col, needs_shift))
+
+    def _process_pygame_key_buffer(self) -> None:
+        """Process the pygame key buffer, injecting keys into CIA.
+
+        Called from main loop. Handles timing for key injection using CPU cycles
+        so keys inject faster when emulator runs faster than real-time.
+        - Press key, hold for ~20000 cycles (~20ms at 1MHz)
+        - Release key, wait ~5000 cycles gap
+        - Repeat for next key
+        """
+        current_cycles = self.cpu.cycles_executed
+
+        # If we have a current injection in progress, check timing
+        if self._pygame_current_injection is not None:
+            row, col, needs_shift, start_cycles, released = self._pygame_current_injection
+
+            if not released:
+                # Key is being held - check if hold cycles elapsed
+                if current_cycles - start_cycles >= self._pygame_injection_hold_cycles:
+                    # Release the key
+                    self.cia1.release_key(row, col)
+                    if needs_shift:
+                        self.cia1.release_key(1, 7)  # Release SHIFT
+                    # Mark as released, record release cycle
+                    self._pygame_current_injection = (row, col, needs_shift, current_cycles, True)
+            else:
+                # Key is released - check if gap cycles elapsed
+                if current_cycles - start_cycles >= self._pygame_injection_gap_cycles:
+                    # Done with this key, clear injection
+                    self._pygame_current_injection = None
+
+        # If no current injection and buffer has keys, start next one
+        if self._pygame_current_injection is None and self._pygame_key_buffer:
+            row, col, needs_shift = self._pygame_key_buffer.pop(0)
+            # Press the key
+            if needs_shift:
+                self.cia1.press_key(1, 7)  # Press SHIFT
+            self.cia1.press_key(row, col)
+            # Record injection start (not released yet)
+            self._pygame_current_injection = (row, col, needs_shift, current_cycles, False)
+
     def _handle_terminal_input(self, char: str) -> bool:
         """Handle a single character of terminal input.
 
         Converts ASCII input to C64 key presses. Handles escape sequences
-        for arrow keys and other special keys.
+        for arrow keys and other special keys. Uses non-blocking key release
+        queue to avoid stalling the main loop.
 
         Arguments:
             char: Single character from terminal input
@@ -4890,7 +5232,6 @@ class C64:
             True if Ctrl+C was pressed (should exit), False otherwise
         """
         import sys as _sys
-        import time
 
         # Handle special keys
         if char == '\x03':  # Ctrl+C
@@ -4904,47 +5245,40 @@ class C64:
                     if seq == '[A':  # Up arrow -> CRSR UP (SHIFT + CRSR DOWN)
                         self.cia1.press_key(1, 7)  # SHIFT
                         self.cia1.press_key(0, 7)  # CRSR DOWN
-                        time.sleep(0.05)
-                        self.cia1.release_key(0, 7)
-                        self.cia1.release_key(1, 7)
+                        self._queue_key_release(0, 7)
+                        self._queue_key_release(1, 7)
                     elif seq == '[B':  # Down arrow -> CRSR DOWN
                         self.cia1.press_key(0, 7)
-                        time.sleep(0.05)
-                        self.cia1.release_key(0, 7)
+                        self._queue_key_release(0, 7)
                     elif seq == '[C':  # Right arrow -> CRSR RIGHT
                         self.cia1.press_key(0, 2)
-                        time.sleep(0.05)
-                        self.cia1.release_key(0, 2)
+                        self._queue_key_release(0, 2)
                     elif seq == '[D':  # Left arrow -> CRSR LEFT (SHIFT + CRSR RIGHT)
                         self.cia1.press_key(1, 7)  # SHIFT
                         self.cia1.press_key(0, 2)  # CRSR RIGHT
-                        time.sleep(0.05)
-                        self.cia1.release_key(0, 2)
-                        self.cia1.release_key(1, 7)
+                        self._queue_key_release(0, 2)
+                        self._queue_key_release(1, 7)
                     elif seq == '[3':  # Delete key (followed by ~)
                         if select.select([_sys.stdin], [], [], 0.1)[0]:
                             _sys.stdin.read(1)  # Consume the ~
                         self.cia1.press_key(0, 0)  # DEL
-                        time.sleep(0.05)
-                        self.cia1.release_key(0, 0)
+                        self._queue_key_release(0, 0)
             except ImportError:
                 pass  # select not available
         elif char == '\x7f':  # Backspace
             self.cia1.press_key(0, 0)  # DEL
-            time.sleep(0.05)
-            self.cia1.release_key(0, 0)
+            self._queue_key_release(0, 0)
         else:
-            # Regular character - just press and release the key
+            # Regular character - press key and queue release
             key_info = self.ascii_to_key_press(char)
             if key_info:
                 needs_shift, row, col = key_info
                 if needs_shift:
                     self.cia1.press_key(1, 7)  # SHIFT
                 self.cia1.press_key(row, col)
-                time.sleep(0.05)  # Hold key briefly
-                self.cia1.release_key(row, col)
+                self._queue_key_release(row, col)
                 if needs_shift:
-                    self.cia1.release_key(1, 7)
+                    self._queue_key_release(1, 7)
 
         return False
 
