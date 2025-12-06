@@ -505,6 +505,13 @@ class C64:
         self._execution_start_time: Optional[float] = None
         self._execution_end_time: Optional[float] = None
 
+        # Rolling average speed tracking (default 10 samples = 10 second window)
+        from collections import deque
+        self._speed_sample_count: int = 10
+        self._speed_samples: deque[float] = deque(maxlen=self._speed_sample_count)
+        self._last_sample_time: float = 0.0
+        self._last_sample_cycles: int = 0
+
         # Load ROMs during initialization
         # This sets up the memory handler and all peripherals (VIC, CIAs)
         self.load_roms()
@@ -1140,6 +1147,10 @@ class C64:
                 self.pygame_screen = pygame.display.set_mode((width, height))
             pygame.display.set_caption(f"C64 Emulator - {self.get_video_standard()} ({self.video_chip})")
 
+            # Enable key repeat (delay=300ms before repeat, interval=30ms between repeats)
+            # This matches typical terminal key repeat behavior
+            pygame.key.set_repeat(300, 30)
+
             # Create the rendering surface (384x270 with border)
             self.pygame_surface = pygame.Surface((total_width, total_height))
 
@@ -1150,6 +1161,65 @@ class C64:
             log.error(f"Failed to initialize pygame: {e}")
             self.pygame_available = False
             return False
+
+    def set_speed_sample_count(self, count: int) -> None:
+        """Set the number of samples for rolling average speed calculation.
+
+        Args:
+            count: Number of samples to keep (e.g., 10 = 10 second rolling window).
+                   Set to 0 to disable rolling average.
+        """
+        from collections import deque
+        self._speed_sample_count = count
+        if count > 0:
+            self._speed_samples = deque(maxlen=count)
+        else:
+            self._speed_samples = deque(maxlen=1)  # Keep at least 1 for the API
+            self._speed_samples.clear()
+
+    def _record_speed_sample(self) -> bool:
+        """Record a speed sample for rolling average (rate-limited to once per second).
+
+        Returns:
+            True if a sample was recorded, False if rate-limited.
+        """
+        import time
+        now = time.time()
+
+        # Only record once per second
+        if self._last_sample_time > 0 and now - self._last_sample_time < 1.0:
+            return False
+
+        # Calculate cycles since last sample
+        current_cycles = self.cpu.cycles_executed
+        if self._last_sample_time > 0:
+            delta_time = now - self._last_sample_time
+            delta_cycles = current_cycles - self._last_sample_cycles
+            if delta_time > 0:
+                sample_cps = delta_cycles / delta_time
+                self._speed_samples.append(sample_cps)
+
+        self._last_sample_time = now
+        self._last_sample_cycles = current_cycles
+        return True
+
+    def _update_pygame_title(self, pygame) -> None:
+        """Update pygame window title with speed stats (rate-limited to once per second)."""
+        if not self._record_speed_sample():
+            return
+
+        # Use rolling average if we have samples
+        if self._speed_samples:
+            cycles_per_second = sum(self._speed_samples) / len(self._speed_samples)
+            real_cpu_freq = self.video_timing.cpu_freq
+            speedup = cycles_per_second / real_cpu_freq
+            chip = self.video_timing.chip_name
+            region = "PAL" if chip == "6569" else "NTSC"
+            actual_mhz = cycles_per_second / 1e6
+            real_mhz = real_cpu_freq / 1e6
+            title = (f"C64 Emulator - {region} ({chip}) - "
+                     f"{actual_mhz:.3f}MHz ({speedup:.1%} of {real_mhz:.3f})")
+            pygame.display.set_caption(title)
 
     def _write_rom_to_memory(self, start_addr: int, rom_data: bytes) -> None:
         """Write ROM data to CPU memory.
@@ -1602,8 +1672,11 @@ class C64:
             log.info(f"CPU execution completed: {e}")
         except errors.CPUBreakError as e:
             log.info(f"Program terminated (BRK at PC=${self.cpu.PC:04X})")
-        except KeyboardInterrupt:
-            log.info("\nExecution interrupted by user")
+        except (KeyboardInterrupt, errors.QuitRequestError) as e:
+            if isinstance(e, errors.QuitRequestError):
+                log.info(f"\nExecution stopped: {e}")
+            else:
+                log.info("\nExecution interrupted by user")
             log.info(f"PC=${self.cpu.PC:04X}, Cycles={self.cpu.cycles_executed}")
         except (errors.IllegalCPUInstructionError, RuntimeError) as e:
             log.exception(f"Execution error at PC=${self.cpu.PC:04X}")
@@ -1655,9 +1728,11 @@ class C64:
             Dictionary with speed stats, or None if timing data not available:
             - elapsed_seconds: Wall-clock time elapsed
             - cycles_executed: Total CPU cycles executed
-            - cycles_per_second: Actual execution rate
+            - cycles_per_second: Actual execution rate (lifetime average)
+            - rolling_cycles_per_second: Rolling average over last 10 seconds (if available)
             - real_cpu_freq: Real C64 CPU frequency for this chip
-            - speedup: Ratio of actual speed to real hardware speed
+            - speedup: Ratio of actual speed to real hardware speed (lifetime)
+            - rolling_speedup: Ratio based on rolling average (if available)
             - chip_name: VIC-II chip name (6569, 6567R8, etc.)
         """
         if self._execution_start_time is None:
@@ -1675,7 +1750,7 @@ class C64:
         real_cpu_freq = self.video_timing.cpu_freq
         speedup = cycles_per_second / real_cpu_freq
 
-        return {
+        result = {
             "elapsed_seconds": elapsed,
             "cycles_executed": cycles_executed,
             "cycles_per_second": cycles_per_second,
@@ -1683,6 +1758,14 @@ class C64:
             "speedup": speedup,
             "chip_name": self.video_timing.chip_name,
         }
+
+        # Add rolling average if we have samples
+        if self._speed_samples:
+            rolling_cps = sum(self._speed_samples) / len(self._speed_samples)
+            result["rolling_cycles_per_second"] = rolling_cps
+            result["rolling_speedup"] = rolling_cps / real_cpu_freq
+
+        return result
 
     def dump_registers(self) -> None:
         """Dump CPU register state."""
@@ -1875,8 +1958,8 @@ class C64:
         cols = 40
         rows = 25
 
-        # Header row offset (3 lines: border, title, border)
-        header_offset = 3
+        # Header row offset (4 lines: title, speed, separator, top border)
+        header_offset = 4
 
         # Check if we need a full redraw
         needs_full = self.dirty_tracker.needs_full_redraw()
@@ -2048,6 +2131,9 @@ class C64:
         """
         import sys as _sys
 
+        # Record speed sample for rolling average (once per second)
+        self._record_speed_sample()
+
         screen_start = 0x0400
         cols = 40
         rows = 25
@@ -2060,8 +2146,8 @@ class C64:
         border_color = self.vic.regs[0x20] & 0x0F
         border_ansi = c64_to_ansi_bg(border_color)
 
-        # Header row offset (3 lines: border, title, border)
-        header_offset = 3
+        # Header row offset (4 lines: title, speed, separator, top border)
+        header_offset = 4
 
         # Check if we need a full redraw
         needs_full = self.dirty_tracker.needs_full_redraw()
@@ -2070,14 +2156,23 @@ class C64:
             # Full screen redraw
             _sys.stdout.write("\033[2J\033[H")  # Clear screen and move to top
 
-            # Border line
-            _sys.stdout.write(border_ansi + " " * 44 + ANSI_RESET + "\r\n")
-            title_text = f" C64 REPL (Ctrl+C to exit) - {self.get_video_standard()} ({self.video_chip}) "
-            # Total width is 44: 1 space + title_text + padding
-            title_padding = max(0, 43 - len(title_text))
-            _sys.stdout.write(border_ansi + " " + ANSI_RESET +
-                            title_text +
-                            border_ansi + " " * title_padding + ANSI_RESET + "\r\n")
+            # Terminal header (not part of C64 display)
+            title_line = f"C64 REPL (Ctrl+C to exit) - {self.get_video_standard()} ({self.video_chip})"
+            stats = self.get_speed_stats()
+            if stats:
+                # Prefer rolling average if available, otherwise use lifetime average
+                cps = stats.get('rolling_cycles_per_second', stats['cycles_per_second'])
+                speedup = stats.get('rolling_speedup', stats['speedup'])
+                actual_mhz = cps / 1e6
+                real_mhz = stats['real_cpu_freq'] / 1e6
+                speed_line = f"{actual_mhz:.3f}MHz ({speedup:.1%} of {real_mhz:.3f}MHz)"
+            else:
+                speed_line = "(calculating speed...)"
+            _sys.stdout.write(f"{title_line}\r\n")
+            _sys.stdout.write(f"{speed_line}\r\n")
+            _sys.stdout.write("=" * 44 + "\r\n")
+
+            # C64 screen with border (top border)
             _sys.stdout.write(border_ansi + " " * 44 + ANSI_RESET + "\r\n")
 
             for row in range(rows):
@@ -2250,7 +2345,7 @@ class C64:
 
             # Row 6
             # pygame.K_POUND: (6, 0),    # £ (pound symbol on C64, no direct US keyboard equivalent)
-            pygame.K_QUOTE: (3, 0),      # Map to '7' key - SHIFT+7 produces apostrophe on C64
+            pygame.K_QUOTE: (7, 3),      # Map to '2' key - SHIFT+2 produces " (double quote) for BASIC strings
             pygame.K_ASTERISK: (6, 1),   # *
             pygame.K_SEMICOLON: (6, 2),  # ;
             pygame.K_HOME: (6, 3),       # HOME/CLR
@@ -2344,8 +2439,7 @@ class C64:
             # Handle pygame events (window close, keyboard, etc.)
             for event in pygame.event.get():
                 if event.type == pygame.QUIT:
-                    import sys
-                    sys.exit(0)
+                    raise errors.QuitRequestError("Window closed")
                 elif event.type == pygame.KEYDOWN:
                     if DEBUG_KEYBOARD:
                         log.info(f"*** PYGAME KEYDOWN EVENT: key={event.key} ***")
@@ -2483,6 +2577,9 @@ class C64:
             )
             self.pygame_screen.blit(scaled_surface, (0, 0))
             pygame.display.flip()
+
+            # Update window title with speed stats (rate-limited to once per second)
+            self._update_pygame_title(pygame)
 
             # Also render terminal repl output (screen with colors)
             # Force full redraw since pygame already handled the dirty tracking
@@ -2655,8 +2752,7 @@ class C64:
 
             for event in pygame.event.get():
                 if event.type == pygame.QUIT:
-                    import sys
-                    sys.exit(0)
+                    raise errors.QuitRequestError("Window closed")
                 elif event.type == pygame.KEYDOWN:
                     if DEBUG_KEYBOARD:
                         log.info(f"*** PYGAME KEYDOWN EVENT: key={event.key} ***")
@@ -2664,6 +2760,8 @@ class C64:
                 elif event.type == pygame.KEYUP:
                     self._handle_pygame_keyboard(event, pygame)
 
+        except errors.QuitRequestError:
+            raise  # Re-raise quit request to propagate up
         except Exception as e:
             log.error(f"Error pumping pygame events: {e}")
 
@@ -2722,7 +2820,7 @@ class C64:
         '$': (1, 7, 1, 3),   # SHIFT + 4
         '%': (1, 7, 2, 0),   # SHIFT + 5
         '&': (1, 7, 2, 3),   # SHIFT + 6
-        "'": (1, 7, 3, 0),   # SHIFT + 7
+        "'": (1, 7, 7, 3),   # SHIFT + 2 - produces " (double quote) for BASIC strings
         '(': (1, 7, 3, 3),   # SHIFT + 8
         ')': (1, 7, 4, 0),   # SHIFT + 9
         '?': (1, 7, 6, 7),   # SHIFT + /
@@ -2799,7 +2897,7 @@ class C64:
             self.type_character(char, hold_cycles)
 
     # Pending key releases for non-blocking terminal input
-    # Each entry is (release_time, row, col)
+    # Each entry is (release_cycles, row, col) - uses CPU cycles, not wall-clock time
     _pending_key_releases: list = []
 
     # Pygame keyboard buffer for type-ahead
@@ -2807,37 +2905,54 @@ class C64:
     _pygame_key_buffer: list = []
     _pygame_keys_currently_pressed: set = set()  # Track physical key state
     _pygame_current_injection: tuple | None = None  # (row, col, needs_shift, start_cycles, released)
-    # Timing in CPU cycles (not wall-clock) so keys inject faster when emulator runs fast
+
+    # Timing in CPU cycles (not wall-clock) so keys inject correctly at any emulator speed
     # KERNAL scans keyboard once per frame (~17000-20000 cycles). We need to span one scan.
     # At ~1MHz: 20000 cycles = ~20ms (one full frame), 2000 cycles = ~2ms
-    _pygame_injection_hold_cycles: int = 20000  # ~20ms - one full frame, guarantees KERNAL sees it
-    _pygame_injection_gap_cycles: int = 2000    # ~2ms gap between keys
+    _key_hold_cycles: int = 20000   # Hold key for one full frame, guarantees KERNAL sees it
+    _key_gap_cycles: int = 2000     # Gap between keys
 
-    def _queue_key_release(self, row: int, col: int, delay_seconds: float = 0.03) -> None:
-        """Queue a key for release after a delay (non-blocking).
+    def _queue_key_release(self, row: int, col: int) -> bool:
+        """Queue a key for release after a delay (cycle-based, not wall-clock).
+
+        Uses CPU cycles for timing so key handling works correctly at any
+        emulator speed (throttled or unthrottled).
+
+        Implements debouncing: if this key already has a pending release,
+        the keypress is skipped entirely to prevent key repeat issues.
 
         Args:
             row: Keyboard matrix row
             col: Keyboard matrix column
-            delay_seconds: How long to hold key (default 30ms = 1.5 frames)
+
+        Returns:
+            True if key was queued, False if skipped due to debouncing
         """
-        import time
-        release_time = time.perf_counter() + delay_seconds
-        self._pending_key_releases.append((release_time, row, col))
+        # Check if this key already has a pending release (debounce)
+        for _, pending_row, pending_col in self._pending_key_releases:
+            if pending_row == row and pending_col == col:
+                # Key already pending - skip this press (debounce)
+                return False
+
+        release_cycles = self.cpu.cycles_executed + self._key_hold_cycles
+        self._pending_key_releases.append((release_cycles, row, col))
+        return True
 
     def _process_pending_key_releases(self) -> None:
-        """Process any pending key releases (call from main loop)."""
-        import time
+        """Process any pending key releases (call from main loop).
+
+        Uses CPU cycles for timing, which scales correctly with emulator speed.
+        """
         if not self._pending_key_releases:
             return
 
-        now = time.perf_counter()
+        current_cycles = self.cpu.cycles_executed
         still_pending = []
-        for release_time, row, col in self._pending_key_releases:
-            if now >= release_time:
+        for release_cycles, row, col in self._pending_key_releases:
+            if current_cycles >= release_cycles:
                 self.cia1.release_key(row, col)
             else:
-                still_pending.append((release_time, row, col))
+                still_pending.append((release_cycles, row, col))
         self._pending_key_releases = still_pending
 
     def _buffer_pygame_key(self, row: int, col: int, needs_shift: bool = False) -> None:
@@ -2865,7 +2980,7 @@ class C64:
 
             if not released:
                 # Key is being held - check if hold cycles elapsed
-                if current_cycles - start_cycles >= self._pygame_injection_hold_cycles:
+                if current_cycles - start_cycles >= self._key_hold_cycles:
                     # Release the key
                     self.cia1.release_key(row, col)
                     if needs_shift:
@@ -2874,7 +2989,7 @@ class C64:
                     self._pygame_current_injection = (row, col, needs_shift, current_cycles, True)
             else:
                 # Key is released - check if gap cycles elapsed
-                if current_cycles - start_cycles >= self._pygame_injection_gap_cycles:
+                if current_cycles - start_cycles >= self._key_gap_cycles:
                     # Done with this key, clear injection
                     self._pygame_current_injection = None
 
@@ -2936,19 +3051,25 @@ class C64:
             except ImportError:
                 pass  # select not available
         elif char == '\x7f':  # Backspace
-            self.cia1.press_key(0, 0)  # DEL
-            self._queue_key_release(0, 0)
+            # Check if key is already pending (debounce)
+            already_pending = any(r == 0 and c == 0 for _, r, c in self._pending_key_releases)
+            if not already_pending:
+                self.cia1.press_key(0, 0)  # DEL
+                self._queue_key_release(0, 0)
         else:
             # Regular character - press key and queue release
             key_info = self.ascii_to_key_press(char)
             if key_info:
                 needs_shift, row, col = key_info
-                if needs_shift:
-                    self.cia1.press_key(1, 7)  # SHIFT
-                self.cia1.press_key(row, col)
-                self._queue_key_release(row, col)
-                if needs_shift:
-                    self._queue_key_release(1, 7)
+                # Check if key is already pending (debounce)
+                already_pending = any(r == row and c == col for _, r, c in self._pending_key_releases)
+                if not already_pending:
+                    if needs_shift:
+                        self.cia1.press_key(1, 7)  # SHIFT
+                    self.cia1.press_key(row, col)
+                    self._queue_key_release(row, col)
+                    if needs_shift:
+                        self._queue_key_release(1, 7)
 
         return False
 
@@ -3024,6 +3145,9 @@ class C64:
                     if self._handle_terminal_input(char):
                         break  # Ctrl+C pressed
 
+                # Process any pending key releases
+                self._process_pending_key_releases()
+
                 # Render at limited rate to avoid terminal buffer overflow
                 now = time.time()
                 if now - last_render >= render_interval:
@@ -3031,7 +3155,7 @@ class C64:
                     self._render_terminal_repl()
                     last_render = now
 
-        except KeyboardInterrupt:
+        except (KeyboardInterrupt, errors.QuitRequestError):
             pass
         finally:
             # Record execution end time for speedup calculation

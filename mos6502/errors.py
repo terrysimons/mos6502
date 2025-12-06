@@ -24,3 +24,7 @@ class InvalidMemoryAssignmentError(Exception):
 
 class CPUBreakError(Exception):
     """Raise when BRK instruction is executed."""
+
+
+class QuitRequestError(Exception):
+    """Raise when user requests to quit (window close, Ctrl+C, etc.)."""
