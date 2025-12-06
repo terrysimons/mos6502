@@ -10,11 +10,15 @@ import logging
 
 from .base import (
     Cartridge,
+    CartridgeVariant,
+    CartridgeImage,
     ROML_START,
     ROML_SIZE,
     ROMH_START,
     ROMH_SIZE,
 )
+from .rom_builder import TestROMBuilder
+from c64.colors import COLOR_BLUE, COLOR_YELLOW, COLOR_WHITE
 
 log = logging.getLogger("c64.cartridge")
 
@@ -177,3 +181,65 @@ class FinalCartridgeICartridge(Cartridge):
         Any access to IO2 enables the cartridge ROM.
         """
         self._enable_cartridge()
+
+    # --- Test cartridge generation ---
+
+    @classmethod
+    def get_cartridge_variants(cls) -> list[CartridgeVariant]:
+        """Return all valid configuration variants for Type 13."""
+        return [
+            CartridgeVariant("", exrom=0, game=0),  # 16KB mode
+        ]
+
+    @classmethod
+    def create_test_cartridge(cls, variant: CartridgeVariant) -> CartridgeImage:
+        """Create test cartridge image for Final Cartridge I."""
+        builder = TestROMBuilder(base_address=ROML_START)
+
+        builder.emit_screen_init()
+        builder.emit_set_border_and_background(COLOR_BLUE)
+        builder.emit_display_text("TYPE 13 FINAL CART I", line=0, color=COLOR_WHITE)
+        builder.emit_display_text("EXROM=0 GAME=0 16KB", line=1, color=COLOR_YELLOW)
+        builder.current_line = 3
+
+        # Test 1: ROML is visible at $8000
+        test1 = builder.start_test("ROML AT $8000")
+        builder.emit_check_byte(0x9FF0, ord('R'), f"{test1}_fail")
+        builder.emit_check_byte(0x9FF1, ord('L'), f"{test1}_fail")
+        builder.emit_pass_result(test1)
+        builder.emit_fail_result(test1)
+
+        # Test 2: ROMH is visible at $A000
+        test2 = builder.start_test("ROMH AT $A000")
+        builder.emit_check_byte(0xBFF0, ord('R'), f"{test2}_fail")
+        builder.emit_check_byte(0xBFF1, ord('H'), f"{test2}_fail")
+        builder.emit_pass_result(test2)
+        builder.emit_fail_result(test2)
+
+        # Test 3: IO1 access disables cart, IO2 re-enables
+        test3 = builder.start_test("IO1/IO2 TOGGLE")
+        # Write to IO2 to ensure cart is enabled
+        builder.emit_write_byte(0xDF00, 0x00)
+        builder.emit_check_byte(0x9FF0, ord('R'), f"{test3}_fail")
+        # Note: Can't test disable easily since code is in ROM - if disabled,
+        # code would crash. Just test that IO2 keeps it enabled.
+        builder.emit_pass_result(test3)
+        builder.emit_fail_result(test3)
+
+        builder.emit_final_status(hardware_type=13, type_name="FINAL CART I")
+
+        # Build ROMs
+        roml_data = bytearray(builder.build_rom())
+        roml_data[0x1FF0:0x1FF8] = b"RL-SIGN!"  # ROML signature
+
+        romh_data = bytearray(ROMH_SIZE)
+        romh_data[0x1FF0:0x1FF8] = b"RH-SIGN!"  # ROMH signature
+
+        return CartridgeImage(
+            description=variant.description,
+            exrom=variant.exrom,
+            game=variant.game,
+            extra=variant.extra,
+            rom_data={"roml": bytes(roml_data), "romh": bytes(romh_data)},
+            hardware_type=cls.HARDWARE_TYPE,
+        )

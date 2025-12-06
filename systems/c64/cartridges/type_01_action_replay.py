@@ -10,11 +10,15 @@ import logging
 
 from .base import (
     Cartridge,
+    CartridgeVariant,
+    CartridgeImage,
     ROML_START,
     ROML_SIZE,
     ROMH_START,
     IO2_START,
 )
+from .rom_builder import TestROMBuilder
+from c64.colors import COLOR_BLUE, COLOR_YELLOW, COLOR_WHITE
 
 log = logging.getLogger("c64.cartridge")
 
@@ -198,3 +202,79 @@ class ActionReplayCartridge(Cartridge):
             io2_ram_base = ROML_SIZE - 0x100  # 0x1F00 - last 256 bytes
             offset = io2_ram_base + (addr - IO2_START)
             self.ram[offset] = data
+
+    # --- Test cartridge generation ---
+
+    # Bank select register and signature location
+    BANK_SELECT_ADDR = 0xDE00
+    SIGNATURE_ADDR = 0x9FF5  # Each bank has its bank number here
+
+    @classmethod
+    def get_cartridge_variants(cls) -> list[CartridgeVariant]:
+        """Return all valid configuration variants for Type 1."""
+        return [
+            CartridgeVariant("", exrom=0, game=0, extra={"bank_count": 4}),
+        ]
+
+    @classmethod
+    def create_test_cartridge(cls, variant: CartridgeVariant) -> CartridgeImage:
+        """Create test cartridge image for Action Replay.
+
+        Uses a RAM-based bank switch routine because we can't switch banks
+        while executing from the ROM being switched.
+
+        Note: Action Replay uses bits 3-4 of $DE00 for bank selection:
+            Bank 0: 0x00, Bank 1: 0x08, Bank 2: 0x10, Bank 3: 0x18
+        """
+        bank_count = variant.extra.get("bank_count", 4)
+
+        # Bank 0: Main test code
+        builder = TestROMBuilder(base_address=ROML_START)
+
+        builder.emit_screen_init()
+        builder.emit_set_border_and_background(COLOR_BLUE)
+        builder.emit_display_text("TYPE 1 ACTION REPLAY", line=0, color=COLOR_WHITE)
+        builder.emit_display_text("EXROM=0 GAME=0 4 BANKS", line=1, color=COLOR_YELLOW)
+        builder.current_line = 3
+
+        # Install the bank-switch routine in RAM at $C000
+        builder.emit_install_bank_switch_routine(
+            bank_select_addr=cls.BANK_SELECT_ADDR,
+            signature_addr=cls.SIGNATURE_ADDR,
+        )
+
+        # Test each bank by calling the RAM routine
+        # Action Replay: control value = bank << 3
+        test_banks = [0, 1, 2, 3]
+        for test_bank in test_banks:
+            control_value = test_bank << 3  # Bits 3-4 = bank number
+            test_id = builder.start_test(f"BANK {test_bank} SIGNATURE")
+            builder.emit_call_bank_switch(control_value)
+            builder.emit_check_a_equals(test_bank, f"{test_id}_fail")
+            builder.emit_pass_result(test_id)
+            builder.emit_fail_result(test_id)
+
+        builder.emit_final_status(hardware_type=1, type_name="ACTION REPLAY")
+
+        # Build banks
+        banks = []
+
+        # Bank 0: Test code with signature
+        bank0 = bytearray(builder.build_rom())
+        bank0[0x1FF5] = 0  # Bank 0 signature
+        banks.append(bytes(bank0))
+
+        # Banks 1-3: Each has its bank number at $9FF5
+        for i in range(1, bank_count):
+            bank = bytearray(ROML_SIZE)
+            bank[0x1FF5] = i  # Bank number as signature
+            banks.append(bytes(bank))
+
+        return CartridgeImage(
+            description=variant.description,
+            exrom=variant.exrom,
+            game=variant.game,
+            extra=variant.extra,
+            rom_data={"banks": banks},
+            hardware_type=cls.HARDWARE_TYPE,
+        )

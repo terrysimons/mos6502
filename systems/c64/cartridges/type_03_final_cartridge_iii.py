@@ -10,6 +10,8 @@ import logging
 
 from .base import (
     Cartridge,
+    CartridgeVariant,
+    CartridgeImage,
     ROML_START,
     ROML_SIZE,
     ROMH_START,
@@ -17,6 +19,8 @@ from .base import (
     IO1_START,
     IO2_START,
 )
+from .rom_builder import TestROMBuilder
+from c64.colors import COLOR_BLUE, COLOR_YELLOW, COLOR_WHITE
 
 log = logging.getLogger("c64.cartridge")
 
@@ -215,4 +219,80 @@ class FinalCartridgeIIICartridge(Cartridge):
             f"bank={self._current_bank}, EXROM={1 if self._exrom else 0}, "
             f"GAME={1 if self._game else 0}, NMI={'inactive' if self._nmi_line else 'ACTIVE'}, "
             f"hidden={self._register_hidden}"
+        )
+
+    # --- Test cartridge generation ---
+
+    # Bank select register and signature location
+    BANK_SELECT_ADDR = 0xDFFF  # FC3 uses $DFFF, not $DE00
+    SIGNATURE_ADDR = 0x9FF5    # Each bank has its bank number here
+
+    @classmethod
+    def get_cartridge_variants(cls) -> list[CartridgeVariant]:
+        """Return all valid configuration variants for Type 3."""
+        return [
+            CartridgeVariant("", exrom=0, game=0, extra={"bank_count": 4}),
+        ]
+
+    @classmethod
+    def create_test_cartridge(cls, variant: CartridgeVariant) -> CartridgeImage:
+        """Create test cartridge image for Final Cartridge III.
+
+        Uses a RAM-based bank switch routine because we can't switch banks
+        while executing from the ROM being switched.
+
+        Note: FC3 uses $DFFF for control, bits 0-1 for bank selection.
+        """
+        bank_count = variant.extra.get("bank_count", 4)
+
+        # Bank 0: Main test code
+        builder = TestROMBuilder(base_address=ROML_START)
+
+        builder.emit_screen_init()
+        builder.emit_set_border_and_background(COLOR_BLUE)
+        builder.emit_display_text("TYPE 3 FINAL CART III", line=0, color=COLOR_WHITE)
+        builder.emit_display_text("EXROM=0 GAME=0 4x16K", line=1, color=COLOR_YELLOW)
+        builder.current_line = 3
+
+        # Install the bank-switch routine in RAM at $C000
+        builder.emit_install_bank_switch_routine(
+            bank_select_addr=cls.BANK_SELECT_ADDR,
+            signature_addr=cls.SIGNATURE_ADDR,
+        )
+
+        # Test each bank by calling the RAM routine
+        # FC3: control value = bank & 0x03 (bits 0-1)
+        test_banks = [0, 1, 2, 3]
+        for test_bank in test_banks:
+            test_id = builder.start_test(f"BANK {test_bank} SIGNATURE")
+            builder.emit_call_bank_switch(test_bank)  # Direct mapping for FC3
+            builder.emit_check_a_equals(test_bank, f"{test_id}_fail")
+            builder.emit_pass_result(test_id)
+            builder.emit_fail_result(test_id)
+
+        builder.emit_final_status(hardware_type=3, type_name="FINAL CART III")
+
+        # Build banks (16KB each: 8KB ROML + 8KB ROMH)
+        banks = []
+
+        # Bank 0: Test code in ROML, empty ROMH
+        roml0 = bytearray(builder.build_rom())
+        roml0[0x1FF5] = 0  # Bank 0 signature
+        romh0 = bytearray(ROMH_SIZE)
+        banks.append(bytes(roml0) + bytes(romh0))
+
+        # Banks 1-3: Each has its bank number at $9FF5
+        for i in range(1, bank_count):
+            roml = bytearray(ROML_SIZE)
+            roml[0x1FF5] = i  # Bank number as signature
+            romh = bytearray(ROMH_SIZE)
+            banks.append(bytes(roml) + bytes(romh))
+
+        return CartridgeImage(
+            description=variant.description,
+            exrom=variant.exrom,
+            game=variant.game,
+            extra=variant.extra,
+            rom_data={"banks": banks},
+            hardware_type=cls.HARDWARE_TYPE,
         )

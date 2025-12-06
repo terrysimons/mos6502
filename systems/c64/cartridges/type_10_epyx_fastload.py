@@ -8,7 +8,9 @@ from __future__ import annotations
 
 import logging
 
-from .base import Cartridge, ROML_START, ROML_SIZE, IO2_START
+from .base import Cartridge, CartridgeVariant, CartridgeImage, ROML_START, ROML_SIZE, IO2_START
+from .rom_builder import TestROMBuilder
+from c64.colors import COLOR_BLUE, COLOR_YELLOW, COLOR_WHITE
 
 log = logging.getLogger("c64.cartridge")
 
@@ -147,3 +149,66 @@ class EpyxFastloadCartridge(Cartridge):
         if rom_offset < len(self.rom_data):
             return self.rom_data[rom_offset]
         return 0xFF
+
+    # --- Test cartridge generation ---
+
+    @classmethod
+    def get_cartridge_variants(cls) -> list[CartridgeVariant]:
+        """Return all valid configuration variants for Type 10."""
+        return [
+            CartridgeVariant("", exrom=0, game=1),  # 8KB mode
+        ]
+
+    @classmethod
+    def create_test_cartridge(cls, variant: CartridgeVariant) -> CartridgeImage:
+        """Create test cartridge image for Epyx FastLoad."""
+        builder = TestROMBuilder(base_address=ROML_START)
+
+        builder.emit_screen_init()
+        builder.emit_set_border_and_background(COLOR_BLUE)
+        builder.emit_display_text("TYPE 10 EPYX FASTLOAD", line=0, color=COLOR_WHITE)
+        builder.emit_display_text("EXROM=0 GAME=1 8KB", line=1, color=COLOR_YELLOW)
+        builder.current_line = 3
+
+        # Test 1: ROML is visible at $8000 (check at $8FF0, not in IO2 mirror area)
+        test1 = builder.start_test("ROML AT $8000")
+        builder.emit_check_byte(0x8FF0, ord('R'), f"{test1}_fail")
+        builder.emit_check_byte(0x8FF1, ord('L'), f"{test1}_fail")
+        builder.emit_pass_result(test1)
+        builder.emit_fail_result(test1)
+
+        # Test 2: IO2 mirrors last 256 bytes of ROM ($1F00-$1FFF -> $DF00-$DFFF)
+        test2 = builder.start_test("IO2 MIRRORS $1F00")
+        builder.emit_check_byte(0xDFF0, ord('I'), f"{test2}_fail")
+        builder.emit_check_byte(0xDFF1, ord('O'), f"{test2}_fail")
+        builder.emit_pass_result(test2)
+        builder.emit_fail_result(test2)
+
+        # Test 3: IO1 read should keep cart enabled (tests enable mechanism)
+        # Note: Can't easily test timeout without cycle-accurate simulation
+        test3 = builder.start_test("IO1 READ $DE00")
+        # Read IO1 (which keeps cart enabled), then verify ROML still works
+        builder.emit_bytes([
+            0xAD, 0x00, 0xDE,  # LDA $DE00 - read IO1 to keep cart enabled
+        ])
+        builder.emit_check_byte(0x8FF0, ord('R'), f"{test3}_fail")
+        builder.emit_pass_result(test3)
+        builder.emit_fail_result(test3)
+
+        builder.emit_final_status(hardware_type=10, type_name="EPYX FASTLOAD")
+
+        # Build ROM with signatures
+        rom_data = bytearray(builder.build_rom())
+        # ROML signature at $0FF0 (maps to $8FF0, outside IO2 mirror area)
+        rom_data[0x0FF0:0x0FF8] = b"RL-SIGN!"
+        # IO2 signature at $1FF0 (maps to $DFF0 via IO2 mirror)
+        rom_data[0x1FF0:0x1FF8] = b"IO-SIGN!"
+
+        return CartridgeImage(
+            description=variant.description,
+            exrom=variant.exrom,
+            game=variant.game,
+            extra=variant.extra,
+            rom_data={"roml": bytes(rom_data)},
+            hardware_type=cls.HARDWARE_TYPE,
+        )

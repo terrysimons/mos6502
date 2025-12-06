@@ -12,11 +12,34 @@ from __future__ import annotations
 
 import logging
 import re
+import struct
 from abc import ABC, abstractmethod
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from enum import IntEnum
+from typing import Protocol
 
 log = logging.getLogger("c64.cartridge")
+
+
+# Memory region constants
+ROML_START = 0x8000
+ROML_END = 0x9FFF
+ROML_SIZE = 0x2000  # 8KB
+
+ROMH_START = 0xA000
+ROMH_END = 0xBFFF
+ROMH_SIZE = 0x2000  # 8KB
+
+# Ultimax mode: ROMH appears at $E000-$FFFF instead of $A000-$BFFF
+ULTIMAX_ROMH_START = 0xE000
+ULTIMAX_ROMH_END = 0xFFFF
+ULTIMAX_ROMH_SIZE = 0x2000  # 8KB
+
+IO1_START = 0xDE00
+IO1_END = 0xDEFF
+
+IO2_START = 0xDF00
+IO2_END = 0xDFFF
 
 
 class CartridgeType(IntEnum):
@@ -24,35 +47,110 @@ class CartridgeType(IntEnum):
 
     These are the standard cartridge type IDs used in CRT files.
     The list comes from: http://rr.c64.org/wiki/CRT_ID
-
-    Only the most common/implemented types are named here.
-    Use the integer value directly for unlisted types.
     """
-    # Implemented types
+    # Type 0-9
     NORMAL = 0                  # Generic/normal cartridge (8K/16K/Ultimax)
     ACTION_REPLAY = 1           # Action Replay freezer cartridge
+    KCS_POWER = 2               # KCS Power Cartridge
     FINAL_CARTRIDGE_III = 3     # Final Cartridge III freezer
     SIMONS_BASIC = 4            # Simons' BASIC extension
     OCEAN_TYPE_1 = 5            # Ocean Type 1 bank switching
-    EPYX_FASTLOAD = 10          # Epyx FastLoad disk speedup
-    FINAL_CARTRIDGE_I = 13      # Final Cartridge I
-    C64_GAME_SYSTEM = 15        # C64 Game System / System 3
-    DINAMIC = 17                # Dinamic bank switching
-    MAGIC_DESK = 19             # Magic Desk / Domark / HES Australia
-
-    # Not yet implemented but commonly seen
-    KCS_POWER = 2               # KCS Power Cartridge
+    EXPERT = 6                  # Expert Cartridge
     FUN_PLAY = 7                # Fun Play / Power Play
     SUPER_GAMES = 8             # Super Games
     ATOMIC_POWER = 9            # Atomic Power
+
+    # Type 10-19
+    EPYX_FASTLOAD = 10          # Epyx FastLoad disk speedup
     WESTERMANN = 11             # Westermann Learning
     REX_UTILITY = 12            # Rex Utility
+    FINAL_CARTRIDGE_I = 13      # Final Cartridge I
     MAGIC_FORMEL = 14           # Magic Formel
+    C64_GAME_SYSTEM = 15        # C64 Game System / System 3
     WARPSPEED = 16              # WarpSpeed
+    DINAMIC = 17                # Dinamic bank switching
     ZAXXON = 18                 # Zaxxon / Super Zaxxon
+    MAGIC_DESK = 19             # Magic Desk / Domark / HES Australia
+
+    # Type 20-29
     SUPER_SNAPSHOT_5 = 20       # Super Snapshot 5
     COMAL_80 = 21               # COMAL 80
+    STRUCTURED_BASIC = 22       # Structured Basic
+    ROSS = 23                   # Ross
+    DELA_EP64 = 24              # Dela EP64
+    DELA_EP7X8 = 25             # Dela EP7x8
+    DELA_EP256 = 26             # Dela EP256
+    REX_EP256 = 27              # Rex EP256
+    MIKRO_ASSEMBLER = 28        # Mikro Assembler
+    FINAL_CARTRIDGE_PLUS = 29   # Final Cartridge Plus
+
+    # Type 30-39
+    ACTION_REPLAY_4 = 30        # Action Replay 4
+    STARDOS = 31                # Stardos
     EASYFLASH = 32              # EasyFlash
+    EASYFLASH_XBANK = 33        # EasyFlash Xbank
+    CAPTURE = 34                # Capture
+    ACTION_REPLAY_3 = 35        # Action Replay 3
+    RETRO_REPLAY = 36           # Retro Replay
+    MMC64 = 37                  # MMC64
+    MMC_REPLAY = 38             # MMC Replay
+    IDE64 = 39                  # IDE64
+
+    # Type 40-49
+    SUPER_SNAPSHOT_4 = 40       # Super Snapshot V4
+    IEEE488 = 41                # IEEE-488
+    GAME_KILLER = 42            # Game Killer
+    PROPHET64 = 43              # Prophet64
+    EXOS = 44                   # EXOS
+    FREEZE_FRAME = 45           # Freeze Frame
+    FREEZE_MACHINE = 46         # Freeze Machine
+    SNAPSHOT64 = 47             # Snapshot64
+    SUPER_EXPLODE_5 = 48        # Super Explode V5
+    MAGIC_VOICE = 49            # Magic Voice
+
+    # Type 50-59
+    ACTION_REPLAY_2 = 50        # Action Replay 2
+    MACH5 = 51                  # MACH 5
+    DIASHOW_MAKER = 52          # Diashow-Maker
+    PAGEFOX = 53                # Pagefox
+    KINGSOFT = 54               # Kingsoft Business Basic
+    SILVERROCK_128 = 55         # Silverrock 128K
+    FORMEL64 = 56               # Formel 64
+    RGCD = 57                   # RGCD
+    RRNET_MK3 = 58              # RR-Net MK3
+    EASY_CALC = 59              # Easy Calc Result
+
+    # Type 60-69
+    GMOD2 = 60                  # GMod2
+    MAX_BASIC = 61              # MAX Basic
+    GMOD3 = 62                  # GMod3
+    ZIPP_CODE_48 = 63           # ZIPP-CODE 48
+    BLACKBOX_V8 = 64            # Blackbox V8
+    BLACKBOX_V3 = 65            # Blackbox V3
+    BLACKBOX_V4 = 66            # Blackbox V4
+    REX_RAM_FLOPPY = 67         # REX RAM-Floppy
+    BIS_PLUS = 68               # BIS-Plus
+    SD_BOX = 69                 # SD-BOX
+
+    # Type 70-79
+    MULTIMAX = 70               # MultiMAX
+    BLACKBOX_V9 = 71            # Blackbox V9
+    LT_KERNAL = 72              # Lt. Kernal Host Adaptor
+    RAMLINK = 73                # RAMLink
+    DREAN = 74                  # Drean (H.E.R.O. bootleg)
+    IEEE_FLASH_64 = 75          # IEEE Flash! 64
+    TURTLE_GRAPHICS_II = 76     # Turtle Graphics II
+    FREEZE_FRAME_MK2 = 77       # Freeze Frame MK2
+    PARTNER64 = 78              # Partner 64
+    HYPER_BASIC = 79            # Hyper-BASIC
+
+    # Type 80-85
+    UNIVERSAL_1 = 80            # Universal Cartridge 1
+    UNIVERSAL_15 = 81           # Universal Cartridge 1.5
+    UNIVERSAL_2 = 82            # Universal Cartridge 2
+    TURBO_2000 = 83             # BMP Data Turbo 2000
+    PROFI_DOS = 84              # Profi-DOS
+    MAGIC_DESK_16 = 85          # Magic Desk 16
 
     # Special internal type (not a real CRT type)
     ERROR = -1                  # Error cartridge (internal use only)
@@ -102,25 +200,178 @@ class MapperTest:
     passed: bool = False  # Default to fail
 
 
-# Memory region constants
-ROML_START = 0x8000
-ROML_END = 0x9FFF
-ROML_SIZE = 0x2000  # 8KB
+class CartridgeInterface(Protocol):
+    """Common cartridge metadata interface.
 
-ROMH_START = 0xA000
-ROMH_END = 0xBFFF
-ROMH_SIZE = 0x2000  # 8KB
+    Structural interface for type checking and test utilities.
+    Enables generic comparison functions without coupling to specific classes.
+    """
+    description: str
+    exrom: int
+    game: int
 
-# Ultimax mode: ROMH appears at $E000-$FFFF instead of $A000-$BFFF
-ULTIMAX_ROMH_START = 0xE000
-ULTIMAX_ROMH_END = 0xFFFF
-ULTIMAX_ROMH_SIZE = 0x2000  # 8KB
 
-IO1_START = 0xDE00
-IO1_END = 0xDEFF
+@dataclass
+class CartridgeVariant:
+    """Configuration/specification for a cartridge mode.
 
-IO2_START = 0xDF00
-IO2_END = 0xDFFF
+    Describes a particular configuration of a cartridge type.
+    For example, Type 0 can be 8k, 16k, or ultimax mode.
+    Single-variant cartridges use an empty description.
+    """
+    description: str  # "8k", "16k", "" for single-variant carts
+    exrom: int
+    game: int
+    extra: dict = None  # {"single_chip": True}, {"bank_count": 64}, etc.
+
+    def __post_init__(self):
+        if self.extra is None:
+            self.extra = {}
+
+
+@dataclass
+class CartridgeImage(CartridgeVariant):
+    """Serializable cartridge data - the file representation.
+
+    Inherits variant configuration and adds ROM data and serialization.
+    This is the result of calling create_test_cartridge().
+    """
+    rom_data: dict = None  # {"roml": bytes, "romh": bytes} or {"banks": list[bytes]}
+    hardware_type: int = 0
+
+    def __post_init__(self):
+        super().__post_init__()
+        if self.rom_data is None:
+            self.rom_data = {}
+
+    def to_bin(self) -> bytes:
+        """Serialize to raw binary format.
+
+        For Type 0 cartridges only. Concatenates ROML + ROMH data.
+        For Ultimax mode (ultimax_romh), returns just the ultimax ROMH.
+        """
+        result = b""
+        if "roml" in self.rom_data:
+            result += self.rom_data["roml"]
+        if "romh" in self.rom_data:
+            result += self.rom_data["romh"]
+        if "ultimax_romh" in self.rom_data:
+            result += self.rom_data["ultimax_romh"]
+        if result:
+            return result
+        elif "banks" in self.rom_data:
+            return b"".join(self.rom_data["banks"])
+        return b""
+
+    def to_crt(self) -> bytes:
+        """Serialize to CRT format."""
+        header = self._build_crt_header()
+        chips = self._build_chips()
+        return header + chips
+
+    def _build_crt_header(self) -> bytes:
+        """Build 64-byte CRT header."""
+        header = bytearray(64)
+
+        # Signature: "C64 CARTRIDGE   " (16 bytes, space-padded)
+        signature = b"C64 CARTRIDGE   "
+        header[0:16] = signature
+
+        # Header length (32-bit big-endian) - 64 bytes
+        header[16:20] = struct.pack(">I", 64)
+
+        # CRT version (16-bit big-endian) - 1.0
+        header[20:22] = struct.pack(">H", 0x0100)
+
+        # Hardware type (16-bit big-endian)
+        header[22:24] = struct.pack(">H", self.hardware_type)
+
+        # EXROM line (8-bit)
+        header[24] = self.exrom
+
+        # GAME line (8-bit)
+        header[25] = self.game
+
+        # Reserved (6 bytes) - already zero
+
+        # Name (32 bytes, null-padded)
+        name = self.description.encode("ascii", errors="replace")[:32]
+        header[32:32 + len(name)] = name
+
+        return bytes(header)
+
+    def _build_chip_packet(self, bank: int, load_addr: int, data: bytes) -> bytes:
+        """Build CHIP packet with header + ROM data."""
+        # CHIP signature (4 bytes)
+        packet = bytearray(b"CHIP")
+
+        # Total packet length (32-bit big-endian) = 16 + ROM size
+        packet_length = 16 + len(data)
+        packet.extend(struct.pack(">I", packet_length))
+
+        # Chip type (16-bit big-endian) - 0 = ROM
+        packet.extend(struct.pack(">H", 0))
+
+        # Bank number (16-bit big-endian)
+        packet.extend(struct.pack(">H", bank))
+
+        # Load address (16-bit big-endian)
+        packet.extend(struct.pack(">H", load_addr))
+
+        # ROM size (16-bit big-endian)
+        packet.extend(struct.pack(">H", len(data)))
+
+        # ROM data
+        packet.extend(data)
+
+        return bytes(packet)
+
+    def _build_chips(self) -> bytes:
+        """Build all CHIP packets based on rom_data structure."""
+        chips = b""
+
+        if "roml" in self.rom_data:
+            if self.extra.get("single_chip") and "romh" in self.rom_data:
+                # Combined ROML+ROMH as single 16KB chip
+                combined = self.rom_data["roml"] + self.rom_data["romh"]
+                chips += self._build_chip_packet(
+                    bank=0, load_addr=ROML_START, data=combined
+                )
+            else:
+                # ROML as separate chip
+                chips += self._build_chip_packet(
+                    bank=0, load_addr=ROML_START, data=self.rom_data["roml"]
+                )
+                if "romh" in self.rom_data:
+                    # ROMH as separate chip (16KB mode at $A000)
+                    chips += self._build_chip_packet(
+                        bank=0, load_addr=ROMH_START, data=self.rom_data["romh"]
+                    )
+                if "ultimax_romh" in self.rom_data:
+                    # Ultimax ROMH as separate chip at $E000 (with ROML present)
+                    chips += self._build_chip_packet(
+                        bank=0, load_addr=ULTIMAX_ROMH_START, data=self.rom_data["ultimax_romh"]
+                    )
+        elif "romh" in self.rom_data:
+            # ROMH alone (Ultimax mode - loads at $E000)
+            # Use extra["ultimax_romh_addr"] if specified, else ULTIMAX_ROMH_START
+            romh_addr = self.extra.get("ultimax_romh_addr", ULTIMAX_ROMH_START)
+            chips += self._build_chip_packet(
+                bank=0, load_addr=romh_addr, data=self.rom_data["romh"]
+            )
+        elif "ultimax_romh" in self.rom_data:
+            # Ultimax ROMH alone at $E000
+            chips += self._build_chip_packet(
+                bank=0, load_addr=ULTIMAX_ROMH_START, data=self.rom_data["ultimax_romh"]
+            )
+
+        if "banks" in self.rom_data:
+            for i, bank_data in enumerate(self.rom_data["banks"]):
+                chips += self._build_chip_packet(
+                    bank=i, load_addr=ROML_START, data=bank_data
+                )
+
+        return chips
 
 
 # Mapper requirements for each hardware type
@@ -658,17 +909,28 @@ class Cartridge(ABC):
     # CRT hardware type ID (set by subclasses)
     HARDWARE_TYPE: int = -1
 
-    def __init__(self, rom_data: bytes, name: str = ""):
+    def __init__(self, rom_data: bytes, name: str = "", description: str = ""):
         """Initialize cartridge with ROM data.
 
         Args:
             rom_data: Raw ROM data (may contain multiple banks)
             name: Cartridge name (from CRT header or filename)
+            description: Human-readable description (e.g., "Ocean Type 1 test cart")
         """
         self.rom_data = rom_data
         self.name = name
+        self._description = description
         self._exrom = True   # Default: inactive (no cartridge)
         self._game = True    # Default: inactive (no cartridge)
+
+    @property
+    def description(self) -> str:
+        """Human-readable description of this cartridge.
+
+        Returns _description if set, otherwise falls back to name.
+        This property satisfies the CartridgeInterface protocol.
+        """
+        return self._description if self._description else self.name
 
     @property
     def exrom(self) -> bool:
@@ -786,3 +1048,71 @@ class Cartridge(ABC):
         Called on C64 reset. Subclasses should reset bank registers etc.
         """
         pass  # Default: no state to reset
+
+    # --- Test cartridge generation ---
+
+    @classmethod
+    def get_cartridge_variants(cls) -> list[CartridgeVariant]:
+        """Return all valid configuration variants for this cartridge type.
+
+        Each variant represents a different mode or configuration that should
+        be tested. For example, Type 0 has 8k, 16k, and ultimax variants.
+
+        Subclasses should override this method to return their specific variants.
+        The default implementation returns an empty list, indicating no test
+        cartridge generation is available yet.
+
+        Returns:
+            List of CartridgeVariant specifications
+        """
+        return []
+
+    @classmethod
+    def create_test_cartridge(cls, variant: CartridgeVariant) -> CartridgeImage:
+        """Create test cartridge image for the given variant.
+
+        Builds ROM data with test code that verifies the cartridge type works
+        correctly (bank switching, memory mapping, etc.).
+
+        Subclasses should override this method to implement test cart generation.
+        The default implementation raises NotImplementedError.
+
+        Args:
+            variant: The configuration variant to generate
+
+        Returns:
+            CartridgeImage with ROM data ready for serialization
+
+        Raises:
+            NotImplementedError: If the subclass hasn't implemented this method
+        """
+        raise NotImplementedError(
+            f"{cls.__name__}.create_test_cartridge() not implemented"
+        )
+
+    @classmethod
+    def create_error_cartridge(
+        cls, variant: CartridgeVariant, results: CartridgeTestResults
+    ) -> CartridgeImage:
+        """Create error cartridge image for error_cartridges/ directory.
+
+        Generates a simple 8KB cartridge that displays the error information
+        on screen. Used as a fallback when cart loading fails.
+
+        Args:
+            variant: The configuration variant this error cart represents
+            results: Test results showing what failed
+
+        Returns:
+            CartridgeImage for a Type 0 8KB error display cart
+        """
+        lines = results.to_display_lines()
+        rom_bytes = create_error_cartridge_rom(lines, border_color=0x02)  # Red border
+        return CartridgeImage(
+            description=variant.description,
+            exrom=0,
+            game=1,
+            extra=variant.extra,
+            rom_data={"roml": rom_bytes},
+            hardware_type=0,  # Type 0 for simplest compatibility
+        )

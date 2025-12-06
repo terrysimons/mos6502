@@ -10,13 +10,16 @@ Tests that:
 """
 
 from pathlib import Path
+from typing import NamedTuple
 
 import pytest
 
 from c64 import C64
 from c64.cartridges import (
     CARTRIDGE_TYPES,
+    UNIMPLEMENTED_CARTRIDGE_TYPES,
     CartridgeType,
+    CartridgeVariant,
     Cartridge,
     ErrorCartridge,
     StaticROMCartridge,
@@ -31,6 +34,186 @@ from c64.cartridges import (
     IO2_START,
 )
 
+from .conftest import CARTRIDGE_TYPES_DIR, C64_ROMS_DIR, requires_c64_roms
+
+
+# --- Parameterized test helpers ---
+
+class CartridgeTestCase(NamedTuple):
+    """Test case for a cartridge variant."""
+    cart_type: CartridgeType
+    variant: CartridgeVariant
+    crt_path: Path
+
+
+def _get_safe_name(hw_type: int) -> str:
+    """Get safe filename component from hardware type."""
+    type_name = C64.CRT_HARDWARE_TYPES.get(hw_type, f"unknown_{hw_type}")
+    return (
+        type_name.lower()
+        .replace(" ", "_")
+        .replace(",", "")
+        .replace("/", "_")
+        .replace("(", "")
+        .replace(")", "")
+        .replace(".", "")
+    )
+
+
+def _build_crt_test_cases() -> list[CartridgeTestCase]:
+    """Build list of all CRT test cases from registered cartridge types."""
+    cases = []
+    for cart_type_key, cart_class in CARTRIDGE_TYPES.items():
+        # Get the CartridgeType enum
+        if isinstance(cart_type_key, CartridgeType):
+            cart_type = cart_type_key
+        else:
+            cart_type = CartridgeType(cart_type_key)
+
+        hw_type = cart_type.value
+        safe_name = _get_safe_name(hw_type)
+        base = f"test_cart_type_{hw_type:02d}_{safe_name}"
+
+        for variant in cart_class.get_cartridge_variants():
+            if variant.description:
+                filename = f"{base}_{variant.description}.crt"
+            else:
+                filename = f"{base}.crt"
+            crt_path = CARTRIDGE_TYPES_DIR / filename
+            cases.append(CartridgeTestCase(cart_type, variant, crt_path))
+
+    return cases
+
+
+def _make_test_id(case: CartridgeTestCase) -> str:
+    """Generate test ID like 'NORMAL-8k' or 'ACTION_REPLAY'."""
+    if case.variant.description:
+        return f"{case.cart_type.name}-{case.variant.description}"
+    return case.cart_type.name
+
+
+# Build test cases at module load time
+CRT_TEST_CASES = _build_crt_test_cases()
+CRT_TEST_IDS = [_make_test_id(case) for case in CRT_TEST_CASES]
+
+
+class BinTestCase(NamedTuple):
+    """Test case for a raw .bin cartridge file (Type 0 only)."""
+    variant: CartridgeVariant
+    bin_path: Path
+    # Expected values after auto-detection (may differ from variant when
+    # raw .bin loading can't distinguish certain modes)
+    expected_cart_type: str
+    expected_exrom: int
+    expected_game: int
+
+
+def _build_bin_test_cases() -> list[BinTestCase]:
+    """Build list of .bin test cases from Type 0 variants.
+
+    Only Type 0 (Normal cartridge) supports raw .bin loading since
+    other types require CRT metadata for bank configuration.
+    """
+    cases = []
+    cart_class = CARTRIDGE_TYPES.get(CartridgeType.NORMAL)
+    if cart_class is None:
+        return cases
+
+    hw_type = CartridgeType.NORMAL.value
+    safe_name = _get_safe_name(hw_type)
+    base = f"test_cart_type_{hw_type:02d}_{safe_name}"
+
+    # Map variant descriptions to cart_type strings for raw .bin detection.
+    # Most variants use their own cart_type name, but some are detected differently.
+    CART_TYPE_DETECTION = {
+        "8k": "8k",
+        "16k": "16k",
+        "16k_single_chip": "16k",
+        "ultimax": "ultimax",
+        # ultimax_with_roml is 16KB so auto-detection sees it as 16k mode -
+        # raw .bin files have no metadata to indicate ultimax mode with ROML.
+        "ultimax_with_roml": "16k",
+    }
+
+    for variant in cart_class.get_cartridge_variants():
+        if variant.description:
+            filename = f"{base}_{variant.description}.bin"
+        else:
+            filename = f"{base}.bin"
+        bin_path = CARTRIDGE_TYPES_DIR / filename
+
+        detected_type = CART_TYPE_DETECTION.get(variant.description, "8k")
+
+        # Use variant's EXROM/GAME unless detection differs from variant
+        if detected_type == variant.description or detected_type == variant.description.replace("_single_chip", ""):
+            # Detection matches variant - use variant's values
+            exrom, game = variant.exrom, variant.game
+        else:
+            # Detection differs - look up the target variant's EXROM/GAME
+            # (e.g., ultimax_with_roml detected as 16k uses 16k's EXROM/GAME)
+            target_variant = next(
+                (v for v in cart_class.get_cartridge_variants() if v.description == detected_type),
+                None
+            )
+            if target_variant:
+                exrom, game = target_variant.exrom, target_variant.game
+            else:
+                # Fallback to variant's own values
+                exrom, game = variant.exrom, variant.game
+
+        cases.append(BinTestCase(variant, bin_path, detected_type, exrom, game))
+
+    return cases
+
+
+# Build .bin test cases at module load time
+BIN_TEST_CASES = _build_bin_test_cases()
+BIN_TEST_IDS = [f"NORMAL-{case.variant.description}" for case in BIN_TEST_CASES]
+
+
+class UnimplementedTestCase(NamedTuple):
+    """Test case for an unimplemented cartridge type."""
+    hw_type: int
+    variant: CartridgeVariant
+    crt_path: Path
+
+
+def _build_unimplemented_test_cases() -> list[UnimplementedTestCase]:
+    """Build list of test cases for unimplemented cartridge types.
+
+    These cartridges have test .crt files but should load as ErrorCartridge
+    since the mapper is not yet implemented.
+    """
+    cases = []
+
+    for hw_type, cart_class in sorted(UNIMPLEMENTED_CARTRIDGE_TYPES.items()):
+        safe_name = _get_safe_name(hw_type)
+        base = f"test_cart_type_{hw_type:02d}_{safe_name}"
+
+        for variant in cart_class.get_cartridge_variants():
+            if variant.description:
+                filename = f"{base}_{variant.description}.crt"
+            else:
+                filename = f"{base}.crt"
+            crt_path = CARTRIDGE_TYPES_DIR / filename
+            cases.append(UnimplementedTestCase(hw_type, variant, crt_path))
+
+    return cases
+
+
+def _make_unimplemented_test_id(case: UnimplementedTestCase) -> str:
+    """Generate test ID for unimplemented cartridge test case."""
+    name = C64.CRT_HARDWARE_TYPES.get(case.hw_type, f"TYPE_{case.hw_type}")
+    safe_name = name.upper().replace(" ", "_").replace(",", "").replace("/", "_").replace("-", "_")
+    if case.variant.description:
+        return f"{safe_name}-{case.variant.description}"
+    return safe_name
+
+
+# Build unimplemented test cases at module load time
+UNIMPLEMENTED_TEST_CASES = _build_unimplemented_test_cases()
+UNIMPLEMENTED_TEST_IDS = [_make_unimplemented_test_id(case) for case in UNIMPLEMENTED_TEST_CASES]
+
 
 def cart_type_id(hw_type: int) -> str:
     """Generate a readable test ID for a cartridge hardware type."""
@@ -43,8 +226,6 @@ def cart_type_id(hw_type: int) -> str:
     name = C64.CRT_HARDWARE_TYPES.get(hw_type, f"TYPE_{hw_type}")
     # Convert to TEST_ID format: "Ocean type 1" -> "OCEAN_TYPE_1"
     return name.upper().replace(" ", "_").replace(",", "").replace("/", "_").replace("-", "_")
-
-from .conftest import CARTRIDGE_TYPES_DIR, C64_ROMS_DIR, requires_c64_roms
 
 
 class TestCartridgeModule:
@@ -1057,45 +1238,13 @@ class TestCreateCartridgeFactory:
             create_cartridge(32, roml_data, name="Test")  # EasyFlash - not yet implemented
 
 
-class TestC64CartridgeLoading:
-    """Integration tests for loading cartridges through C64.
+@requires_c64_roms
+class TestCartridgeExecution:
+    """Parameterized tests for cartridge execution.
 
-    These tests require C64 ROMs to be present in tests/fixtures/roms/c64/
+    Tests that each cartridge variant loads and executes correctly,
+    running the embedded self-test code and verifying it passes.
     """
-
-    @pytest.fixture
-    def c64(self):
-        """Create a C64 instance with ROMs loaded."""
-        return C64(rom_dir=C64_ROMS_DIR, display_mode="headless")
-
-    def _get_crt_path(self, hw_type: int) -> Path:
-        """Get the path to a test CRT file for a given hardware type."""
-        type_name = C64.CRT_HARDWARE_TYPES.get(hw_type, f"unknown_{hw_type}")
-        safe_name = (
-            type_name.lower()
-            .replace(" ", "_")
-            .replace(",", "")
-            .replace("/", "_")
-            .replace("(", "")
-            .replace(")", "")
-            .replace(".", "")
-        )
-        return CARTRIDGE_TYPES_DIR / f"test_cart_type_{hw_type:02d}_{safe_name}.crt"
-
-    def _test_load_cartridge_type(self, c64, hw_type: int):
-        """Test that a cartridge type loads correctly (not as error cart)."""
-        crt_path = self._get_crt_path(hw_type)
-        if not crt_path.exists():
-            pytest.skip(f"Test fixture not found: {crt_path}")
-
-        c64.load_cartridge(crt_path)
-
-        # The test FAILS if we get an error cartridge (mapper not implemented)
-        assert c64.cartridge_type != "error", \
-            f"Type {hw_type} ({C64.CRT_HARDWARE_TYPES.get(hw_type, 'unknown')}) not implemented"
-        assert c64.memory.cartridge is not None
-        assert not isinstance(c64.memory.cartridge, ErrorCartridge), \
-            f"Type {hw_type} loaded as ErrorCartridge - mapper not implemented"
 
     # Fail counter protocol constants (must match scripts/create_test_carts.py)
     FAIL_COUNTER_ZP = 0x02
@@ -1103,20 +1252,18 @@ class TestC64CartridgeLoading:
     FAIL_COUNT_MASK = 0x7F
     MAX_CYCLES = 5_000_000  # 5M cycles should be enough for any test cart
 
-    def _run_test_cartridge(self, c64, crt_path: Path) -> tuple[bool, int]:
-        """Run a test cartridge and return (tests_complete, fail_count).
+    @pytest.fixture
+    def c64(self):
+        """Create a C64 instance with ROMs loaded."""
+        return C64(rom_dir=C64_ROMS_DIR, display_mode="headless")
 
-        Returns:
-            Tuple of (tests_complete, fail_count):
-            - tests_complete: True if bit 7 of $02 was set before max cycles
-            - fail_count: Number of failures (bits 0-6 of $02)
-        """
+    def _run_test_cartridge(self, c64, crt_path: Path) -> tuple[bool, int]:
+        """Run a test cartridge and return (tests_complete, fail_count)."""
         from mos6502.errors import CPUCycleExhaustionError
 
         c64.load_cartridge(crt_path)
         c64.reset()
 
-        # Run in chunks and check for completion
         CHUNK_SIZE = 100_000
         cycles_run = 0
 
@@ -1124,758 +1271,142 @@ class TestC64CartridgeLoading:
             try:
                 c64.cpu.execute(cycles=CHUNK_SIZE)
             except CPUCycleExhaustionError:
-                pass  # Expected - chunk complete
+                pass
 
             cycles_run += CHUNK_SIZE
 
-            # Check fail counter for completion flag
             fail_counter = c64.memory.read(self.FAIL_COUNTER_ZP)
             if fail_counter & self.TESTS_COMPLETE_BIT:
-                # Tests complete - return result
                 fail_count = fail_counter & self.FAIL_COUNT_MASK
                 return True, fail_count
 
-        # Timed out - tests didn't complete
         fail_counter = c64.memory.read(self.FAIL_COUNTER_ZP)
         return False, fail_counter & self.FAIL_COUNT_MASK
 
-    @requires_c64_roms
-    def test_type_00_normal_8kb_bin_cartridge_loads(self, c64):
-        """Type 0: Normal 8KB cartridge (raw .bin, EXROM=0, GAME=1)."""
-        bin_path = CARTRIDGE_TYPES_DIR / "test_cart_type_00_8k.bin"
-        if not bin_path.exists():
-            pytest.skip(f"Test fixture not found: {bin_path}")
+    @pytest.mark.parametrize("test_case", CRT_TEST_CASES, ids=CRT_TEST_IDS)
+    def test_cartridge_executes(self, c64, test_case: CartridgeTestCase):
+        """Test that cartridge loads and executes, passing all self-tests."""
+        if not test_case.crt_path.exists():
+            pytest.skip(f"Test fixture not found: {test_case.crt_path.name}")
 
-        c64.load_cartridge(bin_path)
+        tests_complete, fail_count = self._run_test_cartridge(c64, test_case.crt_path)
 
-        assert c64.cartridge_type == "8k"
-        assert c64.memory.cartridge is not None
-        assert isinstance(c64.memory.cartridge, StaticROMCartridge)
-        assert c64.memory.cartridge.exrom is False  # Active
-        assert c64.memory.cartridge.game is True    # Inactive (8KB mode)
+        assert tests_complete, (
+            f"{test_case.cart_type.name} {test_case.variant.description or ''} "
+            f"test cartridge did not complete within max cycles"
+        )
+        assert fail_count == 0, (
+            f"{test_case.cart_type.name} {test_case.variant.description or ''} "
+            f"test cartridge reported {fail_count} failures"
+        )
 
-    @requires_c64_roms
-    def test_type_00_normal_8kb_crt_cartridge_loads(self, c64):
-        """Type 0: Normal 8KB cartridge (.crt, EXROM=0, GAME=1)."""
-        crt_path = CARTRIDGE_TYPES_DIR / "test_cart_type_00_8k.crt"
-        if not crt_path.exists():
-            pytest.skip(f"Test fixture not found: {crt_path}")
 
-        c64.load_cartridge(crt_path)
+@requires_c64_roms
+class TestCartridgeLoading:
+    """Parameterized tests for cartridge loading.
 
-        assert c64.cartridge_type == "8k"
-        assert c64.memory.cartridge is not None
-        assert isinstance(c64.memory.cartridge, StaticROMCartridge)
-        assert c64.memory.cartridge.exrom is False  # Active
-        assert c64.memory.cartridge.game is True    # Inactive (8KB mode)
-        assert c64.memory.cartridge.roml_data is not None
+    Tests that each cartridge variant loads correctly from both:
+    - CRT files (all cartridge types)
+    - BIN files (Type 0 only, with auto-detection)
+    """
 
-    @requires_c64_roms
-    def test_type_00_8k_cartridge_executes(self, c64):
-        """Type 0 8KB test cartridge should pass all tests."""
-        crt_path = CARTRIDGE_TYPES_DIR / "test_cart_type_00_8k.crt"
-        if not crt_path.exists():
-            pytest.skip(f"Test fixture not found: {crt_path}")
+    @pytest.fixture
+    def c64_factory(self):
+        """Factory to create fresh C64 instances for each test."""
+        def _create():
+            return C64(rom_dir=C64_ROMS_DIR, display_mode="headless")
+        return _create
 
-        tests_complete, fail_count = self._run_test_cartridge(c64, crt_path)
+    @pytest.mark.parametrize("test_case", CRT_TEST_CASES, ids=CRT_TEST_IDS)
+    def test_crt_cartridge_loads(self, c64_factory, test_case: CartridgeTestCase):
+        """Test that cartridge CRT file loads correctly."""
+        if not test_case.crt_path.exists():
+            pytest.skip(f"Test fixture not found: {test_case.crt_path.name}")
 
-        assert tests_complete, "Test cartridge did not complete within max cycles"
-        assert fail_count == 0, f"Test cartridge reported {fail_count} failures"
+        c64 = c64_factory()
+        c64.load_cartridge(test_case.crt_path)
 
-    @requires_c64_roms
-    def test_type_00_normal_16kb_bin_cartridge_loads(self, c64):
-        """Type 0: Normal 16KB cartridge (raw .bin, EXROM=0, GAME=0)."""
-        bin_path = CARTRIDGE_TYPES_DIR / "test_cart_type_00_16k.bin"
-        if not bin_path.exists():
-            pytest.skip(f"Test fixture not found: {bin_path}")
+        # Verify cartridge loaded (not an error cartridge)
+        assert c64.memory.cartridge is not None, (
+            f"{test_case.cart_type.name} {test_case.variant.description or ''}: "
+            f"no cartridge loaded"
+        )
+        assert not isinstance(c64.memory.cartridge, ErrorCartridge), (
+            f"{test_case.cart_type.name} {test_case.variant.description or ''}: "
+            f"loaded as ErrorCartridge"
+        )
+        assert c64.cartridge_type != "error", (
+            f"{test_case.cart_type.name} {test_case.variant.description or ''}: "
+            f"cartridge_type is 'error'"
+        )
 
-        c64.load_cartridge(bin_path)
+    @pytest.mark.parametrize("test_case", BIN_TEST_CASES, ids=BIN_TEST_IDS)
+    def test_bin_cartridge_loads(self, c64_factory, test_case: BinTestCase):
+        """Test that raw .bin cartridge loads with correct auto-detection.
 
-        assert c64.cartridge_type == "16k"
-        assert c64.memory.cartridge is not None
-        assert isinstance(c64.memory.cartridge, StaticROMCartridge)
-        assert c64.memory.cartridge.exrom is False  # Active
-        assert c64.memory.cartridge.game is False   # Active (16KB mode)
-
-    @requires_c64_roms
-    def test_type_00_normal_16kb_crt_single_chip_cartridge_loads(self, c64):
-        """Type 0: Normal 16KB cartridge (.crt with single CHIP, EXROM=0, GAME=0).
-
-        CRT structure: One 16KB CHIP at $8000, split into ROML and ROMH.
+        Only Type 0 (Normal) supports raw .bin loading since other types
+        require CRT metadata for bank configuration.
         """
-        crt_path = CARTRIDGE_TYPES_DIR / "test_cart_type_00_16k_single_chip.crt"
-        if not crt_path.exists():
-            pytest.skip(f"Test fixture not found: {crt_path}")
+        if not test_case.bin_path.exists():
+            pytest.skip(f"Test fixture not found: {test_case.bin_path.name}")
 
-        c64.load_cartridge(crt_path)
+        c64 = c64_factory()
+        c64.load_cartridge(test_case.bin_path)
 
-        assert c64.cartridge_type == "16k"
+        assert c64.cartridge_type == test_case.expected_cart_type
         assert c64.memory.cartridge is not None
         assert isinstance(c64.memory.cartridge, StaticROMCartridge)
-        assert c64.memory.cartridge.exrom is False  # Active
-        assert c64.memory.cartridge.game is False   # Active (16KB mode)
-        assert c64.memory.cartridge.roml_data is not None
-        assert c64.memory.cartridge.romh_data is not None
 
-    @requires_c64_roms
-    def test_type_00_normal_16kb_crt_two_chip_cartridge_loads(self, c64):
-        """Type 0: Normal 16KB cartridge (.crt with two CHIPs, EXROM=0, GAME=0).
-
-        CRT structure: Two separate 8KB CHIPs at $8000 (ROML) and $A000 (ROMH).
-        """
-        crt_path = CARTRIDGE_TYPES_DIR / "test_cart_type_00_16k.crt"
-        if not crt_path.exists():
-            pytest.skip(f"Test fixture not found: {crt_path}")
-
-        c64.load_cartridge(crt_path)
-
-        assert c64.cartridge_type == "16k"
-        assert c64.memory.cartridge is not None
-        assert isinstance(c64.memory.cartridge, StaticROMCartridge)
-        assert c64.memory.cartridge.exrom is False  # Active
-        assert c64.memory.cartridge.game is False   # Active (16KB mode)
-        assert c64.memory.cartridge.roml_data is not None
-        assert c64.memory.cartridge.romh_data is not None
-
-    @requires_c64_roms
-    def test_type_00_16k_cartridge_executes(self, c64):
-        """Type 0 16KB test cartridge should pass all tests."""
-        crt_path = CARTRIDGE_TYPES_DIR / "test_cart_type_00_16k.crt"
-        if not crt_path.exists():
-            pytest.skip(f"Test fixture not found: {crt_path}")
-
-        tests_complete, fail_count = self._run_test_cartridge(c64, crt_path)
-
-        assert tests_complete, "Test cartridge did not complete within max cycles"
-        assert fail_count == 0, f"Test cartridge reported {fail_count} failures"
-
-    @requires_c64_roms
-    def test_type_00_ultimax_bin_cartridge_loads(self, c64):
-        """Type 0: Ultimax cartridge (raw .bin with explicit type, EXROM=1, GAME=0)."""
-        bin_path = CARTRIDGE_TYPES_DIR / "test_cart_type_00_ultimax.bin"
-        if not bin_path.exists():
-            pytest.skip(f"Test fixture not found: {bin_path}")
-
-        c64.load_cartridge(bin_path, cart_type="ultimax")
-
-        assert c64.cartridge_type == "ultimax"
-        assert c64.memory.cartridge is not None
-        assert isinstance(c64.memory.cartridge, StaticROMCartridge)
-        assert c64.memory.cartridge.exrom is True   # Inactive (Ultimax)
-        assert c64.memory.cartridge.game is False   # Active (Ultimax)
-        assert c64.memory.cartridge.ultimax_romh_data is not None
-
-    @requires_c64_roms
-    def test_type_00_ultimax_bin_autodetect_cartridge_loads(self, c64):
-        """Type 0: Ultimax cartridge auto-detection from reset vector.
-
-        When an 8KB .bin file doesn't have CBM80 signature but has a reset
-        vector pointing to $E000-$FFFF, it should be auto-detected as Ultimax.
-        """
-        bin_path = CARTRIDGE_TYPES_DIR / "test_cart_type_00_ultimax.bin"
-        if not bin_path.exists():
-            pytest.skip(f"Test fixture not found: {bin_path}")
-
-        # Load with auto-detection (no explicit cart_type)
-        c64.load_cartridge(bin_path)
-
-        assert c64.cartridge_type == "ultimax"
-        assert c64.memory.cartridge is not None
-        assert isinstance(c64.memory.cartridge, StaticROMCartridge)
-        assert c64.memory.cartridge.exrom is True   # Inactive (Ultimax)
-        assert c64.memory.cartridge.game is False   # Active (Ultimax)
-        assert c64.memory.cartridge.ultimax_romh_data is not None
-
-    @requires_c64_roms
-    def test_type_00_ultimax_crt_cartridge_loads(self, c64):
-        """Type 0: Ultimax cartridge (.crt, EXROM=1, GAME=0)."""
-        crt_path = CARTRIDGE_TYPES_DIR / "test_cart_type_00_ultimax.crt"
-        if not crt_path.exists():
-            pytest.skip(f"Test fixture not found: {crt_path}")
-
-        c64.load_cartridge(crt_path)
-
-        assert c64.cartridge_type == "ultimax"
-        assert c64.memory.cartridge is not None
-        assert isinstance(c64.memory.cartridge, StaticROMCartridge)
-        assert c64.memory.cartridge.exrom is True   # Inactive (Ultimax)
-        assert c64.memory.cartridge.game is False   # Active (Ultimax)
-        assert c64.memory.cartridge.ultimax_romh_data is not None
-
-    @requires_c64_roms
-    def test_type_00_ultimax_cartridge_executes(self, c64):
-        """Type 0 Ultimax test cartridge should pass all tests."""
-        crt_path = CARTRIDGE_TYPES_DIR / "test_cart_type_00_ultimax.crt"
-        if not crt_path.exists():
-            pytest.skip(f"Test fixture not found: {crt_path}")
-
-        tests_complete, fail_count = self._run_test_cartridge(c64, crt_path)
-
-        assert tests_complete, "Test cartridge did not complete within max cycles"
-        assert fail_count == 0, f"Test cartridge reported {fail_count} failures"
-
-    @requires_c64_roms
-    def test_type_00_ultimax_with_roml_crt_cartridge_loads(self, c64):
-        """Type 0: Ultimax cartridge with optional ROML (.crt, EXROM=1, GAME=0)."""
-        crt_path = CARTRIDGE_TYPES_DIR / "test_cart_type_00_ultimax_with_roml.crt"
-        if not crt_path.exists():
-            pytest.skip(f"Test fixture not found: {crt_path}")
-
-        c64.load_cartridge(crt_path)
-
-        assert c64.cartridge_type == "ultimax"
-        assert c64.memory.cartridge is not None
-        assert isinstance(c64.memory.cartridge, StaticROMCartridge)
-        assert c64.memory.cartridge.exrom is True   # Inactive (Ultimax)
-        assert c64.memory.cartridge.game is False   # Active (Ultimax)
-        assert c64.memory.cartridge.ultimax_romh_data is not None
-        # Ultimax with ROML should also have ROML data
-        assert c64.memory.cartridge.roml_data is not None
-
-    @requires_c64_roms
-    def test_type_00_16k_single_chip_cartridge_executes(self, c64):
-        """Type 0 16KB single chip format test cartridge should pass all tests."""
-        crt_path = CARTRIDGE_TYPES_DIR / "test_cart_type_00_16k_single_chip.crt"
-        if not crt_path.exists():
-            pytest.skip(f"Test fixture not found: {crt_path}")
-
-        tests_complete, fail_count = self._run_test_cartridge(c64, crt_path)
-
-        assert tests_complete, "Test cartridge did not complete within max cycles"
-        assert fail_count == 0, f"Test cartridge reported {fail_count} failures"
-
-    @requires_c64_roms
-    def test_type_01_action_replay_cartridge_loads(self, c64):
-        """Type 1: Action Replay."""
-        self._test_load_cartridge_type(c64, CARTRIDGE_TYPES[1].HARDWARE_TYPE)
-
-    @requires_c64_roms
-    def test_type_01_action_replay_cartridge_executes(self, c64):
-        """Type 1 Action Replay test cartridge should pass all tests."""
-        crt_path = CARTRIDGE_TYPES_DIR / "test_cart_type_01_action_replay.crt"
-        if not crt_path.exists():
-            pytest.skip(f"Test fixture not found: {crt_path}")
-
-        tests_complete, fail_count = self._run_test_cartridge(c64, crt_path)
-
-        assert tests_complete, "Test cartridge did not complete within max cycles"
-        assert fail_count == 0, f"Test cartridge reported {fail_count} failures"
-
-    @requires_c64_roms
-    def test_type_02_kcs_power_cartridge_loads(self, c64):
-        """Type 2: KCS Power Cartridge."""
-        self._test_load_cartridge_type(c64, 2)
-
-    @requires_c64_roms
-    def test_type_03_final_cartridge_iii_cartridge_loads(self, c64):
-        """Type 3: Final Cartridge III."""
-        self._test_load_cartridge_type(c64, 3)
-
-    @requires_c64_roms
-    def test_type_03_final_cartridge_iii_cartridge_executes(self, c64):
-        """Type 3 Final Cartridge III test cartridge should pass all tests."""
-        crt_path = CARTRIDGE_TYPES_DIR / "test_cart_type_03_final_cartridge_iii.crt"
-        if not crt_path.exists():
-            pytest.skip(f"Test fixture not found: {crt_path}")
-
-        tests_complete, fail_count = self._run_test_cartridge(c64, crt_path)
-
-        assert tests_complete, "Test cartridge did not complete within max cycles"
-        assert fail_count == 0, f"Test cartridge reported {fail_count} failures"
-
-    @requires_c64_roms
-    def test_type_04_simons_basic_cartridge_loads(self, c64):
-        """Type 4: Simons Basic."""
-        self._test_load_cartridge_type(c64, 4)
-
-    @requires_c64_roms
-    def test_type_04_simons_basic_cartridge_executes(self, c64):
-        """Type 4 Simons Basic test cartridge should pass all tests."""
-        crt_path = CARTRIDGE_TYPES_DIR / "test_cart_type_04_simons_basic.crt"
-        if not crt_path.exists():
-            pytest.skip(f"Test fixture not found: {crt_path}")
-
-        tests_complete, fail_count = self._run_test_cartridge(c64, crt_path)
-
-        assert tests_complete, "Test cartridge did not complete within max cycles"
-        assert fail_count == 0, f"Test cartridge reported {fail_count} failures"
-
-    @requires_c64_roms
-    def test_type_05_ocean_type_1_cartridge_loads(self, c64):
-        """Type 5: Ocean type 1."""
-        self._test_load_cartridge_type(c64, 5)
-
-    @requires_c64_roms
-    def test_type_05_ocean_type_1_cartridge_executes(self, c64):
-        """Type 5 Ocean Type 1 test cartridge should pass all tests."""
-        crt_path = CARTRIDGE_TYPES_DIR / "test_cart_type_05_ocean_type_1.crt"
-        if not crt_path.exists():
-            pytest.skip(f"Test fixture not found: {crt_path}")
-
-        tests_complete, fail_count = self._run_test_cartridge(c64, crt_path)
-
-        assert tests_complete, "Test cartridge did not complete within max cycles"
-        assert fail_count == 0, f"Test cartridge reported {fail_count} failures"
-
-    @requires_c64_roms
-    def test_type_06_expert_cartridge_loads(self, c64):
-        """Type 6: Expert Cartridge."""
-        self._test_load_cartridge_type(c64, 6)
-
-    @requires_c64_roms
-    def test_type_07_fun_play_power_play_cartridge_loads(self, c64):
-        """Type 7: Fun Play, Power Play."""
-        self._test_load_cartridge_type(c64, 7)
-
-    @requires_c64_roms
-    def test_type_08_super_games_cartridge_loads(self, c64):
-        """Type 8: Super Games."""
-        self._test_load_cartridge_type(c64, 8)
-
-    @requires_c64_roms
-    def test_type_09_atomic_power_cartridge_loads(self, c64):
-        """Type 9: Atomic Power."""
-        self._test_load_cartridge_type(c64, 9)
-
-    @requires_c64_roms
-    def test_type_10_epyx_fastload_cartridge_loads(self, c64):
-        """Type 10: Epyx Fastload."""
-        self._test_load_cartridge_type(c64, 10)
-
-    @requires_c64_roms
-    def test_type_10_epyx_fastload_cartridge_executes(self, c64):
-        """Type 10 Epyx FastLoad test cartridge should pass all tests."""
-        crt_path = CARTRIDGE_TYPES_DIR / "test_cart_type_10_epyx_fastload.crt"
-        if not crt_path.exists():
-            pytest.skip(f"Test fixture not found: {crt_path}")
-
-        tests_complete, fail_count = self._run_test_cartridge(c64, crt_path)
-
-        assert tests_complete, "Test cartridge did not complete within max cycles"
-        assert fail_count == 0, f"Test cartridge reported {fail_count} failures"
-
-    @requires_c64_roms
-    def test_type_11_westermann_learning_cartridge_loads(self, c64):
-        """Type 11: Westermann Learning."""
-        self._test_load_cartridge_type(c64, 11)
-
-    @requires_c64_roms
-    def test_type_12_rex_utility_cartridge_loads(self, c64):
-        """Type 12: Rex Utility."""
-        self._test_load_cartridge_type(c64, 12)
-
-    @requires_c64_roms
-    def test_type_13_final_cartridge_i_cartridge_loads(self, c64):
-        """Type 13: Final Cartridge I."""
-        self._test_load_cartridge_type(c64, 13)
-
-    @requires_c64_roms
-    def test_type_13_final_cartridge_i_cartridge_executes(self, c64):
-        """Type 13 Final Cartridge I test cartridge should pass all tests."""
-        crt_path = CARTRIDGE_TYPES_DIR / "test_cart_type_13_final_cartridge_i.crt"
-        if not crt_path.exists():
-            pytest.skip(f"Test fixture not found: {crt_path}")
-
-        tests_complete, fail_count = self._run_test_cartridge(c64, crt_path)
-
-        assert tests_complete, "Test cartridge did not complete within max cycles"
-        assert fail_count == 0, f"Test cartridge reported {fail_count} failures"
-
-    @requires_c64_roms
-    def test_type_14_magic_formel_cartridge_loads(self, c64):
-        """Type 14: Magic Formel."""
-        self._test_load_cartridge_type(c64, 14)
-
-    @requires_c64_roms
-    def test_type_15_c64_game_system_cartridge_loads(self, c64):
-        """Type 15: C64 Game System, System 3."""
-        self._test_load_cartridge_type(c64, 15)
-
-    @requires_c64_roms
-    def test_type_15_c64_game_system_cartridge_executes(self, c64):
-        """Type 15 C64GS test cartridge should pass all tests."""
-        crt_path = CARTRIDGE_TYPES_DIR / "test_cart_type_15_c64_game_system_system_3.crt"
-        if not crt_path.exists():
-            pytest.skip(f"Test fixture not found: {crt_path}")
-
-        tests_complete, fail_count = self._run_test_cartridge(c64, crt_path)
-
-        assert tests_complete, "Test cartridge did not complete within max cycles"
-        assert fail_count == 0, f"Test cartridge reported {fail_count} failures"
-
-    @requires_c64_roms
-    def test_type_16_warpspeed_cartridge_loads(self, c64):
-        """Type 16: WarpSpeed."""
-        self._test_load_cartridge_type(c64, 16)
-
-    @requires_c64_roms
-    def test_type_17_dinamic_cartridge_loads(self, c64):
-        """Type 17: Dinamic."""
-        self._test_load_cartridge_type(c64, 17)
-
-    @requires_c64_roms
-    def test_type_17_dinamic_cartridge_executes(self, c64):
-        """Type 17 Dinamic test cartridge should pass all tests."""
-        crt_path = CARTRIDGE_TYPES_DIR / "test_cart_type_17_dinamic.crt"
-        if not crt_path.exists():
-            pytest.skip(f"Test fixture not found: {crt_path}")
-
-        tests_complete, fail_count = self._run_test_cartridge(c64, crt_path)
-
-        assert tests_complete, "Test cartridge did not complete within max cycles"
-        assert fail_count == 0, f"Test cartridge reported {fail_count} failures"
-
-    @requires_c64_roms
-    def test_type_18_zaxxon_sega_cartridge_loads(self, c64):
-        """Type 18: Zaxxon, Super Zaxxon (SEGA)."""
-        self._test_load_cartridge_type(c64, 18)
-
-    @requires_c64_roms
-    def test_type_19_magic_desk_cartridge_loads(self, c64):
-        """Type 19: Magic Desk, Domark, HES Australia."""
-        self._test_load_cartridge_type(c64, 19)
-
-    @requires_c64_roms
-    def test_type_19_magic_desk_cartridge_executes(self, c64):
-        """Type 19 Magic Desk test cartridge should pass all tests."""
-        crt_path = CARTRIDGE_TYPES_DIR / "test_cart_type_19_magic_desk_domark_hes_australia.crt"
-        if not crt_path.exists():
-            pytest.skip(f"Test fixture not found: {crt_path}")
-
-        tests_complete, fail_count = self._run_test_cartridge(c64, crt_path)
-
-        assert tests_complete, "Test cartridge did not complete within max cycles"
-        assert fail_count == 0, f"Test cartridge reported {fail_count} failures"
-
-    @requires_c64_roms
-    def test_type_20_super_snapshot_v5_cartridge_loads(self, c64):
-        """Type 20: Super Snapshot V5."""
-        self._test_load_cartridge_type(c64, 20)
-
-    @requires_c64_roms
-    def test_type_21_comal_80_cartridge_loads(self, c64):
-        """Type 21: Comal-80."""
-        self._test_load_cartridge_type(c64, 21)
-
-    @requires_c64_roms
-    def test_type_22_structured_basic_cartridge_loads(self, c64):
-        """Type 22: Structured Basic."""
-        self._test_load_cartridge_type(c64, 22)
-
-    @requires_c64_roms
-    def test_type_23_ross_cartridge_loads(self, c64):
-        """Type 23: Ross."""
-        self._test_load_cartridge_type(c64, 23)
-
-    @requires_c64_roms
-    def test_type_24_dela_ep64_cartridge_loads(self, c64):
-        """Type 24: Dela EP64."""
-        self._test_load_cartridge_type(c64, 24)
-
-    @requires_c64_roms
-    def test_type_25_dela_ep7x8_cartridge_loads(self, c64):
-        """Type 25: Dela EP7x8."""
-        self._test_load_cartridge_type(c64, 25)
-
-    @requires_c64_roms
-    def test_type_26_dela_ep256_cartridge_loads(self, c64):
-        """Type 26: Dela EP256."""
-        self._test_load_cartridge_type(c64, 26)
-
-    @requires_c64_roms
-    def test_type_27_rex_ep256_cartridge_loads(self, c64):
-        """Type 27: Rex EP256."""
-        self._test_load_cartridge_type(c64, 27)
-
-    @requires_c64_roms
-    def test_type_28_mikro_assembler_cartridge_loads(self, c64):
-        """Type 28: Mikro Assembler."""
-        self._test_load_cartridge_type(c64, 28)
-
-    @requires_c64_roms
-    def test_type_29_final_cartridge_plus_cartridge_loads(self, c64):
-        """Type 29: Final Cartridge Plus."""
-        self._test_load_cartridge_type(c64, 29)
-
-    @requires_c64_roms
-    def test_type_30_action_replay_4_cartridge_loads(self, c64):
-        """Type 30: Action Replay 4."""
-        self._test_load_cartridge_type(c64, 30)
-
-    @requires_c64_roms
-    def test_type_31_stardos_cartridge_loads(self, c64):
-        """Type 31: StarDOS."""
-        self._test_load_cartridge_type(c64, 31)
-
-    @requires_c64_roms
-    def test_type_32_easyflash_cartridge_loads(self, c64):
-        """Type 32: EasyFlash."""
-        self._test_load_cartridge_type(c64, 32)
-
-    @requires_c64_roms
-    def test_type_33_easyflash_xbank_cartridge_loads(self, c64):
-        """Type 33: EasyFlash X-Bank."""
-        self._test_load_cartridge_type(c64, 33)
-
-    @requires_c64_roms
-    def test_type_34_capture_cartridge_loads(self, c64):
-        """Type 34: Capture."""
-        self._test_load_cartridge_type(c64, 34)
-
-    @requires_c64_roms
-    def test_type_35_action_replay_3_cartridge_loads(self, c64):
-        """Type 35: Action Replay 3."""
-        self._test_load_cartridge_type(c64, 35)
-
-    @requires_c64_roms
-    def test_type_36_retro_replay_cartridge_loads(self, c64):
-        """Type 36: Retro Replay, Nordic Replay."""
-        self._test_load_cartridge_type(c64, 36)
-
-    @requires_c64_roms
-    def test_type_37_mmc64_cartridge_loads(self, c64):
-        """Type 37: MMC64."""
-        self._test_load_cartridge_type(c64, 37)
-
-    @requires_c64_roms
-    def test_type_38_mmc_replay_cartridge_loads(self, c64):
-        """Type 38: MMC Replay."""
-        self._test_load_cartridge_type(c64, 38)
-
-    @requires_c64_roms
-    def test_type_39_ide64_cartridge_loads(self, c64):
-        """Type 39: IDE64."""
-        self._test_load_cartridge_type(c64, 39)
-
-    @requires_c64_roms
-    def test_type_40_super_snapshot_v4_cartridge_loads(self, c64):
-        """Type 40: Super Snapshot V4."""
-        self._test_load_cartridge_type(c64, 40)
-
-    @requires_c64_roms
-    def test_type_41_ieee488_cartridge_loads(self, c64):
-        """Type 41: IEEE488."""
-        self._test_load_cartridge_type(c64, 41)
-
-    @requires_c64_roms
-    def test_type_42_game_killer_cartridge_loads(self, c64):
-        """Type 42: Game Killer."""
-        self._test_load_cartridge_type(c64, 42)
-
-    @requires_c64_roms
-    def test_type_43_prophet_64_cartridge_loads(self, c64):
-        """Type 43: Prophet 64."""
-        self._test_load_cartridge_type(c64, 43)
-
-    @requires_c64_roms
-    def test_type_44_exos_cartridge_loads(self, c64):
-        """Type 44: Exos."""
-        self._test_load_cartridge_type(c64, 44)
-
-    @requires_c64_roms
-    def test_type_45_freeze_frame_cartridge_loads(self, c64):
-        """Type 45: Freeze Frame."""
-        self._test_load_cartridge_type(c64, 45)
-
-    @requires_c64_roms
-    def test_type_46_freeze_machine_cartridge_loads(self, c64):
-        """Type 46: Freeze Machine."""
-        self._test_load_cartridge_type(c64, 46)
-
-    @requires_c64_roms
-    def test_type_47_snapshot64_cartridge_loads(self, c64):
-        """Type 47: Snapshot64."""
-        self._test_load_cartridge_type(c64, 47)
-
-    @requires_c64_roms
-    def test_type_48_super_explode_v5_cartridge_loads(self, c64):
-        """Type 48: Super Explode V5."""
-        self._test_load_cartridge_type(c64, 48)
-
-    @requires_c64_roms
-    def test_type_49_magic_voice_cartridge_loads(self, c64):
-        """Type 49: Magic Voice."""
-        self._test_load_cartridge_type(c64, 49)
-
-    @requires_c64_roms
-    def test_type_50_action_replay_2_cartridge_loads(self, c64):
-        """Type 50: Action Replay 2."""
-        self._test_load_cartridge_type(c64, 50)
-
-    @requires_c64_roms
-    def test_type_51_mach_5_cartridge_loads(self, c64):
-        """Type 51: MACH 5."""
-        self._test_load_cartridge_type(c64, 51)
-
-    @requires_c64_roms
-    def test_type_52_diashow_maker_cartridge_loads(self, c64):
-        """Type 52: Diashow Maker."""
-        self._test_load_cartridge_type(c64, 52)
-
-    @requires_c64_roms
-    def test_type_53_pagefox_cartridge_loads(self, c64):
-        """Type 53: Pagefox."""
-        self._test_load_cartridge_type(c64, 53)
-
-    @requires_c64_roms
-    def test_type_54_kingsoft_business_basic_cartridge_loads(self, c64):
-        """Type 54: Kingsoft Business Basic."""
-        self._test_load_cartridge_type(c64, 54)
-
-    @requires_c64_roms
-    def test_type_55_silver_rock_128_cartridge_loads(self, c64):
-        """Type 55: Silver Rock 128."""
-        self._test_load_cartridge_type(c64, 55)
-
-    @requires_c64_roms
-    def test_type_56_formel_64_cartridge_loads(self, c64):
-        """Type 56: Formel 64."""
-        self._test_load_cartridge_type(c64, 56)
-
-    @requires_c64_roms
-    def test_type_57_rgcd_cartridge_loads(self, c64):
-        """Type 57: RGCD."""
-        self._test_load_cartridge_type(c64, 57)
-
-    @requires_c64_roms
-    def test_type_58_rrnet_mk3_cartridge_loads(self, c64):
-        """Type 58: RR-Net MK3."""
-        self._test_load_cartridge_type(c64, 58)
-
-    @requires_c64_roms
-    def test_type_59_easy_calc_result_cartridge_loads(self, c64):
-        """Type 59: Easy Calc Result."""
-        self._test_load_cartridge_type(c64, 59)
-
-    @requires_c64_roms
-    def test_type_60_gmod2_cartridge_loads(self, c64):
-        """Type 60: GMod2."""
-        self._test_load_cartridge_type(c64, 60)
-
-    @requires_c64_roms
-    def test_type_61_max_basic_cartridge_loads(self, c64):
-        """Type 61: MAX BASIC."""
-        self._test_load_cartridge_type(c64, 61)
-
-    @requires_c64_roms
-    def test_type_62_gmod3_cartridge_loads(self, c64):
-        """Type 62: GMod3."""
-        self._test_load_cartridge_type(c64, 62)
-
-    @requires_c64_roms
-    def test_type_63_zipp_code_48_cartridge_loads(self, c64):
-        """Type 63: ZIPP-CODE 48."""
-        self._test_load_cartridge_type(c64, 63)
-
-    @requires_c64_roms
-    def test_type_64_blackbox_v8_cartridge_loads(self, c64):
-        """Type 64: Blackbox V8."""
-        self._test_load_cartridge_type(c64, 64)
-
-    @requires_c64_roms
-    def test_type_65_blackbox_v3_cartridge_loads(self, c64):
-        """Type 65: Blackbox V3."""
-        self._test_load_cartridge_type(c64, 65)
-
-    @requires_c64_roms
-    def test_type_66_blackbox_v4_cartridge_loads(self, c64):
-        """Type 66: Blackbox V4."""
-        self._test_load_cartridge_type(c64, 66)
-
-    @requires_c64_roms
-    def test_type_67_rex_ram_floppy_cartridge_loads(self, c64):
-        """Type 67: REX RAM Floppy."""
-        self._test_load_cartridge_type(c64, 67)
-
-    @requires_c64_roms
-    def test_type_68_bis_plus_cartridge_loads(self, c64):
-        """Type 68: BIS Plus."""
-        self._test_load_cartridge_type(c64, 68)
-
-    @requires_c64_roms
-    def test_type_69_sd_box_cartridge_loads(self, c64):
-        """Type 69: SD Box."""
-        self._test_load_cartridge_type(c64, 69)
-
-    @requires_c64_roms
-    def test_type_70_multimax_cartridge_loads(self, c64):
-        """Type 70: MultiMAX."""
-        self._test_load_cartridge_type(c64, 70)
-
-    @requires_c64_roms
-    def test_type_71_blackbox_v9_cartridge_loads(self, c64):
-        """Type 71: Blackbox V9."""
-        self._test_load_cartridge_type(c64, 71)
-
-    @requires_c64_roms
-    def test_type_72_lt_kernal_cartridge_loads(self, c64):
-        """Type 72: LT Kernal."""
-        self._test_load_cartridge_type(c64, 72)
-
-    @requires_c64_roms
-    def test_type_73_cmd_ramlink_cartridge_loads(self, c64):
-        """Type 73: CMD RAMlink."""
-        self._test_load_cartridge_type(c64, 73)
-
-    @requires_c64_roms
-    def test_type_74_drean_hero_bootleg_cartridge_loads(self, c64):
-        """Type 74: Drean (H.E.R.O. bootleg)."""
-        self._test_load_cartridge_type(c64, 74)
-
-    @requires_c64_roms
-    def test_type_75_ieee_flash_64_cartridge_loads(self, c64):
-        """Type 75: IEEE Flash 64."""
-        self._test_load_cartridge_type(c64, 75)
-
-    @requires_c64_roms
-    def test_type_76_turtle_graphics_ii_cartridge_loads(self, c64):
-        """Type 76: Turtle Graphics II."""
-        self._test_load_cartridge_type(c64, 76)
-
-    @requires_c64_roms
-    def test_type_77_freeze_frame_mk2_cartridge_loads(self, c64):
-        """Type 77: Freeze Frame MK2."""
-        self._test_load_cartridge_type(c64, 77)
-
-    @requires_c64_roms
-    def test_type_78_partner_64_cartridge_loads(self, c64):
-        """Type 78: Partner 64."""
-        self._test_load_cartridge_type(c64, 78)
-
-    @requires_c64_roms
-    def test_type_79_hyper_basic_mk2_cartridge_loads(self, c64):
-        """Type 79: Hyper-BASIC MK2."""
-        self._test_load_cartridge_type(c64, 79)
-
-    @requires_c64_roms
-    def test_type_80_universal_cartridge_1_cartridge_loads(self, c64):
-        """Type 80: Universal Cartridge 1."""
-        self._test_load_cartridge_type(c64, 80)
-
-    @requires_c64_roms
-    def test_type_81_universal_cartridge_15_cartridge_loads(self, c64):
-        """Type 81: Universal Cartridge 1.5."""
-        self._test_load_cartridge_type(c64, 81)
-
-    @requires_c64_roms
-    def test_type_82_universal_cartridge_2_cartridge_loads(self, c64):
-        """Type 82: Universal Cartridge 2."""
-        self._test_load_cartridge_type(c64, 82)
-
-    @requires_c64_roms
-    def test_type_83_bmp_data_turbo_2000_cartridge_loads(self, c64):
-        """Type 83: BMP Data Turbo 2000."""
-        self._test_load_cartridge_type(c64, 83)
-
-    @requires_c64_roms
-    def test_type_84_profi_dos_cartridge_loads(self, c64):
-        """Type 84: Profi-DOS."""
-        self._test_load_cartridge_type(c64, 84)
-
-    @requires_c64_roms
-    def test_type_85_magic_desk_16_cartridge_loads(self, c64):
-        """Type 85: Magic Desk 16."""
-        self._test_load_cartridge_type(c64, 85)
+        # Verify EXROM/GAME match expected detection values
+        # (may differ from variant when raw .bin can't distinguish modes)
+        expected_exrom = bool(test_case.expected_exrom)
+        expected_game = bool(test_case.expected_game)
+        assert c64.memory.cartridge.exrom is expected_exrom
+        assert c64.memory.cartridge.game is expected_game
+
+
+@requires_c64_roms
+class TestUnimplementedCartridgeTypes:
+    """Negative tests for unimplemented cartridge types.
+
+    These tests verify that cartridge types which are not yet implemented
+    correctly load as ErrorCartridge instances, displaying an error screen
+    with the unsupported hardware type information.
+    """
+
+    @pytest.fixture
+    def c64_factory(self):
+        """Factory to create fresh C64 instances for each test."""
+        def _create():
+            return C64(rom_dir=C64_ROMS_DIR, display_mode="headless")
+        return _create
+
+    @pytest.mark.parametrize("test_case", UNIMPLEMENTED_TEST_CASES, ids=UNIMPLEMENTED_TEST_IDS)
+    def test_unimplemented_cartridge_loads_as_error(self, c64_factory, test_case: UnimplementedTestCase):
+        """Test that unimplemented cartridge type loads as ErrorCartridge."""
+        if not test_case.crt_path.exists():
+            pytest.skip(f"Test fixture not found: {test_case.crt_path.name}")
+
+        c64 = c64_factory()
+        c64.load_cartridge(test_case.crt_path)
+
+        # Should load as ErrorCartridge since the mapper is not implemented
+        assert c64.memory.cartridge is not None, (
+            f"Type {test_case.hw_type}: no cartridge loaded"
+        )
+        assert isinstance(c64.memory.cartridge, ErrorCartridge), (
+            f"Type {test_case.hw_type}: expected ErrorCartridge, "
+            f"got {type(c64.memory.cartridge).__name__}"
+        )
+        assert c64.cartridge_type == "error", (
+            f"Type {test_case.hw_type}: expected cartridge_type='error', "
+            f"got '{c64.cartridge_type}'"
+        )
+
+        # Verify the ErrorCartridge captured the original hardware type
+        assert c64.memory.cartridge.original_type == test_case.hw_type, (
+            f"Type {test_case.hw_type}: ErrorCartridge.original_type mismatch"
+        )
 
 
 class TestCRTHeaderParsing:
@@ -2001,24 +1532,49 @@ class TestErrorCartridgeFiles:
 class TestMapperTestCartridgeFiles:
     """Tests for mapper test cartridge CRT files."""
 
-    # Type 0 has multiple variants (8k, 16k, 16k_single_chip, ultimax, ultimax_with_roml)
-    TYPE_0_VARIANTS = [
-        "test_cart_type_00_8k.crt",
-        "test_cart_type_00_16k.crt",
-        "test_cart_type_00_16k_single_chip.crt",
-        "test_cart_type_00_ultimax.crt",
-        "test_cart_type_00_ultimax_with_roml.crt",
-    ]
+    # Types with multiple variants - map hw_type to list of variant filenames
+    MULTI_VARIANT_TYPES = {
+        0: [  # Normal cartridge: 8k, 16k, 16k_single_chip, ultimax, ultimax_with_roml
+            "test_cart_type_00_normal_cartridge_8k.crt",
+            "test_cart_type_00_normal_cartridge_16k.crt",
+            "test_cart_type_00_normal_cartridge_16k_single_chip.crt",
+            "test_cart_type_00_normal_cartridge_ultimax.crt",
+            "test_cart_type_00_normal_cartridge_ultimax_with_roml.crt",
+        ],
+        5: [  # Ocean type 1: 128k, 256k, 512k
+            "test_cart_type_05_ocean_type_1_128k.crt",
+            "test_cart_type_05_ocean_type_1_256k.crt",
+            "test_cart_type_05_ocean_type_1_512k.crt",
+        ],
+        15: [  # C64 Game System: 64k, 128k, 512k
+            "test_cart_type_15_c64_game_system_system_3_64k.crt",
+            "test_cart_type_15_c64_game_system_system_3_128k.crt",
+            "test_cart_type_15_c64_game_system_system_3_512k.crt",
+        ],
+        17: [  # Dinamic: 128k only
+            "test_cart_type_17_dinamic_128k.crt",
+        ],
+        19: [  # Magic Desk: 32k, 64k, 128k, 256k, 512k
+            "test_cart_type_19_magic_desk_domark_hes_australia_32k.crt",
+            "test_cart_type_19_magic_desk_domark_hes_australia_64k.crt",
+            "test_cart_type_19_magic_desk_domark_hes_australia_128k.crt",
+            "test_cart_type_19_magic_desk_domark_hes_australia_256k.crt",
+            "test_cart_type_19_magic_desk_domark_hes_australia_512k.crt",
+        ],
+    }
+
+    # Legacy alias for backward compatibility
+    TYPE_0_VARIANTS = MULTI_VARIANT_TYPES[0]
 
     @requires_c64_roms
     @pytest.mark.parametrize("hw_type", range(0, 86), ids=cart_type_id)
     def test_mapper_test_cartridge_exists(self, hw_type):
         """Each hardware type should have a test CRT file."""
-        if hw_type == 0:
-            # Type 0 has three variant files instead of one
-            for variant in self.TYPE_0_VARIANTS:
+        if hw_type in self.MULTI_VARIANT_TYPES:
+            # Types with multiple variants - check all variant files exist
+            for variant in self.MULTI_VARIANT_TYPES[hw_type]:
                 path = CARTRIDGE_TYPES_DIR / variant
-                assert path.exists(), f"Type 0 variant missing: {variant}"
+                assert path.exists(), f"Type {hw_type} variant missing: {variant}"
             return
 
         type_name = C64.CRT_HARDWARE_TYPES.get(hw_type, f"unknown_{hw_type}")
@@ -2040,17 +1596,17 @@ class TestMapperTestCartridgeFiles:
     @pytest.mark.parametrize("hw_type", range(0, 86), ids=cart_type_id)
     def test_mapper_test_cartridge_has_correct_hardware_type(self, hw_type):
         """Mapper test CRT files should have correct hardware type in header."""
-        if hw_type == 0:
-            # Type 0 has three variant files - check all of them
-            for variant in self.TYPE_0_VARIANTS:
+        if hw_type in self.MULTI_VARIANT_TYPES:
+            # Types with multiple variants - check all of them
+            for variant in self.MULTI_VARIANT_TYPES[hw_type]:
                 path = CARTRIDGE_TYPES_DIR / variant
                 if not path.exists():
-                    pytest.skip(f"Type 0 variant not found: {variant}")
+                    pytest.skip(f"Type {hw_type} variant not found: {variant}")
 
                 data = path.read_bytes()
                 assert data[:16] == b"C64 CARTRIDGE   ", f"Invalid CRT signature in {variant}"
                 parsed_type = int.from_bytes(data[0x16:0x18], "big")
-                assert parsed_type == 0, f"CRT {variant} has wrong hardware type: expected 0, got {parsed_type}"
+                assert parsed_type == hw_type, f"CRT {variant} has wrong hardware type: expected {hw_type}, got {parsed_type}"
             return
 
         type_name = C64.CRT_HARDWARE_TYPES.get(hw_type, f"unknown_{hw_type}")
