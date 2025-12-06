@@ -69,6 +69,7 @@ class MOS6502CPU(flags.ProcessorStatusFlagsInterface):
         'pc_callback',
         'pre_instruction_callback',
         'post_instruction_callback',
+        '_opcode_handler_cache',
     )
 
     log: logging.Logger = logging.getLogger("mos6502.cpu")
@@ -144,6 +145,10 @@ class MOS6502CPU(flags.ProcessorStatusFlagsInterface):
         self.pre_instruction_callback: callable = None
         self.post_instruction_callback: callable = None
 
+        # Opcode -> handler cache for fast dispatch (per-instance since variant is per-instance)
+        # Maps opcode byte directly to handler function, avoiding double dict lookup
+        self._opcode_handler_cache: dict[int, callable] = {}
+
     @property
     def variant(self: Self) -> variants.CPUVariant:
         """Return the CPU variant being emulated."""
@@ -201,29 +206,6 @@ class MOS6502CPU(flags.ProcessorStatusFlagsInterface):
         handler = getattr(module, function_name)
         self._variant_handler_cache[cache_key] = handler
         return handler
-
-    def _execute_instruction(self: Self, opcode: instructions.InstructionOpcode) -> None:
-        """Execute a variant-specific instruction.
-
-        Handles pre/post instruction callbacks for debugging, profiling, and extensibility.
-
-        Arguments:
-        ---------
-            opcode: The instruction opcode carrying variant metadata
-        """
-        # Look up the variant-specific handler (cached for performance)
-        handler = self._load_variant_handler(opcode.package, opcode.function)
-
-        # Pre-instruction callback (for debugging, profiling, breakpoints)
-        if self.pre_instruction_callback:
-            self.pre_instruction_callback(self, opcode)
-
-        # Execute the instruction
-        handler(self)
-
-        # Post-instruction callback (for debugging, profiling, state validation)
-        if self.post_instruction_callback:
-            self.post_instruction_callback(self, opcode)
 
     def __enter__(self: Self) -> Self:
         """With entrypoint."""
@@ -1228,10 +1210,35 @@ class MOS6502CPU(flags.ProcessorStatusFlagsInterface):
                     f"Executed requested instructions after {self.cycles_executed} cycles.",
                 )
 
-            instruction_byte: Byte = self.fetch_byte()
+            instruction_byte: int = self.fetch_byte()
 
-            # Convert to InstructionOpcode if available for variant dispatch
-            instruction = instructions.OPCODE_LOOKUP.get(int(instruction_byte), instruction_byte)
+            # Fast path: use opcode -> handler cache when no debug/callbacks needed
+            # This avoids OPCODE_LOOKUP dict lookup and isinstance check
+            if not (self.verbose_cycles or self.pre_instruction_callback or self.post_instruction_callback):
+                handler = self._opcode_handler_cache.get(instruction_byte)
+                if handler is not None:
+                    handler(self)
+                    self.instructions_executed += 1
+                    if use_instruction_limit:
+                        self.instructions_remaining -= 1
+                    if self.periodic_callback:
+                        cycles_since_last = self.cycles_executed - self._last_periodic_callback_cycle
+                        if cycles_since_last >= self.periodic_callback_interval:
+                            self._last_periodic_callback_cycle = self.cycles_executed
+                            self.periodic_callback()
+                    # NMI check (edge-triggered, higher priority than IRQ)
+                    if self.nmi_pending and not self._nmi_line_previous:
+                        self._nmi_line_previous = True
+                        self._handle_nmi()
+                    elif not self.nmi_pending:
+                        self._nmi_line_previous = False
+                    # IRQ check (level-triggered, maskable)
+                    if self.irq_pending and not self.I:
+                        self._handle_irq()
+                    continue
+
+            # Slow path: need full instruction lookup for cache miss, verbose, or callbacks
+            instruction = instructions.OPCODE_LOOKUP.get(instruction_byte, instruction_byte)
 
             # Verbose instruction tracing (only when verbose_cycles is enabled)
             # This entire block is for debug output and NOT needed for execution
@@ -1294,7 +1301,22 @@ class MOS6502CPU(flags.ProcessorStatusFlagsInterface):
             # This automatically invokes the correct opcode handler based on the configured CPU variant.
             # Legal instructions are InstructionOpcode objects with package/function metadata
             if isinstance(instruction, instructions.InstructionOpcode):
-                self._execute_instruction(instruction)
+                # Get handler (uses existing variant handler cache)
+                handler = self._load_variant_handler(instruction.package, instruction.function)
+
+                # Populate opcode -> handler cache for fast path
+                if instruction_byte not in self._opcode_handler_cache:
+                    self._opcode_handler_cache[instruction_byte] = handler
+
+                # Pre-instruction callback (for debugging, profiling, breakpoints)
+                if self.pre_instruction_callback:
+                    self.pre_instruction_callback(self, instruction)
+
+                handler(self)
+
+                # Post-instruction callback (for debugging, profiling, state validation)
+                if self.post_instruction_callback:
+                    self.post_instruction_callback(self, instruction)
             else:
                 # Illegal instruction - not in OPCODE_LOOKUP, just a raw byte
                 self.log.error(f"ILLEGAL INSTRUCTION: {instruction} ({instruction:02X})")
