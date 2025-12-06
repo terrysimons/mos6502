@@ -2362,6 +2362,254 @@ def create_type5_test_cart(is_error_cart: bool = False, num_banks: int = 8) -> t
     return banks, desc
 
 
+def write_dinamic_crt(path: Path, banks: list[bytes], name: str = "TEST") -> None:
+    """Write a Dinamic CRT file with multiple banks.
+
+    Args:
+        path: Output file path
+        banks: List of 8KB ROM banks (typically 16 banks = 128KB)
+        name: Cartridge name
+    """
+    # CRT Header (64 bytes)
+    header = bytearray(64)
+    header[0:16] = b'C64 CARTRIDGE   '
+    header[0x10:0x14] = (64).to_bytes(4, 'big')  # Header length
+    header[0x14] = 1  # Version hi
+    header[0x15] = 0  # Version lo
+    header[0x16:0x18] = (17).to_bytes(2, 'big')  # Hardware type 17 = Dinamic
+    header[0x18] = 0  # EXROM = 0 (active)
+    header[0x19] = 1  # GAME = 1 (inactive) -> 8KB mode
+    name_bytes = name.encode('ascii')[:32].ljust(32, b'\x00')
+    header[0x20:0x40] = name_bytes
+
+    with open(path, 'wb') as f:
+        f.write(bytes(header))
+
+        # Write each bank as a CHIP packet
+        for bank_num, bank_data in enumerate(banks):
+            chip = bytearray(16)
+            chip[0:4] = b'CHIP'
+            chip[4:8] = (16 + len(bank_data)).to_bytes(4, 'big')
+            chip[8:10] = (0).to_bytes(2, 'big')  # Type (0 = ROM)
+            chip[10:12] = bank_num.to_bytes(2, 'big')  # Bank number
+            chip[12:14] = (C64.ROML_START).to_bytes(2, 'big')  # Load address
+            chip[14:16] = (len(bank_data)).to_bytes(2, 'big')
+            f.write(bytes(chip))
+            f.write(bank_data)
+
+
+def create_type17_test_cart(is_error_cart: bool = False, num_banks: int = 8) -> tuple[list[bytes], str]:
+    """Create Type 17 (Dinamic) test cartridge with bank switching tests.
+
+    Dinamic uses simple bank selection via $DE00 (bits 0-3, max 16 banks).
+    We test bank switching by:
+    1. Copying a bank test routine to RAM
+    2. For each bank, switch and verify the signature
+
+    Args:
+        is_error_cart: If True, this is for error/regression testing
+        num_banks: Number of 8KB banks to create (default 16 for 128KB)
+
+    Returns:
+        Tuple of (banks_list, description)
+    """
+    cart = bytearray(C64.ROML_SIZE)
+
+    # Cartridge header at $8000-$8008
+    cart[0x0000] = 0x09  # Cold start lo -> $8009
+    cart[0x0001] = 0x80  # Cold start hi
+    cart[0x0002] = 0x09  # Warm start lo -> $8009
+    cart[0x0003] = 0x80  # Warm start hi
+    cart[0x0004] = 0xC3  # 'C' (CBM80 signature)
+    cart[0x0005] = 0xC2  # 'B'
+    cart[0x0006] = 0xCD  # 'M'
+    cart[0x0007] = 0x38  # '8'
+    cart[0x0008] = 0x30  # '0'
+
+    code = []
+    code_base = 0x8009
+
+    # Initialize - disable interrupts, set up stack
+    code.extend([
+        SEI_IMPLIED_0x78,
+        LDX_IMMEDIATE_0xA2, 0xFF,
+        TXS_IMPLIED_0x9A,
+    ])
+
+    # Clear screen
+    code.extend([
+        LDA_IMMEDIATE_0xA9, 0x20,
+        LDX_IMMEDIATE_0xA2, 0x00,
+    ])
+    code.extend([
+        STA_ABSOLUTE_X_0x9D, 0x00, 0x04,
+        STA_ABSOLUTE_X_0x9D, 0x00, 0x05,
+        STA_ABSOLUTE_X_0x9D, 0x00, 0x06,
+        STA_ABSOLUTE_X_0x9D, 0x00, 0x07,
+        INX_IMPLIED_0xE8,
+        BNE_RELATIVE_0xD0, 0xF1,
+    ])
+
+    # Initialize fail counter
+    code.extend(emit_init_fail_counter())
+
+    # Set border/background to black
+    code.extend([
+        LDA_IMMEDIATE_0xA9, COLOR_BLACK,
+        STA_ABSOLUTE_0x8D, 0x20, 0xD0,
+        STA_ABSOLUTE_0x8D, 0x21, 0xD0,
+    ])
+
+    # Display title and type info
+    title = "TYPE 17 ERROR CART" if is_error_cart else "TYPE 17 VERIFY"
+    code.extend(create_display_code(title, line=0, color=COLOR_WHITE))
+    code.extend(create_display_code("TYPE: 17", line=1, color=COLOR_YELLOW))
+    code.extend(create_display_code("NAME: DINAMIC", line=2, color=COLOR_YELLOW))
+    code.extend(create_display_code(f"BANKS: {num_banks}", line=3, color=COLOR_YELLOW))
+
+    current_line = 5
+
+    # Bank test routine - copy to RAM at $C000 and run from there
+    # because bank switching changes the visible ROM
+    ram_routine_addr = 0xC000
+    sig_addr = 0x9FF5  # Signature location in each bank (ROML_START + 0x1FF5)
+
+    # Generate bank test routine that runs from RAM
+    # Routine: Switch to bank (in A), read signature, switch back to bank 0, return in A
+    # CRITICAL: Must switch back to bank 0 before RTS so we return to correct code!
+    bank_test_routine = [
+        0x8D, 0x00, 0xDE,  # STA $DE00 (A already has bank number)
+        0xAD, 0xF5, 0x9F,  # LDA $9FF5 - read signature
+        0x48,              # PHA - save result
+        0xA9, 0x00,        # LDA #$00 - bank 0
+        0x8D, 0x00, 0xDE,  # STA $DE00 - switch back
+        0x68,              # PLA - restore result
+        0x60,              # RTS
+    ]
+
+    # Copy bank test routine to RAM ($C000)
+    for i, byte in enumerate(bank_test_routine):
+        code.extend([
+            LDA_IMMEDIATE_0xA9, byte,
+            STA_ABSOLUTE_0x8D, (ram_routine_addr + i) & 0xFF, (ram_routine_addr + i) >> 8,
+        ])
+
+    # Test each bank
+    for bank_num in range(num_banks):
+        # Display test name with FAIL initially
+        test_name = f"BANK {bank_num:02d} SIG ${bank_num:02X}"
+        result_screen = 0x0400 + (current_line * 40) + 35
+        result_color = 0xD800 + (current_line * 40) + 35
+
+        # Display test name
+        code.extend(create_display_code(test_name, line=current_line, color=COLOR_LIGHT_GRAY))
+
+        # Display FAIL initially
+        for i, ch in enumerate([0x06, 0x01, 0x09, 0x0C]):  # FAIL
+            code.extend([
+                LDA_IMMEDIATE_0xA9, ch,
+                STA_ABSOLUTE_0x8D, (result_screen + i) & 0xFF, (result_screen + i) >> 8,
+                LDA_IMMEDIATE_0xA9, COLOR_FAIL,
+                STA_ABSOLUTE_0x8D, (result_color + i) & 0xFF, (result_color + i) >> 8,
+            ])
+
+        # Call bank test routine: load A with bank number, JSR to RAM routine
+        code.extend([
+            LDA_IMMEDIATE_0xA9, bank_num,        # Bank number to test
+            JSR_ABSOLUTE_0x20, ram_routine_addr & 0xFF, (ram_routine_addr >> 8) & 0xFF,
+            CMP_IMMEDIATE_0xC9, bank_num,        # Compare signature to expected
+            BEQ_RELATIVE_0xF0, 0x00,             # BEQ to pass (placeholder)
+        ])
+        pass_branch_idx = len(code) - 1
+
+        # Test failed - increment counter and jump to next
+        code.extend(emit_inc_fail_counter())
+        code.extend([JMP_ABSOLUTE_0x4C, 0x00, 0x00])  # JMP to next test (placeholder)
+        fail_done_jmp = len(code) - 2
+
+        # PASS label - overwrite FAIL with PASS
+        pass_addr = len(code)
+        branch_offset = pass_addr - (pass_branch_idx + 1)
+        if branch_offset < -128 or branch_offset > 127:
+            raise ValueError(f"Branch offset {branch_offset} out of range")
+        code[pass_branch_idx] = branch_offset & 0xFF
+
+        for i, ch in enumerate([0x10, 0x01, 0x13, 0x13]):  # PASS
+            code.extend([
+                LDA_IMMEDIATE_0xA9, ch,
+                STA_ABSOLUTE_0x8D, (result_screen + i) & 0xFF, (result_screen + i) >> 8,
+                LDA_IMMEDIATE_0xA9, COLOR_PASS,
+                STA_ABSOLUTE_0x8D, (result_color + i) & 0xFF, (result_color + i) >> 8,
+            ])
+
+        # Next test label - fix up fail jump
+        next_addr = len(code)
+        code[fail_done_jmp] = (code_base + next_addr) & 0xFF
+        code[fail_done_jmp + 1] = ((code_base + next_addr) >> 8) & 0xFF
+
+        current_line += 1
+
+    current_line += 1  # Skip a line before final status
+
+    # === Final status ===
+    code.extend(emit_load_fail_counter())
+    code.extend([
+        BEQ_RELATIVE_0xF0, 0x03,  # BEQ +3 (skip JMP) - no failures
+        JMP_ABSOLUTE_0x4C, 0x00, 0x00,  # JMP to show_fail (placeholder)
+    ])
+    show_fail_jmp = len(code) - 2
+
+    # All passed - green border (keep black background for text visibility)
+    code.extend([
+        LDA_IMMEDIATE_0xA9, COLOR_GREEN,
+        STA_ABSOLUTE_0x8D, 0x20, 0xD0,  # Border green
+    ])
+    code.extend(create_display_code("ALL TESTS PASSED", line=current_line, color=COLOR_GREEN))
+    code.extend(create_display_code("TYPE 17 SUPPORTED: PASS", line=current_line + 1, color=COLOR_GREEN))
+    code.extend([JMP_ABSOLUTE_0x4C, 0x00, 0x00])  # JMP to loop (placeholder)
+    loop_jmp = len(code) - 2
+
+    # Show fail - red border
+    show_fail_addr = len(code)
+    code[show_fail_jmp] = (code_base + show_fail_addr) & 0xFF
+    code[show_fail_jmp + 1] = ((code_base + show_fail_addr) >> 8) & 0xFF
+
+    code.extend([
+        LDA_IMMEDIATE_0xA9, COLOR_RED,
+        STA_ABSOLUTE_0x8D, 0x20, 0xD0,  # Border red
+    ])
+    code.extend(create_display_code("VERIFICATION FAILED", line=current_line, color=COLOR_FAIL))
+    code.extend(create_display_code("TYPE 17 SUPPORTED: FAIL", line=current_line + 1, color=COLOR_FAIL))
+
+    # Mark tests complete (set bit 7, preserve failure count)
+    loop_addr = len(code)
+    code[loop_jmp] = (code_base + loop_addr) & 0xFF
+    code[loop_jmp + 1] = ((code_base + loop_addr) >> 8) & 0xFF
+    code.extend(emit_mark_tests_complete())
+
+    # Infinite loop
+    inf_loop_addr = len(code)
+    code.extend([JMP_ABSOLUTE_0x4C, (code_base + inf_loop_addr) & 0xFF, ((code_base + inf_loop_addr) >> 8) & 0xFF])
+
+    # Copy code into cartridge
+    for i, byte in enumerate(code):
+        cart[0x0009 + i] = byte
+
+    # Add signature to bank 0 (bank number as signature byte)
+    sig_offset = 0x1FF5
+    cart[sig_offset] = 0x00  # Bank 0 signature
+
+    # Create remaining banks with their signatures
+    banks = [bytes(cart)]
+    for bank_num in range(1, num_banks):
+        bank = bytearray(C64.ROML_SIZE)
+        bank[sig_offset] = bank_num  # Bank signature = bank number
+        banks.append(bytes(bank))
+
+    desc = f"Type 17 verification ({num_banks} banks)" if not is_error_cart else f"Type 17 error cart ({num_banks} banks)"
+    return banks, desc
+
+
 def main():
     fixtures_dir = project_root / "tests" / "fixtures"
     fixtures_dir.mkdir(parents=True, exist_ok=True)
@@ -2437,6 +2685,15 @@ def main():
         path = error_cart_dir / "error_cart_type_05_ocean_type_1.bin"
         with open(path, 'wb') as f:
             for bank in banks_err_v5:
+                f.write(bank)
+        print(f"    {path.name}")
+
+        # Type 17: Dinamic error cart
+        print("  Type 17 - Dinamic error cart...")
+        banks_err_v17, desc = create_type17_test_cart(is_error_cart=True, num_banks=8)
+        path = error_cart_dir / "error_cart_type_17_dinamic.bin"
+        with open(path, 'wb') as f:
+            for bank in banks_err_v17:
                 f.write(bank)
         print(f"    {path.name}")
 
@@ -2534,6 +2791,13 @@ def main():
     write_ocean_type1_crt(path_v5_crt, banks_v5, name="TYPE 5 TEST")
     print(f"    {path_v5_crt.name} ({desc_v5})")
 
+    # Type 17: Dinamic test cart
+    print("  Type 17 - Dinamic...")
+    banks_v17, desc_v17 = create_type17_test_cart(is_error_cart=False, num_banks=8)
+    path_v17_crt = cartridge_types_dir / "test_cart_type_17_dinamic.crt"
+    write_dinamic_crt(path_v17_crt, banks_v17, name="TYPE 17 TEST")
+    print(f"    {path_v17_crt.name} ({desc_v17})")
+
     # Unsupported types (2-85) - create simple info display carts
     for hw_type, type_name in sorted(C64.CRT_HARDWARE_TYPES.items()):
         if hw_type in CARTRIDGE_TYPES:
@@ -2554,6 +2818,7 @@ def main():
     print(f"  poetry run c64 --cartridge {path_v1_crt}")
     print(f"  poetry run c64 --cartridge {path_v4_crt}")
     print(f"  poetry run c64 --cartridge {path_v5_crt}")
+    print(f"  poetry run c64 --cartridge {path_v17_crt}")
     print(f"\nTest unsupported type (should show error cart with NO TESTS):")
     print(f"  poetry run c64 --cartridge {cartridge_types_dir}/test_cart_type_02_kcs_power_cartridge.crt")
 

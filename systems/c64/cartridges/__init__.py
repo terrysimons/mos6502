@@ -208,6 +208,15 @@ MAPPER_REQUIREMENTS: dict[int, MapperRequirements] = {
             ("$DE00", "Bank Select"),
         ],
     ),
+    # Type 17: Dinamic
+    17: MapperRequirements(
+        uses_roml=True,
+        num_banks=16,  # 128KB typical
+        uses_io1=True,
+        control_registers=[
+            ("$DE00", "Bank Select"),
+        ],
+    ),
 }
 
 
@@ -1212,6 +1221,49 @@ class OceanType1Cartridge(Cartridge):
         log.debug(f"Ocean: Bank select ${data:02X} -> bank {self.current_bank}")
 
 
+class DinamicCartridge(OceanType1Cartridge):
+    """Type 17: Dinamic cartridge with bank switching.
+
+    CRT hardware type 17. Dinamic cartridges are functionally identical to
+    Ocean Type 1 cartridges. They typically use 128KB ROM organized as
+    16 × 8KB banks with bank selection via $DE00.
+
+    Control register at $DE00 (accent write only):
+        Bits 0-3: Bank number (0-15 for 128KB)
+        Bits 4-7: Unused
+
+    Memory mapping:
+        - ROML ($8000-$9FFF): Selected 8KB bank
+
+    Initial state: 8KB mode with bank 0 (EXROM=0, GAME=1)
+
+    Games using this format:
+        - Narco Police, Mega Phoenix, etc.
+
+    References:
+        - VICE dinamic.c
+        - https://vice-emu.sourceforge.io/vice_17.html
+    """
+
+    HARDWARE_TYPE = 17
+
+    def write_io1(self, addr: int, data: int) -> None:
+        """Write to IO1 region ($DE00-$DEFF) - bank select register.
+
+        Any write to $DE00-$DEFF selects a bank. Bits 0-3 select
+        the bank number (0-15). The bank is masked to the actual
+        number of banks available.
+        """
+        # Bits 0-3 select bank for Dinamic (max 16 banks = 128KB)
+        bank = data & 0x0F
+        if self.num_banks > 0:
+            self.current_bank = bank % self.num_banks
+        else:
+            self.current_bank = 0
+
+        log.debug(f"Dinamic: Bank select ${data:02X} -> bank {self.current_bank}")
+
+
 class ErrorCartridge(StaticROMCartridge):
     """Special cartridge that displays an error message.
 
@@ -1240,6 +1292,7 @@ CARTRIDGE_TYPES: dict[int, type[Cartridge]] = {
     1: ActionReplayCartridge,
     4: SimonsBasicCartridge,
     5: OceanType1Cartridge,
+    17: DinamicCartridge,
 }
 
 
@@ -1286,5 +1339,9 @@ def create_cartridge(
         if banks is None:
             raise ValueError("OceanType1Cartridge requires banks parameter")
         return OceanType1Cartridge(banks, name)
+    elif cart_class == DinamicCartridge:
+        if banks is None:
+            raise ValueError("DinamicCartridge requires banks parameter")
+        return DinamicCartridge(banks, name)
     else:
         raise ValueError(f"Cartridge type {hardware_type} not yet implemented")
