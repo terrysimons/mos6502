@@ -554,6 +554,18 @@ class TestC64CartridgeLoading:
         self._test_load_cartridge_type(c64, 5)
 
     @requires_c64_roms
+    def test_type_05_ocean_type_1_cartridge_executes(self, c64):
+        """Type 5 Ocean Type 1 test cartridge should pass all tests."""
+        crt_path = CARTRIDGE_TYPES_DIR / "test_cart_type_05_ocean_type_1.crt"
+        if not crt_path.exists():
+            pytest.skip(f"Test fixture not found: {crt_path}")
+
+        tests_complete, fail_count = self._run_test_cartridge(c64, crt_path)
+
+        assert tests_complete, "Test cartridge did not complete within max cycles"
+        assert fail_count == 0, f"Test cartridge reported {fail_count} failures"
+
+    @requires_c64_roms
     def test_type_06_expert_cartridge_loads(self, c64):
         """Type 6: Expert Cartridge."""
         self._test_load_cartridge_type(c64, 6)
