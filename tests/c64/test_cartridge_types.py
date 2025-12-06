@@ -608,6 +608,162 @@ class TestFinalCartridgeIIICartridge:
         assert cart.nmi_pending is False
 
 
+class TestFinalCartridgeICartridge:
+    """Tests for FinalCartridgeICartridge (Type 13).
+
+    Final Cartridge I is a simple 16KB utility cartridge with:
+    - IO1 access ($DE00-$DEFF) disables cartridge
+    - IO2 access ($DF00-$DFFF) enables cartridge
+
+    Ref: https://rr.pokefinder.org/wiki/Final_Cartridge
+    """
+
+    # Get class from registry to avoid direct import
+    CartClass = CARTRIDGE_TYPES[13]
+
+    def test_hardware_type(self):
+        """FinalCartridgeICartridge should have hardware type 13."""
+        assert self.CartClass.HARDWARE_TYPE == 13
+
+    def test_initial_state_8kb_mode(self):
+        """FC1 with only ROML should start in 8KB mode (EXROM=0, GAME=1)."""
+        roml = bytes(ROML_SIZE)
+        cart = self.CartClass(roml, name="Test FC1 8KB")
+
+        assert cart.exrom is False, "FC1 should have EXROM active (False)"
+        assert cart.game is True, "FC1 8KB should have GAME inactive (True) = 8KB mode"
+        assert cart._enabled is True
+
+    def test_initial_state_16kb_mode(self):
+        """FC1 with ROML + ROMH should start in 16KB mode (EXROM=0, GAME=0)."""
+        roml = bytes(ROML_SIZE)
+        romh = bytes(ROMH_SIZE)
+        cart = self.CartClass(roml, romh, name="Test FC1 16KB")
+
+        assert cart.exrom is False, "FC1 should have EXROM active (False)"
+        assert cart.game is False, "FC1 16KB should have GAME active (False) = 16KB mode"
+        assert cart._enabled is True
+
+    def test_io1_access_disables_cartridge(self):
+        """Any access to IO1 should disable the cartridge."""
+        roml = bytearray(ROML_SIZE)
+        roml[0] = 0x42
+        cart = self.CartClass(bytes(roml), name="Test FC1")
+
+        # Initially enabled
+        assert cart._enabled is True
+        assert cart.read_roml(ROML_START) == 0x42
+
+        # Read from IO1 disables
+        cart.read_io1(IO1_START)
+        assert cart._enabled is False
+        assert cart.exrom is True
+        assert cart.game is True
+        assert cart.read_roml(ROML_START) == 0xFF  # ROM invisible
+
+    def test_io1_write_disables_cartridge(self):
+        """Write to IO1 should also disable the cartridge."""
+        roml = bytes(ROML_SIZE)
+        cart = self.CartClass(roml, name="Test FC1")
+
+        assert cart._enabled is True
+
+        cart.write_io1(IO1_START, 0x00)
+        assert cart._enabled is False
+        assert cart.exrom is True
+
+    def test_io2_access_enables_cartridge(self):
+        """Any access to IO2 should enable the cartridge."""
+        roml = bytearray(ROML_SIZE)
+        roml[0] = 0x42
+        cart = self.CartClass(bytes(roml), name="Test FC1")
+
+        # Disable first
+        cart.read_io1(IO1_START)
+        assert cart._enabled is False
+
+        # Read from IO2 enables
+        cart.read_io2(IO2_START)
+        assert cart._enabled is True
+        assert cart.exrom is False
+        assert cart.read_roml(ROML_START) == 0x42
+
+    def test_io2_write_enables_cartridge(self):
+        """Write to IO2 should also enable the cartridge."""
+        roml = bytes(ROML_SIZE)
+        cart = self.CartClass(roml, name="Test FC1")
+
+        # Disable first
+        cart.write_io1(IO1_START, 0x00)
+        assert cart._enabled is False
+
+        # Write to IO2 enables
+        cart.write_io2(IO2_START, 0x00)
+        assert cart._enabled is True
+        assert cart.exrom is False
+
+    def test_roml_read_returns_data(self):
+        """ROML should return ROM data when enabled."""
+        roml = bytearray(ROML_SIZE)
+        roml[0] = 0x11
+        roml[0x1FFF] = 0x22
+        cart = self.CartClass(bytes(roml), name="Test FC1")
+
+        assert cart.read_roml(ROML_START) == 0x11
+        assert cart.read_roml(ROML_START + 0x1FFF) == 0x22
+
+    def test_romh_read_returns_data(self):
+        """ROMH should return ROM data when enabled (16KB mode)."""
+        roml = bytes(ROML_SIZE)
+        romh = bytearray(ROMH_SIZE)
+        romh[0] = 0x33
+        romh[0x1FFF] = 0x44
+        cart = self.CartClass(roml, bytes(romh), name="Test FC1 16KB")
+
+        assert cart.read_romh(ROMH_START) == 0x33
+        assert cart.read_romh(ROMH_START + 0x1FFF) == 0x44
+
+    def test_romh_returns_ff_when_not_present(self):
+        """ROMH should return $FF when cart only has ROML."""
+        roml = bytes(ROML_SIZE)
+        cart = self.CartClass(roml, name="Test FC1 8KB")
+
+        assert cart.read_romh(ROMH_START) == 0xFF
+
+    def test_reset_re_enables_cartridge(self):
+        """Reset should re-enable the cartridge."""
+        roml = bytearray(ROML_SIZE)
+        roml[0] = 0x42
+        cart = self.CartClass(bytes(roml), name="Test FC1")
+
+        # Disable
+        cart.read_io1(IO1_START)
+        assert cart._enabled is False
+
+        # Reset
+        cart.reset()
+
+        assert cart._enabled is True
+        assert cart.exrom is False
+        assert cart.read_roml(ROML_START) == 0x42
+
+    def test_toggle_enable_disable(self):
+        """Should be able to toggle enable/disable repeatedly."""
+        roml = bytearray(ROML_SIZE)
+        roml[0] = 0x42
+        cart = self.CartClass(bytes(roml), name="Test FC1")
+
+        # Toggle several times
+        for _ in range(3):
+            cart.read_io1(IO1_START)  # Disable
+            assert cart._enabled is False
+            assert cart.read_roml(ROML_START) == 0xFF
+
+            cart.read_io2(IO2_START)  # Enable
+            assert cart._enabled is True
+            assert cart.read_roml(ROML_START) == 0x42
+
+
 @requires_c64_roms
 class TestEpyxFastloadCartridge:
     """Tests for EpyxFastloadCartridge (Type 10).

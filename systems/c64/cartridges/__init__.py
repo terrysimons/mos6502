@@ -64,6 +64,7 @@ from .type_03_final_cartridge_iii import FinalCartridgeIIICartridge
 from .type_04_simons_basic import SimonsBasicCartridge
 from .type_05_ocean import OceanType1Cartridge
 from .type_10_epyx_fastload import EpyxFastloadCartridge
+from .type_13_final_cartridge_i import FinalCartridgeICartridge
 from .type_15_c64gs import C64GSCartridge
 from .type_17_dinamic import DinamicCartridge
 from .type_19_magic_desk import MagicDeskCartridge
@@ -109,6 +110,7 @@ __all__ = [
     "SimonsBasicCartridge",
     "OceanType1Cartridge",
     "EpyxFastloadCartridge",
+    "FinalCartridgeICartridge",
     "C64GSCartridge",
     "DinamicCartridge",
     "MagicDeskCartridge",

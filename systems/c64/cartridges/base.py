@@ -35,6 +35,7 @@ class CartridgeType(IntEnum):
     SIMONS_BASIC = 4            # Simons' BASIC extension
     OCEAN_TYPE_1 = 5            # Ocean Type 1 bank switching
     EPYX_FASTLOAD = 10          # Epyx FastLoad disk speedup
+    FINAL_CARTRIDGE_I = 13      # Final Cartridge I
     C64_GAME_SYSTEM = 15        # C64 Game System / System 3
     DINAMIC = 17                # Dinamic bank switching
     MAGIC_DESK = 19             # Magic Desk / Domark / HES Australia
@@ -46,7 +47,6 @@ class CartridgeType(IntEnum):
     ATOMIC_POWER = 9            # Atomic Power
     WESTERMANN = 11             # Westermann Learning
     REX_UTILITY = 12            # Rex Utility
-    FINAL_CARTRIDGE_I = 13      # Final Cartridge I
     MAGIC_FORMEL = 14           # Magic Formel
     WARPSPEED = 16              # WarpSpeed
     ZAXXON = 18                 # Zaxxon / Super Zaxxon
@@ -200,6 +200,18 @@ MAPPER_REQUIREMENTS: dict[int | CartridgeType, MapperRequirements] = {
         control_registers=[
             ("$DE00", "Enable (read)"),
             ("$DF00", "ROM stub"),
+        ],
+    ),
+    # Type 13: Final Cartridge I
+    CartridgeType.FINAL_CARTRIDGE_I: MapperRequirements(
+        uses_roml=True,
+        uses_romh=True,
+        num_banks=1,
+        uses_io1=True,  # Any IO1 access disables cartridge
+        uses_io2=True,  # Any IO2 access enables cartridge
+        control_registers=[
+            ("$DE00", "Disable (any access)"),
+            ("$DF00", "Enable (any access)"),
         ],
     ),
     # Type 15: C64 Game System / System 3

@@ -15,6 +15,7 @@ from .type_03_final_cartridge_iii import FinalCartridgeIIICartridge
 from .type_04_simons_basic import SimonsBasicCartridge
 from .type_05_ocean import OceanType1Cartridge
 from .type_10_epyx_fastload import EpyxFastloadCartridge
+from .type_13_final_cartridge_i import FinalCartridgeICartridge
 from .type_15_c64gs import C64GSCartridge
 from .type_17_dinamic import DinamicCartridge
 from .type_19_magic_desk import MagicDeskCartridge
@@ -28,6 +29,7 @@ CARTRIDGE_TYPES: dict[int | CartridgeType, type[Cartridge]] = {
     CartridgeType.SIMONS_BASIC: SimonsBasicCartridge,
     CartridgeType.OCEAN_TYPE_1: OceanType1Cartridge,
     CartridgeType.EPYX_FASTLOAD: EpyxFastloadCartridge,
+    CartridgeType.FINAL_CARTRIDGE_I: FinalCartridgeICartridge,
     CartridgeType.C64_GAME_SYSTEM: C64GSCartridge,
     CartridgeType.DINAMIC: DinamicCartridge,
     CartridgeType.MAGIC_DESK: MagicDeskCartridge,
@@ -98,6 +100,18 @@ def create_cartridge(
         if rom_data is None:
             raise ValueError("EpyxFastloadCartridge requires roml_data or banks parameter")
         return EpyxFastloadCartridge(rom_data, name)
+    elif cart_class == FinalCartridgeICartridge:
+        # FC1 uses roml_data and optionally romh_data
+        # Accept either direct data or banks[0]/banks[1]
+        fc1_roml = roml_data
+        fc1_romh = romh_data
+        if fc1_roml is None and banks is not None and len(banks) > 0:
+            fc1_roml = banks[0]
+            if len(banks) > 1:
+                fc1_romh = banks[1]
+        if fc1_roml is None:
+            raise ValueError("FinalCartridgeICartridge requires roml_data or banks parameter")
+        return FinalCartridgeICartridge(fc1_roml, fc1_romh, name)
     elif cart_class == C64GSCartridge:
         if banks is None:
             raise ValueError("C64GSCartridge requires banks parameter")
