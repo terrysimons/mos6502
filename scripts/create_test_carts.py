@@ -28,6 +28,7 @@ from c64.cartridges import (
     create_error_cartridge_rom,
     generate_mapper_tests,
     MAPPER_REQUIREMENTS,
+    CARTRIDGE_TYPES,
 )
 
 # Import 6502 instruction opcodes from the existing module
@@ -1808,6 +1809,290 @@ def write_action_replay_crt(path: Path, banks: list[bytes], name: str = "TEST") 
             f.write(bank_data)
 
 
+def write_simons_basic_crt(path: Path, roml_data: bytes, romh_data: bytes, name: str = "TEST") -> None:
+    """Write a Simons' BASIC CRT file with ROML and ROMH.
+
+    Args:
+        path: Output file path
+        roml_data: 8KB ROM data for ROML region
+        romh_data: 8KB ROM data for ROMH region
+        name: Cartridge name
+    """
+    # CRT Header (64 bytes)
+    header = bytearray(64)
+    header[0:16] = b'C64 CARTRIDGE   '
+    header[0x10:0x14] = (64).to_bytes(4, 'big')  # Header length
+    header[0x14] = 1  # Version hi
+    header[0x15] = 0  # Version lo
+    header[0x16:0x18] = (4).to_bytes(2, 'big')  # Hardware type 4 = Simons' BASIC
+    header[0x18] = 0  # EXROM = 0 (active)
+    header[0x19] = 1  # GAME = 1 (inactive) -> 8KB mode initially
+    name_bytes = name.encode('ascii')[:32].ljust(32, b'\x00')
+    header[0x20:0x40] = name_bytes
+
+    with open(path, 'wb') as f:
+        f.write(bytes(header))
+
+        # Write ROML CHIP packet (bank 0 at $8000)
+        chip_roml = bytearray(16)
+        chip_roml[0:4] = b'CHIP'
+        chip_roml[4:8] = (16 + len(roml_data)).to_bytes(4, 'big')
+        chip_roml[8:10] = (0).to_bytes(2, 'big')  # Type (0 = ROM)
+        chip_roml[10:12] = (0).to_bytes(2, 'big')  # Bank 0
+        chip_roml[12:14] = (C64.ROML_START).to_bytes(2, 'big')  # Load address $8000
+        chip_roml[14:16] = (len(roml_data)).to_bytes(2, 'big')
+        f.write(bytes(chip_roml))
+        f.write(roml_data)
+
+        # Write ROMH CHIP packet (bank 0 at $A000)
+        chip_romh = bytearray(16)
+        chip_romh[0:4] = b'CHIP'
+        chip_romh[4:8] = (16 + len(romh_data)).to_bytes(4, 'big')
+        chip_romh[8:10] = (0).to_bytes(2, 'big')  # Type (0 = ROM)
+        chip_romh[10:12] = (0).to_bytes(2, 'big')  # Bank 0
+        chip_romh[12:14] = (C64.ROMH_START).to_bytes(2, 'big')  # Load address $A000
+        chip_romh[14:16] = (len(romh_data)).to_bytes(2, 'big')
+        f.write(bytes(chip_romh))
+        f.write(romh_data)
+
+
+def create_type4_test_cart(is_error_cart: bool = False) -> tuple[bytes, bytes, str]:
+    """Create Type 4 (Simons' BASIC) test cartridge with ROMH toggle tests.
+
+    Simons' BASIC uses IO1/IO2 writes to toggle ROMH visibility:
+    - Write to $DE00: Enable ROMH (16KB mode)
+    - Write to $DF00: Disable ROMH (8KB mode)
+
+    We test this by:
+    1. Verifying ROML is readable at $8000
+    2. Enabling ROMH via $DE00 write, verifying $A000 has our signature
+    3. Disabling ROMH via $DF00 write, verifying $A000 no longer has signature
+
+    Args:
+        is_error_cart: If True, this is for error/regression testing
+
+    Returns:
+        Tuple of (roml_data, romh_data, description)
+    """
+    roml = bytearray(C64.ROML_SIZE)
+    romh = bytearray(C64.ROMH_SIZE)
+
+    # Cartridge header at $8000-$8008
+    roml[0x0000] = 0x09  # Cold start lo -> $8009
+    roml[0x0001] = 0x80  # Cold start hi
+    roml[0x0002] = 0x09  # Warm start lo -> $8009
+    roml[0x0003] = 0x80  # Warm start hi
+    roml[0x0004] = 0xC3  # 'C' (CBM80 signature)
+    roml[0x0005] = 0xC2  # 'B'
+    roml[0x0006] = 0xCD  # 'M'
+    roml[0x0007] = 0x38  # '8'
+    roml[0x0008] = 0x30  # '0'
+
+    # Put a signature at the end of ROML for testing
+    ROML_SIG_OFFSET = 0x1FF5
+    roml[ROML_SIG_OFFSET] = 0x04  # Type 4 signature
+
+    # Put a signature at the start of ROMH for testing ROMH visibility
+    ROMH_SIG_OFFSET = 0x0000  # $A000
+    romh[ROMH_SIG_OFFSET] = 0xA4  # Distinct signature for ROMH (0xA for $A000, 4 for type 4)
+
+    code = []
+    code_base = 0x8009
+
+    # Initialize - disable interrupts, set up stack
+    code.extend([
+        SEI_IMPLIED_0x78,
+        LDX_IMMEDIATE_0xA2, 0xFF,
+        TXS_IMPLIED_0x9A,
+    ])
+
+    # Clear screen
+    code.extend([
+        LDA_IMMEDIATE_0xA9, 0x20,
+        LDX_IMMEDIATE_0xA2, 0x00,
+    ])
+    code.extend([
+        STA_ABSOLUTE_X_0x9D, 0x00, 0x04,
+        STA_ABSOLUTE_X_0x9D, 0x00, 0x05,
+        STA_ABSOLUTE_X_0x9D, 0x00, 0x06,
+        STA_ABSOLUTE_X_0x9D, 0x00, 0x07,
+        INX_IMPLIED_0xE8,
+        BNE_RELATIVE_0xD0, 0xF1,
+    ])
+
+    # Initialize fail counter
+    code.extend(emit_init_fail_counter())
+
+    # Set border/background to black
+    code.extend([
+        LDA_IMMEDIATE_0xA9, COLOR_BLACK,
+        STA_ABSOLUTE_0x8D, 0x20, 0xD0,
+        STA_ABSOLUTE_0x8D, 0x21, 0xD0,
+    ])
+
+    # Display title and type info
+    title = "TYPE 4 ERROR CART" if is_error_cart else "TYPE 4 VERIFY"
+    code.extend(create_display_code(title, line=0, color=COLOR_WHITE))
+    code.extend(create_display_code("TYPE: 4", line=1, color=COLOR_YELLOW))
+    code.extend(create_display_code("NAME: SIMONS BASIC", line=2, color=COLOR_YELLOW))
+
+    current_line = 4
+
+    # Helper function to emit a test with FAIL-first pattern
+    def emit_test(test_name, line, test_code_emitter):
+        """Emit test code with FAIL displayed first, updated to PASS on success."""
+        nonlocal code
+
+        # Calculate screen positions
+        result_screen = 0x0400 + (line * 40) + 35
+        result_color = 0xD800 + (line * 40) + 35
+
+        # 1. Display test name with FAIL
+        code.extend(create_display_code(test_name, line=line, color=COLOR_LIGHT_GRAY))
+        for i, ch in enumerate([0x06, 0x01, 0x09, 0x0C]):  # FAIL
+            code.extend([
+                LDA_IMMEDIATE_0xA9, ch,
+                STA_ABSOLUTE_0x8D, (result_screen + i) & 0xFF, (result_screen + i) >> 8,
+                LDA_IMMEDIATE_0xA9, COLOR_FAIL,
+                STA_ABSOLUTE_0x8D, (result_color + i) & 0xFF, (result_color + i) >> 8,
+            ])
+
+        # 2. Run the test - emitter adds test code and returns branch info
+        pass_branch_idx, is_beq = test_code_emitter()
+
+        # 3. If we get here without branching, test failed - increment counter and jump to next
+        code.extend(emit_inc_fail_counter())
+        code.extend([JMP_ABSOLUTE_0x4C, 0x00, 0x00])  # JMP to next test (placeholder)
+        fail_done_jmp = len(code) - 2
+
+        # 4. PASS label - overwrite FAIL with PASS
+        pass_addr = len(code)
+        # Fix up the branch to point here
+        branch_offset = pass_addr - (pass_branch_idx + 1)
+        if branch_offset < -128 or branch_offset > 127:
+            raise ValueError(f"Branch offset {branch_offset} out of range")
+        code[pass_branch_idx] = branch_offset & 0xFF
+
+        for i, ch in enumerate([0x10, 0x01, 0x13, 0x13]):  # PASS
+            code.extend([
+                LDA_IMMEDIATE_0xA9, ch,
+                STA_ABSOLUTE_0x8D, (result_screen + i) & 0xFF, (result_screen + i) >> 8,
+                LDA_IMMEDIATE_0xA9, COLOR_PASS,
+                STA_ABSOLUTE_0x8D, (result_color + i) & 0xFF, (result_color + i) >> 8,
+            ])
+
+        # 5. Next test label - fix up fail jump
+        next_addr = len(code)
+        code[fail_done_jmp] = (code_base + next_addr) & 0xFF
+        code[fail_done_jmp + 1] = ((code_base + next_addr) >> 8) & 0xFF
+
+    # Test 1: Verify ROML is readable at $9FF5
+    def roml_test():
+        code.extend([
+            LDA_ABSOLUTE_0xAD, 0xF5, 0x9F,   # LDA $9FF5 (ROML signature)
+            CMP_IMMEDIATE_0xC9, 0x04,         # Compare to expected signature
+            BEQ_RELATIVE_0xF0, 0x00,          # BEQ to pass (placeholder)
+        ])
+        return len(code) - 1, True
+
+    emit_test("ROML $9FF5", current_line, roml_test)
+    current_line += 1
+
+    # Test 2: Enable ROMH via $DE00, verify ROMH signature at $A000
+    def romh_enable_test():
+        code.extend([
+            LDA_IMMEDIATE_0xA9, 0x00,         # Any value
+            STA_ABSOLUTE_0x8D, 0x00, 0xDE,    # STA $DE00 - enable ROMH
+            LDA_ABSOLUTE_0xAD, 0x00, 0xA0,    # LDA $A000 (ROMH signature)
+            CMP_IMMEDIATE_0xC9, 0xA4,         # Compare to expected signature
+            BEQ_RELATIVE_0xF0, 0x00,          # BEQ to pass (placeholder)
+        ])
+        return len(code) - 1, True
+
+    emit_test("$DE00 ENABLE ROMH", current_line, romh_enable_test)
+    current_line += 1
+
+    # Test 3: Disable ROMH via $DF00, verify ROMH is gone (shouldn't read 0xA4)
+    def romh_disable_test():
+        code.extend([
+            LDA_IMMEDIATE_0xA9, 0x00,         # Any value
+            STA_ABSOLUTE_0x8D, 0x00, 0xDF,    # STA $DF00 - disable ROMH
+            LDA_ABSOLUTE_0xAD, 0x00, 0xA0,    # LDA $A000 (should NOT be cart ROMH)
+            CMP_IMMEDIATE_0xC9, 0xA4,         # Compare to cart signature
+            BNE_RELATIVE_0xD0, 0x00,          # BNE to pass (should NOT match)
+        ])
+        return len(code) - 1, False  # BNE, not BEQ
+
+    emit_test("$DF00 DISABLE ROMH", current_line, romh_disable_test)
+    current_line += 1
+
+    # Test 4: Re-enable ROMH to confirm toggle works
+    def romh_reenable_test():
+        code.extend([
+            LDA_IMMEDIATE_0xA9, 0x00,         # Any value
+            STA_ABSOLUTE_0x8D, 0x00, 0xDE,    # STA $DE00 - enable ROMH
+            LDA_ABSOLUTE_0xAD, 0x00, 0xA0,    # LDA $A000 (ROMH signature)
+            CMP_IMMEDIATE_0xC9, 0xA4,         # Compare to expected signature
+            BEQ_RELATIVE_0xF0, 0x00,          # BEQ to pass (placeholder)
+        ])
+        return len(code) - 1, True
+
+    emit_test("$DE00 RE-ENABLE", current_line, romh_reenable_test)
+    current_line += 1
+
+    current_line += 1  # Skip a line before final status
+
+    # === Final status ===
+    # Check fail counter
+    code.extend(emit_load_fail_counter())
+    code.extend([
+        BEQ_RELATIVE_0xF0, 0x03,  # BEQ +3 (skip JMP) - no failures
+        JMP_ABSOLUTE_0x4C, 0x00, 0x00,  # JMP to show_fail (placeholder)
+    ])
+    show_fail_jmp = len(code) - 2
+
+    # All passed - green border (keep black background for text visibility)
+    code.extend([
+        LDA_IMMEDIATE_0xA9, COLOR_GREEN,
+        STA_ABSOLUTE_0x8D, 0x20, 0xD0,  # Border green
+        # Background stays black for text visibility
+    ])
+    code.extend(create_display_code("ALL TESTS PASSED", line=current_line, color=COLOR_GREEN))
+    code.extend(create_display_code("TYPE 4 SUPPORTED: PASS", line=current_line + 1, color=COLOR_GREEN))
+    code.extend([JMP_ABSOLUTE_0x4C, 0x00, 0x00])  # JMP to loop (placeholder)
+    loop_jmp = len(code) - 2
+
+    # Show fail - red border
+    show_fail_addr = len(code)
+    code[show_fail_jmp] = (code_base + show_fail_addr) & 0xFF
+    code[show_fail_jmp + 1] = ((code_base + show_fail_addr) >> 8) & 0xFF
+
+    code.extend([
+        LDA_IMMEDIATE_0xA9, COLOR_RED,
+        STA_ABSOLUTE_0x8D, 0x20, 0xD0,  # Border red
+        # Background stays black for text visibility
+    ])
+    code.extend(create_display_code("VERIFICATION FAILED", line=current_line, color=COLOR_FAIL))
+    code.extend(create_display_code("TYPE 4 SUPPORTED: FAIL", line=current_line + 1, color=COLOR_FAIL))
+
+    # Mark tests complete (set bit 7, preserve failure count)
+    loop_addr = len(code)
+    code[loop_jmp] = (code_base + loop_addr) & 0xFF
+    code[loop_jmp + 1] = ((code_base + loop_addr) >> 8) & 0xFF
+    code.extend(emit_mark_tests_complete())
+
+    # Infinite loop
+    inf_loop_addr = len(code)
+    code.extend([JMP_ABSOLUTE_0x4C, (code_base + inf_loop_addr) & 0xFF, ((code_base + inf_loop_addr) >> 8) & 0xFF])
+
+    # Copy code into ROML
+    for i, byte in enumerate(code):
+        roml[0x0009 + i] = byte
+
+    desc = "Type 4 verification" if not is_error_cart else "Type 4 error cart"
+    return bytes(roml), bytes(romh), desc
+
+
 def write_ocean_type1_crt(path: Path, banks: list[bytes], name: str = "TEST") -> None:
     """Write an Ocean Type 1 CRT file with multiple banks.
 
@@ -2137,6 +2422,15 @@ def main():
                 f.write(bank)
         print(f"    {path.name}")
 
+        # Type 4: Simons' BASIC error cart
+        print("  Type 4 - Simons' BASIC error cart...")
+        roml_err_v4, romh_err_v4, desc = create_type4_test_cart(is_error_cart=True)
+        path = error_cart_dir / "error_cart_type_04_simons_basic.bin"
+        with open(path, 'wb') as f:
+            f.write(roml_err_v4)
+            f.write(romh_err_v4)
+        print(f"    {path.name}")
+
         # Type 5: Ocean Type 1 error cart
         print("  Type 5 - Ocean Type 1 error cart...")
         banks_err_v5, desc = create_type5_test_cart(is_error_cart=True, num_banks=8)
@@ -2226,6 +2520,13 @@ def main():
     write_action_replay_crt(path_v1_crt, banks_v1, name="TYPE 1 TEST")
     print(f"    {path_v1_crt.name} ({desc_v1})")
 
+    # Type 4: Simons' BASIC test cart
+    print("  Type 4 - Simons' BASIC...")
+    roml_v4, romh_v4, desc_v4 = create_type4_test_cart(is_error_cart=False)
+    path_v4_crt = cartridge_types_dir / "test_cart_type_04_simons_basic.crt"
+    write_simons_basic_crt(path_v4_crt, roml_v4, romh_v4, name="TYPE 4 TEST")
+    print(f"    {path_v4_crt.name} ({desc_v4})")
+
     # Type 5: Ocean Type 1 test cart
     print("  Type 5 - Ocean Type 1...")
     banks_v5, desc_v5 = create_type5_test_cart(is_error_cart=False, num_banks=8)
@@ -2235,7 +2536,7 @@ def main():
 
     # Unsupported types (2-85) - create simple info display carts
     for hw_type, type_name in sorted(C64.CRT_HARDWARE_TYPES.items()):
-        if hw_type in (0, 1, 5):
+        if hw_type in CARTRIDGE_TYPES:
             continue  # Already handled above with proper test carts
         # Create a test ROM that displays the mapper type
         mapper_rom = create_mapper_test_cartridge(hw_type, type_name)
@@ -2251,6 +2552,7 @@ def main():
     print(f"  poetry run c64 --cartridge {path_16k_crt}")
     print(f"  poetry run c64 --cartridge {path_ultimax_crt}")
     print(f"  poetry run c64 --cartridge {path_v1_crt}")
+    print(f"  poetry run c64 --cartridge {path_v4_crt}")
     print(f"  poetry run c64 --cartridge {path_v5_crt}")
     print(f"\nTest unsupported type (should show error cart with NO TESTS):")
     print(f"  poetry run c64 --cartridge {cartridge_types_dir}/test_cart_type_02_kcs_power_cartridge.crt")

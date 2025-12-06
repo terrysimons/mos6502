@@ -965,9 +965,22 @@ class C64:
                     log.info(f"Loaded Ultimax ROMH: ${load_address:04X}-${load_address + rom_size - 1:04X} ({rom_size} bytes)")
                 else:
                     log.warning(f"Unknown CHIP load address: ${load_address:04X}")
+            elif hardware_type == 4:
+                # Type 4: Simons' BASIC - 16KB cartridge with ROML + ROMH
+                # Two CHIP packets: one for ROML at $8000, one for ROMH at $A000
+                if load_address == self.ROML_START:
+                    roml_data = rom_data
+                    results.roml_valid = True
+                    log.info(f"Loaded ROML: ${load_address:04X}-${load_address + rom_size - 1:04X} ({rom_size} bytes)")
+                elif load_address == self.ROMH_START:
+                    romh_data = rom_data
+                    results.romh_valid = True
+                    log.info(f"Loaded ROMH: ${load_address:04X}-${load_address + rom_size - 1:04X} ({rom_size} bytes)")
+                else:
+                    log.warning(f"Unknown CHIP load address for Type 4: ${load_address:04X}")
             else:
-                # Banked cartridges (Type 1+): Collect all banks
-                # For Action Replay, each bank is 8KB at $8000
+                # Banked cartridges (Type 1, 5+): Collect all banks
+                # Each bank is typically 8KB at $8000
                 if load_address == self.ROML_START:
                     banks[bank_number] = rom_data
                     results.roml_valid = True  # At least one bank loaded to ROML region
@@ -1006,6 +1019,20 @@ class C64:
                 self.cartridge_type = "16k"
             else:
                 self.cartridge_type = "8k"
+        elif hardware_type == 4:
+            # Type 4: Simons' BASIC - needs both ROML and ROMH
+            if roml_data is None or romh_data is None:
+                # Missing ROM data - generate error cart
+                self._load_error_cartridge_with_results(results)
+                return
+
+            cartridge = create_cartridge(
+                hardware_type=4,
+                roml_data=roml_data,
+                romh_data=romh_data,
+                name=cart_name,
+            )
+            self.cartridge_type = "simons_basic"
         else:
             # Banked cartridges - convert bank dict to sorted list
             if not banks:
