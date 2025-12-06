@@ -62,6 +62,7 @@ from .type_00_normal import StaticROMCartridge
 from .type_01_action_replay import ActionReplayCartridge
 from .type_04_simons_basic import SimonsBasicCartridge
 from .type_05_ocean import OceanType1Cartridge
+from .type_10_epyx_fastload import EpyxFastloadCartridge
 from .type_15_c64gs import C64GSCartridge
 from .type_17_dinamic import DinamicCartridge
 from .type_19_magic_desk import MagicDeskCartridge
@@ -105,6 +106,7 @@ __all__ = [
     "ActionReplayCartridge",
     "SimonsBasicCartridge",
     "OceanType1Cartridge",
+    "EpyxFastloadCartridge",
     "C64GSCartridge",
     "DinamicCartridge",
     "MagicDeskCartridge",

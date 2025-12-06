@@ -33,6 +33,7 @@ class CartridgeType(IntEnum):
     ACTION_REPLAY = 1           # Action Replay freezer cartridge
     SIMONS_BASIC = 4            # Simons' BASIC extension
     OCEAN_TYPE_1 = 5            # Ocean Type 1 bank switching
+    EPYX_FASTLOAD = 10          # Epyx FastLoad disk speedup
     C64_GAME_SYSTEM = 15        # C64 Game System / System 3
     DINAMIC = 17                # Dinamic bank switching
     MAGIC_DESK = 19             # Magic Desk / Domark / HES Australia
@@ -43,7 +44,6 @@ class CartridgeType(IntEnum):
     FUN_PLAY = 7                # Fun Play / Power Play
     SUPER_GAMES = 8             # Super Games
     ATOMIC_POWER = 9            # Atomic Power
-    EPYX_FASTLOAD = 10          # Epyx Fastload
     WESTERMANN = 11             # Westermann Learning
     REX_UTILITY = 12            # Rex Utility
     FINAL_CARTRIDGE_I = 13      # Final Cartridge I
@@ -189,6 +189,17 @@ MAPPER_REQUIREMENTS: dict[int | CartridgeType, MapperRequirements] = {
         uses_io1=True,
         control_registers=[
             ("$DE00", "Bank Select"),
+        ],
+    ),
+    # Type 10: Epyx FastLoad
+    CartridgeType.EPYX_FASTLOAD: MapperRequirements(
+        uses_roml=True,
+        num_banks=1,
+        uses_io1=True,  # Reading IO1 enables cartridge
+        uses_io2=True,  # IO2 shows last 256 bytes of ROM (always visible)
+        control_registers=[
+            ("$DE00", "Enable (read)"),
+            ("$DF00", "ROM stub"),
         ],
     ),
     # Type 15: C64 Game System / System 3

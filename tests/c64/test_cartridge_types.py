@@ -413,6 +413,132 @@ class TestC64GSCartridge:
 
 
 @requires_c64_roms
+class TestEpyxFastloadCartridge:
+    """Tests for EpyxFastloadCartridge (Type 10).
+
+    Epyx FastLoad cartridges use a capacitor-based enable/disable mechanism:
+    - Reading ROML or IO1 enables the cartridge
+    - After ~512 cycles without access, cartridge disables
+    - IO2 ($DF00-$DFFF) always shows last 256 bytes of ROM
+    """
+
+    # Get class from registry to avoid direct import
+    CartClass = CARTRIDGE_TYPES[10]
+
+    def test_hardware_type(self):
+        """EpyxFastloadCartridge should have hardware type 10."""
+        assert self.CartClass.HARDWARE_TYPE == 10
+
+    def test_initial_state_8kb_mode(self):
+        """Epyx FastLoad should start in 8KB mode (EXROM=0, GAME=1)."""
+        rom = bytes(ROML_SIZE)
+        cart = self.CartClass(rom, name="Test Epyx")
+
+        assert cart.exrom is False, "Should have EXROM active (False)"
+        assert cart.game is True, "Should have GAME inactive (True) = 8KB mode"
+        assert cart._enabled is True
+
+    def test_roml_read_enables_cartridge(self):
+        """Reading from ROML should enable the cartridge."""
+        rom = bytearray(ROML_SIZE)
+        rom[0] = 0x42
+        cart = self.CartClass(bytes(rom), name="Test Epyx")
+
+        # Manually disable
+        cart._enabled = False
+        cart._exrom = True
+
+        # Reading ROML should enable
+        value = cart.read_roml(ROML_START)
+        assert cart._enabled is True
+        assert cart.exrom is False
+        assert value == 0x42
+
+    def test_io1_read_enables_cartridge(self):
+        """Reading from IO1 should enable the cartridge."""
+        rom = bytes(ROML_SIZE)
+        cart = self.CartClass(rom, name="Test Epyx")
+
+        # Manually disable
+        cart._enabled = False
+        cart._exrom = True
+
+        # Reading IO1 should enable
+        cart.read_io1(0xDE00)
+        assert cart._enabled is True
+        assert cart.exrom is False
+
+    def test_io2_always_visible(self):
+        """IO2 should always show last 256 bytes of ROM, even when disabled."""
+        rom = bytearray(ROML_SIZE)
+        # Put signature in last 256 bytes
+        rom[0x1F00] = 0xAA  # First byte of IO2 region
+        rom[0x1FFF] = 0xBB  # Last byte of IO2 region
+        cart = self.CartClass(bytes(rom), name="Test Epyx")
+
+        # IO2 visible when enabled
+        assert cart.read_io2(0xDF00) == 0xAA
+        assert cart.read_io2(0xDFFF) == 0xBB
+
+        # Manually disable cartridge
+        cart._enabled = False
+        cart._exrom = True
+
+        # IO2 should STILL be visible
+        assert cart.read_io2(0xDF00) == 0xAA
+        assert cart.read_io2(0xDFFF) == 0xBB
+
+    def test_timeout_disables_cartridge(self):
+        """Cartridge should disable after timeout cycles."""
+        rom = bytes(ROML_SIZE)
+        cart = self.CartClass(rom, name="Test Epyx")
+
+        assert cart._enabled is True
+
+        # Simulate timeout
+        cart.tick(cart.TIMEOUT_CYCLES)
+
+        assert cart._enabled is False
+        assert cart.exrom is True
+
+    def test_reset_re_enables_cartridge(self):
+        """Reset should re-enable the cartridge."""
+        rom = bytes(ROML_SIZE)
+        cart = self.CartClass(rom, name="Test Epyx")
+
+        # Disable via timeout
+        cart.tick(cart.TIMEOUT_CYCLES)
+        assert cart._enabled is False
+
+        # Reset
+        cart.reset()
+
+        assert cart._enabled is True
+        assert cart.exrom is False
+        assert cart.game is True
+
+    def test_access_resets_timeout(self):
+        """Reading ROML/IO1 should reset the timeout counter."""
+        rom = bytes(ROML_SIZE)
+        cart = self.CartClass(rom, name="Test Epyx")
+
+        # Advance partway through timeout
+        cart.tick(cart.TIMEOUT_CYCLES - 10)
+        assert cart._enabled is True
+
+        # Read ROML - should reset counter
+        cart.read_roml(ROML_START)
+        assert cart._cycles_since_access == 0
+
+        # Now timeout should take full count again
+        cart.tick(cart.TIMEOUT_CYCLES - 1)
+        assert cart._enabled is True  # Still enabled
+
+        cart.tick(1)
+        assert cart._enabled is False  # Now disabled
+
+
+@requires_c64_roms
 class TestStaticROMCartridge:
     """Tests for StaticROMCartridge (Type 0)."""
 

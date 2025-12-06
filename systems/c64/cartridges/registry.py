@@ -13,6 +13,7 @@ from .type_00_normal import StaticROMCartridge
 from .type_01_action_replay import ActionReplayCartridge
 from .type_04_simons_basic import SimonsBasicCartridge
 from .type_05_ocean import OceanType1Cartridge
+from .type_10_epyx_fastload import EpyxFastloadCartridge
 from .type_15_c64gs import C64GSCartridge
 from .type_17_dinamic import DinamicCartridge
 from .type_19_magic_desk import MagicDeskCartridge
@@ -24,6 +25,7 @@ CARTRIDGE_TYPES: dict[int | CartridgeType, type[Cartridge]] = {
     CartridgeType.ACTION_REPLAY: ActionReplayCartridge,
     CartridgeType.SIMONS_BASIC: SimonsBasicCartridge,
     CartridgeType.OCEAN_TYPE_1: OceanType1Cartridge,
+    CartridgeType.EPYX_FASTLOAD: EpyxFastloadCartridge,
     CartridgeType.C64_GAME_SYSTEM: C64GSCartridge,
     CartridgeType.DINAMIC: DinamicCartridge,
     CartridgeType.MAGIC_DESK: MagicDeskCartridge,
@@ -81,6 +83,15 @@ def create_cartridge(
         if banks is None:
             raise ValueError("MagicDeskCartridge requires banks parameter")
         return MagicDeskCartridge(banks, name)
+    elif cart_class == EpyxFastloadCartridge:
+        # Epyx FastLoad is a single-bank 8KB cartridge
+        # Accept either roml_data directly or banks[0]
+        rom_data = roml_data
+        if rom_data is None and banks is not None and len(banks) > 0:
+            rom_data = banks[0]
+        if rom_data is None:
+            raise ValueError("EpyxFastloadCartridge requires roml_data or banks parameter")
+        return EpyxFastloadCartridge(rom_data, name)
     elif cart_class == C64GSCartridge:
         if banks is None:
             raise ValueError("C64GSCartridge requires banks parameter")
