@@ -1372,6 +1372,18 @@ class TestC64CartridgeLoading:
         self._test_load_cartridge_type(c64, 3)
 
     @requires_c64_roms
+    def test_type_03_final_cartridge_iii_cartridge_executes(self, c64):
+        """Type 3 Final Cartridge III test cartridge should pass all tests."""
+        crt_path = CARTRIDGE_TYPES_DIR / "test_cart_type_03_final_cartridge_iii.crt"
+        if not crt_path.exists():
+            pytest.skip(f"Test fixture not found: {crt_path}")
+
+        tests_complete, fail_count = self._run_test_cartridge(c64, crt_path)
+
+        assert tests_complete, "Test cartridge did not complete within max cycles"
+        assert fail_count == 0, f"Test cartridge reported {fail_count} failures"
+
+    @requires_c64_roms
     def test_type_04_simons_basic_cartridge_loads(self, c64):
         """Type 4: Simons Basic."""
         self._test_load_cartridge_type(c64, 4)
@@ -1431,6 +1443,18 @@ class TestC64CartridgeLoading:
         self._test_load_cartridge_type(c64, 10)
 
     @requires_c64_roms
+    def test_type_10_epyx_fastload_cartridge_executes(self, c64):
+        """Type 10 Epyx FastLoad test cartridge should pass all tests."""
+        crt_path = CARTRIDGE_TYPES_DIR / "test_cart_type_10_epyx_fastload.crt"
+        if not crt_path.exists():
+            pytest.skip(f"Test fixture not found: {crt_path}")
+
+        tests_complete, fail_count = self._run_test_cartridge(c64, crt_path)
+
+        assert tests_complete, "Test cartridge did not complete within max cycles"
+        assert fail_count == 0, f"Test cartridge reported {fail_count} failures"
+
+    @requires_c64_roms
     def test_type_11_westermann_learning_cartridge_loads(self, c64):
         """Type 11: Westermann Learning."""
         self._test_load_cartridge_type(c64, 11)
@@ -1444,6 +1468,18 @@ class TestC64CartridgeLoading:
     def test_type_13_final_cartridge_i_cartridge_loads(self, c64):
         """Type 13: Final Cartridge I."""
         self._test_load_cartridge_type(c64, 13)
+
+    @requires_c64_roms
+    def test_type_13_final_cartridge_i_cartridge_executes(self, c64):
+        """Type 13 Final Cartridge I test cartridge should pass all tests."""
+        crt_path = CARTRIDGE_TYPES_DIR / "test_cart_type_13_final_cartridge_i.crt"
+        if not crt_path.exists():
+            pytest.skip(f"Test fixture not found: {crt_path}")
+
+        tests_complete, fail_count = self._run_test_cartridge(c64, crt_path)
+
+        assert tests_complete, "Test cartridge did not complete within max cycles"
+        assert fail_count == 0, f"Test cartridge reported {fail_count} failures"
 
     @requires_c64_roms
     def test_type_14_magic_formel_cartridge_loads(self, c64):

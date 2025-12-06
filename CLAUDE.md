@@ -24,3 +24,4 @@
 - Always generate all error and test carts for every mapper variant.
 - We should be explicit where memory addresses are concerned.
 - Remember to switch back to bank 0 when needed for test carts.
+- Remember to audit the cartridge mappers and verify that all of that is correct before worrying about debugging the code.  Debugging CPU instructions is a last resort.

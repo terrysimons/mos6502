@@ -965,8 +965,19 @@ class C64:
                     log.info(f"Loaded Ultimax ROMH: ${load_address:04X}-${load_address + rom_size - 1:04X} ({rom_size} bytes)")
                 else:
                     log.warning(f"Unknown CHIP load address: ${load_address:04X}")
-            elif hardware_type == 4:
+            elif hardware_type == 3:
+                # Type 3: Final Cartridge III - 4 x 16KB banks
+                # Each bank is a single 16KB CHIP packet at $8000
+                if load_address == self.ROML_START:
+                    banks[bank_number] = rom_data
+                    results.roml_valid = True
+                    results.bank_switching_valid = len(banks) > 1
+                    log.info(f"Loaded FC3 bank {bank_number}: ${load_address:04X}-${load_address + rom_size - 1:04X} ({rom_size} bytes)")
+                else:
+                    log.warning(f"Unknown CHIP load address for Type 3: ${load_address:04X}")
+            elif hardware_type == 4 or hardware_type == 13:
                 # Type 4: Simons' BASIC - 16KB cartridge with ROML + ROMH
+                # Type 13: Final Cartridge I - 16KB cartridge with ROML + ROMH
                 # Two CHIP packets: one for ROML at $8000, one for ROMH at $A000
                 if load_address == self.ROML_START:
                     roml_data = rom_data
@@ -977,7 +988,7 @@ class C64:
                     results.romh_valid = True
                     log.info(f"Loaded ROMH: ${load_address:04X}-${load_address + rom_size - 1:04X} ({rom_size} bytes)")
                 else:
-                    log.warning(f"Unknown CHIP load address for Type 4: ${load_address:04X}")
+                    log.warning(f"Unknown CHIP load address for Type {hardware_type}: ${load_address:04X}")
             else:
                 # Banked cartridges (Type 1, 5+): Collect all banks
                 # Each bank is typically 8KB at $8000
@@ -1033,6 +1044,20 @@ class C64:
                 name=cart_name,
             )
             self.cartridge_type = "simons_basic"
+        elif hardware_type == 13:
+            # Type 13: Final Cartridge I - needs both ROML and ROMH
+            if roml_data is None:
+                # Missing ROM data - generate error cart
+                self._load_error_cartridge_with_results(results)
+                return
+
+            cartridge = create_cartridge(
+                hardware_type=13,
+                roml_data=roml_data,
+                romh_data=romh_data,
+                name=cart_name,
+            )
+            self.cartridge_type = "final_cartridge_i"
         else:
             # Banked cartridges - convert bank dict to sorted list
             if not banks:

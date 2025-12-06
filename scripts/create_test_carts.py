@@ -37,6 +37,7 @@ from mos6502.instructions import (
     LDA_IMMEDIATE_0xA9,
     LDA_ZEROPAGE_0xA5,
     LDA_ABSOLUTE_0xAD,
+    LDA_ABSOLUTE_X_0xBD,
     LDX_IMMEDIATE_0xA2,
     LDY_IMMEDIATE_0xA0,
     # Store
@@ -3155,6 +3156,869 @@ def create_type19_test_cart(is_error_cart: bool = False, num_banks: int = 8) -> 
     return banks, desc
 
 
+def create_type3_test_cart(is_error_cart: bool = False) -> tuple[list[bytes], str]:
+    """Create Type 3 (Final Cartridge III) test cartridge.
+
+    Final Cartridge III features:
+    - 4×16KB banks
+    - Control register at $DFFF
+    - Bits 0-1: Bank selection (0-3)
+    - Bit 4: EXROM line
+    - Bit 5: GAME line
+    - Bit 6: NMI line (0 = active)
+    - Bit 7: Hide register (1 = register writes ignored)
+
+    IMPORTANT: Bank switching tests must run from RAM because when you
+    switch banks while executing from ROM, the instruction fetch changes
+    to the new bank. The test code copies itself to $C000 and jumps there.
+
+    Args:
+        is_error_cart: If True, this is for error/regression testing
+
+    Returns:
+        Tuple of (banks, description)
+    """
+    # Create 4 x 16KB banks
+    BANK_SIZE = C64.ROML_SIZE + C64.ROMH_SIZE  # 16KB
+    NUM_BANKS = 4
+    banks = []
+
+    for bank_num in range(NUM_BANKS):
+        bank = bytearray(BANK_SIZE)
+        banks.append(bank)
+
+    # Cartridge header at $8000-$8008 (bank 0 only)
+    banks[0][0x0000] = 0x09  # Cold start lo -> $8009
+    banks[0][0x0001] = 0x80  # Cold start hi
+    banks[0][0x0002] = 0x09  # Warm start lo -> $8009
+    banks[0][0x0003] = 0x80  # Warm start hi
+    banks[0][0x0004] = 0xC3  # 'C' (CBM80 signature)
+    banks[0][0x0005] = 0xC2  # 'B'
+    banks[0][0x0006] = 0xCD  # 'M'
+    banks[0][0x0007] = 0x38  # '8'
+    banks[0][0x0008] = 0x30  # '0'
+
+    # Signature location - use offset 0x1FF0 (near end of ROML region, visible at $9FF0)
+    # This avoids conflict with test code which starts at 0x0009
+    SIG_OFFSET = 0x1FF0
+    for bank_num in range(NUM_BANKS):
+        banks[bank_num][SIG_OFFSET] = 0x30 + bank_num  # '0', '1', '2', '3'
+
+    # === ROM code at $8009: Initialize and copy test code to RAM, then JMP to RAM ===
+    rom_code = []
+
+    # Initialize - disable interrupts, set up stack
+    rom_code.extend([
+        SEI_IMPLIED_0x78,
+        LDX_IMMEDIATE_0xA2, 0xFF,
+        TXS_IMPLIED_0x9A,
+    ])
+
+    # Copy test code from $8200 to $C000
+    # We'll put the actual test code at offset 0x0200 in the ROM (visible at $8200)
+    # and copy it to $C000 in RAM
+    # Copy loop: 256 bytes at a time, copy enough pages
+    # NOTE: Test code is ~2.4KB (9.3 pages), copy 12 pages (3KB) to be safe
+    TEST_CODE_SIZE_PAGES = 12  # 3KB - test code with all the display routines is large
+    for page in range(TEST_CODE_SIZE_PAGES):
+        rom_code.extend([
+            LDX_IMMEDIATE_0xA2, 0x00,  # X = 0
+        ])
+        # Copy loop - LDA (3) + STA (3) + INX (1) + BNE (2) = 9 bytes
+        # BNE needs to branch back 9 bytes to the LDA instruction
+        # Note: page is added to HIGH byte (0x82 + page for source, 0xC0 + page for dest)
+        rom_code.extend([
+            LDA_ABSOLUTE_X_0xBD, 0x00, 0x82 + page,  # LDA $(82+page)00,X (source: ROM at $8200+)
+            STA_ABSOLUTE_X_0x9D, 0x00, 0xC0 + page,  # STA $(C0+page)00,X (dest: RAM at $C000+)
+            INX_IMPLIED_0xE8,
+            BNE_RELATIVE_0xD0, (-9) & 0xFF,  # BNE back to LDA (offset = -9 = 0xF7)
+        ])
+
+    # JMP to RAM test code
+    rom_code.extend([
+        JMP_ABSOLUTE_0x4C, 0x00, 0xC0,  # JMP $C000
+    ])
+
+    # Copy ROM code into bank 0 at offset 0x0009
+    for i, byte in enumerate(rom_code):
+        banks[0][0x0009 + i] = byte
+
+    # === RAM-based test code (goes at $8200 in ROM, runs at $C000 in RAM) ===
+    code = []
+    code_base = 0xC000  # This code will run from RAM at $C000
+
+    # Clear screen
+    code.extend([
+        LDA_IMMEDIATE_0xA9, 0x20,
+        LDX_IMMEDIATE_0xA2, 0x00,
+    ])
+    code.extend([
+        STA_ABSOLUTE_X_0x9D, 0x00, 0x04,
+        STA_ABSOLUTE_X_0x9D, 0x00, 0x05,
+        STA_ABSOLUTE_X_0x9D, 0x00, 0x06,
+        STA_ABSOLUTE_X_0x9D, 0x00, 0x07,
+        INX_IMPLIED_0xE8,
+        BNE_RELATIVE_0xD0, 0xF1,
+    ])
+
+    # Initialize fail counter
+    code.extend(emit_init_fail_counter())
+
+    # Set border/background to black
+    code.extend([
+        LDA_IMMEDIATE_0xA9, COLOR_BLACK,
+        STA_ABSOLUTE_0x8D, 0x20, 0xD0,
+        STA_ABSOLUTE_0x8D, 0x21, 0xD0,
+    ])
+
+    # Display title and type info
+    title = "TYPE 3 ERROR CART" if is_error_cart else "TYPE 3 VERIFY"
+    code.extend(create_display_code(title, line=0, color=COLOR_WHITE))
+    code.extend(create_display_code("TYPE: 3", line=1, color=COLOR_YELLOW))
+    code.extend(create_display_code("NAME: FINAL CARTRIDGE III", line=2, color=COLOR_YELLOW))
+
+    current_line = 4
+
+    # Helper function to emit a test with FAIL-first pattern
+    def emit_test(test_name, line, test_code_emitter):
+        """Emit test code with FAIL displayed first, updated to PASS on success."""
+        nonlocal code
+
+        # Calculate screen positions
+        result_screen = 0x0400 + (line * 40) + 35
+        result_color = 0xD800 + (line * 40) + 35
+
+        # 1. Display test name with FAIL
+        code.extend(create_display_code(test_name, line=line, color=COLOR_LIGHT_GRAY))
+        for i, ch in enumerate([0x06, 0x01, 0x09, 0x0C]):  # FAIL
+            code.extend([
+                LDA_IMMEDIATE_0xA9, ch,
+                STA_ABSOLUTE_0x8D, (result_screen + i) & 0xFF, (result_screen + i) >> 8,
+                LDA_IMMEDIATE_0xA9, COLOR_FAIL,
+                STA_ABSOLUTE_0x8D, (result_color + i) & 0xFF, (result_color + i) >> 8,
+            ])
+
+        # 2. Run the test - emitter adds test code and returns branch info
+        pass_branch_idx, is_beq = test_code_emitter()
+
+        # 3. If we get here without branching, test failed - increment counter and jump to next
+        code.extend(emit_inc_fail_counter())
+        code.extend([JMP_ABSOLUTE_0x4C, 0x00, 0x00])  # JMP to next test (placeholder)
+        fail_done_jmp = len(code) - 2
+
+        # 4. PASS label - overwrite FAIL with PASS
+        pass_addr = len(code)
+        # Fix up the branch to point here
+        branch_offset = pass_addr - (pass_branch_idx + 1)
+        if branch_offset < -128 or branch_offset > 127:
+            raise ValueError(f"Branch offset {branch_offset} out of range")
+        code[pass_branch_idx] = branch_offset & 0xFF
+
+        for i, ch in enumerate([0x10, 0x01, 0x13, 0x13]):  # PASS
+            code.extend([
+                LDA_IMMEDIATE_0xA9, ch,
+                STA_ABSOLUTE_0x8D, (result_screen + i) & 0xFF, (result_screen + i) >> 8,
+                LDA_IMMEDIATE_0xA9, COLOR_PASS,
+                STA_ABSOLUTE_0x8D, (result_color + i) & 0xFF, (result_color + i) >> 8,
+            ])
+
+        # 5. Next test label - fix up fail jump
+        next_addr = len(code)
+        code[fail_done_jmp] = (code_base + next_addr) & 0xFF
+        code[fail_done_jmp + 1] = ((code_base + next_addr) >> 8) & 0xFF
+
+    # Test 1: Verify bank 0 signature at $9FF0
+    def bank0_test():
+        code.extend([
+            LDA_ABSOLUTE_0xAD, 0xF0, 0x9F,   # LDA $9FF0 (bank 0 signature)
+            CMP_IMMEDIATE_0xC9, 0x30,         # Compare to '0'
+            BEQ_RELATIVE_0xF0, 0x00,          # BEQ to pass (placeholder)
+        ])
+        return len(code) - 1, True
+
+    emit_test("BANK 0 $9FF0", current_line, bank0_test)
+    current_line += 1
+
+    # Test 2: Switch to bank 1 via $DFFF, verify signature
+    def bank1_test():
+        code.extend([
+            LDA_IMMEDIATE_0xA9, 0x01,         # Bank 1, keep EXROM=0, GAME=0
+            STA_ABSOLUTE_0x8D, 0xFF, 0xDF,    # STA $DFFF - switch to bank 1
+            LDA_ABSOLUTE_0xAD, 0xF0, 0x9F,    # LDA $9FF0 (bank 1 signature)
+            CMP_IMMEDIATE_0xC9, 0x31,         # Compare to '1'
+            BEQ_RELATIVE_0xF0, 0x00,          # BEQ to pass (placeholder)
+        ])
+        return len(code) - 1, True
+
+    emit_test("BANK 1 $DFFF", current_line, bank1_test)
+    current_line += 1
+
+    # Test 3: Switch to bank 2
+    def bank2_test():
+        code.extend([
+            LDA_IMMEDIATE_0xA9, 0x02,         # Bank 2
+            STA_ABSOLUTE_0x8D, 0xFF, 0xDF,    # STA $DFFF - switch to bank 2
+            LDA_ABSOLUTE_0xAD, 0xF0, 0x9F,    # LDA $9FF0 (bank 2 signature)
+            CMP_IMMEDIATE_0xC9, 0x32,         # Compare to '2'
+            BEQ_RELATIVE_0xF0, 0x00,          # BEQ to pass (placeholder)
+        ])
+        return len(code) - 1, True
+
+    emit_test("BANK 2 $DFFF", current_line, bank2_test)
+    current_line += 1
+
+    # Test 4: Switch to bank 3
+    def bank3_test():
+        code.extend([
+            LDA_IMMEDIATE_0xA9, 0x03,         # Bank 3
+            STA_ABSOLUTE_0x8D, 0xFF, 0xDF,    # STA $DFFF - switch to bank 3
+            LDA_ABSOLUTE_0xAD, 0xF0, 0x9F,    # LDA $9FF0 (bank 3 signature)
+            CMP_IMMEDIATE_0xC9, 0x33,         # Compare to '3'
+            BEQ_RELATIVE_0xF0, 0x00,          # BEQ to pass (placeholder)
+        ])
+        return len(code) - 1, True
+
+    emit_test("BANK 3 $DFFF", current_line, bank3_test)
+    current_line += 1
+
+    # Test 5: Switch back to bank 0
+    def bank0_again_test():
+        code.extend([
+            LDA_IMMEDIATE_0xA9, 0x00,         # Bank 0
+            STA_ABSOLUTE_0x8D, 0xFF, 0xDF,    # STA $DFFF - switch to bank 0
+            LDA_ABSOLUTE_0xAD, 0xF0, 0x9F,    # LDA $9FF0 (bank 0 signature)
+            CMP_IMMEDIATE_0xC9, 0x30,         # Compare to '0'
+            BEQ_RELATIVE_0xF0, 0x00,          # BEQ to pass (placeholder)
+        ])
+        return len(code) - 1, True
+
+    emit_test("BANK 0 RETURN", current_line, bank0_again_test)
+    current_line += 1
+
+    current_line += 1  # Skip a line before final status
+
+    # === Final status ===
+    # Check fail counter
+    code.extend(emit_load_fail_counter())
+    code.extend([
+        BEQ_RELATIVE_0xF0, 0x03,  # BEQ +3 (skip JMP) - no failures
+        JMP_ABSOLUTE_0x4C, 0x00, 0x00,  # JMP to show_fail (placeholder)
+    ])
+    show_fail_jmp = len(code) - 2
+
+    # All passed - green border
+    code.extend([
+        LDA_IMMEDIATE_0xA9, COLOR_GREEN,
+        STA_ABSOLUTE_0x8D, 0x20, 0xD0,  # Border green
+    ])
+    code.extend(create_display_code("ALL TESTS PASSED", line=current_line, color=COLOR_GREEN))
+    code.extend(create_display_code("TYPE 3 SUPPORTED: PASS", line=current_line + 1, color=COLOR_GREEN))
+    code.extend([JMP_ABSOLUTE_0x4C, 0x00, 0x00])  # JMP to loop (placeholder)
+    loop_jmp = len(code) - 2
+
+    # Show fail - red border
+    show_fail_addr = len(code)
+    code[show_fail_jmp] = (code_base + show_fail_addr) & 0xFF
+    code[show_fail_jmp + 1] = ((code_base + show_fail_addr) >> 8) & 0xFF
+
+    code.extend([
+        LDA_IMMEDIATE_0xA9, COLOR_RED,
+        STA_ABSOLUTE_0x8D, 0x20, 0xD0,  # Border red
+    ])
+    code.extend(create_display_code("VERIFICATION FAILED", line=current_line, color=COLOR_FAIL))
+    code.extend(create_display_code("TYPE 3 SUPPORTED: FAIL", line=current_line + 1, color=COLOR_FAIL))
+
+    # Mark tests complete
+    loop_addr = len(code)
+    code[loop_jmp] = (code_base + loop_addr) & 0xFF
+    code[loop_jmp + 1] = ((code_base + loop_addr) >> 8) & 0xFF
+    code.extend(emit_mark_tests_complete())
+
+    # Infinite loop
+    inf_loop_addr = len(code)
+    code.extend([JMP_ABSOLUTE_0x4C, (code_base + inf_loop_addr) & 0xFF, ((code_base + inf_loop_addr) >> 8) & 0xFF])
+
+    # Copy test code into bank 0 at offset 0x0200 (visible at $8200)
+    for i, byte in enumerate(code):
+        banks[0][0x0200 + i] = byte
+
+    # Convert banks to bytes
+    banks = [bytes(bank) for bank in banks]
+
+    desc = "Type 3 verification" if not is_error_cart else "Type 3 error cart"
+    return banks, desc
+
+
+def write_fc3_crt(path: Path, banks: list[bytes], name: str = "TEST") -> None:
+    """Write a Final Cartridge III CRT file.
+
+    Args:
+        path: Output file path
+        banks: List of 4 x 16KB ROM banks
+        name: Cartridge name
+    """
+    # CRT Header (64 bytes)
+    header = bytearray(64)
+    header[0:16] = b'C64 CARTRIDGE   '
+    header[0x10:0x14] = (64).to_bytes(4, 'big')  # Header length
+    header[0x14] = 1  # Version hi
+    header[0x15] = 0  # Version lo
+    header[0x16:0x18] = (3).to_bytes(2, 'big')  # Hardware type 3 = FC3
+    header[0x18] = 0  # EXROM = 0 (active)
+    header[0x19] = 0  # GAME = 0 (active) -> 16KB mode
+    name_bytes = name.encode('ascii')[:32].ljust(32, b'\x00')
+    header[0x20:0x40] = name_bytes
+
+    with open(path, 'wb') as f:
+        f.write(bytes(header))
+
+        # Write each 16KB bank as a single CHIP packet
+        for bank_num, bank_data in enumerate(banks):
+            chip = bytearray(16)
+            chip[0:4] = b'CHIP'
+            chip[4:8] = (16 + len(bank_data)).to_bytes(4, 'big')
+            chip[8:10] = (0).to_bytes(2, 'big')  # Type (0 = ROM)
+            chip[10:12] = bank_num.to_bytes(2, 'big')  # Bank number
+            chip[12:14] = (C64.ROML_START).to_bytes(2, 'big')  # Load address $8000
+            chip[14:16] = (len(bank_data)).to_bytes(2, 'big')
+            f.write(bytes(chip))
+            f.write(bank_data)
+
+
+def create_type10_test_cart(is_error_cart: bool = False) -> tuple[bytes, str]:
+    """Create Type 10 (Epyx FastLoad) test cartridge.
+
+    Epyx FastLoad features:
+    - 8KB ROM at ROML
+    - IO2 ($DF00-$DFFF) always shows last 256 bytes of ROM
+    - Reading IO1 or ROML enables cartridge (resets timeout)
+    - Cartridge disables after ~512 cycles without access
+
+    Args:
+        is_error_cart: If True, this is for error/regression testing
+
+    Returns:
+        Tuple of (rom_data, description)
+    """
+    rom = bytearray(C64.ROML_SIZE)
+
+    # Cartridge header at $8000-$8008
+    rom[0x0000] = 0x09  # Cold start lo -> $8009
+    rom[0x0001] = 0x80  # Cold start hi
+    rom[0x0002] = 0x09  # Warm start lo -> $8009
+    rom[0x0003] = 0x80  # Warm start hi
+    rom[0x0004] = 0xC3  # 'C' (CBM80 signature)
+    rom[0x0005] = 0xC2  # 'B'
+    rom[0x0006] = 0xCD  # 'M'
+    rom[0x0007] = 0x38  # '8'
+    rom[0x0008] = 0x30  # '0'
+
+    # Put a signature near end of ROML for testing (avoid code area)
+    # Offset 0x1F10 is visible at $9F10
+    ROML_SIG_OFFSET = 0x1F10
+    rom[ROML_SIG_OFFSET] = 0x0A  # Type 10 signature
+
+    # Put a signature in the IO2 region ($1F00-$1FFF maps to $DF00-$DFFF)
+    # Using 0x1F80 (visible at $DF80) to avoid conflict with ROML signature
+    IO2_SIG_OFFSET = 0x1F80
+    rom[IO2_SIG_OFFSET] = 0x1A  # IO2 signature (0x1A for type 10)
+
+    code = []
+    code_base = 0x8009
+
+    # Initialize - disable interrupts, set up stack
+    code.extend([
+        SEI_IMPLIED_0x78,
+        LDX_IMMEDIATE_0xA2, 0xFF,
+        TXS_IMPLIED_0x9A,
+    ])
+
+    # Clear screen
+    code.extend([
+        LDA_IMMEDIATE_0xA9, 0x20,
+        LDX_IMMEDIATE_0xA2, 0x00,
+    ])
+    code.extend([
+        STA_ABSOLUTE_X_0x9D, 0x00, 0x04,
+        STA_ABSOLUTE_X_0x9D, 0x00, 0x05,
+        STA_ABSOLUTE_X_0x9D, 0x00, 0x06,
+        STA_ABSOLUTE_X_0x9D, 0x00, 0x07,
+        INX_IMPLIED_0xE8,
+        BNE_RELATIVE_0xD0, 0xF1,
+    ])
+
+    # Initialize fail counter
+    code.extend(emit_init_fail_counter())
+
+    # Set border/background to black
+    code.extend([
+        LDA_IMMEDIATE_0xA9, COLOR_BLACK,
+        STA_ABSOLUTE_0x8D, 0x20, 0xD0,
+        STA_ABSOLUTE_0x8D, 0x21, 0xD0,
+    ])
+
+    # Display title and type info
+    title = "TYPE 10 ERROR CART" if is_error_cart else "TYPE 10 VERIFY"
+    code.extend(create_display_code(title, line=0, color=COLOR_WHITE))
+    code.extend(create_display_code("TYPE: 10", line=1, color=COLOR_YELLOW))
+    code.extend(create_display_code("NAME: EPYX FASTLOAD", line=2, color=COLOR_YELLOW))
+
+    current_line = 4
+
+    # Helper function to emit a test with FAIL-first pattern
+    def emit_test(test_name, line, test_code_emitter):
+        """Emit test code with FAIL displayed first, updated to PASS on success."""
+        nonlocal code
+
+        result_screen = 0x0400 + (line * 40) + 35
+        result_color = 0xD800 + (line * 40) + 35
+
+        code.extend(create_display_code(test_name, line=line, color=COLOR_LIGHT_GRAY))
+        for i, ch in enumerate([0x06, 0x01, 0x09, 0x0C]):  # FAIL
+            code.extend([
+                LDA_IMMEDIATE_0xA9, ch,
+                STA_ABSOLUTE_0x8D, (result_screen + i) & 0xFF, (result_screen + i) >> 8,
+                LDA_IMMEDIATE_0xA9, COLOR_FAIL,
+                STA_ABSOLUTE_0x8D, (result_color + i) & 0xFF, (result_color + i) >> 8,
+            ])
+
+        pass_branch_idx, is_beq = test_code_emitter()
+
+        code.extend(emit_inc_fail_counter())
+        code.extend([JMP_ABSOLUTE_0x4C, 0x00, 0x00])
+        fail_done_jmp = len(code) - 2
+
+        pass_addr = len(code)
+        branch_offset = pass_addr - (pass_branch_idx + 1)
+        if branch_offset < -128 or branch_offset > 127:
+            raise ValueError(f"Branch offset {branch_offset} out of range")
+        code[pass_branch_idx] = branch_offset & 0xFF
+
+        for i, ch in enumerate([0x10, 0x01, 0x13, 0x13]):  # PASS
+            code.extend([
+                LDA_IMMEDIATE_0xA9, ch,
+                STA_ABSOLUTE_0x8D, (result_screen + i) & 0xFF, (result_screen + i) >> 8,
+                LDA_IMMEDIATE_0xA9, COLOR_PASS,
+                STA_ABSOLUTE_0x8D, (result_color + i) & 0xFF, (result_color + i) >> 8,
+            ])
+
+        next_addr = len(code)
+        code[fail_done_jmp] = (code_base + next_addr) & 0xFF
+        code[fail_done_jmp + 1] = ((code_base + next_addr) >> 8) & 0xFF
+
+    # Test 1: Verify ROML signature at $9F10
+    def roml_test():
+        code.extend([
+            LDA_ABSOLUTE_0xAD, 0x10, 0x9F,   # LDA $9F10 (ROML signature)
+            CMP_IMMEDIATE_0xC9, 0x0A,         # Compare to type 10 signature
+            BEQ_RELATIVE_0xF0, 0x00,          # BEQ to pass (placeholder)
+        ])
+        return len(code) - 1, True
+
+    emit_test("ROML $9F10", current_line, roml_test)
+    current_line += 1
+
+    # Test 2: Verify IO2 signature at $DF80
+    def io2_test():
+        code.extend([
+            LDA_ABSOLUTE_0xAD, 0x80, 0xDF,   # LDA $DF80 (IO2 - last 256 bytes of ROM)
+            CMP_IMMEDIATE_0xC9, 0x1A,        # Compare to IO2 signature
+            BEQ_RELATIVE_0xF0, 0x00,          # BEQ to pass (placeholder)
+        ])
+        return len(code) - 1, True
+
+    emit_test("IO2 $DF80", current_line, io2_test)
+    current_line += 1
+
+    # Test 3: Verify IO1 read works (doesn't crash)
+    def io1_test():
+        code.extend([
+            LDA_ABSOLUTE_0xAD, 0x00, 0xDE,   # LDA $DE00 (IO1 - should enable cart)
+            # Just verify we can read it (returns open bus 0xFF typically)
+            # Then verify ROML is still accessible
+            LDA_ABSOLUTE_0xAD, 0x10, 0x9F,   # LDA $9F10 (ROML signature)
+            CMP_IMMEDIATE_0xC9, 0x0A,         # Compare to type 10 signature
+            BEQ_RELATIVE_0xF0, 0x00,          # BEQ to pass (placeholder)
+        ])
+        return len(code) - 1, True
+
+    emit_test("IO1 ENABLE", current_line, io1_test)
+    current_line += 1
+
+    current_line += 1  # Skip a line before final status
+
+    # === Final status ===
+    code.extend(emit_load_fail_counter())
+    code.extend([
+        BEQ_RELATIVE_0xF0, 0x03,
+        JMP_ABSOLUTE_0x4C, 0x00, 0x00,
+    ])
+    show_fail_jmp = len(code) - 2
+
+    code.extend([
+        LDA_IMMEDIATE_0xA9, COLOR_GREEN,
+        STA_ABSOLUTE_0x8D, 0x20, 0xD0,
+    ])
+    code.extend(create_display_code("ALL TESTS PASSED", line=current_line, color=COLOR_GREEN))
+    code.extend(create_display_code("TYPE 10 SUPPORTED: PASS", line=current_line + 1, color=COLOR_GREEN))
+    code.extend([JMP_ABSOLUTE_0x4C, 0x00, 0x00])
+    loop_jmp = len(code) - 2
+
+    show_fail_addr = len(code)
+    code[show_fail_jmp] = (code_base + show_fail_addr) & 0xFF
+    code[show_fail_jmp + 1] = ((code_base + show_fail_addr) >> 8) & 0xFF
+
+    code.extend([
+        LDA_IMMEDIATE_0xA9, COLOR_RED,
+        STA_ABSOLUTE_0x8D, 0x20, 0xD0,
+    ])
+    code.extend(create_display_code("VERIFICATION FAILED", line=current_line, color=COLOR_FAIL))
+    code.extend(create_display_code("TYPE 10 SUPPORTED: FAIL", line=current_line + 1, color=COLOR_FAIL))
+
+    loop_addr = len(code)
+    code[loop_jmp] = (code_base + loop_addr) & 0xFF
+    code[loop_jmp + 1] = ((code_base + loop_addr) >> 8) & 0xFF
+    code.extend(emit_mark_tests_complete())
+
+    inf_loop_addr = len(code)
+    code.extend([JMP_ABSOLUTE_0x4C, (code_base + inf_loop_addr) & 0xFF, ((code_base + inf_loop_addr) >> 8) & 0xFF])
+
+    # Copy code into ROM
+    for i, byte in enumerate(code):
+        rom[0x0009 + i] = byte
+
+    desc = "Type 10 verification" if not is_error_cart else "Type 10 error cart"
+    return bytes(rom), desc
+
+
+def write_epyx_crt(path: Path, rom_data: bytes, name: str = "TEST") -> None:
+    """Write an Epyx FastLoad CRT file.
+
+    Args:
+        path: Output file path
+        rom_data: 8KB ROM data
+        name: Cartridge name
+    """
+    # CRT Header (64 bytes)
+    header = bytearray(64)
+    header[0:16] = b'C64 CARTRIDGE   '
+    header[0x10:0x14] = (64).to_bytes(4, 'big')  # Header length
+    header[0x14] = 1  # Version hi
+    header[0x15] = 0  # Version lo
+    header[0x16:0x18] = (10).to_bytes(2, 'big')  # Hardware type 10 = Epyx FastLoad
+    header[0x18] = 0  # EXROM = 0 (active)
+    header[0x19] = 1  # GAME = 1 (inactive) -> 8KB mode
+    name_bytes = name.encode('ascii')[:32].ljust(32, b'\x00')
+    header[0x20:0x40] = name_bytes
+
+    with open(path, 'wb') as f:
+        f.write(bytes(header))
+
+        # Single 8KB CHIP packet at $8000
+        chip = bytearray(16)
+        chip[0:4] = b'CHIP'
+        chip[4:8] = (16 + len(rom_data)).to_bytes(4, 'big')
+        chip[8:10] = (0).to_bytes(2, 'big')  # Type (0 = ROM)
+        chip[10:12] = (0).to_bytes(2, 'big')  # Bank number
+        chip[12:14] = (C64.ROML_START).to_bytes(2, 'big')  # Load address $8000
+        chip[14:16] = (len(rom_data)).to_bytes(2, 'big')
+        f.write(bytes(chip))
+        f.write(rom_data)
+
+
+def create_type13_test_cart(is_error_cart: bool = False) -> tuple[bytes, bytes, str]:
+    """Create Type 13 (Final Cartridge I) test cartridge.
+
+    Final Cartridge I features:
+    - 16KB ROM (ROML + ROMH)
+    - Any IO1 access ($DE00-$DEFF) disables cartridge
+    - Any IO2 access ($DF00-$DFFF) enables cartridge
+
+    IMPORTANT: Test code must run from RAM because the IO1/IO2 tests
+    enable/disable the cartridge. If we ran from ROM, we'd lose the
+    code we're executing when the cartridge is disabled.
+
+    Args:
+        is_error_cart: If True, this is for error/regression testing
+
+    Returns:
+        Tuple of (roml_data, romh_data, description)
+    """
+    roml = bytearray(C64.ROML_SIZE)
+    romh = bytearray(C64.ROMH_SIZE)
+
+    # Cartridge header at $8000-$8008
+    roml[0x0000] = 0x09  # Cold start lo -> $8009
+    roml[0x0001] = 0x80  # Cold start hi
+    roml[0x0002] = 0x09  # Warm start lo -> $8009
+    roml[0x0003] = 0x80  # Warm start hi
+    roml[0x0004] = 0xC3  # 'C' (CBM80 signature)
+    roml[0x0005] = 0xC2  # 'B'
+    roml[0x0006] = 0xCD  # 'M'
+    roml[0x0007] = 0x38  # '8'
+    roml[0x0008] = 0x30  # '0'
+
+    # Put signature at end of ROML for testing
+    ROML_SIG_OFFSET = 0x1FF5
+    roml[ROML_SIG_OFFSET] = 0x0D  # Type 13 signature
+
+    # Put signature at start of ROMH for testing ROMH visibility
+    ROMH_SIG_OFFSET = 0x0000  # $A000
+    romh[ROMH_SIG_OFFSET] = 0xAD  # ROMH signature (0xA for $A000, D for type 13)
+
+    # === ROM code at $8009: Initialize and copy test code to RAM, then JMP to RAM ===
+    rom_code = []
+
+    # Initialize - disable interrupts, set up stack
+    rom_code.extend([
+        SEI_IMPLIED_0x78,
+        LDX_IMMEDIATE_0xA2, 0xFF,
+        TXS_IMPLIED_0x9A,
+    ])
+
+    # Copy test code from $8200 to $C000
+    # Test code is at offset 0x0200 in ROML (visible at $8200)
+    TEST_CODE_SIZE_PAGES = 12  # 3KB - enough for display code
+    for page in range(TEST_CODE_SIZE_PAGES):
+        rom_code.extend([
+            LDX_IMMEDIATE_0xA2, 0x00,  # X = 0
+        ])
+        # Copy loop - LDA (3) + STA (3) + INX (1) + BNE (2) = 9 bytes
+        rom_code.extend([
+            LDA_ABSOLUTE_X_0xBD, 0x00, 0x82 + page,  # LDA $(82+page)00,X
+            STA_ABSOLUTE_X_0x9D, 0x00, 0xC0 + page,  # STA $(C0+page)00,X
+            INX_IMPLIED_0xE8,
+            BNE_RELATIVE_0xD0, (-9) & 0xFF,  # BNE back to LDA
+        ])
+
+    # JMP to RAM test code
+    rom_code.extend([
+        JMP_ABSOLUTE_0x4C, 0x00, 0xC0,  # JMP $C000
+    ])
+
+    # Copy ROM code into ROML at offset 0x0009
+    for i, byte in enumerate(rom_code):
+        roml[0x0009 + i] = byte
+
+    # === RAM-based test code (goes at $8200 in ROM, runs at $C000 in RAM) ===
+    code = []
+    code_base = 0xC000  # This code will run from RAM at $C000
+
+    # Clear screen
+    code.extend([
+        LDA_IMMEDIATE_0xA9, 0x20,
+        LDX_IMMEDIATE_0xA2, 0x00,
+    ])
+    code.extend([
+        STA_ABSOLUTE_X_0x9D, 0x00, 0x04,
+        STA_ABSOLUTE_X_0x9D, 0x00, 0x05,
+        STA_ABSOLUTE_X_0x9D, 0x00, 0x06,
+        STA_ABSOLUTE_X_0x9D, 0x00, 0x07,
+        INX_IMPLIED_0xE8,
+        BNE_RELATIVE_0xD0, 0xF1,
+    ])
+
+    # Initialize fail counter
+    code.extend(emit_init_fail_counter())
+
+    # Set border/background to black
+    code.extend([
+        LDA_IMMEDIATE_0xA9, COLOR_BLACK,
+        STA_ABSOLUTE_0x8D, 0x20, 0xD0,
+        STA_ABSOLUTE_0x8D, 0x21, 0xD0,
+    ])
+
+    # Display title and type info
+    title = "TYPE 13 ERROR CART" if is_error_cart else "TYPE 13 VERIFY"
+    code.extend(create_display_code(title, line=0, color=COLOR_WHITE))
+    code.extend(create_display_code("TYPE: 13", line=1, color=COLOR_YELLOW))
+    code.extend(create_display_code("NAME: FINAL CARTRIDGE I", line=2, color=COLOR_YELLOW))
+
+    current_line = 4
+
+    # Helper function
+    def emit_test(test_name, line, test_code_emitter):
+        nonlocal code
+
+        result_screen = 0x0400 + (line * 40) + 35
+        result_color = 0xD800 + (line * 40) + 35
+
+        code.extend(create_display_code(test_name, line=line, color=COLOR_LIGHT_GRAY))
+        for i, ch in enumerate([0x06, 0x01, 0x09, 0x0C]):  # FAIL
+            code.extend([
+                LDA_IMMEDIATE_0xA9, ch,
+                STA_ABSOLUTE_0x8D, (result_screen + i) & 0xFF, (result_screen + i) >> 8,
+                LDA_IMMEDIATE_0xA9, COLOR_FAIL,
+                STA_ABSOLUTE_0x8D, (result_color + i) & 0xFF, (result_color + i) >> 8,
+            ])
+
+        pass_branch_idx, is_beq = test_code_emitter()
+
+        code.extend(emit_inc_fail_counter())
+        code.extend([JMP_ABSOLUTE_0x4C, 0x00, 0x00])
+        fail_done_jmp = len(code) - 2
+
+        pass_addr = len(code)
+        branch_offset = pass_addr - (pass_branch_idx + 1)
+        if branch_offset < -128 or branch_offset > 127:
+            raise ValueError(f"Branch offset {branch_offset} out of range")
+        code[pass_branch_idx] = branch_offset & 0xFF
+
+        for i, ch in enumerate([0x10, 0x01, 0x13, 0x13]):  # PASS
+            code.extend([
+                LDA_IMMEDIATE_0xA9, ch,
+                STA_ABSOLUTE_0x8D, (result_screen + i) & 0xFF, (result_screen + i) >> 8,
+                LDA_IMMEDIATE_0xA9, COLOR_PASS,
+                STA_ABSOLUTE_0x8D, (result_color + i) & 0xFF, (result_color + i) >> 8,
+            ])
+
+        next_addr = len(code)
+        code[fail_done_jmp] = (code_base + next_addr) & 0xFF
+        code[fail_done_jmp + 1] = ((code_base + next_addr) >> 8) & 0xFF
+
+    # Test 1: Verify ROML is readable at $9FF5
+    def roml_test():
+        code.extend([
+            LDA_ABSOLUTE_0xAD, 0xF5, 0x9F,   # LDA $9FF5 (ROML signature)
+            CMP_IMMEDIATE_0xC9, 0x0D,         # Compare to type 13 signature
+            BEQ_RELATIVE_0xF0, 0x00,          # BEQ to pass (placeholder)
+        ])
+        return len(code) - 1, True
+
+    emit_test("ROML $9FF5", current_line, roml_test)
+    current_line += 1
+
+    # Test 2: Verify ROMH is readable at $A000
+    def romh_test():
+        code.extend([
+            LDA_ABSOLUTE_0xAD, 0x00, 0xA0,   # LDA $A000 (ROMH signature)
+            CMP_IMMEDIATE_0xC9, 0xAD,         # Compare to ROMH signature
+            BEQ_RELATIVE_0xF0, 0x00,          # BEQ to pass (placeholder)
+        ])
+        return len(code) - 1, True
+
+    emit_test("ROMH $A000", current_line, romh_test)
+    current_line += 1
+
+    # Test 3: Disable via IO1, verify ROML no longer has signature
+    def io1_disable_test():
+        code.extend([
+            LDA_ABSOLUTE_0xAD, 0x00, 0xDE,   # LDA $DE00 - disables cartridge
+            LDA_ABSOLUTE_0xAD, 0xF5, 0x9F,   # LDA $9FF5 (should NOT be cart ROML)
+            CMP_IMMEDIATE_0xC9, 0x0D,         # Compare to cart signature
+            BNE_RELATIVE_0xD0, 0x00,          # BNE to pass (should NOT match)
+        ])
+        return len(code) - 1, False  # BNE, not BEQ
+
+    emit_test("IO1 DISABLE", current_line, io1_disable_test)
+    current_line += 1
+
+    # Test 4: Re-enable via IO2, verify ROML has signature again
+    def io2_enable_test():
+        code.extend([
+            LDA_ABSOLUTE_0xAD, 0x00, 0xDF,   # LDA $DF00 - enables cartridge
+            LDA_ABSOLUTE_0xAD, 0xF5, 0x9F,   # LDA $9FF5 (ROML signature)
+            CMP_IMMEDIATE_0xC9, 0x0D,         # Compare to type 13 signature
+            BEQ_RELATIVE_0xF0, 0x00,          # BEQ to pass (placeholder)
+        ])
+        return len(code) - 1, True
+
+    emit_test("IO2 ENABLE", current_line, io2_enable_test)
+    current_line += 1
+
+    current_line += 1  # Skip a line before final status
+
+    # === Final status ===
+    code.extend(emit_load_fail_counter())
+    code.extend([
+        BEQ_RELATIVE_0xF0, 0x03,
+        JMP_ABSOLUTE_0x4C, 0x00, 0x00,
+    ])
+    show_fail_jmp = len(code) - 2
+
+    code.extend([
+        LDA_IMMEDIATE_0xA9, COLOR_GREEN,
+        STA_ABSOLUTE_0x8D, 0x20, 0xD0,
+    ])
+    code.extend(create_display_code("ALL TESTS PASSED", line=current_line, color=COLOR_GREEN))
+    code.extend(create_display_code("TYPE 13 SUPPORTED: PASS", line=current_line + 1, color=COLOR_GREEN))
+    code.extend([JMP_ABSOLUTE_0x4C, 0x00, 0x00])
+    loop_jmp = len(code) - 2
+
+    show_fail_addr = len(code)
+    code[show_fail_jmp] = (code_base + show_fail_addr) & 0xFF
+    code[show_fail_jmp + 1] = ((code_base + show_fail_addr) >> 8) & 0xFF
+
+    code.extend([
+        LDA_IMMEDIATE_0xA9, COLOR_RED,
+        STA_ABSOLUTE_0x8D, 0x20, 0xD0,
+    ])
+    code.extend(create_display_code("VERIFICATION FAILED", line=current_line, color=COLOR_FAIL))
+    code.extend(create_display_code("TYPE 13 SUPPORTED: FAIL", line=current_line + 1, color=COLOR_FAIL))
+
+    loop_addr = len(code)
+    code[loop_jmp] = (code_base + loop_addr) & 0xFF
+    code[loop_jmp + 1] = ((code_base + loop_addr) >> 8) & 0xFF
+    code.extend(emit_mark_tests_complete())
+
+    inf_loop_addr = len(code)
+    code.extend([JMP_ABSOLUTE_0x4C, (code_base + inf_loop_addr) & 0xFF, ((code_base + inf_loop_addr) >> 8) & 0xFF])
+
+    # Copy test code into ROML at offset 0x0200 (visible at $8200)
+    for i, byte in enumerate(code):
+        roml[0x0200 + i] = byte
+
+    desc = "Type 13 verification" if not is_error_cart else "Type 13 error cart"
+    return bytes(roml), bytes(romh), desc
+
+
+def write_fc1_crt(path: Path, roml: bytes, romh: bytes, name: str = "TEST") -> None:
+    """Write a Final Cartridge I CRT file.
+
+    Args:
+        path: Output file path
+        roml: 8KB ROML data
+        romh: 8KB ROMH data
+        name: Cartridge name
+    """
+    # CRT Header (64 bytes)
+    header = bytearray(64)
+    header[0:16] = b'C64 CARTRIDGE   '
+    header[0x10:0x14] = (64).to_bytes(4, 'big')  # Header length
+    header[0x14] = 1  # Version hi
+    header[0x15] = 0  # Version lo
+    header[0x16:0x18] = (13).to_bytes(2, 'big')  # Hardware type 13 = FC1
+    header[0x18] = 0  # EXROM = 0 (active)
+    header[0x19] = 0  # GAME = 0 (active) -> 16KB mode
+    name_bytes = name.encode('ascii')[:32].ljust(32, b'\x00')
+    header[0x20:0x40] = name_bytes
+
+    with open(path, 'wb') as f:
+        f.write(bytes(header))
+
+        # CHIP packet for ROML ($8000-$9FFF)
+        chip = bytearray(16)
+        chip[0:4] = b'CHIP'
+        chip[4:8] = (16 + len(roml)).to_bytes(4, 'big')
+        chip[8:10] = (0).to_bytes(2, 'big')  # Type (0 = ROM)
+        chip[10:12] = (0).to_bytes(2, 'big')  # Bank number
+        chip[12:14] = (C64.ROML_START).to_bytes(2, 'big')  # Load address $8000
+        chip[14:16] = (len(roml)).to_bytes(2, 'big')
+        f.write(bytes(chip))
+        f.write(roml)
+
+        # CHIP packet for ROMH ($A000-$BFFF)
+        chip = bytearray(16)
+        chip[0:4] = b'CHIP'
+        chip[4:8] = (16 + len(romh)).to_bytes(4, 'big')
+        chip[8:10] = (0).to_bytes(2, 'big')  # Type (0 = ROM)
+        chip[10:12] = (0).to_bytes(2, 'big')  # Bank number
+        chip[12:14] = (C64.ROMH_START).to_bytes(2, 'big')  # Load address $A000
+        chip[14:16] = (len(romh)).to_bytes(2, 'big')
+        f.write(bytes(chip))
+        f.write(romh)
+
+
 def main():
     fixtures_dir = project_root / "tests" / "fixtures"
     fixtures_dir.mkdir(parents=True, exist_ok=True)
@@ -3354,6 +4218,27 @@ def main():
     write_ocean_type1_crt(path_v5_crt, banks_v5, name="TYPE 5 TEST")
     print(f"    {path_v5_crt.name} ({desc_v5})")
 
+    # Type 3: Final Cartridge III test cart
+    print("  Type 3 - Final Cartridge III...")
+    banks_v3, desc_v3 = create_type3_test_cart(is_error_cart=False)
+    path_v3_crt = cartridge_types_dir / "test_cart_type_03_final_cartridge_iii.crt"
+    write_fc3_crt(path_v3_crt, banks_v3, name="TYPE 3 TEST")
+    print(f"    {path_v3_crt.name} ({desc_v3})")
+
+    # Type 10: Epyx FastLoad test cart
+    print("  Type 10 - Epyx FastLoad...")
+    rom_v10, desc_v10 = create_type10_test_cart(is_error_cart=False)
+    path_v10_crt = cartridge_types_dir / "test_cart_type_10_epyx_fastload.crt"
+    write_epyx_crt(path_v10_crt, rom_v10, name="TYPE 10 TEST")
+    print(f"    {path_v10_crt.name} ({desc_v10})")
+
+    # Type 13: Final Cartridge I test cart
+    print("  Type 13 - Final Cartridge I...")
+    roml_v13, romh_v13, desc_v13 = create_type13_test_cart(is_error_cart=False)
+    path_v13_crt = cartridge_types_dir / "test_cart_type_13_final_cartridge_i.crt"
+    write_fc1_crt(path_v13_crt, roml_v13, romh_v13, name="TYPE 13 TEST")
+    print(f"    {path_v13_crt.name} ({desc_v13})")
+
     # Type 15: C64 Game System test cart
     print("  Type 15 - C64 Game System...")
     banks_v15, desc_v15 = create_type15_test_cart(is_error_cart=False, num_banks=8)
@@ -3393,8 +4278,11 @@ def main():
     print(f"  poetry run c64 --cartridge {path_16k_crt}")
     print(f"  poetry run c64 --cartridge {path_ultimax_crt}")
     print(f"  poetry run c64 --cartridge {path_v1_crt}")
+    print(f"  poetry run c64 --cartridge {path_v3_crt}")
     print(f"  poetry run c64 --cartridge {path_v4_crt}")
     print(f"  poetry run c64 --cartridge {path_v5_crt}")
+    print(f"  poetry run c64 --cartridge {path_v10_crt}")
+    print(f"  poetry run c64 --cartridge {path_v13_crt}")
     print(f"  poetry run c64 --cartridge {path_v15_crt}")
     print(f"  poetry run c64 --cartridge {path_v17_crt}")
     print(f"  poetry run c64 --cartridge {path_v19_crt}")
