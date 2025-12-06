@@ -11,6 +11,7 @@ from typing import Optional
 from .base import Cartridge, CartridgeType
 from .type_00_normal import StaticROMCartridge
 from .type_01_action_replay import ActionReplayCartridge
+from .type_03_final_cartridge_iii import FinalCartridgeIIICartridge
 from .type_04_simons_basic import SimonsBasicCartridge
 from .type_05_ocean import OceanType1Cartridge
 from .type_10_epyx_fastload import EpyxFastloadCartridge
@@ -23,6 +24,7 @@ from .type_19_magic_desk import MagicDeskCartridge
 CARTRIDGE_TYPES: dict[int | CartridgeType, type[Cartridge]] = {
     CartridgeType.NORMAL: StaticROMCartridge,
     CartridgeType.ACTION_REPLAY: ActionReplayCartridge,
+    CartridgeType.FINAL_CARTRIDGE_III: FinalCartridgeIIICartridge,
     CartridgeType.SIMONS_BASIC: SimonsBasicCartridge,
     CartridgeType.OCEAN_TYPE_1: OceanType1Cartridge,
     CartridgeType.EPYX_FASTLOAD: EpyxFastloadCartridge,
@@ -67,6 +69,10 @@ def create_cartridge(
         if banks is None:
             raise ValueError("ActionReplayCartridge requires banks parameter")
         return ActionReplayCartridge(banks, name)
+    elif cart_class == FinalCartridgeIIICartridge:
+        if banks is None:
+            raise ValueError("FinalCartridgeIIICartridge requires banks parameter")
+        return FinalCartridgeIIICartridge(banks, name)
     elif cart_class == SimonsBasicCartridge:
         if roml_data is None or romh_data is None:
             raise ValueError("SimonsBasicCartridge requires roml_data and romh_data")

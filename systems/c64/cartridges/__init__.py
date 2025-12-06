@@ -60,6 +60,7 @@ from .base import (
 # Cartridge implementations
 from .type_00_normal import StaticROMCartridge
 from .type_01_action_replay import ActionReplayCartridge
+from .type_03_final_cartridge_iii import FinalCartridgeIIICartridge
 from .type_04_simons_basic import SimonsBasicCartridge
 from .type_05_ocean import OceanType1Cartridge
 from .type_10_epyx_fastload import EpyxFastloadCartridge
@@ -104,6 +105,7 @@ __all__ = [
     # Cartridge implementations
     "StaticROMCartridge",
     "ActionReplayCartridge",
+    "FinalCartridgeIIICartridge",
     "SimonsBasicCartridge",
     "OceanType1Cartridge",
     "EpyxFastloadCartridge",

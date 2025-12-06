@@ -31,6 +31,7 @@ class CartridgeType(IntEnum):
     # Implemented types
     NORMAL = 0                  # Generic/normal cartridge (8K/16K/Ultimax)
     ACTION_REPLAY = 1           # Action Replay freezer cartridge
+    FINAL_CARTRIDGE_III = 3     # Final Cartridge III freezer
     SIMONS_BASIC = 4            # Simons' BASIC extension
     OCEAN_TYPE_1 = 5            # Ocean Type 1 bank switching
     EPYX_FASTLOAD = 10          # Epyx FastLoad disk speedup
@@ -40,7 +41,6 @@ class CartridgeType(IntEnum):
 
     # Not yet implemented but commonly seen
     KCS_POWER = 2               # KCS Power Cartridge
-    FINAL_CARTRIDGE_III = 3     # Final Cartridge III
     FUN_PLAY = 7                # Fun Play / Power Play
     SUPER_GAMES = 8             # Super Games
     ATOMIC_POWER = 9            # Atomic Power

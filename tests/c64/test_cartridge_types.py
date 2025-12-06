@@ -27,6 +27,8 @@ from c64.cartridges import (
     ROMH_SIZE,
     ULTIMAX_ROMH_START,
     ULTIMAX_ROMH_SIZE,
+    IO1_START,
+    IO2_START,
 )
 
 
@@ -410,6 +412,200 @@ class TestC64GSCartridge:
             cart.write_io1(0xDE00, bank_num)
             assert cart.current_bank == bank_num
             assert cart.read_roml(ROML_START) == bank_num
+
+
+class TestFinalCartridgeIIICartridge:
+    """Tests for FinalCartridgeIIICartridge (Type 3).
+
+    Final Cartridge III is a freezer/utility cartridge with:
+    - 64KB ROM organized as 4 x 16KB banks
+    - Single control register at $DFFF
+    - NMI generation capability
+    - IO1/IO2 mirror last 2 pages of current ROM bank
+
+    Ref: https://rr.c64.org/wiki/Final_Cartridge_III
+    """
+
+    # Get class from registry to avoid direct import
+    CartClass = CARTRIDGE_TYPES[3]
+
+    def _make_banks(self, num_banks: int = 4) -> list[bytes]:
+        """Create test banks with unique signatures."""
+        banks = []
+        for i in range(num_banks):
+            bank = bytearray(ROML_SIZE + ROMH_SIZE)  # 16KB per bank
+            # Put bank number at start of ROML
+            bank[0] = 0x30 + i
+            # Put bank number at start of ROMH (offset 0x2000)
+            bank[ROML_SIZE] = 0x40 + i
+            # Put signature at IO1 offset ($1E00)
+            bank[0x1E00] = 0x50 + i
+            # Put signature at IO2 offset ($1F00)
+            bank[0x1F00] = 0x60 + i
+            banks.append(bytes(bank))
+        return banks
+
+    def test_hardware_type(self):
+        """FinalCartridgeIIICartridge should have hardware type 3."""
+        assert self.CartClass.HARDWARE_TYPE == 3
+
+    def test_initial_state_16kb_mode(self):
+        """FC3 should start in 16KB mode (EXROM=0, GAME=0)."""
+        banks = self._make_banks()
+        cart = self.CartClass(banks, name="Test FC3")
+
+        assert cart.exrom is False, "FC3 should have EXROM active (False)"
+        assert cart.game is False, "FC3 should have GAME active (False) = 16KB mode"
+        assert cart._current_bank == 0
+        assert cart._register_hidden is False
+
+    def test_bank_switching(self):
+        """Writing bank bits to $DFFF should switch banks."""
+        banks = self._make_banks()
+        cart = self.CartClass(banks, name="Test FC3")
+
+        # Initial state: bank 0
+        assert cart.read_roml(ROML_START) == 0x30  # Bank 0 ROML
+
+        # Switch to bank 1 (bits 0-1 = 01, keep EXROM/GAME active)
+        cart.write_io2(0xDFFF, 0x01)
+        assert cart._current_bank == 1
+        assert cart.read_roml(ROML_START) == 0x31
+
+        # Switch to bank 2
+        cart.write_io2(0xDFFF, 0x02)
+        assert cart._current_bank == 2
+        assert cart.read_roml(ROML_START) == 0x32
+
+        # Switch to bank 3
+        cart.write_io2(0xDFFF, 0x03)
+        assert cart._current_bank == 3
+        assert cart.read_roml(ROML_START) == 0x33
+
+    def test_romh_access(self):
+        """ROMH should be accessible in 16KB mode."""
+        banks = self._make_banks()
+        cart = self.CartClass(banks, name="Test FC3")
+
+        # ROMH starts at offset 0x2000 in the 16KB bank
+        assert cart.read_romh(ROMH_START) == 0x40  # Bank 0 ROMH
+
+        # Switch to bank 2 and check ROMH
+        cart.write_io2(0xDFFF, 0x02)
+        assert cart.read_romh(ROMH_START) == 0x42
+
+    def test_io1_mirrors_rom(self):
+        """IO1 should mirror ROM offset $1E00-$1EFF of current bank."""
+        banks = self._make_banks()
+        cart = self.CartClass(banks, name="Test FC3")
+
+        # IO1 mirrors $1E00-$1EFF
+        assert cart.read_io1(IO1_START) == 0x50  # Bank 0
+
+        cart.write_io2(0xDFFF, 0x02)  # Switch to bank 2
+        assert cart.read_io1(IO1_START) == 0x52
+
+    def test_io2_mirrors_rom(self):
+        """IO2 should mirror ROM offset $1F00-$1FFF of current bank."""
+        banks = self._make_banks()
+        cart = self.CartClass(banks, name="Test FC3")
+
+        # IO2 mirrors $1F00-$1FFF (reading, not the control register address)
+        assert cart.read_io2(IO2_START) == 0x60  # Bank 0
+
+        cart.write_io2(0xDFFF, 0x03)  # Switch to bank 3
+        assert cart.read_io2(IO2_START) == 0x63
+
+    def test_control_register_only_at_dfff(self):
+        """Only writes to $DFFF should affect the control register."""
+        banks = self._make_banks()
+        cart = self.CartClass(banks, name="Test FC3")
+
+        # Write to $DF00 should not change bank
+        cart.write_io2(0xDF00, 0x03)
+        assert cart._current_bank == 0
+
+        # Write to $DFFF should change bank
+        cart.write_io2(0xDFFF, 0x03)
+        assert cart._current_bank == 3
+
+    def test_hide_register(self):
+        """Setting bit 7 should hide the control register until reset."""
+        banks = self._make_banks()
+        cart = self.CartClass(banks, name="Test FC3")
+
+        # Switch to bank 1
+        cart.write_io2(0xDFFF, 0x01)
+        assert cart._current_bank == 1
+
+        # Hide register (bit 7 set)
+        cart.write_io2(0xDFFF, 0x82)  # 0x80 | 0x02
+        assert cart._register_hidden is True
+        assert cart._current_bank == 2  # Bank changed before hiding
+
+        # Further writes should be ignored
+        cart.write_io2(0xDFFF, 0x03)
+        assert cart._current_bank == 2  # Still bank 2
+
+    def test_reset_unhides_register(self):
+        """Reset should unhide the control register."""
+        banks = self._make_banks()
+        cart = self.CartClass(banks, name="Test FC3")
+
+        # Hide register
+        cart.write_io2(0xDFFF, 0x82)
+        assert cart._register_hidden is True
+
+        # Reset
+        cart.reset()
+
+        assert cart._register_hidden is False
+        assert cart._current_bank == 0
+        assert cart.exrom is False
+        assert cart.game is False
+
+    def test_exrom_game_control(self):
+        """Bits 4-5 should directly control EXROM and GAME."""
+        banks = self._make_banks()
+        cart = self.CartClass(banks, name="Test FC3")
+
+        # Initial: 16KB mode (EXROM=0, GAME=0)
+        assert cart.exrom is False
+        assert cart.game is False
+
+        # Set GAME high (bit 5 = 1) -> 8KB mode
+        cart.write_io2(0xDFFF, 0x20)
+        assert cart.exrom is False
+        assert cart.game is True
+
+        # Set EXROM high (bit 4 = 1) -> cartridge invisible
+        cart.write_io2(0xDFFF, 0x30)
+        assert cart.exrom is True
+        assert cart.game is True
+
+        # Both active (EXROM=0, GAME=0) -> back to 16KB
+        cart.write_io2(0xDFFF, 0x00)
+        assert cart.exrom is False
+        assert cart.game is False
+
+    def test_nmi_line(self):
+        """Bit 6 controls NMI line (0 = active/trigger NMI)."""
+        banks = self._make_banks()
+        cart = self.CartClass(banks, name="Test FC3")
+
+        # Initially NMI line is high (inactive)
+        assert cart._nmi_line is True
+        assert cart.nmi_pending is False
+
+        # Set NMI line low (bit 6 = 0)
+        cart.write_io2(0xDFFF, 0x00)
+        assert cart._nmi_line is False
+        assert cart.nmi_pending is True
+
+        # Set NMI line high (bit 6 = 1)
+        cart.write_io2(0xDFFF, 0x40)
+        assert cart._nmi_line is True
+        assert cart.nmi_pending is False
 
 
 @requires_c64_roms
