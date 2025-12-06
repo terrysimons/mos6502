@@ -136,28 +136,69 @@ class C64Memory:
         return self._ram[addr]
 
     def _read_region_8_9(self, addr: int) -> int:
-        """Read from $8xxx-$9xxx - ROML cartridge or RAM."""
+        """Read from $8xxx-$9xxx - ROML cartridge or RAM.
+
+        ROML visibility depends on cartridge EXROM/GAME signals AND CPU port:
+        - Ultimax mode (EXROM=1, GAME=0): ROML always visible
+        - 8K/16K mode (EXROM=0): ROML visible only when LORAM=1 AND HIRAM=1
+          Setting LORAM=0 or HIRAM=0 exposes underlying RAM (used by diagnostics)
+        """
         if self.cartridge is not None:
-            # ROML visible when EXROM=0, or in Ultimax mode (EXROM=1, GAME=0)
-            if not self.cartridge.exrom or not self.cartridge.game:
+            # Ultimax mode: ROML always visible regardless of CPU port
+            if self.cartridge.exrom and not self.cartridge.game:
                 return self.cartridge.read_roml(addr)
+            # 8K/16K mode (EXROM=0): Check CPU port bits
+            if not self.cartridge.exrom:
+                # ROML visible only when both LORAM=1 and HIRAM=1
+                loram = self.port & 0b00000001
+                hiram = self.port & 0b00000010
+                if loram and hiram:
+                    return self.cartridge.read_roml(addr)
         return self._ram[addr]
 
     def _read_region_A_B(self, addr: int) -> int:
-        """Read from $Axxx-$Bxxx - ROMH cartridge, BASIC ROM, or RAM."""
-        # Cartridge ROMH takes priority (16KB mode: EXROM=0, GAME=0)
+        """Read from $Axxx-$Bxxx - ROMH cartridge, BASIC ROM, or RAM.
+
+        Visibility depends on cartridge EXROM/GAME signals AND CPU port:
+        - 16K mode (EXROM=0, GAME=0): ROMH visible only when LORAM=1 AND HIRAM=1
+        - Without 16K cartridge: BASIC ROM visible only when LORAM=1 AND HIRAM=1
+        - Setting LORAM=0 or HIRAM=0 exposes underlying RAM
+        """
+        loram = self.port & 0b00000001
+        hiram = self.port & 0b00000010
+
+        # Check for 16K cartridge ROMH (EXROM=0, GAME=0)
         if self.cartridge is not None and not self.cartridge.exrom and not self.cartridge.game:
-            return self.cartridge.read_romh(addr)
-        # BASIC ROM enabled?
-        if self.port & 0b00000001:
+            # ROMH visible only when both LORAM=1 and HIRAM=1
+            if loram and hiram:
+                return self.cartridge.read_romh(addr)
+            # LORAM=0 or HIRAM=0: RAM visible instead of ROMH
+            return self._ram[addr]
+        # No 16K cartridge: BASIC ROM visible only when LORAM=1 AND HIRAM=1
+        if loram and hiram:
             return self.basic[addr - BASIC_ROM_START]
         return self._ram[addr]
 
     def _read_region_D(self, addr: int) -> int:
-        """Read from $Dxxx - I/O area or CHAR ROM."""
-        if self.port & 0b00000100:  # I/O enabled
+        """Read from $Dxxx - I/O area, CHAR ROM, or RAM.
+
+        The visibility of this region depends on CPU port bits:
+        - CHAREN=1 (bit 2): I/O visible ($D000-$DFFF)
+        - CHAREN=0 AND (LORAM=1 OR HIRAM=1): Character ROM visible
+        - CHAREN=0 AND LORAM=0 AND HIRAM=0: RAM visible (all ROMs banked out)
+        """
+        charen = self.port & 0b00000100
+        if charen:
+            # CHAREN=1: I/O area visible
             return self._read_io_area(addr)
-        return self.char[addr - CHAR_ROM_START]
+        # CHAREN=0: Check if we see Character ROM or RAM
+        loram = self.port & 0b00000001
+        hiram = self.port & 0b00000010
+        if loram or hiram:
+            # At least one ROM bit set: Character ROM visible
+            return self.char[addr - CHAR_ROM_START]
+        # Both LORAM=0 and HIRAM=0: All ROMs banked out, RAM visible
+        return self._ram[addr]
 
     def _read_region_E_F(self, addr: int) -> int:
         """Read from $Exxx-$Fxxx - KERNAL ROM, Ultimax cartridge, or RAM."""
