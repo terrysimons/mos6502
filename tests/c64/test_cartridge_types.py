@@ -20,6 +20,7 @@ from c64.cartridges import (
     ErrorCartridge,
     StaticROMCartridge,
     ActionReplayCartridge,
+    MagicDeskCartridge,
     create_cartridge,
     ROML_START,
     ROMH_START,
@@ -61,6 +62,175 @@ class TestCartridgeModule:
     def test_error_cartridge_hardware_type(self):
         """ErrorCartridge should have hardware type -1 (not a real type)."""
         assert ErrorCartridge.HARDWARE_TYPE == -1
+
+    @requires_c64_roms
+    def test_magic_desk_cartridge_hardware_type(self):
+        """MagicDeskCartridge should have hardware type 19."""
+        assert MagicDeskCartridge.HARDWARE_TYPE == 19
+
+    @requires_c64_roms
+    def test_cartridge_types_registry_contains_type_19(self):
+        """Type 19 (Magic Desk) should be in the registry."""
+        assert MagicDeskCartridge.HARDWARE_TYPE in CARTRIDGE_TYPES
+        assert CARTRIDGE_TYPES[MagicDeskCartridge.HARDWARE_TYPE] == MagicDeskCartridge
+
+
+@requires_c64_roms
+class TestMagicDeskCartridge:
+    """Tests for MagicDeskCartridge (Type 19).
+
+    Ref: https://www.hackup.net/2019/07/bank-switching-cartridges/
+    """
+
+    def test_initial_state_8kb_mode(self):
+        """Magic Desk should start in 8KB mode (EXROM=0, GAME=1)."""
+        banks = [bytes(ROML_SIZE) for _ in range(4)]
+        cart = MagicDeskCartridge(banks, name="Test Magic Desk")
+
+        assert cart.exrom is False, "Magic Desk should have EXROM active (False)"
+        assert cart.game is True, "Magic Desk should have GAME inactive (True) = 8KB mode"
+        assert cart.current_bank == 0
+        assert cart.cartridge_disabled is False
+
+    def test_bank_switching(self):
+        """Writing to $DE00 should switch banks."""
+        # Create 4 banks with different data
+        banks = []
+        for i in range(4):
+            bank = bytearray(ROML_SIZE)
+            bank[0] = 0x10 + i  # Each bank starts with different byte
+            banks.append(bytes(bank))
+
+        cart = MagicDeskCartridge(banks, name="Test Magic Desk")
+
+        # Initial state: bank 0
+        assert cart.read_roml(ROML_START) == 0x10
+
+        # Switch to bank 1
+        cart.write_io1(0xDE00, 0x01)
+        assert cart.current_bank == 1
+        assert cart.read_roml(ROML_START) == 0x11
+
+        # Switch to bank 2
+        cart.write_io1(0xDE00, 0x02)
+        assert cart.current_bank == 2
+        assert cart.read_roml(ROML_START) == 0x12
+
+        # Switch to bank 3
+        cart.write_io1(0xDE00, 0x03)
+        assert cart.current_bank == 3
+        assert cart.read_roml(ROML_START) == 0x13
+
+    def test_bank_wrapping(self):
+        """Bank number should wrap to actual number of banks."""
+        banks = [bytes(ROML_SIZE) for _ in range(4)]
+        cart = MagicDeskCartridge(banks, name="Test Magic Desk")
+
+        # Try to select bank 5 (should wrap to 1 with 4 banks)
+        cart.write_io1(0xDE00, 0x05)
+        assert cart.current_bank == 1  # 5 % 4 = 1
+
+        # Try to select bank 8 (should wrap to 0)
+        cart.write_io1(0xDE00, 0x08)
+        assert cart.current_bank == 0  # 8 % 4 = 0
+
+    def test_disable_cartridge(self):
+        """Writing with bit 7 set should disable cartridge."""
+        banks = [bytes(ROML_SIZE) for _ in range(4)]
+        cart = MagicDeskCartridge(banks, name="Test Magic Desk")
+
+        # Cartridge starts enabled
+        assert cart.cartridge_disabled is False
+        assert cart.exrom is False
+
+        # Disable cartridge by writing $80 to $DE00
+        cart.write_io1(0xDE00, 0x80)
+
+        assert cart.cartridge_disabled is True
+        assert cart.exrom is True, "EXROM should go high when disabled"
+
+        # ROML should return $FF when disabled
+        assert cart.read_roml(ROML_START) == 0xFF
+
+    def test_disabled_cartridge_ignores_writes(self):
+        """Once disabled, writes to $DE00 should be ignored until reset."""
+        banks = []
+        for i in range(4):
+            bank = bytearray(ROML_SIZE)
+            bank[0] = 0x10 + i
+            banks.append(bytes(bank))
+
+        cart = MagicDeskCartridge(banks, name="Test Magic Desk")
+
+        # Disable cartridge
+        cart.write_io1(0xDE00, 0x80)
+        assert cart.cartridge_disabled is True
+
+        # Try to switch bank - should be ignored
+        cart.write_io1(0xDE00, 0x02)
+        assert cart.cartridge_disabled is True  # Still disabled
+        assert cart.read_roml(ROML_START) == 0xFF  # Still returns $FF
+
+    def test_reset_re_enables_cartridge(self):
+        """Reset should re-enable disabled cartridge."""
+        banks = []
+        for i in range(4):
+            bank = bytearray(ROML_SIZE)
+            bank[0] = 0x10 + i
+            banks.append(bytes(bank))
+
+        cart = MagicDeskCartridge(banks, name="Test Magic Desk")
+
+        # Disable cartridge
+        cart.write_io1(0xDE00, 0x80)
+        assert cart.cartridge_disabled is True
+
+        # Reset
+        cart.reset()
+
+        assert cart.cartridge_disabled is False
+        assert cart.exrom is False
+        assert cart.game is True
+        assert cart.current_bank == 0
+        assert cart.read_roml(ROML_START) == 0x10
+
+    def test_64_banks_512kb(self):
+        """Should support up to 64 banks (512KB)."""
+        banks = []
+        for i in range(64):
+            bank = bytearray(ROML_SIZE)
+            bank[0] = i  # Each bank starts with its number
+            banks.append(bytes(bank))
+
+        cart = MagicDeskCartridge(banks, name="Test 512KB")
+
+        assert cart.num_banks == 64
+
+        # Test several banks
+        for bank_num in [0, 15, 31, 63]:
+            cart.write_io1(0xDE00, bank_num)
+            assert cart.current_bank == bank_num
+            assert cart.read_roml(ROML_START) == bank_num
+
+    def test_io_region_addresses(self):
+        """Bank switching should work from any IO1 address ($DE00-$DEFF)."""
+        banks = []
+        for i in range(4):
+            bank = bytearray(ROML_SIZE)
+            bank[0] = 0x10 + i
+            banks.append(bytes(bank))
+
+        cart = MagicDeskCartridge(banks, name="Test Magic Desk")
+
+        # Write to various IO1 addresses
+        cart.write_io1(0xDE00, 0x01)
+        assert cart.current_bank == 1
+
+        cart.write_io1(0xDE42, 0x02)
+        assert cart.current_bank == 2
+
+        cart.write_io1(0xDEFF, 0x03)
+        assert cart.current_bank == 3
 
 
 @requires_c64_roms
@@ -658,6 +828,18 @@ class TestC64CartridgeLoading:
     def test_type_19_magic_desk_cartridge_loads(self, c64):
         """Type 19: Magic Desk, Domark, HES Australia."""
         self._test_load_cartridge_type(c64, 19)
+
+    @requires_c64_roms
+    def test_type_19_magic_desk_cartridge_executes(self, c64):
+        """Type 19 Magic Desk test cartridge should pass all tests."""
+        crt_path = CARTRIDGE_TYPES_DIR / "test_cart_type_19_magic_desk_domark_hes_australia.crt"
+        if not crt_path.exists():
+            pytest.skip(f"Test fixture not found: {crt_path}")
+
+        tests_complete, fail_count = self._run_test_cartridge(c64, crt_path)
+
+        assert tests_complete, "Test cartridge did not complete within max cycles"
+        assert fail_count == 0, f"Test cartridge reported {fail_count} failures"
 
     @requires_c64_roms
     def test_type_20_super_snapshot_v5_cartridge_loads(self, c64):

@@ -23,3 +23,4 @@
 - Make sure to use the code style already present in the project.
 - Always generate all error and test carts for every mapper variant.
 - We should be explicit where memory addresses are concerned.
+- Remember to switch back to bank 0 when needed for test carts.

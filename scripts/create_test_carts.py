@@ -53,6 +53,7 @@ from mos6502.instructions import (
     DEY_IMPLIED_0x88,
     # Compare
     CMP_IMMEDIATE_0xC9,
+    CMP_ZEROPAGE_0xC5,
     CPX_IMMEDIATE_0xE0,
     CPY_IMMEDIATE_0xC0,
     # Branch
@@ -69,6 +70,8 @@ from mos6502.instructions import (
     TXS_IMPLIED_0x9A,
     PHA_IMPLIED_0x48,
     PLA_IMPLIED_0x68,
+    # Transfer
+    TXA_IMPLIED_0x8A,
     # Flags
     SEI_IMPLIED_0x78,
     CLI_IMPLIED_0x58,
@@ -2610,6 +2613,280 @@ def create_type17_test_cart(is_error_cart: bool = False, num_banks: int = 8) -> 
     return banks, desc
 
 
+def write_magic_desk_crt(path: Path, banks: list[bytes], name: str = "TEST") -> None:
+    """Write a Magic Desk CRT file with multiple banks.
+
+    Magic Desk cartridges use 8KB mode with bank switching via $DE00.
+    Bits 0-5 select bank, bit 7 disables the cartridge.
+
+    Ref: https://www.hackup.net/2019/07/bank-switching-cartridges/
+
+    Args:
+        path: Output file path
+        banks: List of 8KB ROM banks (up to 64 banks = 512KB)
+        name: Cartridge name
+    """
+    # CRT Header (64 bytes)
+    header = bytearray(64)
+    header[0:16] = b'C64 CARTRIDGE   '
+    header[0x10:0x14] = (64).to_bytes(4, 'big')  # Header length
+    header[0x14] = 1  # Version hi
+    header[0x15] = 0  # Version lo
+    header[0x16:0x18] = (19).to_bytes(2, 'big')  # Hardware type 19 = Magic Desk
+    header[0x18] = 0  # EXROM = 0 (active)
+    header[0x19] = 1  # GAME = 1 (inactive) -> 8KB mode
+    name_bytes = name.encode('ascii')[:32].ljust(32, b'\x00')
+    header[0x20:0x40] = name_bytes
+
+    with open(path, 'wb') as f:
+        f.write(bytes(header))
+
+        # Write each bank as a CHIP packet
+        for bank_num, bank_data in enumerate(banks):
+            chip = bytearray(16)
+            chip[0:4] = b'CHIP'
+            chip[4:8] = (16 + len(bank_data)).to_bytes(4, 'big')
+            chip[8:10] = (0).to_bytes(2, 'big')  # Type (0 = ROM)
+            chip[10:12] = bank_num.to_bytes(2, 'big')  # Bank number
+            chip[12:14] = (C64.ROML_START).to_bytes(2, 'big')  # Load address
+            chip[14:16] = (len(bank_data)).to_bytes(2, 'big')
+            f.write(bytes(chip))
+            f.write(bank_data)
+
+
+def create_type19_test_cart(is_error_cart: bool = False, num_banks: int = 8) -> tuple[list[bytes], str]:
+    """Create Type 19 (Magic Desk) test cartridge with bank switching tests.
+
+    Magic Desk uses bank selection via $DE00 (bits 0-5, up to 64 banks).
+    Bit 7 of $DE00 disables the cartridge until reset.
+
+    We test bank switching by:
+    1. Copying a bank test routine to RAM
+    2. For each bank, switch and verify the signature
+
+    Ref: https://www.hackup.net/2019/07/bank-switching-cartridges/
+
+    Args:
+        is_error_cart: If True, this is for error/regression testing
+        num_banks: Number of 8KB banks to create (default 8 for 64KB)
+
+    Returns:
+        Tuple of (banks_list, description)
+    """
+    cart = bytearray(C64.ROML_SIZE)
+
+    # Cartridge header at $8000-$8008
+    cart[0x0000] = 0x09  # Cold start lo -> $8009
+    cart[0x0001] = 0x80  # Cold start hi
+    cart[0x0002] = 0x09  # Warm start lo -> $8009
+    cart[0x0003] = 0x80  # Warm start hi
+    cart[0x0004] = 0xC3  # 'C' (CBM80 signature)
+    cart[0x0005] = 0xC2  # 'B'
+    cart[0x0006] = 0xCD  # 'M'
+    cart[0x0007] = 0x38  # '8'
+    cart[0x0008] = 0x30  # '0'
+
+    code = []
+    code_base = 0x8009
+
+    # Initialize - disable interrupts, set up stack
+    code.extend([
+        SEI_IMPLIED_0x78,
+        LDX_IMMEDIATE_0xA2, 0xFF,
+        TXS_IMPLIED_0x9A,
+    ])
+
+    # Clear screen
+    code.extend([
+        LDA_IMMEDIATE_0xA9, 0x20,
+        LDX_IMMEDIATE_0xA2, 0x00,
+    ])
+    code.extend([
+        STA_ABSOLUTE_X_0x9D, 0x00, 0x04,
+        STA_ABSOLUTE_X_0x9D, 0x00, 0x05,
+        STA_ABSOLUTE_X_0x9D, 0x00, 0x06,
+        STA_ABSOLUTE_X_0x9D, 0x00, 0x07,
+        INX_IMPLIED_0xE8,
+        BNE_RELATIVE_0xD0, 0xF1,
+    ])
+
+    # Initialize fail counter
+    code.extend(emit_init_fail_counter())
+
+    # Set border/background to black
+    code.extend([
+        LDA_IMMEDIATE_0xA9, COLOR_BLACK,
+        STA_ABSOLUTE_0x8D, 0x20, 0xD0,
+        STA_ABSOLUTE_0x8D, 0x21, 0xD0,
+    ])
+
+    # Display title and type info
+    title = "TYPE 19 ERROR CART" if is_error_cart else "TYPE 19 VERIFY"
+    code.extend(create_display_code(title, line=0, color=COLOR_WHITE))
+    code.extend(create_display_code("TYPE: 19", line=1, color=COLOR_YELLOW))
+    code.extend(create_display_code("NAME: MAGIC DESK", line=2, color=COLOR_YELLOW))
+    code.extend(create_display_code(f"BANKS: {num_banks}", line=3, color=COLOR_YELLOW))
+
+    current_line = 5
+
+    # Copy bank test routine to RAM at $0340
+    # This routine:
+    #   - Expects bank number in X
+    #   - Returns comparison result in Z flag
+    ram_routine = 0x0340
+    test_routine = [
+        # Switch to bank X by writing X to $DE00
+        STX_ABSOLUTE_0x8E, 0x00, 0xDE,  # STX $DE00 - select bank
+        # Read signature from $9FF5 and compare with expected (bank number)
+        LDA_ABSOLUTE_0xAD, 0xF5, 0x9F,  # LDA $9FF5 - read signature
+        # Compare A with X (bank number = expected signature)
+        STA_ZEROPAGE_0x85, 0xFE,  # STA $FE - store signature read from bank
+        # Switch back to bank 0 before returning (main code is in bank 0!)
+        LDY_IMMEDIATE_0xA0, 0x00,       # LDY #$00
+        STY_ABSOLUTE_0x8C, 0x00, 0xDE,  # STY $DE00 - switch back to bank 0
+        # Now do the comparison (A was saved in $FE)
+        TXA_IMPLIED_0x8A,        # TXA - transfer X (expected bank num) to A
+        CMP_ZEROPAGE_0xC5, 0xFE, # CMP $FE - compare with signature
+        RTS_IMPLIED_0x60,
+    ]
+
+    # Copy test routine to RAM
+    for i, byte in enumerate(test_routine):
+        code.extend([
+            LDA_IMMEDIATE_0xA9, byte,
+            STA_ABSOLUTE_0x8D, (ram_routine + i) & 0xFF, (ram_routine + i) >> 8,
+        ])
+
+    # Test each bank
+    # We test banks 0 through num_banks-1
+    sig_offset = 0x1FF5  # Signature stored at $9FF5 in each bank
+
+    for bank_num in range(num_banks):
+        # Display test name: "BANK N:"
+        test_label = f"BANK {bank_num}:"
+        code.extend(create_display_code(test_label, line=current_line, color=COLOR_WHITE))
+
+        # Result position: create_display_code centers the text, so calculate where it ends
+        # Center position: start_pos = (40 - len) // 2
+        # End position: start_pos + len
+        # Result after a space: start_pos + len + 1
+        label_start = (40 - len(test_label)) // 2
+        result_col = label_start + len(test_label) + 1
+        result_screen = 0x0400 + (current_line * 40) + result_col
+        result_color = 0xD800 + (current_line * 40) + result_col
+
+        # Load bank number and call test routine
+        code.extend([
+            LDX_IMMEDIATE_0xA2, bank_num,
+            JSR_ABSOLUTE_0x20, ram_routine & 0xFF, (ram_routine >> 8) & 0xFF,
+        ])
+
+        # Check result (Z flag set = pass)
+        code.extend([
+            BEQ_RELATIVE_0xF0, 0x03,  # BEQ +3 (skip JMP) - test passed
+            JMP_ABSOLUTE_0x4C, 0x00, 0x00,  # JMP to fail_handler (placeholder)
+        ])
+        fail_jmp = len(code) - 2
+
+        # Pass: Display "PASS" in green
+        for i, ch in enumerate("PASS"):
+            sc = ord(ch) - ord('A') + 1 if ch.isalpha() else 0x20
+            code.extend([
+                LDA_IMMEDIATE_0xA9, sc,
+                STA_ABSOLUTE_0x8D, (result_screen + i) & 0xFF, (result_screen + i) >> 8,
+                LDA_IMMEDIATE_0xA9, COLOR_PASS,
+                STA_ABSOLUTE_0x8D, (result_color + i) & 0xFF, (result_color + i) >> 8,
+            ])
+
+        # Jump over fail handler
+        code.extend([JMP_ABSOLUTE_0x4C, 0x00, 0x00])  # JMP to next_test (placeholder)
+        skip_fail_jmp = len(code) - 2
+
+        # Fail handler
+        fail_addr = len(code)
+        code[fail_jmp] = (code_base + fail_addr) & 0xFF
+        code[fail_jmp + 1] = ((code_base + fail_addr) >> 8) & 0xFF
+
+        # Increment fail counter
+        code.extend(emit_inc_fail_counter())
+
+        # Display "FAIL" in red
+        for i, ch in enumerate("FAIL"):
+            sc = ord(ch) - ord('A') + 1 if ch.isalpha() else 0x20
+            code.extend([
+                LDA_IMMEDIATE_0xA9, sc,
+                STA_ABSOLUTE_0x8D, (result_screen + i) & 0xFF, (result_screen + i) >> 8,
+                LDA_IMMEDIATE_0xA9, COLOR_FAIL,
+                STA_ABSOLUTE_0x8D, (result_color + i) & 0xFF, (result_color + i) >> 8,
+            ])
+
+        # Next test label - fix up skip jump
+        next_addr = len(code)
+        code[skip_fail_jmp] = (code_base + next_addr) & 0xFF
+        code[skip_fail_jmp + 1] = ((code_base + next_addr) >> 8) & 0xFF
+
+        current_line += 1
+
+    current_line += 1  # Skip a line before final status
+
+    # === Final status ===
+    code.extend(emit_load_fail_counter())
+    code.extend([
+        BEQ_RELATIVE_0xF0, 0x03,  # BEQ +3 (skip JMP) - no failures
+        JMP_ABSOLUTE_0x4C, 0x00, 0x00,  # JMP to show_fail (placeholder)
+    ])
+    show_fail_jmp = len(code) - 2
+
+    # All passed - green border
+    code.extend([
+        LDA_IMMEDIATE_0xA9, COLOR_GREEN,
+        STA_ABSOLUTE_0x8D, 0x20, 0xD0,  # Border green
+    ])
+    code.extend(create_display_code("ALL TESTS PASSED", line=current_line, color=COLOR_GREEN))
+    code.extend(create_display_code("TYPE 19 SUPPORTED: PASS", line=current_line + 1, color=COLOR_GREEN))
+    code.extend([JMP_ABSOLUTE_0x4C, 0x00, 0x00])  # JMP to loop (placeholder)
+    loop_jmp = len(code) - 2
+
+    # Show fail - red border
+    show_fail_addr = len(code)
+    code[show_fail_jmp] = (code_base + show_fail_addr) & 0xFF
+    code[show_fail_jmp + 1] = ((code_base + show_fail_addr) >> 8) & 0xFF
+
+    code.extend([
+        LDA_IMMEDIATE_0xA9, COLOR_RED,
+        STA_ABSOLUTE_0x8D, 0x20, 0xD0,  # Border red
+    ])
+    code.extend(create_display_code("VERIFICATION FAILED", line=current_line, color=COLOR_FAIL))
+    code.extend(create_display_code("TYPE 19 SUPPORTED: FAIL", line=current_line + 1, color=COLOR_FAIL))
+
+    # Mark tests complete (set bit 7, preserve failure count)
+    loop_addr = len(code)
+    code[loop_jmp] = (code_base + loop_addr) & 0xFF
+    code[loop_jmp + 1] = ((code_base + loop_addr) >> 8) & 0xFF
+    code.extend(emit_mark_tests_complete())
+
+    # Infinite loop
+    inf_loop_addr = len(code)
+    code.extend([JMP_ABSOLUTE_0x4C, (code_base + inf_loop_addr) & 0xFF, ((code_base + inf_loop_addr) >> 8) & 0xFF])
+
+    # Copy code into cartridge
+    for i, byte in enumerate(code):
+        cart[0x0009 + i] = byte
+
+    # Add signature to bank 0 (bank number as signature byte)
+    cart[sig_offset] = 0x00  # Bank 0 signature
+
+    # Create remaining banks with their signatures
+    banks = [bytes(cart)]
+    for bank_num in range(1, num_banks):
+        bank = bytearray(C64.ROML_SIZE)
+        bank[sig_offset] = bank_num  # Bank signature = bank number
+        banks.append(bytes(bank))
+
+    desc = f"Type 19 verification ({num_banks} banks)" if not is_error_cart else f"Type 19 error cart ({num_banks} banks)"
+    return banks, desc
+
+
 def main():
     fixtures_dir = project_root / "tests" / "fixtures"
     fixtures_dir.mkdir(parents=True, exist_ok=True)
@@ -2798,6 +3075,13 @@ def main():
     write_dinamic_crt(path_v17_crt, banks_v17, name="TYPE 17 TEST")
     print(f"    {path_v17_crt.name} ({desc_v17})")
 
+    # Type 19: Magic Desk test cart
+    print("  Type 19 - Magic Desk...")
+    banks_v19, desc_v19 = create_type19_test_cart(is_error_cart=False, num_banks=8)
+    path_v19_crt = cartridge_types_dir / "test_cart_type_19_magic_desk_domark_hes_australia.crt"
+    write_magic_desk_crt(path_v19_crt, banks_v19, name="TYPE 19 TEST")
+    print(f"    {path_v19_crt.name} ({desc_v19})")
+
     # Unsupported types (2-85) - create simple info display carts
     for hw_type, type_name in sorted(C64.CRT_HARDWARE_TYPES.items()):
         if hw_type in CARTRIDGE_TYPES:
@@ -2819,6 +3103,7 @@ def main():
     print(f"  poetry run c64 --cartridge {path_v4_crt}")
     print(f"  poetry run c64 --cartridge {path_v5_crt}")
     print(f"  poetry run c64 --cartridge {path_v17_crt}")
+    print(f"  poetry run c64 --cartridge {path_v19_crt}")
     print(f"\nTest unsupported type (should show error cart with NO TESTS):")
     print(f"  poetry run c64 --cartridge {cartridge_types_dir}/test_cart_type_02_kcs_power_cartridge.crt")
 
