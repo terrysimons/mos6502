@@ -262,6 +262,24 @@ class C64:
             dest="throttle",
             help="Disable throttling - run at maximum speed (for benchmarks)",
         )
+        core_group.add_argument(
+            "--mouse",
+            action="store_true",
+            help="Enable 1351 proportional mouse emulation (pygame mode only)",
+        )
+        core_group.add_argument(
+            "--mouse-port",
+            type=int,
+            choices=[1, 2],
+            default=1,
+            help="Joystick port for mouse (1 or 2, default: 1)",
+        )
+        core_group.add_argument(
+            "--mouse-sensitivity",
+            type=float,
+            default=1.0,
+            help="Mouse sensitivity multiplier (default: 1.0)",
+        )
 
         # Program loading options
         program_group = parser.add_argument_group("Program Loading")
@@ -2436,7 +2454,7 @@ class C64:
             # Check if we've entered BASIC ROM (for conditional logging)
             self._check_pc_region()
 
-            # Handle pygame events (window close, keyboard, etc.)
+            # Handle pygame events (window close, keyboard, mouse, etc.)
             for event in pygame.event.get():
                 if event.type == pygame.QUIT:
                     raise errors.QuitRequestError("Window closed")
@@ -2446,6 +2464,18 @@ class C64:
                     self._handle_pygame_keyboard(event, pygame)
                 elif event.type == pygame.KEYUP:
                     self._handle_pygame_keyboard(event, pygame)
+                elif event.type == pygame.MOUSEMOTION:
+                    # Update mouse position from relative motion
+                    if self._mouse_enabled:
+                        self.update_mouse_motion(event.rel[0], event.rel[1])
+                elif event.type == pygame.MOUSEBUTTONDOWN:
+                    # Mouse button pressed
+                    if self._mouse_enabled:
+                        self.set_mouse_button(event.button, True)
+                elif event.type == pygame.MOUSEBUTTONUP:
+                    # Mouse button released
+                    if self._mouse_enabled:
+                        self.set_mouse_button(event.button, False)
 
             # Check if VIC has a new frame ready (VBlank)
             # VIC takes the snapshot at the exact moment of VBlank for consistency
@@ -2742,7 +2772,7 @@ class C64:
         """Process pygame events without rendering.
 
         Called when the frame_complete wait times out to keep the UI
-        responsive (handle window close, keyboard input, etc.).
+        responsive (handle window close, keyboard input, mouse input, etc.).
         """
         if not self.pygame_available or self.pygame_screen is None:
             return
@@ -2759,6 +2789,18 @@ class C64:
                     self._handle_pygame_keyboard(event, pygame)
                 elif event.type == pygame.KEYUP:
                     self._handle_pygame_keyboard(event, pygame)
+                elif event.type == pygame.MOUSEMOTION:
+                    # Update mouse position from relative motion
+                    if self._mouse_enabled:
+                        self.update_mouse_motion(event.rel[0], event.rel[1])
+                elif event.type == pygame.MOUSEBUTTONDOWN:
+                    # Mouse button pressed
+                    if self._mouse_enabled:
+                        self.set_mouse_button(event.button, True)
+                elif event.type == pygame.MOUSEBUTTONUP:
+                    # Mouse button released
+                    if self._mouse_enabled:
+                        self.set_mouse_button(event.button, False)
 
         except errors.QuitRequestError:
             raise  # Re-raise quit request to propagate up
@@ -2895,6 +2937,90 @@ class C64:
         """
         for char in text:
             self.type_character(char, hold_cycles)
+
+    # -------------------------------------------------------------------------
+    # Mouse Input (1351 proportional mouse emulation)
+    # -------------------------------------------------------------------------
+    # The Commodore 1351 mouse uses:
+    # - SID POT registers ($D419/$D41A) for position (relative motion, wraps 0-255)
+    # - Joystick port for buttons (active low):
+    #   - Left button = Fire (bit 4)
+    #   - Right button = Up (bit 0) in some implementations
+    # Mouse is typically plugged into Port 1 (joystick_1)
+
+    _mouse_enabled: bool = False
+    _mouse_port: int = 1  # Which joystick port (1 or 2)
+    _mouse_sensitivity: float = 1.0  # Scale factor for mouse motion
+
+    def enable_mouse(self, enabled: bool = True, port: int = 1, sensitivity: float = 1.0) -> None:
+        """Enable or disable mouse input.
+
+        Args:
+            enabled: Whether mouse input is enabled
+            port: Which joystick port (1 or 2) the mouse is connected to
+            sensitivity: Scale factor for mouse motion (1.0 = 1:1 mapping)
+        """
+        self._mouse_enabled = enabled
+        self._mouse_port = port
+        self._mouse_sensitivity = sensitivity
+        self.sid.mouse_enabled = enabled
+        log.info(f"Mouse input {'enabled' if enabled else 'disabled'} on port {port}, sensitivity={sensitivity}")
+
+    def update_mouse_motion(self, delta_x: int, delta_y: int) -> None:
+        """Update mouse position from motion delta.
+
+        The 1351 mouse sends relative motion that wraps around 0-255.
+        This method should be called with pygame MOUSEMOTION event rel values.
+
+        Args:
+            delta_x: Horizontal motion in pixels (positive = right)
+            delta_y: Vertical motion in pixels (positive = down)
+        """
+        if not self._mouse_enabled:
+            return
+
+        # Apply sensitivity scaling
+        scaled_x = int(delta_x * self._mouse_sensitivity)
+        scaled_y = int(delta_y * self._mouse_sensitivity)
+
+        # Update SID POT registers
+        self.sid.update_mouse(scaled_x, scaled_y)
+
+    def set_mouse_button(self, button: int, pressed: bool) -> None:
+        """Set mouse button state.
+
+        Args:
+            button: Button number (1 = left, 3 = right for pygame)
+            pressed: True if button is pressed, False if released
+        """
+        if not self._mouse_enabled:
+            return
+
+        # Get the joystick register for the configured port
+        if self._mouse_port == 1:
+            joystick = self.cia1.joystick_1
+        else:
+            joystick = self.cia1.joystick_2
+
+        # Mouse buttons use active-low logic (0 = pressed, 1 = released)
+        # Left button (1) = Fire (bit 4)
+        # Right button (3) = Up (bit 0) - common mapping for 1351
+        if button == 1:  # Left button = Fire
+            if pressed:
+                joystick &= ~0x10  # Clear bit 4 (pressed)
+            else:
+                joystick |= 0x10   # Set bit 4 (released)
+        elif button == 3:  # Right button = Up
+            if pressed:
+                joystick &= ~0x01  # Clear bit 0 (pressed)
+            else:
+                joystick |= 0x01   # Set bit 0 (released)
+
+        # Update the joystick state
+        if self._mouse_port == 1:
+            self.cia1.joystick_1 = joystick
+        else:
+            self.cia1.joystick_2 = joystick
 
     # Pending key releases for non-blocking terminal input
     # Each entry is (release_cycles, row, col) - uses CPU cycles, not wall-clock time
@@ -3316,6 +3442,17 @@ def main() -> int | None:
             if not c64.init_pygame_display():
                 log.warning("Pygame initialization failed, falling back to terminal mode")
                 c64.display_mode = "terminal"
+
+        # Enable mouse if requested (only works with pygame)
+        if getattr(args, 'mouse', False):
+            if c64.display_mode == "pygame":
+                c64.enable_mouse(
+                    enabled=True,
+                    port=getattr(args, 'mouse_port', 1),
+                    sensitivity=getattr(args, 'mouse_sensitivity', 1.0)
+                )
+            else:
+                log.warning("Mouse input only available in pygame mode")
 
         # In no-roms mode, log that we're running headless
         if args.no_roms:

@@ -165,15 +165,22 @@ class CIA2:
             result = (self.port_a & self.ddr_a) | (~self.ddr_a & 0xFF)
 
             # IEC bus loopback for input bits (when configured as input)
-            # If CLK OUT (bit 4) is LOW (0), CLK IN (bit 6) should be LOW
-            # If DATA OUT (bit 5) is LOW (0), DATA IN (bit 7) should be LOW
-            # But only if the input bits are actually configured as inputs
+            # The IEC bus uses open-collector logic with a 7406 inverter on outputs:
+            # - Port bit = 1 → inverted → drives bus line LOW
+            # - Port bit = 0 → inverted → releases bus line (goes HIGH via pull-up)
+            # The input bits read the actual bus state directly.
+            # With no devices connected, outputs loop back to inputs:
+            # - CLK OUT (bit 4) = 1 → bus LOW → CLK IN (bit 6) = 0
+            # - CLK OUT (bit 4) = 0 → bus HIGH → CLK IN (bit 6) = 1
+            # Reference: https://www.c64-wiki.com/wiki/Serial_Port
             if not (self.ddr_a & 0x40):  # Bit 6 is input
-                if not (self.port_a & 0x10):  # CLK OUT is LOW
+                if self.port_a & 0x10:  # CLK OUT is 1 (driving bus LOW)
                     result &= ~0x40  # CLK IN goes LOW
+                # else: CLK OUT is 0 (bus released), CLK IN stays HIGH (from pull-up)
             if not (self.ddr_a & 0x80):  # Bit 7 is input
-                if not (self.port_a & 0x20):  # DATA OUT is LOW
+                if self.port_a & 0x20:  # DATA OUT is 1 (driving bus LOW)
                     result &= ~0x80  # DATA IN goes LOW
+                # else: DATA OUT is 0 (bus released), DATA IN stays HIGH (from pull-up)
 
             return result
 

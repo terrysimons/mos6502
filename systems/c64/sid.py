@@ -49,9 +49,15 @@ class SID:
         # Last value written to any register (for write-only register reads)
         self.last_written = 0
 
-        # Paddle positions (0-255, 255 = no paddle/fully right)
-        self.pot_x = 0xFF
-        self.pot_y = 0xFF
+        # Paddle/mouse positions (0-255)
+        # For 1351 mouse: values wrap around as mouse moves (relative motion)
+        # For paddles: absolute position (0 = full left, 255 = full right)
+        # Default to 0x80 (mid-range) for diagnostic harness compatibility
+        self.pot_x = 0x80
+        self.pot_y = 0x80
+
+        # Mouse input enabled flag
+        self.mouse_enabled = False
 
         # Oscillator 3 and Envelope 3 output (read-only registers)
         # These would normally come from actual sound synthesis
@@ -88,6 +94,10 @@ class SID:
             return self.pot_y
 
         if reg == 27:  # OSC3 ($D41B)
+            # Simple pseudo-random simulation for diagnostic compatibility
+            # Real SID outputs high 8 bits of voice 3 waveform
+            # This gives a changing value on each read to simulate activity
+            self.osc3_output = (self.osc3_output * 1103515245 + 12345) & 0xFF
             return self.osc3_output
 
         if reg == 28:  # ENV3 ($D41C)
@@ -113,3 +123,28 @@ class SID:
             self.registers[reg] = value
 
         # Read-only registers (25-28) ignore writes
+
+    def update_mouse(self, delta_x: int, delta_y: int) -> None:
+        """Update POT registers from mouse motion.
+
+        The 1351 mouse sends relative motion that wraps around 0-255.
+        This simulates proportional mouse mode.
+
+        Args:
+            delta_x: Horizontal motion (positive = right)
+            delta_y: Vertical motion (positive = down)
+        """
+        # Apply motion with wrapping (0-255)
+        # Note: Y is often inverted in mouse protocols
+        self.pot_x = (self.pot_x + delta_x) & 0xFF
+        self.pot_y = (self.pot_y + delta_y) & 0xFF
+
+    def set_paddle(self, x: int, y: int) -> None:
+        """Set absolute paddle positions.
+
+        Args:
+            x: X position (0-255)
+            y: Y position (0-255)
+        """
+        self.pot_x = x & 0xFF
+        self.pot_y = y & 0xFF
