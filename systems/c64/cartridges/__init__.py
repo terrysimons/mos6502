@@ -639,6 +639,21 @@ class Cartridge(ABC):
         """
         return 0xFF  # Default: not mapped
 
+    def write_roml(self, addr: int, data: int) -> bool:
+        """Write to ROML region ($8000-$9FFF).
+
+        Some cartridges (like Action Replay) have RAM in the ROML region
+        that can be written to. Override this method to handle writes.
+
+        Args:
+            addr: Address in range $8000-$9FFF
+            data: Byte value to write
+
+        Returns:
+            True if write was handled by cartridge, False to write to C64 RAM
+        """
+        return False  # Default: not handled, write goes to C64 RAM
+
     def read_ultimax_romh(self, addr: int) -> int:
         """Read from Ultimax ROMH region ($E000-$FFFF).
 
@@ -907,6 +922,22 @@ class ActionReplayCartridge(Cartridge):
             if offset < len(bank_data):
                 return bank_data[offset]
         return 0xFF
+
+    def write_roml(self, addr: int, data: int) -> bool:
+        """Write to ROML region ($8000-$9FFF).
+
+        When RAM is enabled (bit 5 of control register), writes go to
+        the cartridge's 8KB RAM instead of the C64's RAM.
+        """
+        if self.cartridge_disabled:
+            return False
+
+        if self.ram_enabled:
+            offset = addr - ROML_START
+            self.ram[offset] = data
+            return True  # Write handled by cartridge
+
+        return False  # Write goes to C64 RAM
 
     def read_io1(self, addr: int) -> int:
         """Read from IO1 region ($DE00-$DEFF).

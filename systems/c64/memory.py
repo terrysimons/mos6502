@@ -330,12 +330,8 @@ class C64Memory:
             self.port = value & 0xFF
             return
 
-        # $0002-$9FFF is ALWAYS RAM (never banked on C64)
-        # This includes zero page, stack, KERNAL/BASIC working storage, and screen RAM
-        if 0x0002 <= addr <= 0x9FFF:
-            # Log writes to jiffy clock ($A0-$A2)
-            if 0xA0 <= addr <= 0xA2 and DEBUG_JIFFY:
-                log.info(f"*** JIFFY CLOCK WRITE: addr=${addr:04X}, value=${value:02X} ***")
+        # $0002-$7FFF is always RAM (includes screen RAM at $0400-$07E7)
+        if 0x0002 <= addr <= 0x7FFF:
             # Log writes to screen RAM ($0400-$07E7)
             if 0x0400 <= addr <= 0x07E7:
                 if DEBUG_SCREEN:
@@ -343,18 +339,15 @@ class C64Memory:
                 # Track dirty screen cells for optimized rendering
                 if self.dirty_tracker is not None:
                     self.dirty_tracker.mark_screen_dirty(addr)
-            # Log writes to cursor position variables ($D1-$D6)
-            if 0xD1 <= addr <= 0xD6 and DEBUG_CURSOR:
-                var_names = {0xD1: "PNT_LO", 0xD2: "PNT_HI", 0xD3: "PNTR(col)", 0xD4: "QTSW", 0xD5: "LNMX", 0xD6: "TBLX(row)"}
-                addr_int = int(addr) if hasattr(addr, '__int__') else addr
-                val_int = int(value) if hasattr(value, '__int__') else value
-                log.info(f"*** CURSOR VAR: {var_names.get(addr_int, '?')} (${addr_int:02X}) = ${val_int:02X} ({val_int}) ***")
-            # Log writes to screen line table ($D9-$F1)
-            if 0xD9 <= addr <= 0xF1 and DEBUG_CURSOR:
-                addr_int = int(addr) if hasattr(addr, '__int__') else addr
-                val_int = int(value) if hasattr(value, '__int__') else value
-                row = addr_int - 0xD9
-                log.info(f"*** SCREEN LINE TABLE: row {row} (${addr_int:02X}) = ${val_int:02X} ***")
+            self._write_ram_direct(addr, value & 0xFF)
+            return
+
+        # ROML region ($8000-$9FFF) - check for cartridge RAM first
+        if 0x8000 <= addr <= 0x9FFF:
+            # Some cartridges (like Action Replay) have writable RAM here
+            if self.cartridge is not None and self.cartridge.write_roml(addr, value):
+                return  # Cartridge handled the write
+            # Otherwise fall through to C64 RAM
             self._write_ram_direct(addr, value & 0xFF)
             return
 

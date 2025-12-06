@@ -252,7 +252,7 @@ class TestC64CartridgeLoading:
             .replace(")", "")
             .replace(".", "")
         )
-        return CARTRIDGE_TYPES_DIR / f"type_{hw_type:02d}_{safe_name}.crt"
+        return CARTRIDGE_TYPES_DIR / f"test_cart_type_{hw_type:02d}_{safe_name}.crt"
 
     def _test_load_cartridge_type(self, c64, hw_type: int):
         """Test that a cartridge type loads correctly (not as error cart)."""
@@ -314,7 +314,7 @@ class TestC64CartridgeLoading:
     @requires_c64_roms
     def test_type_00_normal_8kb_bin_cartridge_loads(self, c64):
         """Type 0: Normal 8KB cartridge (raw .bin, EXROM=0, GAME=1)."""
-        bin_path = CARTRIDGE_TYPES_DIR / "test_cart_8k.bin"
+        bin_path = CARTRIDGE_TYPES_DIR / "test_cart_type_00_8k.bin"
         if not bin_path.exists():
             pytest.skip(f"Test fixture not found: {bin_path}")
 
@@ -329,7 +329,7 @@ class TestC64CartridgeLoading:
     @requires_c64_roms
     def test_type_00_normal_8kb_crt_cartridge_loads(self, c64):
         """Type 0: Normal 8KB cartridge (.crt, EXROM=0, GAME=1)."""
-        crt_path = CARTRIDGE_TYPES_DIR / "test_cart_8k.crt"
+        crt_path = CARTRIDGE_TYPES_DIR / "test_cart_type_00_8k.crt"
         if not crt_path.exists():
             pytest.skip(f"Test fixture not found: {crt_path}")
 
@@ -345,7 +345,7 @@ class TestC64CartridgeLoading:
     @requires_c64_roms
     def test_type_00_8k_cartridge_executes(self, c64):
         """Type 0 8KB test cartridge should pass all tests."""
-        crt_path = CARTRIDGE_TYPES_DIR / "type_00_8k.crt"
+        crt_path = CARTRIDGE_TYPES_DIR / "test_cart_type_00_8k.crt"
         if not crt_path.exists():
             pytest.skip(f"Test fixture not found: {crt_path}")
 
@@ -357,7 +357,7 @@ class TestC64CartridgeLoading:
     @requires_c64_roms
     def test_type_00_normal_16kb_bin_cartridge_loads(self, c64):
         """Type 0: Normal 16KB cartridge (raw .bin, EXROM=0, GAME=0)."""
-        bin_path = CARTRIDGE_TYPES_DIR / "test_cart_16k.bin"
+        bin_path = CARTRIDGE_TYPES_DIR / "test_cart_type_00_16k.bin"
         if not bin_path.exists():
             pytest.skip(f"Test fixture not found: {bin_path}")
 
@@ -370,12 +370,12 @@ class TestC64CartridgeLoading:
         assert c64.memory.cartridge.game is False   # Active (16KB mode)
 
     @requires_c64_roms
-    def test_type_00_normal_16kb_crt_1_chip_cartridge_loads(self, c64):
+    def test_type_00_normal_16kb_crt_single_chip_cartridge_loads(self, c64):
         """Type 0: Normal 16KB cartridge (.crt with single CHIP, EXROM=0, GAME=0).
 
         CRT structure: One 16KB CHIP at $8000, split into ROML and ROMH.
         """
-        crt_path = CARTRIDGE_TYPES_DIR / "test_cart_16k_single_chip.crt"
+        crt_path = CARTRIDGE_TYPES_DIR / "test_cart_type_00_16k_single_chip.crt"
         if not crt_path.exists():
             pytest.skip(f"Test fixture not found: {crt_path}")
 
@@ -390,12 +390,12 @@ class TestC64CartridgeLoading:
         assert c64.memory.cartridge.romh_data is not None
 
     @requires_c64_roms
-    def test_type_00_normal_16kb_crt_2_chip_cartridge_loads(self, c64):
+    def test_type_00_normal_16kb_crt_two_chip_cartridge_loads(self, c64):
         """Type 0: Normal 16KB cartridge (.crt with two CHIPs, EXROM=0, GAME=0).
 
         CRT structure: Two separate 8KB CHIPs at $8000 (ROML) and $A000 (ROMH).
         """
-        crt_path = CARTRIDGE_TYPES_DIR / "test_cart_16k.crt"
+        crt_path = CARTRIDGE_TYPES_DIR / "test_cart_type_00_16k.crt"
         if not crt_path.exists():
             pytest.skip(f"Test fixture not found: {crt_path}")
 
@@ -412,7 +412,7 @@ class TestC64CartridgeLoading:
     @requires_c64_roms
     def test_type_00_16k_cartridge_executes(self, c64):
         """Type 0 16KB test cartridge should pass all tests."""
-        crt_path = CARTRIDGE_TYPES_DIR / "type_00_16k.crt"
+        crt_path = CARTRIDGE_TYPES_DIR / "test_cart_type_00_16k.crt"
         if not crt_path.exists():
             pytest.skip(f"Test fixture not found: {crt_path}")
 
@@ -424,7 +424,7 @@ class TestC64CartridgeLoading:
     @requires_c64_roms
     def test_type_00_ultimax_bin_cartridge_loads(self, c64):
         """Type 0: Ultimax cartridge (raw .bin with explicit type, EXROM=1, GAME=0)."""
-        bin_path = CARTRIDGE_TYPES_DIR / "test_cart_ultimax.bin"
+        bin_path = CARTRIDGE_TYPES_DIR / "test_cart_type_00_ultimax.bin"
         if not bin_path.exists():
             pytest.skip(f"Test fixture not found: {bin_path}")
 
@@ -444,7 +444,7 @@ class TestC64CartridgeLoading:
         When an 8KB .bin file doesn't have CBM80 signature but has a reset
         vector pointing to $E000-$FFFF, it should be auto-detected as Ultimax.
         """
-        bin_path = CARTRIDGE_TYPES_DIR / "test_cart_ultimax.bin"
+        bin_path = CARTRIDGE_TYPES_DIR / "test_cart_type_00_ultimax.bin"
         if not bin_path.exists():
             pytest.skip(f"Test fixture not found: {bin_path}")
 
@@ -461,7 +461,7 @@ class TestC64CartridgeLoading:
     @requires_c64_roms
     def test_type_00_ultimax_crt_cartridge_loads(self, c64):
         """Type 0: Ultimax cartridge (.crt, EXROM=1, GAME=0)."""
-        crt_path = CARTRIDGE_TYPES_DIR / "test_cart_ultimax.crt"
+        crt_path = CARTRIDGE_TYPES_DIR / "test_cart_type_00_ultimax.crt"
         if not crt_path.exists():
             pytest.skip(f"Test fixture not found: {crt_path}")
 
@@ -477,7 +477,37 @@ class TestC64CartridgeLoading:
     @requires_c64_roms
     def test_type_00_ultimax_cartridge_executes(self, c64):
         """Type 0 Ultimax test cartridge should pass all tests."""
-        crt_path = CARTRIDGE_TYPES_DIR / "type_00_ultimax.crt"
+        crt_path = CARTRIDGE_TYPES_DIR / "test_cart_type_00_ultimax.crt"
+        if not crt_path.exists():
+            pytest.skip(f"Test fixture not found: {crt_path}")
+
+        tests_complete, fail_count = self._run_test_cartridge(c64, crt_path)
+
+        assert tests_complete, "Test cartridge did not complete within max cycles"
+        assert fail_count == 0, f"Test cartridge reported {fail_count} failures"
+
+    @requires_c64_roms
+    def test_type_00_ultimax_with_roml_crt_cartridge_loads(self, c64):
+        """Type 0: Ultimax cartridge with optional ROML (.crt, EXROM=1, GAME=0)."""
+        crt_path = CARTRIDGE_TYPES_DIR / "test_cart_type_00_ultimax_with_roml.crt"
+        if not crt_path.exists():
+            pytest.skip(f"Test fixture not found: {crt_path}")
+
+        c64.load_cartridge(crt_path)
+
+        assert c64.cartridge_type == "ultimax"
+        assert c64.memory.cartridge is not None
+        assert isinstance(c64.memory.cartridge, StaticROMCartridge)
+        assert c64.memory.cartridge.exrom is True   # Inactive (Ultimax)
+        assert c64.memory.cartridge.game is False   # Active (Ultimax)
+        assert c64.memory.cartridge.ultimax_romh_data is not None
+        # Ultimax with ROML should also have ROML data
+        assert c64.memory.cartridge.roml_data is not None
+
+    @requires_c64_roms
+    def test_type_00_16k_single_chip_cartridge_executes(self, c64):
+        """Type 0 16KB single chip format test cartridge should pass all tests."""
+        crt_path = CARTRIDGE_TYPES_DIR / "test_cart_type_00_16k_single_chip.crt"
         if not crt_path.exists():
             pytest.skip(f"Test fixture not found: {crt_path}")
 
@@ -494,7 +524,7 @@ class TestC64CartridgeLoading:
     @requires_c64_roms
     def test_type_01_action_replay_cartridge_executes(self, c64):
         """Type 1 Action Replay test cartridge should pass all tests."""
-        crt_path = CARTRIDGE_TYPES_DIR / "type_01_action_replay.crt"
+        crt_path = CARTRIDGE_TYPES_DIR / "test_cart_type_01_action_replay.crt"
         if not crt_path.exists():
             pytest.skip(f"Test fixture not found: {crt_path}")
 
@@ -1001,7 +1031,7 @@ class TestErrorCartridgeFiles:
         """Each unsupported type should have a pre-generated error cartridge."""
         type_name = C64.CRT_HARDWARE_TYPES.get(hw_type, f"unknown_{hw_type}")
         safe_name = type_name.lower().replace(" ", "_").replace(",", "").replace("/", "_")
-        filename = f"error_type_{hw_type:02d}_{safe_name}.bin"
+        filename = f"error_cart_type_{hw_type:02d}_{safe_name}.bin"
         path = self.ERROR_CART_DIR / filename
 
         assert path.exists(), f"Error cartridge missing for type {hw_type}: {filename}"
@@ -1012,7 +1042,7 @@ class TestErrorCartridgeFiles:
         """Error cartridge files should be exactly 8KB."""
         type_name = C64.CRT_HARDWARE_TYPES.get(hw_type, f"unknown_{hw_type}")
         safe_name = type_name.lower().replace(" ", "_").replace(",", "").replace("/", "_")
-        filename = f"error_type_{hw_type:02d}_{safe_name}.bin"
+        filename = f"error_cart_type_{hw_type:02d}_{safe_name}.bin"
         path = self.ERROR_CART_DIR / filename
 
         if not path.exists():
@@ -1027,7 +1057,7 @@ class TestErrorCartridgeFiles:
         """Error cartridge ROMs should have valid CBM80 signature."""
         type_name = C64.CRT_HARDWARE_TYPES.get(hw_type, f"unknown_{hw_type}")
         safe_name = type_name.lower().replace(" ", "_").replace(",", "").replace("/", "_")
-        filename = f"error_type_{hw_type:02d}_{safe_name}.bin"
+        filename = f"error_cart_type_{hw_type:02d}_{safe_name}.bin"
         path = self.ERROR_CART_DIR / filename
 
         if not path.exists():
@@ -1047,8 +1077,14 @@ class TestErrorCartridgeFiles:
 class TestMapperTestCartridgeFiles:
     """Tests for mapper test cartridge CRT files."""
 
-    # Type 0 has three variants (8k, 16k, ultimax) instead of a single file
-    TYPE_0_VARIANTS = ["type_00_8k.crt", "type_00_16k.crt", "type_00_ultimax.crt"]
+    # Type 0 has multiple variants (8k, 16k, 16k_single_chip, ultimax, ultimax_with_roml)
+    TYPE_0_VARIANTS = [
+        "test_cart_type_00_8k.crt",
+        "test_cart_type_00_16k.crt",
+        "test_cart_type_00_16k_single_chip.crt",
+        "test_cart_type_00_ultimax.crt",
+        "test_cart_type_00_ultimax_with_roml.crt",
+    ]
 
     @requires_c64_roms
     @pytest.mark.parametrize("hw_type", range(0, 86))
@@ -1071,7 +1107,7 @@ class TestMapperTestCartridgeFiles:
             .replace(")", "")
             .replace(".", "")
         )
-        filename = f"type_{hw_type:02d}_{safe_name}.crt"
+        filename = f"test_cart_type_{hw_type:02d}_{safe_name}.crt"
         path = CARTRIDGE_TYPES_DIR / filename
 
         assert path.exists(), f"Mapper test CRT missing for type {hw_type}: {filename}"
@@ -1103,7 +1139,7 @@ class TestMapperTestCartridgeFiles:
             .replace(")", "")
             .replace(".", "")
         )
-        filename = f"type_{hw_type:02d}_{safe_name}.crt"
+        filename = f"test_cart_type_{hw_type:02d}_{safe_name}.crt"
         path = CARTRIDGE_TYPES_DIR / filename
 
         if not path.exists():

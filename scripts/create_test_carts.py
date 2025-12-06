@@ -22,6 +22,7 @@ sys.path.insert(0, str(project_root))
 sys.path.insert(0, str(project_root / "systems"))
 
 from c64 import C64
+from c64.memory import KERNAL_ROM_START
 from c64.cartridges import (
     CartridgeTestResults,
     create_error_cartridge_rom,
@@ -761,7 +762,7 @@ def create_type0_16k_test_cart(is_error_cart: bool = False) -> tuple[bytes, byte
     return bytes(roml), bytes(romh), desc
 
 
-def create_type0_ultimax_test_cart(is_error_cart: bool = False) -> tuple[bytes, bytes | None, str]:
+def create_type0_ultimax_test_cart(is_error_cart: bool = False, include_roml: bool = False) -> tuple[bytes, bytes | None, str]:
     """Create Type 0 Ultimax mode test cartridge with PASS/FAIL for each test.
 
     Ultimax mode: EXROM=1, GAME=0 - ROMH at $E000-$FFFF (replaces KERNAL)
@@ -769,6 +770,7 @@ def create_type0_ultimax_test_cart(is_error_cart: bool = False) -> tuple[bytes, 
 
     Args:
         is_error_cart: If True, this is for error/regression testing
+        include_roml: If True, include optional ROML at $8000-$9FFF
 
     Returns:
         Tuple of (ROMH bytes for $E000, optional ROML bytes, description)
@@ -998,8 +1000,19 @@ def create_type0_ultimax_test_cart(is_error_cart: bool = False) -> tuple[bytes, 
     # Add signature at $EFF0
     ultimax_rom[0x0FF0] = 0x55  # 'U' for ULTIMAX
 
-    desc = "Type 0 Ultimax mode" if not is_error_cart else "Type 0 Ultimax error"
-    return bytes(ultimax_rom), None, desc
+    # Optionally create ROML at $8000-$9FFF
+    roml_data = None
+    if include_roml:
+        roml_data = bytearray(C64.ROML_SIZE)  # 8KB for $8000-$9FFF
+        # Add signature at $8FF0 for ROML detection test
+        roml_data[0x0FF0] = 0x52  # 'R' for ROML
+        roml_data = bytes(roml_data)
+
+    if include_roml:
+        desc = "Type 0 Ultimax+ROML" if not is_error_cart else "Type 0 Ultimax+ROML error"
+    else:
+        desc = "Type 0 Ultimax mode" if not is_error_cart else "Type 0 Ultimax error"
+    return bytes(ultimax_rom), roml_data, desc
 
 
 def create_type0_test_cart(is_error_cart: bool = False) -> tuple[bytes, bytes, str]:
@@ -1657,7 +1670,7 @@ def write_ultimax_crt_cartridge(
         chip_romh[4:8] = (16 + len(ultimax_romh)).to_bytes(4, 'big')
         chip_romh[8:10] = (0).to_bytes(2, 'big')  # Type (0 = ROM)
         chip_romh[10:12] = (0).to_bytes(2, 'big')  # Bank (0)
-        chip_romh[12:14] = (C64.KERNAL_ROM_START).to_bytes(2, 'big')  # $E000
+        chip_romh[12:14] = (KERNAL_ROM_START).to_bytes(2, 'big')  # $E000
         chip_romh[14:16] = (len(ultimax_romh)).to_bytes(2, 'big')
         f.write(bytes(chip_romh))
         f.write(ultimax_romh)
@@ -1801,57 +1814,6 @@ def main():
     cartridge_types_dir = c64_fixtures_dir / "cartridge_types"
     cartridge_types_dir.mkdir(parents=True, exist_ok=True)
 
-    # Create 8KB cartridge
-    print("Creating 8KB test cartridge...")
-    roml_8k, desc_8k = create_8k_cartridge()
-
-    path_8k_bin = cartridge_types_dir / "test_cart_8k.bin"
-    write_raw_cartridge(path_8k_bin, roml_8k)
-    print(f"  {path_8k_bin} ({len(roml_8k)} bytes)")
-    print(f"  {desc_8k}")
-
-    path_8k_crt = cartridge_types_dir / "test_cart_8k.crt"
-    write_crt_cartridge(path_8k_crt, roml_8k, name="8K TEST CARTRIDGE")
-    print(f"  {path_8k_crt}")
-
-    # Create 16KB cartridge (two CHIP packets - ROML + ROMH separately)
-    print("\nCreating 16KB test cartridge (two CHIP packets)...")
-    roml_16k, romh_16k, desc_16k = create_16k_cartridge()
-
-    path_16k_bin = cartridge_types_dir / "test_cart_16k.bin"
-    write_raw_cartridge(path_16k_bin, roml_16k, romh_16k)
-    print(f"  {path_16k_bin} ({len(roml_16k) + len(romh_16k)} bytes)")
-    print(f"  {desc_16k}")
-
-    path_16k_crt = cartridge_types_dir / "test_cart_16k.crt"
-    write_crt_cartridge(path_16k_crt, roml_16k, romh_16k, name="16K TEST CARTRIDGE")
-    print(f"  {path_16k_crt}")
-
-    # Create 16KB cartridge (single CHIP packet - like Q*bert and many real carts)
-    # This format stores both ROML and ROMH as one 16KB chunk at $8000
-    print("\nCreating 16KB test cartridge (single CHIP packet)...")
-    path_16k_single_crt = cartridge_types_dir / "test_cart_16k_single_chip.crt"
-    write_crt_cartridge(
-        path_16k_single_crt, roml_16k, romh_16k,
-        name="16K SINGLE CHIP TEST", single_chip=True
-    )
-    print(f"  {path_16k_single_crt}")
-    print("  (Tests single 16KB CHIP at $8000 that must be split into ROML+ROMH)")
-
-    # Create Ultimax mode cartridge (ROM at $E000, replaces KERNAL)
-    print("\nCreating Ultimax test cartridge (ROM at $E000)...")
-    ultimax_rom, desc_ultimax = create_ultimax_cartridge()
-
-    path_ultimax_bin = cartridge_types_dir / "test_cart_ultimax.bin"
-    write_raw_cartridge(path_ultimax_bin, ultimax_rom)
-    print(f"  {path_ultimax_bin} ({len(ultimax_rom)} bytes)")
-    print(f"  {desc_ultimax}")
-
-    path_ultimax_crt = cartridge_types_dir / "test_cart_ultimax.crt"
-    write_ultimax_crt_cartridge(path_ultimax_crt, ultimax_rom, name="ULTIMAX TEST CARTRIDGE")
-    print(f"  {path_ultimax_crt}")
-    print("  (Tests Ultimax mode: EXROM=1, GAME=0, ROM at $E000-$FFFF)")
-
     # Create error cartridges for all hardware types
     # These run the same tests as pass carts - used for regression testing
     # Error carts are runtime resources, so they live in the c64 package
@@ -1866,39 +1828,48 @@ def main():
         # Type 0 needs separate error carts for each mode
         print("  Type 0 - 8KB mode error cart...")
         roml_err_8k, desc = create_type0_8k_test_cart(is_error_cart=True)
-        path = error_cart_dir / "error_type_00_8k.bin"
+        path = error_cart_dir / "error_cart_type_00_8k.bin"
         write_raw_cartridge(path, roml_err_8k)
         print(f"    {path.name}")
 
         print("  Type 0 - 16KB mode error cart...")
         roml_err_16k, romh_err_16k, desc = create_type0_16k_test_cart(is_error_cart=True)
-        path = error_cart_dir / "error_type_00_16k.bin"
+        path = error_cart_dir / "error_cart_type_00_16k.bin"
         write_raw_cartridge(path, roml_err_16k, romh_err_16k)
         print(f"    {path.name}")
 
         print("  Type 0 - Ultimax mode error cart...")
-        ultimax_err, _, desc = create_type0_ultimax_test_cart(is_error_cart=True)
-        path = error_cart_dir / "error_type_00_ultimax.bin"
+        ultimax_err, _, desc = create_type0_ultimax_test_cart(is_error_cart=True, include_roml=False)
+        path = error_cart_dir / "error_cart_type_00_ultimax.bin"
         write_raw_cartridge(path, ultimax_err)
+        print(f"    {path.name}")
+
+        print("  Type 0 - Ultimax+ROML mode error cart...")
+        ultimax_err_roml, roml_err, desc = create_type0_ultimax_test_cart(is_error_cart=True, include_roml=True)
+        path = error_cart_dir / "error_cart_type_00_ultimax_with_roml.bin"
+        # For .bin, write ROML first then ROMH (ROML at $8000, ROMH at $E000)
+        with open(path, 'wb') as f:
+            f.write(roml_err)
+            f.write(ultimax_err_roml)
         print(f"    {path.name}")
 
         # Type 1: Action Replay error cart
         print("  Type 1 - Action Replay error cart...")
         banks_err, desc = create_type1_test_cart(is_error_cart=True)
-        path = error_cart_dir / "error_type_01_action_replay.bin"
+        path = error_cart_dir / "error_cart_type_01_action_replay.bin"
         with open(path, 'wb') as f:
             for bank in banks_err:
                 f.write(bank)
         print(f"    {path.name}")
 
         # Generate generic error carts for all types (for regression testing)
-        # Error carts are raw .bin files
+        # Error carts are raw .bin files (runtime resources, not test fixtures)
         # Note: At runtime, unsupported types also get dynamic error carts with
         # test results - see CartridgeTestResults in c64/cartridges/__init__.py
         for hw_type, type_name in sorted(C64.CRT_HARDWARE_TYPES.items()):
             error_rom = create_error_cartridge(hw_type, type_name)
             safe_name = type_name.lower().replace(" ", "_").replace(",", "").replace("/", "_")
-            path = error_cart_dir / f"error_type_{hw_type:02d}_{safe_name}.bin"
+            path = error_cart_dir / f"error_cart_type_{hw_type:02d}_{safe_name}.bin"
             write_raw_cartridge(path, error_rom)
             print(f"  Type {hw_type:2d}: {path.name}")
 
@@ -1918,34 +1889,56 @@ def main():
     # Type 0 - 8KB mode: EXROM=0, GAME=1
     print("  Type 0 - 8KB mode (EXROM=0, GAME=1)...")
     roml_8k, desc_8k = create_type0_8k_test_cart(is_error_cart=False)
-    path_8k_crt = cartridge_types_dir / "type_00_8k.crt"
+    path_8k_crt = cartridge_types_dir / "test_cart_type_00_8k.crt"
     write_crt_cartridge(path_8k_crt, roml_8k, romh=None, name="TYPE 0 8K TEST", exrom=0, game=1)
-    path_8k_bin = cartridge_types_dir / "type_00_8k.bin"
+    path_8k_bin = cartridge_types_dir / "test_cart_type_00_8k.bin"
     write_raw_cartridge(path_8k_bin, roml_8k)
     print(f"    {path_8k_crt.name} + .bin ({desc_8k})")
 
     # Type 0 - 16KB mode: EXROM=0, GAME=0
     print("  Type 0 - 16KB mode (EXROM=0, GAME=0)...")
     roml_16k, romh_16k, desc_16k = create_type0_16k_test_cart(is_error_cart=False)
-    path_16k_crt = cartridge_types_dir / "type_00_16k.crt"
+    path_16k_crt = cartridge_types_dir / "test_cart_type_00_16k.crt"
     write_crt_cartridge(path_16k_crt, roml_16k, romh_16k, name="TYPE 0 16K TEST", exrom=0, game=0)
-    path_16k_bin = cartridge_types_dir / "type_00_16k.bin"
+    path_16k_bin = cartridge_types_dir / "test_cart_type_00_16k.bin"
     write_raw_cartridge(path_16k_bin, roml_16k, romh_16k)
     print(f"    {path_16k_crt.name} + .bin ({desc_16k})")
 
-    # Type 0 - Ultimax mode: EXROM=1, GAME=0
+    # Type 0 - 16KB mode with single CHIP packet (like Q*bert and many real carts)
+    # Same ROM data but stored as one 16KB chunk at $8000 instead of two 8KB CHIPs
+    print("  Type 0 - 16KB single CHIP format...")
+    path_16k_single_crt = cartridge_types_dir / "test_cart_type_00_16k_single_chip.crt"
+    write_crt_cartridge(
+        path_16k_single_crt, roml_16k, romh_16k,
+        name="TYPE 0 16K SINGLECHIP", exrom=0, game=0, single_chip=True
+    )
+    print(f"    {path_16k_single_crt.name} (CRT format variant, same ROM as 16k)")
+
+    # Type 0 - Ultimax mode: EXROM=1, GAME=0 (ROMH only)
     print("  Type 0 - Ultimax mode (EXROM=1, GAME=0)...")
-    ultimax_rom, _, desc_ultimax = create_type0_ultimax_test_cart(is_error_cart=False)
-    path_ultimax_crt = cartridge_types_dir / "type_00_ultimax.crt"
+    ultimax_rom, _, desc_ultimax = create_type0_ultimax_test_cart(is_error_cart=False, include_roml=False)
+    path_ultimax_crt = cartridge_types_dir / "test_cart_type_00_ultimax.crt"
     write_ultimax_crt_cartridge(path_ultimax_crt, ultimax_rom, name="TYPE 0 ULTIMAX TEST")
-    path_ultimax_bin = cartridge_types_dir / "type_00_ultimax.bin"
+    path_ultimax_bin = cartridge_types_dir / "test_cart_type_00_ultimax.bin"
     write_raw_cartridge(path_ultimax_bin, ultimax_rom)
     print(f"    {path_ultimax_crt.name} + .bin ({desc_ultimax})")
+
+    # Type 0 - Ultimax mode with optional ROML: EXROM=1, GAME=0 (ROMH + ROML)
+    print("  Type 0 - Ultimax+ROML mode (EXROM=1, GAME=0, with ROML)...")
+    ultimax_rom_roml, roml_data, desc_ultimax_roml = create_type0_ultimax_test_cart(is_error_cart=False, include_roml=True)
+    path_ultimax_roml_crt = cartridge_types_dir / "test_cart_type_00_ultimax_with_roml.crt"
+    write_ultimax_crt_cartridge(path_ultimax_roml_crt, ultimax_rom_roml, roml=roml_data, name="TYPE 0 ULTIMAX+ROML")
+    path_ultimax_roml_bin = cartridge_types_dir / "test_cart_type_00_ultimax_with_roml.bin"
+    # For .bin, write ROML first then ROMH (ROML at $8000, ROMH at $E000)
+    with open(path_ultimax_roml_bin, 'wb') as f:
+        f.write(roml_data)
+        f.write(ultimax_rom_roml)
+    print(f"    {path_ultimax_roml_crt.name} + .bin ({desc_ultimax_roml})")
 
     # Type 1: Action Replay test cart (CRT only, no .bin for types > 0)
     print("  Type 1 - Action Replay...")
     banks_v1, desc_v1 = create_type1_test_cart(is_error_cart=False)
-    path_v1_crt = cartridge_types_dir / "type_01_action_replay.crt"
+    path_v1_crt = cartridge_types_dir / "test_cart_type_01_action_replay.crt"
     write_action_replay_crt(path_v1_crt, banks_v1, name="TYPE 1 TEST")
     print(f"    {path_v1_crt.name} ({desc_v1})")
 
@@ -1956,7 +1949,7 @@ def main():
         # Create a test ROM that displays the mapper type
         mapper_rom = create_mapper_test_cartridge(hw_type, type_name)
         safe_name = type_name.lower().replace(" ", "_").replace(",", "").replace("/", "_").replace("(", "").replace(")", "").replace(".", "")
-        path = cartridge_types_dir / f"type_{hw_type:02d}_{safe_name}.crt"
+        path = cartridge_types_dir / f"test_cart_type_{hw_type:02d}_{safe_name}.crt"
         write_crt_cartridge(path, mapper_rom, name=f"TYPE {hw_type} TEST", hardware_type=hw_type)
         print(f"  Type {hw_type:2d}: {path.name}")
 
@@ -1968,7 +1961,7 @@ def main():
     print(f"  poetry run c64 --cartridge {path_ultimax_crt}")
     print(f"  poetry run c64 --cartridge {path_v1_crt}")
     print(f"\nTest unsupported type (should show error cart with NO TESTS):")
-    print(f"  poetry run c64 --cartridge {cartridge_types_dir}/type_02_kcs_power_cartridge.crt")
+    print(f"  poetry run c64 --cartridge {cartridge_types_dir}/test_cart_type_02_kcs_power_cartridge.crt")
 
 
 if __name__ == '__main__':
