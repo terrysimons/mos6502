@@ -39,7 +39,8 @@ def benchmark_c64(rom_dir: str, max_cycles: int, video_chip: str = "6569", verbo
     c64 = C64(rom_dir=rom_dir, display_mode="headless", video_chip=video_chip, verbose_cycles=verbose_cycles)
     c64.cpu.reset()
 
-    start_time = time.perf_counter()
+    # Record start time for speed stats
+    c64._execution_start_time = time.perf_counter()
 
     if throttle:
         # Use frame governor to throttle to real-time
@@ -65,8 +66,11 @@ def benchmark_c64(rom_dir: str, max_cycles: int, video_chip: str = "6569", verbo
         except errors.CPUCycleExhaustionError:
             pass
 
-    elapsed = time.perf_counter() - start_time
-    return elapsed, c64.cpu.cycles_executed
+    # Record end time and use get_speed_stats()
+    c64._execution_end_time = time.perf_counter()
+    stats = c64.get_speed_stats()
+
+    return stats["elapsed_seconds"], stats["cycles_executed"]
 
 
 def benchmark_boot(rom_dir: str, video_chip: str = "6569", debug: bool = False, verbose_cycles: bool = False, throttle: bool = False) -> tuple[float, int, int, str]:

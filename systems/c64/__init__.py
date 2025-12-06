@@ -501,6 +501,10 @@ class C64:
         self._kernal_waiting_for_input = False
         self._stop_on_kernal_input = False
 
+        # Execution timing for speedup calculation
+        self._execution_start_time: Optional[float] = None
+        self._execution_end_time: Optional[float] = None
+
         # Load ROMs during initialization
         # This sets up the memory handler and all peripherals (VIC, CIAs)
         self.load_roms()
@@ -1450,6 +1454,9 @@ class C64:
             import sys as _sys
             from mos6502.timing import FrameGovernor
 
+            # Record execution start time for speedup calculation
+            self._execution_start_time = time.perf_counter()
+
             # Check if we're in a TTY (terminal) for interactive display
             is_tty = _sys.stdout.isatty()
 
@@ -1609,6 +1616,9 @@ class C64:
                 log.exception("Could not display context")
             raise
         finally:
+            # Record execution end time for speedup calculation
+            import time
+            self._execution_end_time = time.perf_counter()
             # Clean up PC callback
             self._clear_pc_callback()
             # Show screen buffer on termination
@@ -1638,6 +1648,42 @@ class C64:
                     print("   ", end="")
             print()
 
+    def get_speed_stats(self) -> Optional[dict]:
+        """Calculate CPU execution speed statistics.
+
+        Returns:
+            Dictionary with speed stats, or None if timing data not available:
+            - elapsed_seconds: Wall-clock time elapsed
+            - cycles_executed: Total CPU cycles executed
+            - cycles_per_second: Actual execution rate
+            - real_cpu_freq: Real C64 CPU frequency for this chip
+            - speedup: Ratio of actual speed to real hardware speed
+            - chip_name: VIC-II chip name (6569, 6567R8, etc.)
+        """
+        if self._execution_start_time is None:
+            return None
+
+        import time
+        end_time = self._execution_end_time or time.perf_counter()
+        elapsed = end_time - self._execution_start_time
+
+        if elapsed <= 0:
+            return None
+
+        cycles_executed = self.cpu.cycles_executed
+        cycles_per_second = cycles_executed / elapsed
+        real_cpu_freq = self.video_timing.cpu_freq
+        speedup = cycles_per_second / real_cpu_freq
+
+        return {
+            "elapsed_seconds": elapsed,
+            "cycles_executed": cycles_executed,
+            "cycles_per_second": cycles_per_second,
+            "real_cpu_freq": real_cpu_freq,
+            "speedup": speedup,
+            "chip_name": self.video_timing.chip_name,
+        }
+
     def dump_registers(self) -> None:
         """Dump CPU register state."""
         print(f"\nCPU Registers:")
@@ -1649,6 +1695,16 @@ class C64:
         print(f"  Flags: C={self.cpu.C} Z={self.cpu.Z} I={self.cpu.I} "
               f"D={self.cpu.D} B={self.cpu.B} V={self.cpu.V} N={self.cpu.N}")
         print(f"  Cycles executed: {self.cpu.cycles_executed}")
+
+        # Show speed stats if available
+        stats = self.get_speed_stats()
+        if stats:
+            chip = stats['chip_name']
+            region = "PAL" if chip == "6569" else "NTSC"
+            actual_mhz = stats['cycles_per_second'] / 1e6
+            print(f"  Speed: {stats['cycles_per_second']:,.0f} ({actual_mhz:.3f}MHz) cycles/sec "
+                  f"({stats['speedup']:.1%} of {region} ({chip}) C64 @ "
+                  f"{stats['real_cpu_freq']/1e6:.3f}MHz)")
 
     def disassemble_at(self, address: int, num_instructions: int = 10) -> list[str]:
         """Disassemble instructions starting at address.
@@ -2949,6 +3005,9 @@ class C64:
             # Put terminal in cbreak mode (character-at-a-time, no echo)
             tty.setcbreak(_sys.stdin.fileno())
 
+            # Record execution start time for speedup calculation
+            self._execution_start_time = time.perf_counter()
+
             # Start CPU in background thread
             cpu_thread_obj = threading.Thread(target=cpu_thread, daemon=True)
             cpu_thread_obj.start()
@@ -2975,6 +3034,9 @@ class C64:
         except KeyboardInterrupt:
             pass
         finally:
+            # Record execution end time for speedup calculation
+            self._execution_end_time = time.perf_counter()
+
             stop_event.set()
             # Wait for CPU thread to finish
             cpu_thread_obj.join(timeout=0.5)
