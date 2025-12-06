@@ -1484,8 +1484,7 @@ class TestErrorCartridgeFiles:
     @pytest.mark.parametrize("hw_type", range(1, 86), ids=cart_type_id)
     def test_error_cartridge_file_exists(self, hw_type):
         """Each unsupported type should have a pre-generated error cartridge."""
-        type_name = C64.CRT_HARDWARE_TYPES.get(hw_type, f"unknown_{hw_type}")
-        safe_name = type_name.lower().replace(" ", "_").replace(",", "").replace("/", "_")
+        safe_name = _get_safe_name(hw_type)
         filename = f"error_cart_type_{hw_type:02d}_{safe_name}.bin"
         path = self.ERROR_CART_DIR / filename
 
@@ -1495,8 +1494,7 @@ class TestErrorCartridgeFiles:
     @pytest.mark.parametrize("hw_type", range(1, 86), ids=cart_type_id)
     def test_error_cartridge_file_size(self, hw_type):
         """Error cartridge files should be exactly 8KB."""
-        type_name = C64.CRT_HARDWARE_TYPES.get(hw_type, f"unknown_{hw_type}")
-        safe_name = type_name.lower().replace(" ", "_").replace(",", "").replace("/", "_")
+        safe_name = _get_safe_name(hw_type)
         filename = f"error_cart_type_{hw_type:02d}_{safe_name}.bin"
         path = self.ERROR_CART_DIR / filename
 
@@ -1510,8 +1508,7 @@ class TestErrorCartridgeFiles:
     @pytest.mark.parametrize("hw_type", range(1, 86), ids=cart_type_id)
     def test_error_cartridge_has_cbm80_signature(self, hw_type):
         """Error cartridge ROMs should have valid CBM80 signature."""
-        type_name = C64.CRT_HARDWARE_TYPES.get(hw_type, f"unknown_{hw_type}")
-        safe_name = type_name.lower().replace(" ", "_").replace(",", "").replace("/", "_")
+        safe_name = _get_safe_name(hw_type)
         filename = f"error_cart_type_{hw_type:02d}_{safe_name}.bin"
         path = self.ERROR_CART_DIR / filename
 
