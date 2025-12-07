@@ -46,10 +46,16 @@ PADDLE_2_FIRE = 0x08    # Bit 3 (same physical bit as joystick right)
 MOUSE_LEFT_BUTTON = 0x10   # Bit 4 (directly wired to fire button pin)
 MOUSE_RIGHT_BUTTON = 0x01  # Bit 0 (directly wired to up direction pin)
 
+# Lightpen button bit mask (active low: 0 = pressed, 1 = released)
+# Lightpen only works on port 1, button triggers same as joystick fire
+# Reference: https://www.c64-wiki.com/wiki/Light_pen
+LIGHTPEN_BUTTON = 0x10  # Bit 4 (directly wired to fire button pin, port 1 only)
+
 # Active-low button state constants
 # C64 control port buttons use active-low logic
-BUTTON_PRESSED = 0x00   # Bit is low when button is pressed
-BUTTON_RELEASED = 0x01  # Bit is high when button is released (per-bit, not mask)
+BUTTON_PRESSED = 0x00        # Bit is low when button is pressed
+BUTTON_RELEASED = 0x01       # Bit is high when button is released (per-bit, not mask)
+ALL_BUTTONS_RELEASED = 0xFF  # All bits high = no buttons pressed
 
 
 class CIA1:

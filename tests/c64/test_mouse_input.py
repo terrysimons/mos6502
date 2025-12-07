@@ -7,7 +7,12 @@ Tests the mouse input handling via SID POT registers and CIA1 joystick bits.
 import pytest
 from systems.c64 import C64
 from systems.c64.sid import SID
-from systems.c64.cia1 import MOUSE_LEFT_BUTTON, MOUSE_RIGHT_BUTTON, BUTTON_PRESSED
+from systems.c64.cia1 import MOUSE_LEFT_BUTTON, MOUSE_RIGHT_BUTTON, BUTTON_PRESSED, ALL_BUTTONS_RELEASED
+from systems.c64.cartridges.rom_builder import (
+    PERIPHERAL_TEST_ZP_X,
+    PERIPHERAL_TEST_ZP_Y,
+    PERIPHERAL_TEST_ZP_BUTTONS,
+)
 from mos6502 import errors
 from .conftest import C64_ROMS_DIR, requires_c64_roms
 
@@ -251,11 +256,6 @@ class TestC64MouseInput:
 class TestMouseCartridgeIntegration:
     """Integration tests using the mouse test cartridge."""
 
-    # Zero-page mirror locations (must match create_test_carts.py)
-    POTX_MIRROR = 0x03
-    POTY_MIRROR = 0x04
-    JOY1_MIRROR = 0x05
-
     @pytest.fixture
     def mouse_cart_path(self):
         """Path to the mouse test cartridge."""
@@ -285,8 +285,8 @@ class TestMouseCartridgeIntegration:
         run_cycles(c64, 10000)
 
         # Check zero-page mirrors
-        assert c64.cpu.ram[self.POTX_MIRROR] == 0x42
-        assert c64.cpu.ram[self.POTY_MIRROR] == 0x84
+        assert c64.cpu.ram[PERIPHERAL_TEST_ZP_X] == 0x42
+        assert c64.cpu.ram[PERIPHERAL_TEST_ZP_Y] == 0x84
 
     def test_cartridge_updates_on_mouse_motion(self, c64_with_mouse_cart):
         """Cartridge reflects mouse motion in zero-page mirrors."""
@@ -297,8 +297,8 @@ class TestMouseCartridgeIntegration:
         c64.sid.pot_y = 0x80
         run_cycles(c64, 10000)
 
-        initial_x = c64.cpu.ram[self.POTX_MIRROR]
-        initial_y = c64.cpu.ram[self.POTY_MIRROR]
+        initial_x = c64.cpu.ram[PERIPHERAL_TEST_ZP_X]
+        initial_y = c64.cpu.ram[PERIPHERAL_TEST_ZP_Y]
 
         # Move mouse
         c64.update_mouse_motion(20, 10)
@@ -307,8 +307,8 @@ class TestMouseCartridgeIntegration:
         run_cycles(c64, 10000)
 
         # Values should have changed
-        assert c64.cpu.ram[self.POTX_MIRROR] == (initial_x + 20) & 0xFF
-        assert c64.cpu.ram[self.POTY_MIRROR] == (initial_y + 10) & 0xFF
+        assert c64.cpu.ram[PERIPHERAL_TEST_ZP_X] == (initial_x + 20) & 0xFF
+        assert c64.cpu.ram[PERIPHERAL_TEST_ZP_Y] == (initial_y + 10) & 0xFF
 
     def test_cartridge_reads_joystick_buttons(self, c64_with_mouse_cart):
         """Cartridge correctly reads joystick/button state."""
@@ -318,21 +318,21 @@ class TestMouseCartridgeIntegration:
         run_cycles(c64, 10000)
 
         # Initially no buttons pressed (all bits high)
-        assert c64.cpu.ram[self.JOY1_MIRROR] == 0xFF
+        assert c64.cpu.ram[PERIPHERAL_TEST_ZP_BUTTONS] == ALL_BUTTONS_RELEASED
 
         # Press left mouse button
         c64.set_mouse_button(1, True)
         run_cycles(c64, 10000)
 
         # Left button bit should be low
-        assert (c64.cpu.ram[self.JOY1_MIRROR] & MOUSE_LEFT_BUTTON) == BUTTON_PRESSED
+        assert (c64.cpu.ram[PERIPHERAL_TEST_ZP_BUTTONS] & MOUSE_LEFT_BUTTON) == BUTTON_PRESSED
 
         # Release button
         c64.set_mouse_button(1, False)
         run_cycles(c64, 10000)
 
         # Left button bit should be high again
-        assert (c64.cpu.ram[self.JOY1_MIRROR] & MOUSE_LEFT_BUTTON) == MOUSE_LEFT_BUTTON
+        assert (c64.cpu.ram[PERIPHERAL_TEST_ZP_BUTTONS] & MOUSE_LEFT_BUTTON) == MOUSE_LEFT_BUTTON
 
     def test_cartridge_reads_right_button(self, c64_with_mouse_cart):
         """Cartridge correctly reads right mouse button."""
@@ -345,7 +345,7 @@ class TestMouseCartridgeIntegration:
         run_cycles(c64, 10000)
 
         # Right button bit should be low
-        assert (c64.cpu.ram[self.JOY1_MIRROR] & MOUSE_RIGHT_BUTTON) == BUTTON_PRESSED
+        assert (c64.cpu.ram[PERIPHERAL_TEST_ZP_BUTTONS] & MOUSE_RIGHT_BUTTON) == BUTTON_PRESSED
 
 
 @requires_c64_roms

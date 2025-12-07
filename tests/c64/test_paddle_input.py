@@ -8,7 +8,12 @@ absolute positioning instead of relative motion.
 import pytest
 from systems.c64 import C64
 from systems.c64.sid import SID
-from systems.c64.cia1 import PADDLE_1_FIRE, PADDLE_2_FIRE, BUTTON_PRESSED
+from systems.c64.cia1 import PADDLE_1_FIRE, PADDLE_2_FIRE, BUTTON_PRESSED, ALL_BUTTONS_RELEASED
+from systems.c64.cartridges.rom_builder import (
+    PERIPHERAL_TEST_ZP_X,
+    PERIPHERAL_TEST_ZP_Y,
+    PERIPHERAL_TEST_ZP_BUTTONS,
+)
 from mos6502 import errors
 from .conftest import C64_ROMS_DIR, requires_c64_roms
 
@@ -240,11 +245,6 @@ class TestC64PaddleInput:
 class TestPaddleCartridgeIntegration:
     """Integration tests using the mouse test cartridge (works for paddle too)."""
 
-    # Zero-page mirror locations (same as mouse test)
-    POTX_MIRROR = 0x03
-    POTY_MIRROR = 0x04
-    JOY1_MIRROR = 0x05
-
     @pytest.fixture
     def mouse_cart_path(self):
         """Path to the mouse test cartridge (works for paddle too)."""
@@ -273,8 +273,8 @@ class TestPaddleCartridgeIntegration:
         run_cycles(c64, 10000)
 
         # Check zero-page mirrors - position should be 127 and 127 (scaled)
-        assert c64.cpu.ram[self.POTX_MIRROR] == 127
-        assert c64.cpu.ram[self.POTY_MIRROR] == 127
+        assert c64.cpu.ram[PERIPHERAL_TEST_ZP_X] == 127
+        assert c64.cpu.ram[PERIPHERAL_TEST_ZP_Y] == 127
 
     def test_cartridge_updates_on_paddle_movement(self, c64_with_paddle_cart):
         """Cartridge reflects paddle movement in zero-page mirrors."""
@@ -284,16 +284,16 @@ class TestPaddleCartridgeIntegration:
         c64.update_paddle_position(0, 0, 320, 200)
         run_cycles(c64, 10000)
 
-        assert c64.cpu.ram[self.POTX_MIRROR] == 0
-        assert c64.cpu.ram[self.POTY_MIRROR] == 0
+        assert c64.cpu.ram[PERIPHERAL_TEST_ZP_X] == 0
+        assert c64.cpu.ram[PERIPHERAL_TEST_ZP_Y] == 0
 
         # Move to center
         c64.update_paddle_position(160, 100, 320, 200)
         run_cycles(c64, 10000)
 
         # Values should be approximately center (127-128)
-        assert 126 <= c64.cpu.ram[self.POTX_MIRROR] <= 129
-        assert 126 <= c64.cpu.ram[self.POTY_MIRROR] <= 129
+        assert 126 <= c64.cpu.ram[PERIPHERAL_TEST_ZP_X] <= 129
+        assert 126 <= c64.cpu.ram[PERIPHERAL_TEST_ZP_Y] <= 129
 
     def test_cartridge_reads_paddle_buttons(self, c64_with_paddle_cart):
         """Cartridge correctly reads paddle button state."""
@@ -303,7 +303,7 @@ class TestPaddleCartridgeIntegration:
         run_cycles(c64, 10000)
 
         # Initially no buttons pressed (all bits high)
-        assert c64.cpu.ram[self.JOY1_MIRROR] == 0xFF
+        assert c64.cpu.ram[PERIPHERAL_TEST_ZP_BUTTONS] == ALL_BUTTONS_RELEASED
 
         # Press paddle 1 fire button
         c64.set_paddle_button(1, True)
@@ -311,4 +311,4 @@ class TestPaddleCartridgeIntegration:
 
         # Paddle 1 fire is bit 2 (not bit 4 like joystick fire)
         # Reference: https://www.c64-wiki.com/wiki/Paddle
-        assert (c64.cpu.ram[self.JOY1_MIRROR] & PADDLE_1_FIRE) == BUTTON_PRESSED
+        assert (c64.cpu.ram[PERIPHERAL_TEST_ZP_BUTTONS] & PADDLE_1_FIRE) == BUTTON_PRESSED

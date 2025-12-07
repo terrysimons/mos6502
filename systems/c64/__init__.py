@@ -34,6 +34,7 @@ from c64.cia1 import (
     PADDLE_2_FIRE,
     MOUSE_LEFT_BUTTON,
     MOUSE_RIGHT_BUTTON,
+    LIGHTPEN_BUTTON,
 )
 from c64.cia2 import CIA2
 from c64.sid import SID
@@ -297,6 +298,11 @@ class C64:
             choices=[1, 2],
             default=1,
             help="Joystick port for paddles (1 or 2, default: 1)",
+        )
+        core_group.add_argument(
+            "--lightpen",
+            action="store_true",
+            help="Enable lightpen emulation using mouse position (pygame mode only, port 1)",
         )
 
         # Program loading options
@@ -2483,7 +2489,7 @@ class C64:
                 elif event.type == pygame.KEYUP:
                     self._handle_pygame_keyboard(event, pygame)
                 elif event.type == pygame.MOUSEMOTION:
-                    # Update mouse/paddle position
+                    # Update mouse/paddle/lightpen position
                     if self._mouse_enabled:
                         # Mouse mode: relative motion (like 1351 proportional mouse)
                         self.update_mouse_motion(event.rel[0], event.rel[1])
@@ -2492,19 +2498,27 @@ class C64:
                         # Mouse X → Paddle 1 (POTX), Mouse Y → Paddle 2 (POTY)
                         window_size = self.pygame_screen.get_size()
                         self.update_paddle_position(event.pos[0], event.pos[1], window_size[0], window_size[1])
+                    elif self._lightpen_enabled:
+                        # Lightpen mode: absolute position to VIC registers
+                        window_size = self.pygame_screen.get_size()
+                        self.update_lightpen_position(event.pos[0], event.pos[1], window_size[0], window_size[1])
                 elif event.type == pygame.MOUSEBUTTONDOWN:
-                    # Mouse/paddle button pressed
+                    # Mouse/paddle/lightpen button pressed
                     if self._mouse_enabled:
                         self.set_mouse_button(event.button, True)
                     elif self._paddle_enabled:
                         # Left click → Paddle 1 fire, Right click → Paddle 2 fire
                         self.set_paddle_button(event.button, True)
+                    elif self._lightpen_enabled:
+                        self.set_lightpen_button(event.button, True)
                 elif event.type == pygame.MOUSEBUTTONUP:
-                    # Mouse/paddle button released
+                    # Mouse/paddle/lightpen button released
                     if self._mouse_enabled:
                         self.set_mouse_button(event.button, False)
                     elif self._paddle_enabled:
                         self.set_paddle_button(event.button, False)
+                    elif self._lightpen_enabled:
+                        self.set_lightpen_button(event.button, False)
 
             # Check if VIC has a new frame ready (VBlank)
             # VIC takes the snapshot at the exact moment of VBlank for consistency
@@ -2819,7 +2833,7 @@ class C64:
                 elif event.type == pygame.KEYUP:
                     self._handle_pygame_keyboard(event, pygame)
                 elif event.type == pygame.MOUSEMOTION:
-                    # Update mouse/paddle position
+                    # Update mouse/paddle/lightpen position
                     if self._mouse_enabled:
                         # Mouse mode: relative motion (like 1351 proportional mouse)
                         self.update_mouse_motion(event.rel[0], event.rel[1])
@@ -2828,19 +2842,27 @@ class C64:
                         # Mouse X → Paddle 1 (POTX), Mouse Y → Paddle 2 (POTY)
                         window_size = self.pygame_screen.get_size()
                         self.update_paddle_position(event.pos[0], event.pos[1], window_size[0], window_size[1])
+                    elif self._lightpen_enabled:
+                        # Lightpen mode: absolute position to VIC registers
+                        window_size = self.pygame_screen.get_size()
+                        self.update_lightpen_position(event.pos[0], event.pos[1], window_size[0], window_size[1])
                 elif event.type == pygame.MOUSEBUTTONDOWN:
-                    # Mouse/paddle button pressed
+                    # Mouse/paddle/lightpen button pressed
                     if self._mouse_enabled:
                         self.set_mouse_button(event.button, True)
                     elif self._paddle_enabled:
                         # Left click → Paddle 1 fire, Right click → Paddle 2 fire
                         self.set_paddle_button(event.button, True)
+                    elif self._lightpen_enabled:
+                        self.set_lightpen_button(event.button, True)
                 elif event.type == pygame.MOUSEBUTTONUP:
-                    # Mouse/paddle button released
+                    # Mouse/paddle/lightpen button released
                     if self._mouse_enabled:
                         self.set_mouse_button(event.button, False)
                     elif self._paddle_enabled:
                         self.set_paddle_button(event.button, False)
+                    elif self._lightpen_enabled:
+                        self.set_lightpen_button(event.button, False)
 
         except errors.QuitRequestError:
             raise  # Re-raise quit request to propagate up
@@ -3152,6 +3174,94 @@ class C64:
             self.cia1.joystick_1 = joystick
         else:
             self.cia1.joystick_2 = joystick
+
+    # =========================================================================
+    # Lightpen Input Support
+    # =========================================================================
+    # Lightpen uses VIC-II registers for position (not SID POT like mouse/paddle):
+    # - $D013 (LPX): X coordinate divided by 2 (multiply by 2 to get actual X)
+    # - $D014 (LPY): Y coordinate (same as sprite Y coordinates)
+    # - Button triggers joystick fire on port 1 only (bit 4 of $DC01)
+    # - Can also trigger VIC IRQ bit 3 when position is latched
+    #
+    # Lightpen only works on control port 1 (directly wired to VIC).
+    # Reference: https://www.c64-wiki.com/wiki/Light_pen
+
+    _lightpen_enabled: bool = False
+
+    def enable_lightpen(self, enabled: bool = True) -> None:
+        """Enable or disable lightpen input.
+
+        Note: Lightpen only works on control port 1 (hardware limitation).
+
+        Args:
+            enabled: Whether lightpen input is enabled
+        """
+        self._lightpen_enabled = enabled
+        log.info(f"Lightpen input {'enabled' if enabled else 'disabled'}")
+
+    def update_lightpen_position(self, mouse_x: int, mouse_y: int,
+                                  window_width: int, window_height: int) -> None:
+        """Update lightpen position from mouse position.
+
+        Maps mouse window coordinates to VIC-II lightpen registers.
+        The VIC stores X/2 in $D013 and Y in $D014, using sprite coordinate space.
+
+        Args:
+            mouse_x: Mouse X position in window (pixels)
+            mouse_y: Mouse Y position in window (pixels)
+            window_width: Window width (pixels)
+            window_height: Window height (pixels)
+        """
+        if not self._lightpen_enabled:
+            return
+
+        # VIC-II visible area in sprite coordinates:
+        # PAL: X = 24-343 (320 pixels), Y = 50-249 (200 pixels)
+        # We map the window to the visible screen area
+
+        # X coordinate: map window X to sprite X range (24-343), then divide by 2
+        # The visible screen is 320 pixels wide, starting at sprite X=24
+        sprite_x = 24 + int((mouse_x / max(1, window_width)) * 320)
+        sprite_x = max(0, min(511, sprite_x))  # Clamp to 9-bit range
+        lpx = sprite_x // 2  # VIC stores X/2
+
+        # Y coordinate: map window Y to sprite Y range (50-249)
+        # The visible screen is 200 pixels tall, starting at sprite Y=50
+        sprite_y = 50 + int((mouse_y / max(1, window_height)) * 200)
+        sprite_y = max(0, min(255, sprite_y))  # Clamp to 8-bit range
+
+        # Update VIC lightpen registers
+        self.vic.regs[0x13] = lpx & 0xFF
+        self.vic.regs[0x14] = sprite_y & 0xFF
+
+    def set_lightpen_button(self, button: int, pressed: bool) -> None:
+        """Set lightpen button state.
+
+        Lightpen button is directly wired to joystick fire on port 1.
+        Only left mouse button is used (lightpens have one button).
+
+        Reference: https://www.c64-wiki.com/wiki/Light_pen
+
+        Args:
+            button: Mouse button (1 = left/lightpen button)
+            pressed: True if button is pressed, False if released
+        """
+        if not self._lightpen_enabled:
+            return
+
+        # Lightpen only uses port 1 (hardware constraint)
+        joystick = self.cia1.joystick_1
+
+        # Lightpen button uses active-low logic (0 = pressed, 1 = released)
+        # Only left button (1) triggers the lightpen
+        if button == 1:
+            if pressed:
+                joystick &= ~LIGHTPEN_BUTTON  # Clear bit (pressed)
+            else:
+                joystick |= LIGHTPEN_BUTTON   # Set bit (released)
+
+        self.cia1.joystick_1 = joystick
 
     # Pending key releases for non-blocking terminal input
     # Each entry is (release_cycles, row, col) - uses CPU cycles, not wall-clock time
@@ -3597,6 +3707,17 @@ def main() -> int | None:
                 )
             else:
                 log.warning("Paddle input only available in pygame mode")
+
+        # Enable lightpen if requested (only works with pygame, mutually exclusive with mouse/paddle)
+        if getattr(args, 'lightpen', False):
+            if getattr(args, 'mouse', False) or getattr(args, 'paddle', False):
+                log.warning("Cannot enable lightpen with mouse or paddle - lightpen takes precedence")
+                c64._mouse_enabled = False
+                c64._paddle_enabled = False
+            if c64.display_mode == "pygame":
+                c64.enable_lightpen(enabled=True)
+            else:
+                log.warning("Lightpen input only available in pygame mode")
 
         # In no-roms mode, log that we're running headless
         if args.no_roms:

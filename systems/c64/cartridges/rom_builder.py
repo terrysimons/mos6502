@@ -87,6 +87,13 @@ COLOR_TEST_NAME = COLOR_LIGHT_GRAY
 # Values: 0x00-0x7F = running, 0x80 = done/pass, 0x81-0xFF = done/fail
 FAIL_COUNTER_ZP = 0x02
 
+# Zero-page locations for peripheral test cartridges
+# Test cartridges store hardware register values here for test framework verification
+# These are arbitrary locations we chose - not real C64 hardware addresses
+PERIPHERAL_TEST_ZP_X = 0x03       # X-axis value (POTX for mouse/paddle, LPX for lightpen)
+PERIPHERAL_TEST_ZP_Y = 0x04       # Y-axis value (POTY for mouse/paddle, LPY for lightpen)
+PERIPHERAL_TEST_ZP_BUTTONS = 0x05  # Button state (CIA joystick port bits)
+
 # RAM address for bank-switch routine
 # $C000 is free RAM on C64 (between BASIC and I/O area)
 RAM_ROUTINE_ADDR = 0xC000
