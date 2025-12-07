@@ -87,6 +87,18 @@ class CIA1:
         # CPU thread reads during CIA register access
         self._keyboard_lock = threading.Lock()
 
+        # Cached keyboard matrix snapshot for fast reads
+        # Updated only when keys change (invalidated by press/release)
+        self._kb_matrix_cache: list = [0xFF] * 8
+        self._kb_cache_valid = True  # Start valid since matrix is all 0xFF
+
+        # Pre-computed column results for each possible port_a value
+        # _column_cache[port_a] = resulting column byte for Port B read
+        # This avoids the double loop on every Port B read
+        # Invalidated when keyboard matrix changes
+        self._column_cache: dict = {}
+        self._column_cache_valid = False  # Will be populated on first read
+
         # Track key press times for minimum hold duration
         # Key: (row, col), Value: press timestamp
         self._key_press_times: dict = {}
@@ -202,11 +214,11 @@ class CIA1:
     def read(self, addr) -> int:
         reg = addr & 0x0F
 
-        # Take thread-safe snapshot of keyboard matrix for registers that need it
-        # This ensures consistent reads within a single operation
+        # Use cached keyboard matrix for registers that need it
+        # The cache is invalidated when keys are pressed/released, avoiding
+        # lock acquisition and copy on every read
         if reg in (0x00, 0x01):
-            with self._keyboard_lock:
-                kb_matrix = self.keyboard_matrix.copy()
+            kb_matrix = self._get_cached_keyboard_matrix()
         else:
             kb_matrix = None
 
@@ -256,9 +268,6 @@ class CIA1:
         # Each column bit is pulled low (0) if any key in that column is pressed in a selected row
         # This is where the keyboard magic happens!
         if reg == 0x01:
-            # Start with keyboard matrix scan
-            keyboard_ext = 0xFF
-
             # IMPORTANT: The C64 keyboard matrix is electrically bidirectional
             # Port A bits can be outputs (actively drive row selection) OR inputs (pulled high externally)
             #
@@ -274,40 +283,14 @@ class CIA1:
             #   - The row line "floats" and keys can affect it
             #
             # This means ALL rows (both output and input) can have their keys detected!
+            #
+            # Row participates in Port B scanning if its Port A bit is LOW, regardless
+            # of whether it's an output or input. The key insight: the KERNAL writes
+            # specific bit patterns to Port A to select rows, and we should respect
+            # that selection even for input rows.
 
-            # For each row, check if it should participate in THIS Port B scan
-            for row in range(8):
-                row_is_output = bool(self.ddr_a & (1 << row))
-                row_bit_low = not bool(self.port_a & (1 << row))
-
-                # CRITICAL FIX for input row detection:
-                # When Port A bit is LOW for an INPUT row, the KERNAL is trying to "select"
-                # that row even though it can't actually drive it. We should ONLY scan that
-                # specific input row, not all input rows!
-                #
-                # Row participates in Port B scanning if its Port A bit is LOW, regardless
-                # of whether it's an output or input. The key insight: the KERNAL writes
-                # specific bit patterns to Port A to select rows, and we should respect
-                # that selection even for input rows.
-                row_selected = row_bit_low  # Participate if Port A bit is LOW
-
-                if row_selected:
-                    # For each column in this row
-                    for col in range(8):
-                        # Check if key at [row][col] is pressed (using thread-safe snapshot)
-                        # kb_matrix[row] is a byte: 0 bit = pressed, 1 bit = released
-                        if not (kb_matrix[row] & (1 << col)):  # Key is pressed (bit=0)
-                            # Pressed key pulls that column line low
-                            keyboard_ext &= ~(1 << col)
-
-                            if DEBUG_KEYBOARD:
-                                # Get key name for this matrix position
-                                key_name = self._get_key_name(row, col)
-
-                                if row_is_output:
-                                    log.info(f"*** MATRIX: row={row}, col={col} ({key_name}), matrix[{row}]=${kb_matrix[row]:02X}, keyboard_ext now=${keyboard_ext:02X} ***")
-                                else:
-                                    log.info(f"*** MATRIX (INPUT ROW): row={row}, col={col} ({key_name}), keyboard_ext now=${keyboard_ext:02X} ***")
+            # Use optimized column computation - avoids double loop
+            keyboard_ext = self._compute_keyboard_columns(self.port_a, kb_matrix)
 
             # Combine keyboard and joystick 1 inputs (both active low, so AND them)
             # Joystick 1 only affects bits 0-4 (Up, Down, Left, Right, Fire)
@@ -954,6 +937,57 @@ class CIA1:
         # Simple key name lookup - just return the key label
         return key_map.get((row, col), f"?({row},{col})?")
 
+    def _invalidate_keyboard_cache(self) -> None:
+        """Invalidate keyboard caches when matrix changes.
+
+        Must be called while holding _keyboard_lock.
+        """
+        self._kb_cache_valid = False
+        self._column_cache_valid = False
+        self._column_cache.clear()
+
+    def _get_cached_keyboard_matrix(self) -> list:
+        """Get keyboard matrix, using cache if valid.
+
+        This avoids acquiring the lock and copying on every read.
+        The cache is invalidated when keys are pressed/released.
+
+        Returns:
+            Cached copy of keyboard matrix (8 bytes)
+        """
+        if self._kb_cache_valid:
+            return self._kb_matrix_cache
+
+        # Cache miss - need to copy under lock
+        with self._keyboard_lock:
+            # Double-check after acquiring lock
+            if not self._kb_cache_valid:
+                self._kb_matrix_cache = self.keyboard_matrix.copy()
+                self._kb_cache_valid = True
+            return self._kb_matrix_cache
+
+    def _compute_keyboard_columns(self, port_a: int, kb_matrix: list) -> int:
+        """Compute keyboard column result for a given port_a value.
+
+        This is the expensive double-loop that we want to cache.
+
+        Args:
+            port_a: Port A value (row selection, active low)
+            kb_matrix: Keyboard matrix snapshot
+
+        Returns:
+            Column byte (active low: 0 = key pressed)
+        """
+        keyboard_ext = 0xFF
+
+        for row in range(8):
+            # Row participates if Port A bit is LOW (selected)
+            if not (port_a & (1 << row)):
+                # AND in this row's columns (pressed keys pull columns low)
+                keyboard_ext &= kb_matrix[row]
+
+        return keyboard_ext
+
     def press_key(self, row: int, col: int) -> None:
         """Press a key at the given matrix position (thread-safe).
 
@@ -968,6 +1002,9 @@ class CIA1:
                 old_value = self.keyboard_matrix[row]
                 self.keyboard_matrix[row] &= ~(1 << col)
                 new_value = self.keyboard_matrix[row]
+                # Invalidate cache since matrix changed
+                if old_value != new_value:
+                    self._invalidate_keyboard_cache()
                 # Track press time for minimum hold duration
                 self._key_press_times[(row, col)] = time.perf_counter()
                 if DEBUG_KEYBOARD:
@@ -983,7 +1020,11 @@ class CIA1:
         if 0 <= row < 8 and 0 <= col < 8:
             with self._keyboard_lock:
                 # Set the bit (active low = released)
+                old_value = self.keyboard_matrix[row]
                 self.keyboard_matrix[row] |= (1 << col)
+                # Invalidate cache since matrix changed
+                if old_value != self.keyboard_matrix[row]:
+                    self._invalidate_keyboard_cache()
                 # Clear press time tracking
                 self._key_press_times.pop((row, col), None)
 
