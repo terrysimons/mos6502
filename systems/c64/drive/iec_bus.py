@@ -79,6 +79,10 @@ class IECBus:
         # to the current C64 cycle count before updating bus state
         self._last_drive_sync_cycle = 0
 
+        # Cache of last input state for change detection
+        # Avoids recomputing bus state when nothing has changed
+        self._last_input_state = -1  # Invalid initial value to force first update
+
     def connect_c64(self, cia2: CIA2) -> None:
         """Connect C64's CIA2 to the bus.
 
@@ -143,11 +147,6 @@ class IECBus:
 
         This implements open-collector logic: the bus line is low if ANY
         device is pulling it low, and high only if ALL devices release it.
-
-        Optimized for speed:
-        - Single loop over drives instead of multiple
-        - Caches VIA reference to minimize attribute lookups
-        - Avoids bool() calls where not needed
         """
         cia2 = self.cia2
         if not cia2:
@@ -164,7 +163,7 @@ class IECBus:
         clk_low = c64_ddr_a & 0x10 and c64_port_a & 0x10
         data_low = c64_ddr_a & 0x20 and c64_port_a & 0x20
 
-        # Single loop: process all drive contributions
+        # Process all drive contributions
         for drive in self.drives:
             via1 = drive.via1
             orb = via1.orb
@@ -179,7 +178,6 @@ class IECBus:
                 data_low = True
 
             # ATN ACK (bit 4) - XOR: different states pull DATA low
-            # Reference: https://janderogee.com/projects/1541-III/files/pdf/IEC_disected-IEC_1541_info.pdf
             if ddrb & 0x10 and (bool(orb & 0x10) != (not atn)):
                 data_low = True
 

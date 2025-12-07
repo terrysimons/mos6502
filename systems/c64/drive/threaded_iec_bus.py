@@ -82,6 +82,10 @@ class ThreadedIECBus:
         # The C64 updates this, drives read it to stay in sync
         self._c64_cycles: int = 0
 
+        # Cache of last input state for change detection
+        # Avoids recomputing bus state when nothing has changed
+        self._last_input_state = -1  # Invalid initial value to force first update
+
     @property
     def drives(self):
         """Get list of connected drives (for compatibility)."""
