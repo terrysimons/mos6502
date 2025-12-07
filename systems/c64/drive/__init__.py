@@ -21,10 +21,14 @@ from .via6522 import VIA6522
 from .d64 import D64Image
 from .drive1541 import Drive1541
 from .iec_bus import IECBus
+from .threaded_iec_bus import ThreadedIECBus
+from .threaded_drive import ThreadedDrive1541
 
 __all__ = [
     "VIA6522",
     "D64Image",
     "Drive1541",
     "IECBus",
+    "ThreadedIECBus",
+    "ThreadedDrive1541",
 ]

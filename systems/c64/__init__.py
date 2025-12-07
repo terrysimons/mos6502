@@ -77,7 +77,7 @@ from c64.memory import (
     CIA2_END,
     BASIC_PROGRAM_START,
 )
-from c64.drive import Drive1541, IECBus, D64Image
+from c64.drive import Drive1541, IECBus, D64Image, ThreadedDrive1541, ThreadedIECBus
 
 logging.basicConfig(level=logging.CRITICAL)
 log = logging.getLogger("c64")
@@ -744,7 +744,8 @@ class C64:
         # fetching the vector from $FFFC/$FFFD and setting PC accordingly
         log.info(f"PC initialized to ${self.cpu.PC:04X} (from reset vector at ${self.RESET_VECTOR_ADDR:04X})")
 
-    def attach_drive(self, drive_rom_path: Optional[Path] = None, disk_path: Optional[Path] = None) -> bool:
+    def attach_drive(self, drive_rom_path: Optional[Path] = None, disk_path: Optional[Path] = None,
+                      threaded: bool = True) -> bool:
         """Attach a 1541 disk drive to the IEC bus.
 
         Supports multiple ROM formats:
@@ -754,6 +755,8 @@ class C64:
         Args:
             drive_rom_path: Path to 1541 DOS ROM (default: auto-detect in rom_dir)
             disk_path: Optional D64 disk image to insert
+            threaded: If True (default), run drive in separate thread for performance.
+                      If False, use synchronous mode for cycle-accurate emulation.
 
         Returns:
             True if drive attached successfully, False otherwise
@@ -815,13 +818,25 @@ class C64:
             log.warning("  Expected: 1541.rom (16KB) or 1541-c000.bin + 1541-e000.bin (8KB each)")
             return False
 
-        # Create IEC bus and connect C64
-        self.iec_bus = IECBus()
-        self.iec_bus.connect_c64(self.cia2)
-        self.cia2.set_iec_bus(self.iec_bus)
+        # Track whether we're using threaded mode
+        self.drive_threaded = threaded
 
-        # Create drive 8
-        self.drive8 = Drive1541(device_number=8)
+        if threaded:
+            # Threaded mode: Drive runs in its own thread for better performance
+            self.iec_bus = ThreadedIECBus()
+            self.iec_bus.connect_c64(self.cia2)
+            self.cia2.set_iec_bus(self.iec_bus)
+
+            # Create threaded drive 8
+            self.drive8 = ThreadedDrive1541(device_number=8)
+        else:
+            # Synchronous mode: Cycle-accurate but slower
+            self.iec_bus = IECBus()
+            self.iec_bus.connect_c64(self.cia2)
+            self.cia2.set_iec_bus(self.iec_bus)
+
+            # Create standard drive 8
+            self.drive8 = Drive1541(device_number=8)
 
         # Create a separate CPU for the drive
         # The 1541 uses a full 6502 (not 6510)
@@ -841,7 +856,10 @@ class C64:
             return False
 
         # Connect drive to IEC bus
-        self.iec_bus.connect_drive(self.drive8)
+        if threaded:
+            self.drive8.connect_to_threaded_bus(self.iec_bus)
+        else:
+            self.iec_bus.connect_drive(self.drive8)
 
         # Insert disk if provided
         if disk_path is not None:
@@ -855,30 +873,52 @@ class C64:
 
         self.drive_enabled = True
 
-        # Set up cycle-accurate IEC synchronization using post_tick_callback.
-        # The tick() function is called every time the CPU spends cycles, which
-        # is the natural place to synchronize connected hardware.
-        #
-        # The IEC serial bus is bit-banged and requires tight timing between
-        # the C64 and 1541 CPUs. By hooking into tick(), we ensure the drive
-        # runs in lockstep with every cycle the C64 spends.
+        if threaded:
+            # Threaded mode: Uses ThreadedIECBus for thread-safe state
+            # but still runs drive in lockstep via post_tick_callback
+            # The threading benefit is that bus state updates are atomic
 
-        def sync_drive_on_tick(cpu, cycles):
-            """Sync drive CPU and IEC bus after each C64 cycle consumption."""
-            if self.drive8 and self.drive8.cpu:
-                # Update IEC bus state so drive sees current C64 outputs
-                self.iec_bus.update()
+            def sync_drive_on_tick_threaded(cpu, cycles):
+                """Sync drive CPU and IEC bus after each C64 cycle consumption."""
+                if self.drive8 and self.drive8.cpu:
+                    # Update IEC bus state so drive sees current C64 outputs
+                    self.iec_bus.update()
 
-                # Run drive for the same number of cycles
-                # The drive's tick() method handles its own cycle budget
-                self.drive8.tick(cycles)
+                    # Run drive for the same number of cycles (1:1 sync)
+                    # Call the base class tick() directly since ThreadedDrive1541.tick() is a no-op
+                    Drive1541.tick(self.drive8, cycles)
 
-                # Update IEC bus again so C64 sees drive's response
-                self.iec_bus.update()
+                    # Update IEC bus again so C64 sees drive's response
+                    self.iec_bus.update()
 
-        self.cpu.post_tick_callback = sync_drive_on_tick
+            self.cpu.post_tick_callback = sync_drive_on_tick_threaded
+            # Note: Not starting drive thread - running synchronously with ThreadedIECBus
+            log.info(f"1541 drive 8 attached with ThreadedIECBus (ROM: {rom_path.name})")
+        else:
+            # Synchronous mode: Set up cycle-accurate IEC synchronization
+            # using post_tick_callback. The tick() function is called every
+            # time the CPU spends cycles, which is the natural place to
+            # synchronize connected hardware.
+            #
+            # The IEC serial bus is bit-banged and requires tight timing between
+            # the C64 and 1541 CPUs. By hooking into tick(), we ensure the drive
+            # runs in lockstep with every cycle the C64 spends.
 
-        log.info(f"1541 drive 8 attached (ROM: {rom_path.name})")
+            def sync_drive_on_tick(cpu, cycles):
+                """Sync drive CPU and IEC bus after each C64 cycle consumption."""
+                if self.drive8 and self.drive8.cpu:
+                    # Update IEC bus state so drive sees current C64 outputs
+                    self.iec_bus.update()
+
+                    # Run drive for the same number of cycles
+                    # The drive's tick() method handles its own cycle budget
+                    self.drive8.tick(cycles)
+
+                    # Update IEC bus again so C64 sees drive's response
+                    self.iec_bus.update()
+
+            self.cpu.post_tick_callback = sync_drive_on_tick
+            log.info(f"1541 drive 8 attached in SYNCHRONOUS mode (ROM: {rom_path.name})")
 
         return True
 
@@ -1401,6 +1441,12 @@ class C64:
             # Enable key repeat (delay=300ms before repeat, interval=30ms between repeats)
             # This matches typical terminal key repeat behavior
             pygame.key.set_repeat(300, 30)
+
+            # Initialize clipboard support for Ctrl+V paste
+            try:
+                pygame.scrap.init()
+            except Exception as e:
+                log.warning(f"Clipboard support unavailable: {e}")
 
             # Create the rendering surface (384x270 with border)
             self.pygame_surface = pygame.Surface((total_width, total_height))
@@ -2027,6 +2073,11 @@ class C64:
                 stop_cpu.set()
                 cpu_done.set()
                 cpu_thread_obj.join(timeout=0.5)
+
+                # Stop drive thread if running in threaded mode
+                if self.drive_enabled and getattr(self, 'drive_threaded', False):
+                    if self.drive8 is not None and hasattr(self.drive8, 'stop_thread'):
+                        self.drive8.stop_thread()
 
                 # Restore terminal settings if we changed them
                 if old_settings is not None:
@@ -2745,6 +2796,24 @@ class C64:
             except (ValueError, OverflowError):
                 ascii_char = f"<non-printable>"
                 ascii_code = event.key
+
+            # Handle Ctrl+V for paste from system clipboard
+            ctrl_held = bool(event.mod & (pygame.KMOD_LCTRL | pygame.KMOD_RCTRL))
+            if ctrl_held and event.key == pygame.K_v:
+                try:
+                    clipboard_text = pygame.scrap.get(pygame.SCRAP_TEXT)
+                    if clipboard_text:
+                        # Decode bytes to string if needed
+                        if isinstance(clipboard_text, bytes):
+                            clipboard_text = clipboard_text.decode('utf-8', errors='ignore')
+                        # Remove null terminator if present
+                        clipboard_text = clipboard_text.rstrip('\x00')
+                        if clipboard_text:
+                            self._paste_text(clipboard_text)
+                            log.info(f"Pasted {len(clipboard_text)} characters from clipboard")
+                except Exception as e:
+                    log.warning(f"Paste failed: {e}")
+                return
 
             # Handle joystick keys first (if joystick enabled)
             if self._joystick_enabled and event.key in joystick_key_map:
@@ -3761,6 +3830,80 @@ class C64:
                            (for when user is holding shift but we want unshifted char)
         """
         self._pygame_key_buffer.append((row, col, needs_shift, suppress_shift))
+
+    def _paste_text(self, text: str) -> None:
+        """Paste text by buffering keystrokes for each character.
+
+        Converts ASCII/Unicode text to C64 key matrix positions and buffers
+        them for injection via the pygame key buffer system.
+
+        Args:
+            text: Text to paste (ASCII characters)
+        """
+        # ASCII character to C64 keyboard matrix mapping: (row, col, needs_shift)
+        # Based on the C64 keyboard matrix
+        ascii_to_matrix = {
+            # Letters (unshifted = uppercase on C64)
+            'A': (1, 2, False), 'B': (3, 4, False), 'C': (2, 4, False),
+            'D': (2, 2, False), 'E': (1, 6, False), 'F': (2, 5, False),
+            'G': (3, 2, False), 'H': (3, 5, False), 'I': (4, 1, False),
+            'J': (4, 2, False), 'K': (4, 5, False), 'L': (5, 2, False),
+            'M': (4, 4, False), 'N': (4, 7, False), 'O': (4, 6, False),
+            'P': (5, 1, False), 'Q': (7, 6, False), 'R': (2, 1, False),
+            'S': (1, 5, False), 'T': (2, 6, False), 'U': (3, 6, False),
+            'V': (3, 7, False), 'W': (1, 1, False), 'X': (2, 7, False),
+            'Y': (3, 1, False), 'Z': (1, 4, False),
+            # Lowercase -> same as uppercase (C64 types uppercase by default)
+            'a': (1, 2, False), 'b': (3, 4, False), 'c': (2, 4, False),
+            'd': (2, 2, False), 'e': (1, 6, False), 'f': (2, 5, False),
+            'g': (3, 2, False), 'h': (3, 5, False), 'i': (4, 1, False),
+            'j': (4, 2, False), 'k': (4, 5, False), 'l': (5, 2, False),
+            'm': (4, 4, False), 'n': (4, 7, False), 'o': (4, 6, False),
+            'p': (5, 1, False), 'q': (7, 6, False), 'r': (2, 1, False),
+            's': (1, 5, False), 't': (2, 6, False), 'u': (3, 6, False),
+            'v': (3, 7, False), 'w': (1, 1, False), 'x': (2, 7, False),
+            'y': (3, 1, False), 'z': (1, 4, False),
+            # Numbers
+            '1': (7, 0, False), '2': (7, 3, False), '3': (1, 0, False),
+            '4': (1, 3, False), '5': (2, 0, False), '6': (2, 3, False),
+            '7': (3, 0, False), '8': (3, 3, False), '9': (4, 0, False),
+            '0': (4, 3, False),
+            # Symbols (unshifted)
+            ' ': (7, 4, False),   # SPACE
+            '\r': (0, 1, False),  # RETURN
+            '\n': (0, 1, False),  # RETURN (newline)
+            ',': (5, 7, False),   # COMMA
+            '.': (5, 4, False),   # PERIOD
+            ':': (5, 5, False),   # COLON
+            ';': (6, 2, False),   # SEMICOLON
+            '/': (6, 7, False),   # SLASH
+            '=': (6, 5, False),   # EQUALS
+            '+': (5, 0, False),   # PLUS
+            '-': (5, 3, False),   # MINUS
+            '*': (6, 1, False),   # ASTERISK
+            '@': (5, 6, False),   # AT
+            # Shifted symbols
+            '!': (7, 0, True),    # SHIFT+1
+            '"': (7, 3, True),    # SHIFT+2 (quote)
+            '#': (1, 0, True),    # SHIFT+3
+            '$': (1, 3, True),    # SHIFT+4
+            '%': (2, 0, True),    # SHIFT+5
+            '&': (2, 3, True),    # SHIFT+6
+            "'": (3, 0, True),    # SHIFT+7 (apostrophe)
+            '(': (3, 3, True),    # SHIFT+8
+            ')': (4, 0, True),    # SHIFT+9
+            '<': (5, 7, True),    # SHIFT+COMMA
+            '>': (5, 4, True),    # SHIFT+PERIOD
+            '?': (6, 7, True),    # SHIFT+SLASH
+        }
+
+        for char in text:
+            if char in ascii_to_matrix:
+                row, col, needs_shift = ascii_to_matrix[char]
+                self._buffer_pygame_key(row, col, needs_shift, suppress_shift=False)
+            else:
+                # Skip unmapped characters
+                log.debug(f"Paste: skipping unmapped character '{char}' (0x{ord(char):02X})")
 
     def _process_pygame_key_buffer(self) -> None:
         """Process the pygame key buffer, injecting keys into CIA.
