@@ -447,9 +447,9 @@ class MOS6502CPU(flags.ProcessorStatusFlagsInterface):
                 self.log.warning(f"*** write_byte SCREEN: addr=${addr_int:04X}, data=${data & 0xFF:02X} ***")
             self.log.info("w")
 
-    def read_word(self: Self, address: Word) -> Word:
+    def read_word(self: Self, address: Word) -> int:
         """
-        Read a Word() from RAM at location RAM[address].
+        Read a 16-bit word from RAM at location RAM[address].
 
         Costs 2 CPU cycles.
 
@@ -459,22 +459,22 @@ class MOS6502CPU(flags.ProcessorStatusFlagsInterface):
 
         Returns:
         -------
-            a Byte() set to the value located in memory at RAM[address]
+            int: the 16-bit value located in memory at RAM[address:address+1]
         """
-        lowbyte: Byte = self.ram[int(address)]
+        lowbyte: int = self.ram[int(address)]
         self.spend_cpu_cycles(cost=1)
-        highbyte: Byte = self.ram[int(address) + 1]
+        highbyte: int = self.ram[int(address) + 1]
         self.spend_cpu_cycles(cost=1)
-        data = (int(highbyte) << 8) + int(lowbyte)
+        data = (highbyte << 8) + lowbyte
         if self.verbose_cycles:
             memory_section = self.ram.memory_section(address=address)
             self.log.info("rr")
             self.log.debug(f"read_word({memory_section}[0x{address:02x}]): 0x{data:04X} ({data})")
-        return Word(data, endianness=self.endianness)
+        return data
 
-    def read_word_zeropage(self: Self, address: Byte) -> Word:
+    def read_word_zeropage(self: Self, address: Byte) -> int:
         """
-        Read a Word() from zero page at location RAM[address].
+        Read a 16-bit word from zero page at location RAM[address].
 
         Handles zero page wrap: if address is 0xFF, highbyte comes from 0x00.
 
@@ -490,21 +490,21 @@ class MOS6502CPU(flags.ProcessorStatusFlagsInterface):
 
         Returns:
         -------
-            a Word() set to the value located in memory at RAM[address:address+1]
+            int: the 16-bit value located in memory at RAM[address:address+1]
         """
-        lowbyte: Byte = self.ram[int(address) & 0xFF]
+        lowbyte: int = self.ram[int(address) & 0xFF]
         self.spend_cpu_cycles(cost=1)
-        highbyte: Byte = self.ram[(int(address) + 1) & 0xFF]
+        highbyte: int = self.ram[(int(address) + 1) & 0xFF]
         self.spend_cpu_cycles(cost=1)
-        data = (int(highbyte) << 8) + int(lowbyte)
+        data = (highbyte << 8) + lowbyte
         if self.verbose_cycles:
             self.log.info("rr")
             self.log.debug(f"read_word(zeropage[0x{address & 0xFF:02x}]): 0x{data:04X} ({data})")
-        return Word(data, endianness=self.endianness)
+        return data
 
-    def peek_word(self: Self, address: Word) -> Word:
+    def peek_word(self: Self, address: Word) -> int:
         """
-        Read a Word() from RAM at location RAM[address].
+        Read a 16-bit word from RAM at location RAM[address].
 
         Doesn't use CPU cycles.
 
@@ -514,12 +514,11 @@ class MOS6502CPU(flags.ProcessorStatusFlagsInterface):
 
         Returns:
         -------
-            a Byte() set to the value located in memory at RAM[address]
+            int: the 16-bit value located in memory at RAM[address:address+1]
         """
-        lowbyte: Byte = self.ram[int(address)]
-        highbyte: Byte = self.ram[int(address) + 1]
-        data = (int(highbyte) << 8) + int(lowbyte)
-        return Word(data, endianness=self.endianness)
+        lowbyte: int = self.ram[int(address)]
+        highbyte: int = self.ram[int(address) + 1]
+        return (highbyte << 8) + lowbyte
 
     def write_word(self: Self, address: Word, data: Word) -> None:
         """
