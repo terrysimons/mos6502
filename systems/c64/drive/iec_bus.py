@@ -81,7 +81,7 @@ class IECBus:
 
         # Cache of last input state for change detection
         # Avoids recomputing bus state when nothing has changed
-        self._last_input_state = -1  # Invalid initial value to force first update
+        self._last_input_state = None  # Invalid initial value to force first update
 
     def connect_c64(self, cia2: CIA2) -> None:
         """Connect C64's CIA2 to the bus.
@@ -184,16 +184,24 @@ class IECBus:
         clk = not clk_low
         data = not data_low
 
+        # Check if anything changed
+        atn_changed = atn != self.atn
+        clk_changed = clk != self.clk
+        data_changed = data != self.data
+
         # Store bus state
         self.atn = atn
         self.clk = clk
         self.data = data
 
-        # Update all drives with current bus state
-        for drive in self.drives:
-            drive.set_iec_atn(atn)
-            drive.set_iec_clk(clk)
-            drive.set_iec_data(data)
+        # Update drives - ATN always (for CA1 edge detection), others only if changed
+        if atn_changed or clk_changed or data_changed:
+            for drive in self.drives:
+                drive.set_iec_atn(atn)  # Always call - has CA1 side effects
+                if clk_changed:
+                    drive.iec_clk = clk
+                if data_changed:
+                    drive.iec_data = data
 
     def get_c64_input(self) -> int:
         """Get the bus state for CIA2 Port A input bits.

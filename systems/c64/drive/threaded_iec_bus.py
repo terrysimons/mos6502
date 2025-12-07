@@ -84,7 +84,7 @@ class ThreadedIECBus:
 
         # Cache of last input state for change detection
         # Avoids recomputing bus state when nothing has changed
-        self._last_input_state = -1  # Invalid initial value to force first update
+        self._last_input_state = None  # Invalid initial value to force first update
 
     @property
     def drives(self):
@@ -314,16 +314,26 @@ class ThreadedIECBus:
         clk = not clk_low
         data = not data_low
 
+        # Check if anything changed
+        atn_changed = atn != self.atn
+        clk_changed = clk != self.clk
+        data_changed = data != self.data
+
         # Store computed bus state
         self.atn = atn
         self.clk = clk
         self.data = data
 
-        # Update all drives with current bus state
-        for drive in self._drives_list:
-            drive.set_iec_atn(atn)
-            drive.set_iec_clk(clk)
-            drive.set_iec_data(data)
+        # Update drives only if something changed
+        # ATN always needs set_iec_atn() call for CA1 edge detection
+        # CLK and DATA are just cached values
+        if atn_changed or clk_changed or data_changed:
+            for drive in self._drives_list:
+                drive.set_iec_atn(atn)  # Always call - has CA1 side effects
+                if clk_changed:
+                    drive.iec_clk = clk
+                if data_changed:
+                    drive.iec_data = data
 
     def sync_drives(self) -> None:
         """No-op in threaded mode - drives run independently."""
