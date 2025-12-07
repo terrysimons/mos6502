@@ -156,8 +156,9 @@ class MOS6502CPU(flags.ProcessorStatusFlagsInterface):
         self.post_tick_callback: callable = None
 
         # Opcode -> handler cache for fast dispatch (per-instance since variant is per-instance)
-        # Maps opcode byte directly to handler function, avoiding double dict lookup
-        self._opcode_handler_cache: dict[int, callable] = {}
+        # 256-entry list indexed by opcode byte for O(1) array access (faster than dict)
+        # None entries indicate illegal opcodes
+        self._opcode_handler_cache: list = self._build_opcode_handler_table()
 
     @property
     def variant(self: Self) -> variants.CPUVariant:
@@ -216,6 +217,24 @@ class MOS6502CPU(flags.ProcessorStatusFlagsInterface):
         handler = getattr(module, function_name)
         self._variant_handler_cache[cache_key] = handler
         return handler
+
+    def _build_opcode_handler_table(self: Self) -> list:
+        """Build a 256-entry opcode handler table for fast dispatch.
+
+        Pre-populates handlers for all legal opcodes using OPCODE_LOOKUP.
+        Illegal opcodes are set to None.
+
+        Returns:
+            256-entry list where table[opcode] is the handler function or None
+        """
+        table = [None] * 256
+
+        for opcode, instruction in instructions.OPCODE_LOOKUP.items():
+            if isinstance(instruction, instructions.InstructionOpcode):
+                handler = self._load_variant_handler(instruction.package, instruction.function)
+                table[opcode] = handler
+
+        return table
 
     def __enter__(self: Self) -> Self:
         """With entrypoint."""
@@ -1245,11 +1264,11 @@ class MOS6502CPU(flags.ProcessorStatusFlagsInterface):
 
             instruction_byte: int = self.fetch_byte()
 
-            # Fast path: use opcode -> handler cache when no debug/callbacks needed
-            # This avoids OPCODE_LOOKUP dict lookup and isinstance check
+            # Fast path: use opcode -> handler table when no debug/callbacks needed
+            # Direct list indexing is faster than dict.get() - no hash computation
             # Uses pre-computed use_fast_path and cached opcode_handler_cache
             if use_fast_path:
-                handler = opcode_handler_cache.get(instruction_byte)
+                handler = opcode_handler_cache[instruction_byte]
                 if handler is not None:
                     handler(self)
                     self.instructions_executed += 1
@@ -1335,11 +1354,10 @@ class MOS6502CPU(flags.ProcessorStatusFlagsInterface):
             # This automatically invokes the correct opcode handler based on the configured CPU variant.
             # Legal instructions are InstructionOpcode objects with package/function metadata
             if isinstance(instruction, instructions.InstructionOpcode):
-                # Get handler (uses existing variant handler cache)
-                handler = self._load_variant_handler(instruction.package, instruction.function)
-
-                # Populate opcode -> handler cache for fast path
-                if instruction_byte not in opcode_handler_cache:
+                # Get handler from pre-built table (faster) or load if somehow missing
+                handler = opcode_handler_cache[instruction_byte]
+                if handler is None:
+                    handler = self._load_variant_handler(instruction.package, instruction.function)
                     opcode_handler_cache[instruction_byte] = handler
 
                 # Pre-instruction callback (for debugging, profiling, breakpoints)
