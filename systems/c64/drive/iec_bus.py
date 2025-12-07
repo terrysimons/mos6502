@@ -144,87 +144,58 @@ class IECBus:
         This implements open-collector logic: the bus line is low if ANY
         device is pulling it low, and high only if ALL devices release it.
 
-        Note: Drive CPU synchronization is now handled by the C64's
-        post_instruction_callback for cycle-accurate IEC timing.
+        Optimized for speed:
+        - Single loop over drives instead of multiple
+        - Caches VIA reference to minimize attribute lookups
+        - Avoids bool() calls where not needed
         """
-        if not self.cia2:
+        cia2 = self.cia2
+        if not cia2:
             return
 
         # Read C64's output from CIA2 Port A
-        # The output bits go through inverters, so:
-        # - Port bit = 1 -> inverter -> drives bus LOW
-        # - Port bit = 0 -> inverter -> releases bus (goes HIGH)
-        c64_port_a = self.cia2.port_a
-        c64_ddr_a = self.cia2.ddr_a
+        c64_port_a = cia2.port_a
+        c64_ddr_a = cia2.ddr_a
 
-        # Only consider bits that are configured as outputs
-        # ATN OUT is bit 3, CLK OUT is bit 4, DATA OUT is bit 5
-        self._c64_atn_out = bool(c64_ddr_a & 0x08) and bool(c64_port_a & 0x08)
-        self._c64_clk_out = bool(c64_ddr_a & 0x10) and bool(c64_port_a & 0x10)
-        self._c64_data_out = bool(c64_ddr_a & 0x20) and bool(c64_port_a & 0x20)
+        # ATN: Only C64 can drive ATN (True = released, False = asserted)
+        atn = not (c64_ddr_a & 0x08 and c64_port_a & 0x08)
 
-        # Calculate bus state using open-collector logic
-        # ATN: Only C64 can drive ATN (drives can only read it)
-        # The inverter means: C64 bit=1 -> ATN line LOW (asserted)
-        self.atn = not self._c64_atn_out
+        # CLK and DATA: Start with C64's contribution
+        clk_low = c64_ddr_a & 0x10 and c64_port_a & 0x10
+        data_low = c64_ddr_a & 0x20 and c64_port_a & 0x20
 
-        # CLK: Both C64 and drives can drive this
-        # Start with C64's contribution (inverted)
-        clk_low = self._c64_clk_out
-
-        # Add each drive's contribution
+        # Single loop: process all drive contributions
         for drive in self.drives:
-            # Drive CLK OUT is VIA1 Port B bit 3, also inverted
-            if drive.via1.ddrb & 0x08:  # If configured as output
-                if drive.via1.orb & 0x08:  # If driving low
-                    clk_low = True
+            via1 = drive.via1
+            orb = via1.orb
+            ddrb = via1.ddrb
 
-        self.clk = not clk_low
+            # CLK OUT is bit 3
+            if ddrb & 0x08 and orb & 0x08:
+                clk_low = True
 
-        # DATA: Both C64 and drives can drive this
-        data_low = self._c64_data_out
+            # DATA OUT is bit 1
+            if ddrb & 0x02 and orb & 0x02:
+                data_low = True
 
-        for drive in self.drives:
-            # Drive DATA OUT is VIA1 Port B bit 1, inverted
-            if drive.via1.ddrb & 0x02:  # If configured as output
-                if drive.via1.orb & 0x02:  # If driving low
-                    data_low = True
-
-            # Drive ATN ACK (bit 4) - XORed with ATN before affecting DATA
+            # ATN ACK (bit 4) - XOR: different states pull DATA low
             # Reference: https://janderogee.com/projects/1541-III/files/pdf/IEC_disected-IEC_1541_info.pdf
-            # "Whenever ATN and ATNA have the same state (true/false), this will
-            # result in data being 'false' [released], but whenever both lines
-            # differ, data will be set to true [asserted/low]."
-            #
-            # IEC bus terminology: "true" = asserted (electrically LOW)
-            # - self.atn: False = ATN asserted (bus LOW, logically "true")
-            # - atna_bit: True = ATNA set (VIA bit HIGH, logically "true")
-            #
-            # The XOR compares logical states:
-            # - ATN logical state: (not self.atn) - True when ATN is asserted
-            # - ATNA logical state: atna_bit - True when ATNA bit is set
-            # - Same logical state → DATA released
-            # - Different logical state → DATA pulled low
-            #
-            # This provides automatic ATN acknowledge:
-            # 1. C64 asserts ATN (self.atn=False, logically "true")
-            # 2. Initially ATNA is clear, so XOR pulls DATA low (acknowledge)
-            # 3. 1541 sets ATNA to match ATN state
-            # 4. Now both "true", DATA automatically releases (device ready)
-            if drive.via1.ddrb & 0x10:  # If configured as output
-                atna_bit = bool(drive.via1.orb & 0x10)
-                atn_logical = not self.atn  # True when ATN is asserted
-                # Different logical states = DATA pulled low
-                if atna_bit != atn_logical:
-                    data_low = True
+            if ddrb & 0x10 and (bool(orb & 0x10) != (not atn)):
+                data_low = True
 
-        self.data = not data_low
+        clk = not clk_low
+        data = not data_low
+
+        # Store bus state
+        self.atn = atn
+        self.clk = clk
+        self.data = data
 
         # Update all drives with current bus state
         for drive in self.drives:
-            drive.set_iec_atn(self.atn)
-            drive.set_iec_clk(self.clk)
-            drive.set_iec_data(self.data)
+            drive.set_iec_atn(atn)
+            drive.set_iec_clk(clk)
+            drive.set_iec_data(data)
 
     def get_c64_input(self) -> int:
         """Get the bus state for CIA2 Port A input bits.

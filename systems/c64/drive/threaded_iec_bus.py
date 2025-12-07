@@ -58,6 +58,14 @@ class ThreadedIECBus:
         # Connected devices (protected by lock for modification)
         self.cia2: Optional[CIA2] = None
         self._drives: Dict[int, Drive1541] = {}  # device_number -> drive
+        self._drives_list: list = []  # Cached list for fast iteration in update()
+
+        # Bus line states (True = released/high, False = asserted/low)
+        # These represent the actual bus state after open-collector resolution
+        # Stored after update() so get_c64_input() doesn't need to recompute
+        self.atn = True
+        self.clk = True
+        self.data = True
 
         # C64's output states (written by C64 thread, read by all)
         # These are the inverted port bits - True means driving bus LOW
@@ -100,6 +108,7 @@ class ThreadedIECBus:
             if drive.device_number not in self._drives:
                 self._drives[drive.device_number] = drive
                 self._drive_outputs[drive.device_number] = (False, False, False)
+                self._drives_list = list(self._drives.values())  # Update cached list
                 drive.iec_bus = self
         log.info(f"Drive {drive.device_number} connected to threaded IEC bus")
 
@@ -113,6 +122,7 @@ class ThreadedIECBus:
             if drive.device_number in self._drives:
                 del self._drives[drive.device_number]
                 del self._drive_outputs[drive.device_number]
+                self._drives_list = list(self._drives.values())  # Update cached list
                 drive.iec_bus = None
         log.info(f"Drive {drive.device_number} disconnected from threaded IEC bus")
 
@@ -219,15 +229,16 @@ class ThreadedIECBus:
     def get_c64_input(self) -> int:
         """Get the bus state for CIA2 Port A input bits.
 
+        Uses the stored bus state from the last update() call for speed.
+
         Returns:
             Port A input value (bits 6-7: CLK IN, DATA IN)
         """
-        _, clk, data = self.get_bus_state()
-
+        # Use stored values from last update() - much faster than recomputing
         result = 0xFF
-        if not clk:
+        if not self.clk:
             result &= ~0x40  # CLK is low
-        if not data:
+        if not self.data:
             result &= ~0x80  # DATA is low
 
         return result
@@ -262,21 +273,53 @@ class ThreadedIECBus:
         c64_ddr_a = self.cia2.ddr_a
 
         # Only consider bits that are configured as outputs
-        atn_out = bool(c64_ddr_a & 0x08) and bool(c64_port_a & 0x08)
-        clk_out = bool(c64_ddr_a & 0x10) and bool(c64_port_a & 0x10)
-        data_out = bool(c64_ddr_a & 0x20) and bool(c64_port_a & 0x20)
+        self._c64_atn_out = bool(c64_ddr_a & 0x08) and bool(c64_port_a & 0x08)
+        self._c64_clk_out = bool(c64_ddr_a & 0x10) and bool(c64_port_a & 0x10)
+        self._c64_data_out = bool(c64_ddr_a & 0x20) and bool(c64_port_a & 0x20)
 
-        self.set_c64_outputs(atn_out, clk_out, data_out)
+        # ATN: Only C64 can drive ATN
+        atn = not self._c64_atn_out
 
-        # Compute current bus state and update all drives
-        # This is critical - drives need their cached IEC state updated!
-        atn, clk, data = self.get_bus_state()
+        # CLK and DATA: Both C64 and drives can drive
+        clk_low = self._c64_clk_out
+        data_low = self._c64_data_out
 
-        with self._lock:
-            for drive in self._drives.values():
-                drive.set_iec_atn(atn)
-                drive.set_iec_clk(clk)
-                drive.set_iec_data(data)
+        # Read from each drive's VIA registers directly
+        for drive in self._drives_list:
+            orb = drive.via1.orb
+            ddrb = drive.via1.ddrb
+
+            # CLK OUT is bit 3
+            if ddrb & 0x08:  # If configured as output
+                if orb & 0x08:  # If driving low
+                    clk_low = True
+
+            # DATA OUT is bit 1
+            if ddrb & 0x02:  # If configured as output
+                if orb & 0x02:  # If driving low
+                    data_low = True
+
+            # ATN ACK (bit 4) - XORed with ATN
+            if ddrb & 0x10:  # If configured as output
+                atna_bit = bool(orb & 0x10)
+                atn_logical = not atn  # True when ATN is asserted
+                # Different logical states = DATA pulled low
+                if atna_bit != atn_logical:
+                    data_low = True
+
+        clk = not clk_low
+        data = not data_low
+
+        # Store computed bus state
+        self.atn = atn
+        self.clk = clk
+        self.data = data
+
+        # Update all drives with current bus state
+        for drive in self._drives_list:
+            drive.set_iec_atn(atn)
+            drive.set_iec_clk(clk)
+            drive.set_iec_data(data)
 
     def sync_drives(self) -> None:
         """No-op in threaded mode - drives run independently."""

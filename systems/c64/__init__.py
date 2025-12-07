@@ -378,6 +378,11 @@ class C64:
             action="store_true",
             help="Disable 1541 drive emulation (faster boot, no disk access)",
         )
+        drive_group.add_argument(
+            "--sync-drive",
+            action="store_true",
+            help="Use synchronous IEC bus (original implementation, for benchmarking)",
+        )
 
         # Execution control options
         exec_group = parser.add_argument_group("Execution Control")
@@ -4254,7 +4259,9 @@ def main() -> int | None:
         if not getattr(args, 'no_drive', False):
             drive_rom = getattr(args, 'drive_rom', None)
             disk_path = getattr(args, 'disk', None)
-            if c64.attach_drive(drive_rom_path=drive_rom, disk_path=disk_path):
+            # Use synchronous mode if --sync-drive is specified, otherwise threaded (default)
+            use_threaded = not getattr(args, 'sync_drive', False)
+            if c64.attach_drive(drive_rom_path=drive_rom, disk_path=disk_path, threaded=use_threaded):
                 if disk_path:
                     log.info(f"Disk inserted: {disk_path.name}")
             else:
