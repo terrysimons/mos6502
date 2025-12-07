@@ -164,22 +164,28 @@ class IECBus:
         data_low = c64_ddr_a & 0x20 and c64_port_a & 0x20
 
         # Process all drive contributions
+        # Pre-compute ATN logical state for ATNA XOR check
+        atn_asserted = not atn  # True when ATN is asserted (bus LOW)
         for drive in self.drives:
             via1 = drive.via1
-            orb = via1.orb
-            ddrb = via1.ddrb
+            # Combine port output and direction into effective output bits
+            output_bits = via1.orb & via1.ddrb
 
-            # CLK OUT is bit 3
-            if ddrb & 0x08 and orb & 0x08:
+            # CLK OUT is bit 3 - if set, pulls bus LOW
+            if output_bits & 0x08:
                 clk_low = True
 
-            # DATA OUT is bit 1
-            if ddrb & 0x02 and orb & 0x02:
+            # DATA OUT is bit 1 - if set, pulls bus LOW
+            if output_bits & 0x02:
                 data_low = True
 
             # ATN ACK (bit 4) - XOR: different states pull DATA low
-            if ddrb & 0x10 and (bool(orb & 0x10) != (not atn)):
-                data_low = True
+            # Only applies if bit 4 is configured as output (check via1.ddrb)
+            if via1.ddrb & 0x10:
+                atna_set = bool(output_bits & 0x10)
+                # Different logical states = DATA pulled low
+                if atna_set != atn_asserted:
+                    data_low = True
 
         clk = not clk_low
         data = not data_low

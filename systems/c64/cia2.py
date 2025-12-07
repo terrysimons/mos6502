@@ -170,17 +170,17 @@ class CIA2:
             # Start with output bits from port_a, input bits pulled high
             result = (self.port_a & self.ddr_a) | (~self.ddr_a & 0xFF)
 
-            if self.iec_bus is not None:
+            iec_bus = self.iec_bus
+            if iec_bus is not None:
                 # Update IEC bus state before reading to ensure we see
                 # the drive's current output (especially DATA line for ATN ack)
-                self.iec_bus.update()
+                iec_bus.update()
                 # Use real IEC bus state from connected devices
-                bus_input = self.iec_bus.get_c64_input()
-                # Apply bus state to input bits (6 and 7)
-                if not (self.ddr_a & 0x40):  # Bit 6 is input
-                    result = (result & ~0x40) | (bus_input & 0x40)
-                if not (self.ddr_a & 0x80):  # Bit 7 is input
-                    result = (result & ~0x80) | (bus_input & 0x80)
+                bus_input = iec_bus.get_c64_input()
+                # Apply bus state to input bits (6 and 7) in one operation
+                # Mask out bits that are inputs, then OR in bus state for those bits
+                input_mask = ~self.ddr_a & 0xC0  # Which of bits 6-7 are inputs
+                result = (result & ~input_mask) | (bus_input & input_mask)
 
             else:
                 # IEC bus loopback for input bits (when configured as input)

@@ -5,6 +5,7 @@ import logging
 import sys
 import time
 from pathlib import Path
+from typing import Optional
 
 from c64 import C64, PAL, NTSC, c64_to_ansi_fg, c64_to_ansi_bg, ANSI_RESET
 from mos6502 import errors
@@ -19,7 +20,7 @@ BASIC_ROM_END = 0xBFFF
 logging.getLogger().setLevel(logging.CRITICAL)
 for logger_name in ['c64', 'c64.vic', 'mos6502', 'mos6502.cpu', 'mos6502.cpu.flags',
                      'mos6502.memory', 'mos6502.memory.RAM', 'mos6502.memory.Byte',
-                     'mos6502.memory.Word']:
+                     'mos6502.memory.Word', 'iec_bus', 'drive1541', 'via6522']:
     logging.getLogger(logger_name).setLevel(logging.CRITICAL)
 
 
@@ -205,9 +206,119 @@ def capture_screen(c64: C64) -> str:
     return "\n".join(lines)
 
 
+def benchmark_disk_load(
+    rom_dir: str,
+    disk_path: Path,
+    video_chip: str = "6569",
+    drive_rom: Optional[Path] = None,
+    sync_drive: bool = False,
+    throttle: bool = False
+) -> tuple[float, int, str]:
+    """Benchmark loading from disk (LOAD"*",8,1 then RUN).
+
+    Args:
+        rom_dir: Path to ROM directory
+        disk_path: Path to D64 disk image
+        video_chip: VIC-II chip variant
+        drive_rom: Optional path to 1541 ROM
+        sync_drive: Use synchronous IEC bus (vs threaded)
+        throttle: If True, throttle to real-time speed
+
+    Returns:
+        (elapsed_seconds, cycles_executed, screen_capture)
+    """
+    c64 = C64(rom_dir=rom_dir, display_mode="headless", video_chip=video_chip)
+    c64.cpu.reset()
+
+    # Attach drive with disk
+    use_threaded = not sync_drive
+    if not c64.attach_drive(drive_rom_path=drive_rom, disk_path=disk_path, threaded=use_threaded):
+        raise RuntimeError("Failed to attach drive - check ROM path")
+
+    # First boot to BASIC
+    print("Booting to BASIC...", flush=True)
+    def detect_basic_immediate(pc: int) -> None:
+        if BASIC_ROM_START <= pc <= BASIC_ROM_END:
+            raise StopIteration
+
+    c64.cpu.pc_callback = detect_basic_immediate
+
+    # Boot to BASIC
+    if throttle:
+        stop_requested = [False]
+        def detect_basic_throttled(pc: int) -> None:
+            if BASIC_ROM_START <= pc <= BASIC_ROM_END:
+                stop_requested[0] = True
+        c64.cpu.pc_callback = detect_basic_throttled
+        governor = FrameGovernor(fps=c64.video_timing.refresh_hz, enabled=True)
+        cycles_per_frame = c64.video_timing.cycles_per_frame
+        while not stop_requested[0]:
+            try:
+                c64.cpu.execute(cycles=cycles_per_frame)
+            except errors.CPUCycleExhaustionError:
+                pass
+            governor.throttle()
+    else:
+        try:
+            c64.cpu.execute(cycles=INFINITE_CYCLES)
+        except (errors.CPUCycleExhaustionError, StopIteration):
+            pass
+
+    print(f"Booted after {c64.cpu.cycles_executed:,} cycles", flush=True)
+    c64.cpu.pc_callback = None
+
+    # Let screen render and wait for KERNAL to be ready for input
+    print("Letting screen settle...", flush=True)
+    try:
+        c64.cpu.execute(cycles=100_000)
+    except errors.CPUCycleExhaustionError:
+        pass
+
+    # Inject LOAD"*",8 command (max 10 chars in keyboard buffer)
+    # We'll inject LOAD"*",8 first, then RUN after load completes
+    print("Injecting LOAD command...", flush=True)
+    c64.inject_keyboard_buffer('LOAD"*",8\r')
+
+    # Now benchmark the actual disk load
+    print("Starting disk load benchmark...", flush=True)
+    start_time = time.perf_counter()
+    start_cycles = c64.cpu.cycles_executed
+
+    # Run for a fixed number of cycles to let the load complete
+    # A typical load takes several million cycles
+    load_cycles = 50_000_000  # ~50 seconds of C64 time at 1MHz
+
+    if throttle:
+        governor = FrameGovernor(fps=c64.video_timing.refresh_hz, enabled=True)
+        cycles_per_frame = c64.video_timing.cycles_per_frame
+        cycles_remaining = load_cycles
+        while cycles_remaining > 0:
+            cycles_this_frame = min(cycles_per_frame, cycles_remaining)
+            try:
+                c64.cpu.execute(cycles=cycles_this_frame)
+            except errors.CPUCycleExhaustionError:
+                pass
+            cycles_remaining -= cycles_this_frame
+            governor.throttle()
+    else:
+        try:
+            c64.cpu.execute(cycles=load_cycles)
+        except errors.CPUCycleExhaustionError:
+            pass
+
+    print("Load complete", flush=True)
+    elapsed = time.perf_counter() - start_time
+    cycles_executed = c64.cpu.cycles_executed - start_cycles
+
+    # Capture screen
+    screen_capture = capture_screen(c64)
+
+    return elapsed, cycles_executed, screen_capture
+
+
 def main():
     parser = argparse.ArgumentParser(description="Benchmark C64 emulator performance")
-    C64.args(parser)  # Add C64 arguments (--rom-dir, --video, etc.)
+    C64.args(parser)  # Add C64 arguments (--rom-dir, --video, --disk, --sync-drive, etc.)
     parser.add_argument(
         "--debug",
         action="store_true",
@@ -236,6 +347,38 @@ def main():
     impl = sys.implementation.name.capitalize()  # "Cpython" or "Pypy"
     py_version = f"{sys.version_info.major}.{sys.version_info.minor}.{sys.version_info.micro}"
 
+    # Check if disk benchmark mode
+    disk_path = getattr(args, 'disk', None)
+    sync_drive = getattr(args, 'sync_drive', False)
+    drive_rom = getattr(args, 'drive_rom', None)
+
+    if disk_path:
+        # Disk load benchmark mode
+        drive_mode = "synchronous" if sync_drive else "threaded"
+        print(f"\nDisk Load Benchmark ({impl} {py_version}, VIC-II {timing.chip_name} {region}, {drive_mode} drive, throttle {throttle_status})")
+        print(f"Disk: {disk_path}")
+        print()
+
+        elapsed, cycles_executed, screen = benchmark_disk_load(
+            rom_dir=str(args.rom_dir),
+            disk_path=disk_path,
+            video_chip=video_chip,
+            drive_rom=drive_rom,
+            sync_drive=sync_drive,
+            throttle=throttle
+        )
+
+        cycles_per_sec = cycles_executed / elapsed if elapsed > 0 else 0
+        speed_ratio = cycles_per_sec / timing.cpu_freq
+
+        print(f"Executed {cycles_executed:,} cycles in {elapsed:.2f}s")
+        print(f"Speed: {cycles_per_sec:,.0f} cycles/sec ({speed_ratio:.1%} of real C64)")
+        print()
+        print("Screen after load:")
+        print(screen)
+        return
+
+    # Standard CPU benchmark (no disk)
     print(f"\nBenchmarking C64 CPU execution speed ({impl} {py_version}, VIC-II {timing.chip_name} {region}, throttle {throttle_status})...\n")
 
     # Benchmark different cycle counts

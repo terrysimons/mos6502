@@ -198,31 +198,30 @@ class ThreadedIECBus:
 
             # Read LIVE state from each drive's VIA registers
             # This is critical for the IEC handshake protocol to work!
+            # Pre-compute ATN logical state for ATNA XOR check
+            atn_asserted = not atn  # True when ATN is asserted (bus LOW)
             for device_num, drive in self._drives.items():
                 # Skip the requesting drive - it shouldn't see its own outputs
                 if device_num == exclude_device:
                     continue
 
                 # Read directly from VIA1 registers for real-time state
-                orb = drive.via1.orb
-                ddrb = drive.via1.ddrb
+                via1 = drive.via1
+                ddrb = via1.ddrb
+                output_bits = via1.orb & ddrb
 
-                # Drive CLK OUT is VIA1 Port B bit 3, also inverted
-                if ddrb & 0x08:  # If configured as output
-                    if orb & 0x08:  # If driving low
-                        clk_low = True
+                # Drive CLK OUT is VIA1 Port B bit 3 - if set, pulls bus LOW
+                if output_bits & 0x08:
+                    clk_low = True
 
-                # Drive DATA OUT is VIA1 Port B bit 1, inverted
-                if ddrb & 0x02:  # If configured as output
-                    if orb & 0x02:  # If driving low
-                        data_low = True
+                # Drive DATA OUT is VIA1 Port B bit 1 - if set, pulls bus LOW
+                if output_bits & 0x02:
+                    data_low = True
 
-                # ATN ACK (bit 4) - XORed with ATN before affecting DATA
-                if ddrb & 0x10:  # If configured as output
-                    atna_bit = bool(orb & 0x10)
-                    atn_logical = not atn  # True when ATN is asserted
-                    # Different logical states = DATA pulled low
-                    if atna_bit != atn_logical:
+                # ATN ACK (bit 4) - XOR: different states pull DATA low
+                if ddrb & 0x10:
+                    atna_set = bool(output_bits & 0x10)
+                    if atna_set != atn_asserted:
                         data_low = True
 
             clk = not clk_low
@@ -289,26 +288,28 @@ class ThreadedIECBus:
         data_low = self._c64_data_out
 
         # Read from each drive's VIA registers directly
+        # Pre-compute ATN logical state for ATNA XOR check
+        atn_asserted = not atn  # True when ATN is asserted (bus LOW)
         for drive in self._drives_list:
-            orb = drive.via1.orb
-            ddrb = drive.via1.ddrb
+            via1 = drive.via1
+            ddrb = via1.ddrb
+            # Combine port output and direction into effective output bits
+            output_bits = via1.orb & ddrb
 
-            # CLK OUT is bit 3
-            if ddrb & 0x08:  # If configured as output
-                if orb & 0x08:  # If driving low
-                    clk_low = True
+            # CLK OUT is bit 3 - if set, pulls bus LOW
+            if output_bits & 0x08:
+                clk_low = True
 
-            # DATA OUT is bit 1
-            if ddrb & 0x02:  # If configured as output
-                if orb & 0x02:  # If driving low
-                    data_low = True
+            # DATA OUT is bit 1 - if set, pulls bus LOW
+            if output_bits & 0x02:
+                data_low = True
 
-            # ATN ACK (bit 4) - XORed with ATN
-            if ddrb & 0x10:  # If configured as output
-                atna_bit = bool(orb & 0x10)
-                atn_logical = not atn  # True when ATN is asserted
+            # ATN ACK (bit 4) - XOR: different states pull DATA low
+            # Only applies if bit 4 is configured as output
+            if ddrb & 0x10:
+                atna_set = bool(output_bits & 0x10)
                 # Different logical states = DATA pulled low
-                if atna_bit != atn_logical:
+                if atna_set != atn_asserted:
                     data_low = True
 
         clk = not clk_low

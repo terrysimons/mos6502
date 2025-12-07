@@ -400,10 +400,9 @@ class VIA6522:
                 self.ifr |= IRQ_T1
                 self._update_irq()
 
-                # Toggle PB7 if in output mode
-                if self.acr & ACR_T1_PB7_OUTPUT:
-                    for _ in range(underflows):
-                        self.t1_pb7_state = not self.t1_pb7_state
+                # Toggle PB7 if in output mode (odd underflows toggle, even don't)
+                if self.acr & ACR_T1_PB7_OUTPUT and (underflows & 1):
+                    self.t1_pb7_state = not self.t1_pb7_state
             else:
                 self.t1_counter -= cycles
 
