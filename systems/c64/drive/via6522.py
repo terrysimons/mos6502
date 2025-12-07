@@ -384,43 +384,71 @@ class VIA6522:
         Args:
             cycles: Number of cycles to advance
         """
-        # Update Timer 1
+        # Fast path: Timer 1 running, no underflow
+        # This is the common case - just decrement and return
+        t1_counter = self.t1_counter
+        if self.t1_running and t1_counter > cycles:
+            self.t1_counter = t1_counter - cycles
+            # Check Timer 2 fast path too
+            t2_counter = self.t2_counter
+            if self.t2_running and t2_counter > cycles:
+                self.t2_counter = t2_counter - cycles
+                return
+            # Timer 2 needs slow path
+            if self.t2_running and not (self.acr & ACR_T2_COUNT_PB6):
+                self._handle_t2_underflow(cycles)
+            return
+
+        # Slow path for Timer 1 (underflow or not running)
         if self.t1_running:
-            if self.t1_counter <= cycles:
-                # Timer 1 underflow
-                underflows = 1 + (cycles - self.t1_counter - 1) // (self.t1_latch + 1)
-
-                if self.acr & ACR_T1_CONTINUOUS:
-                    # Continuous mode - reload from latch
-                    remaining = cycles - self.t1_counter - 1
-                    self.t1_counter = self.t1_latch - (remaining % (self.t1_latch + 1))
-                else:
-                    # One-shot mode - stop timer
-                    self.t1_counter = 0xFFFF - (cycles - self.t1_counter - 1)
-                    self.t1_running = False
-
-                # Set T1 interrupt flag
-                self.ifr |= IRQ_T1
-                self._update_irq()
-
-                # Toggle PB7 if in output mode (odd underflows toggle, even don't)
-                if self.acr & ACR_T1_PB7_OUTPUT and (underflows & 1):
-                    self.t1_pb7_state = not self.t1_pb7_state
-            else:
-                self.t1_counter -= cycles
+            self._handle_t1_underflow(cycles)
 
         # Update Timer 2 (if not in pulse counting mode)
         if self.t2_running and not (self.acr & ACR_T2_COUNT_PB6):
-            if self.t2_counter <= cycles:
-                # Timer 2 underflow (one-shot only)
-                self.t2_counter = 0xFFFF - (cycles - self.t2_counter - 1)
-                self.t2_running = False
-
-                # Set T2 interrupt flag
-                self.ifr |= IRQ_T2
-                self._update_irq()
-            else:
+            if self.t2_counter > cycles:
                 self.t2_counter -= cycles
+            else:
+                self._handle_t2_underflow(cycles)
+
+    def _handle_t1_underflow(self, cycles: int) -> None:
+        """Handle Timer 1 underflow (slow path).
+
+        Args:
+            cycles: Number of cycles being processed
+        """
+        # Timer 1 underflow
+        underflows = 1 + (cycles - self.t1_counter - 1) // (self.t1_latch + 1)
+
+        if self.acr & ACR_T1_CONTINUOUS:
+            # Continuous mode - reload from latch
+            remaining = cycles - self.t1_counter - 1
+            self.t1_counter = self.t1_latch - (remaining % (self.t1_latch + 1))
+        else:
+            # One-shot mode - stop timer
+            self.t1_counter = 0xFFFF - (cycles - self.t1_counter - 1)
+            self.t1_running = False
+
+        # Set T1 interrupt flag
+        self.ifr |= IRQ_T1
+        self._update_irq()
+
+        # Toggle PB7 if in output mode (odd underflows toggle, even don't)
+        if self.acr & ACR_T1_PB7_OUTPUT and (underflows & 1):
+            self.t1_pb7_state = not self.t1_pb7_state
+
+    def _handle_t2_underflow(self, cycles: int) -> None:
+        """Handle Timer 2 underflow (slow path).
+
+        Args:
+            cycles: Number of cycles being processed
+        """
+        # Timer 2 underflow (one-shot only)
+        self.t2_counter = 0xFFFF - (cycles - self.t2_counter - 1)
+        self.t2_running = False
+
+        # Set T2 interrupt flag
+        self.ifr |= IRQ_T2
+        self._update_irq()
 
     def set_ca1(self, state: bool) -> None:
         """Set CA1 input line state.
