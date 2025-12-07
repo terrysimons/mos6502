@@ -1242,6 +1242,16 @@ class MOS6502CPU(flags.ProcessorStatusFlagsInterface):
         post_instruction_callback = self.post_instruction_callback
         opcode_handler_cache = self._opcode_handler_cache
 
+        # Cache method references to avoid repeated lookups
+        fetch_byte = self.fetch_byte
+        handle_nmi = self._handle_nmi
+        handle_irq = self._handle_irq
+
+        # Cache counters that are only modified in this loop (not by handlers)
+        # Write them back before any exception/return
+        instructions_executed = self.instructions_executed
+        instructions_remaining = self.instructions_remaining if use_instruction_limit else 0
+
         # Pre-compute whether we can use the fast path (no debug/callbacks)
         use_fast_path = not (verbose_cycles or pre_instruction_callback or post_instruction_callback)
 
@@ -1250,18 +1260,25 @@ class MOS6502CPU(flags.ProcessorStatusFlagsInterface):
             # This prevents PC from being incremented into the next instruction
             # when we don't have enough cycles to execute it
             if self.cycles <= 0:
+                # Write back cached counters before raising exception
+                self.instructions_executed = instructions_executed
+                if use_instruction_limit:
+                    self.instructions_remaining = instructions_remaining
                 raise errors.CPUCycleExhaustionError(
                     f"Exhausted available CPU cycles after {self.cycles_executed} "
                     f"executed cycles with {self.cycles} remaining.",
                 )
 
             # Check instruction limit if using instruction-based control
-            if use_instruction_limit and self.instructions_remaining <= 0:
+            if use_instruction_limit and instructions_remaining <= 0:
+                # Write back cached counters before raising exception
+                self.instructions_executed = instructions_executed
+                self.instructions_remaining = instructions_remaining
                 raise errors.CPUCycleExhaustionError(
                     f"Executed requested instructions after {self.cycles_executed} cycles.",
                 )
 
-            instruction_byte: int = self.fetch_byte()
+            instruction_byte: int = fetch_byte()
 
             # Fast path: use opcode -> handler table when no debug/callbacks needed
             # Direct list indexing is faster than dict.get() - no hash computation
@@ -1270,9 +1287,9 @@ class MOS6502CPU(flags.ProcessorStatusFlagsInterface):
                 handler = opcode_handler_cache[instruction_byte]
                 if handler is not None:
                     handler(self)
-                    self.instructions_executed += 1
+                    instructions_executed += 1
                     if use_instruction_limit:
-                        self.instructions_remaining -= 1
+                        instructions_remaining -= 1
                     if periodic_callback:
                         cycles_since_last = self.cycles_executed - self._last_periodic_callback_cycle
                         if cycles_since_last >= periodic_callback_interval:
@@ -1281,12 +1298,12 @@ class MOS6502CPU(flags.ProcessorStatusFlagsInterface):
                     # NMI check (edge-triggered, higher priority than IRQ)
                     if self.nmi_pending and not self._nmi_line_previous:
                         self._nmi_line_previous = True
-                        self._handle_nmi()
+                        handle_nmi()
                     elif not self.nmi_pending:
                         self._nmi_line_previous = False
                     # IRQ check (level-triggered, maskable)
                     if self.irq_pending and not self.I:
-                        self._handle_irq()
+                        handle_irq()
                     continue
 
             # Slow path: need full instruction lookup for cache miss, verbose, or callbacks
@@ -1371,16 +1388,20 @@ class MOS6502CPU(flags.ProcessorStatusFlagsInterface):
             else:
                 # Illegal instruction - not in OPCODE_LOOKUP, just a raw byte
                 self.log.error(f"ILLEGAL INSTRUCTION: {instruction} ({instruction:02X})")
+                # Write back cached counters before raising exception
+                self.instructions_executed = instructions_executed
+                if use_instruction_limit:
+                    self.instructions_remaining = instructions_remaining
                 raise errors.IllegalCPUInstructionError(
                     f"Illegal instruction: 0x{int(instruction):02X}"
                 )
 
-            # Track total instructions executed
-            self.instructions_executed += 1
+            # Track total instructions executed (using cached local)
+            instructions_executed += 1
 
             # Decrement instruction counter (for instruction-based execution control)
             if use_instruction_limit:
-                self.instructions_remaining -= 1
+                instructions_remaining -= 1
 
             # Periodically call system update callback (e.g., VIC raster updates)
             # This allows external hardware to check cycle count and trigger IRQs
@@ -1397,14 +1418,14 @@ class MOS6502CPU(flags.ProcessorStatusFlagsInterface):
             # NMI has higher priority than IRQ
             if self.nmi_pending and not self._nmi_line_previous:
                 self._nmi_line_previous = True  # Remember we've seen the edge
-                self._handle_nmi()
+                handle_nmi()
             elif not self.nmi_pending:
                 self._nmi_line_previous = False  # Reset edge detection when line goes high
 
             # Check for pending hardware IRQ between instructions (after instruction completes)
             # This is when the real 6502 samples the IRQ line
             if self.irq_pending and not self.I:
-                self._handle_irq()
+                handle_irq()
 
     def _handle_irq(self: Self) -> None:
         """Handle a pending hardware IRQ.
