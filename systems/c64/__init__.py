@@ -28,7 +28,13 @@ from c64.cartridges import (
     IO2_START,
     IO2_END,
 )
-from c64.cia1 import CIA1
+from c64.cia1 import (
+    CIA1,
+    PADDLE_1_FIRE,
+    PADDLE_2_FIRE,
+    MOUSE_LEFT_BUTTON,
+    MOUSE_RIGHT_BUTTON,
+)
 from c64.cia2 import CIA2
 from c64.sid import SID
 from c64.vic import (
@@ -279,6 +285,18 @@ class C64:
             type=float,
             default=1.0,
             help="Mouse sensitivity multiplier (default: 1.0)",
+        )
+        core_group.add_argument(
+            "--paddle",
+            action="store_true",
+            help="Enable paddle emulation using mouse position (pygame mode only)",
+        )
+        core_group.add_argument(
+            "--paddle-port",
+            type=int,
+            choices=[1, 2],
+            default=1,
+            help="Joystick port for paddles (1 or 2, default: 1)",
         )
 
         # Program loading options
@@ -2465,17 +2483,28 @@ class C64:
                 elif event.type == pygame.KEYUP:
                     self._handle_pygame_keyboard(event, pygame)
                 elif event.type == pygame.MOUSEMOTION:
-                    # Update mouse position from relative motion
+                    # Update mouse/paddle position
                     if self._mouse_enabled:
+                        # Mouse mode: relative motion (like 1351 proportional mouse)
                         self.update_mouse_motion(event.rel[0], event.rel[1])
+                    elif self._paddle_enabled:
+                        # Paddle mode: absolute position scaled to window
+                        # Mouse X → Paddle 1 (POTX), Mouse Y → Paddle 2 (POTY)
+                        window_size = self.pygame_screen.get_size()
+                        self.update_paddle_position(event.pos[0], event.pos[1], window_size[0], window_size[1])
                 elif event.type == pygame.MOUSEBUTTONDOWN:
-                    # Mouse button pressed
+                    # Mouse/paddle button pressed
                     if self._mouse_enabled:
                         self.set_mouse_button(event.button, True)
+                    elif self._paddle_enabled:
+                        # Left click → Paddle 1 fire, Right click → Paddle 2 fire
+                        self.set_paddle_button(event.button, True)
                 elif event.type == pygame.MOUSEBUTTONUP:
-                    # Mouse button released
+                    # Mouse/paddle button released
                     if self._mouse_enabled:
                         self.set_mouse_button(event.button, False)
+                    elif self._paddle_enabled:
+                        self.set_paddle_button(event.button, False)
 
             # Check if VIC has a new frame ready (VBlank)
             # VIC takes the snapshot at the exact moment of VBlank for consistency
@@ -2790,17 +2819,28 @@ class C64:
                 elif event.type == pygame.KEYUP:
                     self._handle_pygame_keyboard(event, pygame)
                 elif event.type == pygame.MOUSEMOTION:
-                    # Update mouse position from relative motion
+                    # Update mouse/paddle position
                     if self._mouse_enabled:
+                        # Mouse mode: relative motion (like 1351 proportional mouse)
                         self.update_mouse_motion(event.rel[0], event.rel[1])
+                    elif self._paddle_enabled:
+                        # Paddle mode: absolute position scaled to window
+                        # Mouse X → Paddle 1 (POTX), Mouse Y → Paddle 2 (POTY)
+                        window_size = self.pygame_screen.get_size()
+                        self.update_paddle_position(event.pos[0], event.pos[1], window_size[0], window_size[1])
                 elif event.type == pygame.MOUSEBUTTONDOWN:
-                    # Mouse button pressed
+                    # Mouse/paddle button pressed
                     if self._mouse_enabled:
                         self.set_mouse_button(event.button, True)
+                    elif self._paddle_enabled:
+                        # Left click → Paddle 1 fire, Right click → Paddle 2 fire
+                        self.set_paddle_button(event.button, True)
                 elif event.type == pygame.MOUSEBUTTONUP:
-                    # Mouse button released
+                    # Mouse/paddle button released
                     if self._mouse_enabled:
                         self.set_mouse_button(event.button, False)
+                    elif self._paddle_enabled:
+                        self.set_paddle_button(event.button, False)
 
         except errors.QuitRequestError:
             raise  # Re-raise quit request to propagate up
@@ -3005,19 +3045,110 @@ class C64:
         # Mouse buttons use active-low logic (0 = pressed, 1 = released)
         # Left button (1) = Fire (bit 4)
         # Right button (3) = Up (bit 0) - common mapping for 1351
-        if button == 1:  # Left button = Fire
+        if button == 1:  # Left button
             if pressed:
-                joystick &= ~0x10  # Clear bit 4 (pressed)
+                joystick &= ~MOUSE_LEFT_BUTTON  # Clear bit (pressed)
             else:
-                joystick |= 0x10   # Set bit 4 (released)
-        elif button == 3:  # Right button = Up
+                joystick |= MOUSE_LEFT_BUTTON   # Set bit (released)
+        elif button == 3:  # Right button
             if pressed:
-                joystick &= ~0x01  # Clear bit 0 (pressed)
+                joystick &= ~MOUSE_RIGHT_BUTTON  # Clear bit (pressed)
             else:
-                joystick |= 0x01   # Set bit 0 (released)
+                joystick |= MOUSE_RIGHT_BUTTON   # Set bit (released)
 
         # Update the joystick state
         if self._mouse_port == 1:
+            self.cia1.joystick_1 = joystick
+        else:
+            self.cia1.joystick_2 = joystick
+
+    # =========================================================================
+    # Paddle Input Support
+    # =========================================================================
+    # Paddles use the same SID POT registers as the 1351 mouse, but with
+    # absolute positioning instead of relative motion.
+    # - Two paddles per port (directly reading the same POT registers)
+    # - Each paddle has a fire button (directly triggers joystick port bits)
+    # - Paddle 1: POTX ($D419), fire on bit 2 of joystick port
+    # - Paddle 2: POTY ($D41A), fire on bit 3 of joystick port
+    # Fire buttons active-low on the joystick port.
+
+    _paddle_enabled: bool = False
+    _paddle_port: int = 1  # Which joystick port (1 or 2)
+
+    def enable_paddle(self, enabled: bool = True, port: int = 1) -> None:
+        """Enable or disable paddle input.
+
+        Args:
+            enabled: Whether paddle input is enabled
+            port: Which joystick port (1 or 2) the paddles are connected to
+        """
+        self._paddle_enabled = enabled
+        self._paddle_port = port
+        log.info(f"Paddle input {'enabled' if enabled else 'disabled'} on port {port}")
+
+    def update_paddle_position(self, mouse_x: int, mouse_y: int, window_width: int, window_height: int) -> None:
+        """Update paddle position from absolute mouse position.
+
+        Args:
+            mouse_x: Mouse X position in window (pixels)
+            mouse_y: Mouse Y position in window (pixels)
+            window_width: Window width (pixels)
+            window_height: Window height (pixels)
+        """
+        if not self._paddle_enabled:
+            return
+
+        # Scale mouse position to paddle range (0-255)
+        # Clamp to valid range in case mouse is outside window
+        paddle_x = max(0, min(255, int((mouse_x / max(1, window_width)) * 255)))
+        paddle_y = max(0, min(255, int((mouse_y / max(1, window_height)) * 255)))
+
+        # Update SID POT registers
+        self.sid.set_paddle(paddle_x, paddle_y)
+
+    def set_paddle_button(self, button: int, pressed: bool) -> None:
+        """Set paddle button state.
+
+        C64 paddle fire buttons use different CIA bits than joystick fire:
+        - Paddle 1 (X-axis paddle) fire: Bit 2 of CIA port
+        - Paddle 2 (Y-axis paddle) fire: Bit 3 of CIA port
+
+        Port 1 paddles read from $DC01 (CIA1 Port B)
+        Port 2 paddles read from $DC00 (CIA1 Port A)
+
+        Reference: https://www.c64-wiki.com/wiki/Paddle
+
+        Args:
+            button: Mouse button (1 = left → paddle 1 fire, 3 = right → paddle 2 fire)
+            pressed: True if button is pressed, False if released
+        """
+        if not self._paddle_enabled:
+            return
+
+        # Get the joystick register for the configured port
+        if self._paddle_port == 1:
+            joystick = self.cia1.joystick_1
+        else:
+            joystick = self.cia1.joystick_2
+
+        # Paddle buttons use active-low logic (0 = pressed, 1 = released)
+        # Real C64 paddle fire buttons:
+        # - Paddle 1 (X) fire = Bit 2 (directly wired to control port pin 3)
+        # - Paddle 2 (Y) fire = Bit 3 (directly wired to control port pin 4)
+        if button == 1:  # Left mouse button = Paddle 1 fire
+            if pressed:
+                joystick &= ~PADDLE_1_FIRE  # Clear bit 2 (pressed)
+            else:
+                joystick |= PADDLE_1_FIRE   # Set bit 2 (released)
+        elif button == 3:  # Right mouse button = Paddle 2 fire
+            if pressed:
+                joystick &= ~PADDLE_2_FIRE  # Clear bit 3 (pressed)
+            else:
+                joystick |= PADDLE_2_FIRE   # Set bit 3 (released)
+
+        # Update the joystick state
+        if self._paddle_port == 1:
             self.cia1.joystick_1 = joystick
         else:
             self.cia1.joystick_2 = joystick
@@ -3453,6 +3584,19 @@ def main() -> int | None:
                 )
             else:
                 log.warning("Mouse input only available in pygame mode")
+
+        # Enable paddle if requested (only works with pygame, mutually exclusive with mouse)
+        if getattr(args, 'paddle', False):
+            if getattr(args, 'mouse', False):
+                log.warning("Cannot enable both mouse and paddle - paddle takes precedence")
+                c64._mouse_enabled = False
+            if c64.display_mode == "pygame":
+                c64.enable_paddle(
+                    enabled=True,
+                    port=getattr(args, 'paddle_port', 1)
+                )
+            else:
+                log.warning("Paddle input only available in pygame mode")
 
         # In no-roms mode, log that we're running headless
         if args.no_roms:

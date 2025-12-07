@@ -25,6 +25,32 @@ log = logging.getLogger("c64")
 DEBUG_CIA = False      # CIA register reads/writes
 DEBUG_KEYBOARD = False # Keyboard events
 
+# Joystick bit masks (active low: 0 = pressed, 1 = released)
+# Reference: https://www.c64-wiki.com/wiki/Joystick
+JOYSTICK_UP = 0x01      # Bit 0
+JOYSTICK_DOWN = 0x02    # Bit 1
+JOYSTICK_LEFT = 0x04    # Bit 2
+JOYSTICK_RIGHT = 0x08   # Bit 3
+JOYSTICK_FIRE = 0x10    # Bit 4
+JOYSTICK_BITS_MASK = 0x1F  # Bits 0-4 (joystick only, 5-7 are keyboard)
+
+# Paddle fire button bit masks (active low: 0 = pressed, 1 = released)
+# Note: Paddle fire buttons use DIFFERENT bits than joystick fire!
+# Reference: https://www.c64-wiki.com/wiki/Paddle
+PADDLE_1_FIRE = 0x04    # Bit 2 (same physical bit as joystick left)
+PADDLE_2_FIRE = 0x08    # Bit 3 (same physical bit as joystick right)
+
+# 1351 Mouse button bit masks (active low: 0 = pressed, 1 = released)
+# The 1351 mouse buttons are directly wired to joystick-compatible pins
+# Reference: https://www.c64-wiki.com/wiki/Mouse_1351
+MOUSE_LEFT_BUTTON = 0x10   # Bit 4 (directly wired to fire button pin)
+MOUSE_RIGHT_BUTTON = 0x01  # Bit 0 (directly wired to up direction pin)
+
+# Active-low button state constants
+# C64 control port buttons use active-low logic
+BUTTON_PRESSED = 0x00   # Bit is low when button is pressed
+BUTTON_RELEASED = 0x01  # Bit is high when button is released (per-bit, not mask)
+
 
 class CIA1:
     """CIA1 (Complex Interface Adapter) at $DC00-$DCFF.

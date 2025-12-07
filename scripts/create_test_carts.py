@@ -265,6 +265,189 @@ def create_mouse_test_cartridge() -> bytes:
     return bytes(crt_header) + bytes(chip_header) + rom
 
 
+def create_paddle_test_cartridge() -> bytes:
+    """Create a test cartridge for verifying paddle input.
+
+    The cartridge:
+    - Reads SID POT registers ($D419 POTX, $D41A POTY)
+    - Reads CIA1 Port B ($DC01) for joystick 1 / paddle buttons
+    - Stores values in zero-page for test framework verification:
+      - $03: POTX mirror (Paddle 1 position)
+      - $04: POTY mirror (Paddle 2 position)
+      - $05: Joystick 1 bits (paddle buttons)
+    - Displays values on screen for visual verification
+    - Loops forever (test framework controls execution)
+
+    Memory map for test verification:
+      $02: Standard fail counter (not used by this cart, stays 0x00)
+      $03: Current POTX value / Paddle 1 position (updated each loop)
+      $04: Current POTY value / Paddle 2 position (updated each loop)
+      $05: Current Joystick 1 bits (updated each loop)
+
+    Returns:
+        CRT file bytes
+    """
+    from c64.cartridges.rom_builder import (
+        TestROMBuilder,
+        text_to_screen_codes,
+        COLOR_BLUE,
+        COLOR_WHITE,
+        COLOR_YELLOW,
+        COLOR_CYAN,
+        COLOR_GREEN,
+        FAIL_COUNTER_ZP,
+    )
+    from mos6502.instructions import (
+        LDA_ABSOLUTE_0xAD,
+        STA_ZEROPAGE_0x85,
+        STA_ABSOLUTE_0x8D,
+        JMP_ABSOLUTE_0x4C,
+        LDA_IMMEDIATE_0xA9,
+        AND_IMMEDIATE_0x29,
+        LSR_ACCUMULATOR_0x4A,
+        ORA_IMMEDIATE_0x09,
+        CLC_IMPLIED_0x18,
+        ADC_IMMEDIATE_0x69,
+        CMP_IMMEDIATE_0xC9,
+        BCC_RELATIVE_0x90,
+        SBC_IMMEDIATE_0xE9,
+        BNE_RELATIVE_0xD0,
+    )
+
+    def emit_nibble_to_hex_screen_code(builder, screen_addr):
+        """Convert nibble in A (0-15) to C64 screen code and store to screen."""
+        builder.code.extend([
+            CMP_IMMEDIATE_0xC9, 0x0A,
+            BCC_RELATIVE_0x90, 0x04,
+            SBC_IMMEDIATE_0xE9, 0x09,
+            BNE_RELATIVE_0xD0, 0x02,
+            ADC_IMMEDIATE_0x69, 0x30,
+            STA_ABSOLUTE_0x8D, screen_addr & 0xFF, (screen_addr >> 8) & 0xFF,
+        ])
+
+    # Zero-page locations for test verification
+    POTX_MIRROR = 0x03
+    POTY_MIRROR = 0x04
+    JOY1_MIRROR = 0x05
+
+    # Hardware addresses
+    SID_POTX = 0xD419
+    SID_POTY = 0xD41A
+    CIA1_PRB = 0xDC01  # Port B - Joystick 1
+
+    builder = TestROMBuilder()
+    builder.emit_screen_init()
+    builder.emit_set_border_and_background(COLOR_BLUE)
+
+    # Display title
+    builder.emit_display_text("PADDLE TEST", line=1, color=COLOR_WHITE)
+    builder.emit_display_text("MOVE PADDLE LEFT/RIGHT", line=3, color=COLOR_CYAN)
+
+    # Display labels - show paddle 1 and paddle 2
+    builder.emit_display_text("PDL1:", line=6, color=COLOR_YELLOW, centered=False)
+    builder.emit_display_text("PDL2:", line=8, color=COLOR_YELLOW, centered=False)
+    builder.emit_display_text("FIRE:", line=10, color=COLOR_YELLOW, centered=False)
+
+    # Mark start of main loop
+    builder.label("main_loop")
+
+    # Read POTX (Paddle 1) and store
+    builder.code.extend([
+        LDA_ABSOLUTE_0xAD, SID_POTX & 0xFF, (SID_POTX >> 8) & 0xFF,
+        STA_ZEROPAGE_0x85, POTX_MIRROR,
+    ])
+
+    # Read POTY (Paddle 2) and store
+    builder.code.extend([
+        LDA_ABSOLUTE_0xAD, SID_POTY & 0xFF, (SID_POTY >> 8) & 0xFF,
+        STA_ZEROPAGE_0x85, POTY_MIRROR,
+    ])
+
+    # Read joystick 1 (paddle buttons) and store
+    builder.code.extend([
+        LDA_ABSOLUTE_0xAD, CIA1_PRB & 0xFF, (CIA1_PRB >> 8) & 0xFF,
+        STA_ZEROPAGE_0x85, JOY1_MIRROR,
+    ])
+
+    # Display Paddle 1 (POTX) as hex
+    pdl1_screen_addr = 0x0400 + (6 * 40) + 6
+    builder.code.extend([
+        LDA_ABSOLUTE_0xAD, POTX_MIRROR, 0x00,
+        LSR_ACCUMULATOR_0x4A,
+        LSR_ACCUMULATOR_0x4A,
+        LSR_ACCUMULATOR_0x4A,
+        LSR_ACCUMULATOR_0x4A,
+    ])
+    emit_nibble_to_hex_screen_code(builder, pdl1_screen_addr)
+    builder.code.extend([
+        LDA_ABSOLUTE_0xAD, POTX_MIRROR, 0x00,
+        AND_IMMEDIATE_0x29, 0x0F,
+    ])
+    emit_nibble_to_hex_screen_code(builder, pdl1_screen_addr + 1)
+
+    # Display Paddle 2 (POTY) as hex
+    pdl2_screen_addr = 0x0400 + (8 * 40) + 6
+    builder.code.extend([
+        LDA_ABSOLUTE_0xAD, POTY_MIRROR, 0x00,
+        LSR_ACCUMULATOR_0x4A,
+        LSR_ACCUMULATOR_0x4A,
+        LSR_ACCUMULATOR_0x4A,
+        LSR_ACCUMULATOR_0x4A,
+    ])
+    emit_nibble_to_hex_screen_code(builder, pdl2_screen_addr)
+    builder.code.extend([
+        LDA_ABSOLUTE_0xAD, POTY_MIRROR, 0x00,
+        AND_IMMEDIATE_0x29, 0x0F,
+    ])
+    emit_nibble_to_hex_screen_code(builder, pdl2_screen_addr + 1)
+
+    # Display button state as hex
+    fire_screen_addr = 0x0400 + (10 * 40) + 6
+    builder.code.extend([
+        LDA_ABSOLUTE_0xAD, JOY1_MIRROR, 0x00,
+        LSR_ACCUMULATOR_0x4A,
+        LSR_ACCUMULATOR_0x4A,
+        LSR_ACCUMULATOR_0x4A,
+        LSR_ACCUMULATOR_0x4A,
+    ])
+    emit_nibble_to_hex_screen_code(builder, fire_screen_addr)
+    builder.code.extend([
+        LDA_ABSOLUTE_0xAD, JOY1_MIRROR, 0x00,
+        AND_IMMEDIATE_0x29, 0x0F,
+    ])
+    emit_nibble_to_hex_screen_code(builder, fire_screen_addr + 1)
+
+    # Jump back to main loop
+    loop_addr = builder.labels["main_loop"]
+    builder.code.extend([
+        JMP_ABSOLUTE_0x4C, loop_addr & 0xFF, (loop_addr >> 8) & 0xFF,
+    ])
+
+    # Build the ROM
+    rom = builder.build_rom()
+
+    # Create CRT header
+    crt_header = bytearray(64)
+    crt_header[0:16] = b'C64 CARTRIDGE   '
+    crt_header[16:20] = (64).to_bytes(4, 'big')  # Header length
+    crt_header[20:22] = (0x0100).to_bytes(2, 'big')  # Version 1.0
+    crt_header[22:24] = (0).to_bytes(2, 'big')  # Hardware type 0 (normal)
+    crt_header[24] = 0  # EXROM line (active low, 0 = active)
+    crt_header[25] = 1  # GAME line (active low, 1 = inactive) -> 8K mode
+    crt_header[32:64] = b'PADDLE TEST'.ljust(32, b'\x00')
+
+    # CHIP packet
+    chip_header = bytearray(16)
+    chip_header[0:4] = b'CHIP'
+    chip_header[4:8] = (16 + len(rom)).to_bytes(4, 'big')
+    chip_header[8:10] = (0).to_bytes(2, 'big')  # Chip type (ROM)
+    chip_header[10:12] = (0).to_bytes(2, 'big')  # Bank number
+    chip_header[12:14] = (0x8000).to_bytes(2, 'big')  # Load address
+    chip_header[14:16] = len(rom).to_bytes(2, 'big')  # ROM size
+
+    return bytes(crt_header) + bytes(chip_header) + rom
+
+
 def main():
     """Generate all test cartridges."""
     fixtures_dir = project_root / "tests" / "fixtures" / "c64"
@@ -373,6 +556,12 @@ def main():
     mouse_cart_path = peripheral_test_dir / "test_mouse_input.crt"
     mouse_cart_path.write_bytes(mouse_cart)
     print(f"  - test_mouse_input.crt")
+
+    # Paddle test cartridge
+    paddle_cart = create_paddle_test_cartridge()
+    paddle_cart_path = peripheral_test_dir / "test_paddle_input.crt"
+    paddle_cart_path.write_bytes(paddle_cart)
+    print(f"  - test_paddle_input.crt")
 
     print(f"  Output directory: {peripheral_test_dir}")
 

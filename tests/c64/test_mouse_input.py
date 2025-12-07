@@ -7,6 +7,7 @@ Tests the mouse input handling via SID POT registers and CIA1 joystick bits.
 import pytest
 from systems.c64 import C64
 from systems.c64.sid import SID
+from systems.c64.cia1 import MOUSE_LEFT_BUTTON, MOUSE_RIGHT_BUTTON, BUTTON_PRESSED
 from mos6502 import errors
 from .conftest import C64_ROMS_DIR, requires_c64_roms
 
@@ -174,8 +175,8 @@ class TestC64MouseInput:
 
         c64.set_mouse_button(1, True)  # Left button pressed
 
-        # Fire is bit 4, active low (0 = pressed)
-        assert (c64.cia1.joystick_1 & 0x10) == 0x00
+        # Left button active low (0 = pressed)
+        assert (c64.cia1.joystick_1 & MOUSE_LEFT_BUTTON) == BUTTON_PRESSED
 
     def test_mouse_left_button_release_port1(self, c64):
         """Left mouse button release clears fire bit on port 1."""
@@ -183,8 +184,8 @@ class TestC64MouseInput:
         c64.set_mouse_button(1, True)
         c64.set_mouse_button(1, False)
 
-        # Fire bit released (1 = released)
-        assert (c64.cia1.joystick_1 & 0x10) == 0x10
+        # Left button released (1 = released)
+        assert (c64.cia1.joystick_1 & MOUSE_LEFT_BUTTON) == MOUSE_LEFT_BUTTON
 
     def test_mouse_right_button_press_port1(self, c64):
         """Right mouse button sets up bit on port 1."""
@@ -192,8 +193,8 @@ class TestC64MouseInput:
 
         c64.set_mouse_button(3, True)  # Right button pressed
 
-        # Up is bit 0, active low (0 = pressed)
-        assert (c64.cia1.joystick_1 & 0x01) == 0x00
+        # Right button active low (0 = pressed)
+        assert (c64.cia1.joystick_1 & MOUSE_RIGHT_BUTTON) == BUTTON_PRESSED
 
     def test_mouse_right_button_release_port1(self, c64):
         """Right mouse button release clears up bit on port 1."""
@@ -201,8 +202,8 @@ class TestC64MouseInput:
         c64.set_mouse_button(3, True)
         c64.set_mouse_button(3, False)
 
-        # Up bit released
-        assert (c64.cia1.joystick_1 & 0x01) == 0x01
+        # Right button released
+        assert (c64.cia1.joystick_1 & MOUSE_RIGHT_BUTTON) == MOUSE_RIGHT_BUTTON
 
     def test_mouse_buttons_port2(self, c64):
         """Mouse buttons work on port 2."""
@@ -211,8 +212,8 @@ class TestC64MouseInput:
 
         c64.set_mouse_button(1, True)  # Left button
 
-        # Fire bit on joystick_2
-        assert (c64.cia1.joystick_2 & 0x10) == 0x00
+        # Left button on joystick_2
+        assert (c64.cia1.joystick_2 & MOUSE_LEFT_BUTTON) == BUTTON_PRESSED
 
     def test_mouse_buttons_ignored_when_disabled(self, c64):
         """Mouse buttons are ignored when mouse is disabled."""
@@ -319,32 +320,32 @@ class TestMouseCartridgeIntegration:
         # Initially no buttons pressed (all bits high)
         assert c64.cpu.ram[self.JOY1_MIRROR] == 0xFF
 
-        # Press left mouse button (fire = bit 4)
+        # Press left mouse button
         c64.set_mouse_button(1, True)
         run_cycles(c64, 10000)
 
-        # Bit 4 should be low
-        assert (c64.cpu.ram[self.JOY1_MIRROR] & 0x10) == 0x00
+        # Left button bit should be low
+        assert (c64.cpu.ram[self.JOY1_MIRROR] & MOUSE_LEFT_BUTTON) == BUTTON_PRESSED
 
         # Release button
         c64.set_mouse_button(1, False)
         run_cycles(c64, 10000)
 
-        # Bit 4 should be high again
-        assert (c64.cpu.ram[self.JOY1_MIRROR] & 0x10) == 0x10
+        # Left button bit should be high again
+        assert (c64.cpu.ram[self.JOY1_MIRROR] & MOUSE_LEFT_BUTTON) == MOUSE_LEFT_BUTTON
 
     def test_cartridge_reads_right_button(self, c64_with_mouse_cart):
-        """Cartridge correctly reads right mouse button (mapped to Up)."""
+        """Cartridge correctly reads right mouse button."""
         c64 = c64_with_mouse_cart
 
         run_cycles(c64, 10000)
 
-        # Press right mouse button (up = bit 0)
+        # Press right mouse button
         c64.set_mouse_button(3, True)
         run_cycles(c64, 10000)
 
-        # Bit 0 should be low
-        assert (c64.cpu.ram[self.JOY1_MIRROR] & 0x01) == 0x00
+        # Right button bit should be low
+        assert (c64.cpu.ram[self.JOY1_MIRROR] & MOUSE_RIGHT_BUTTON) == BUTTON_PRESSED
 
 
 @requires_c64_roms
