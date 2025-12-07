@@ -630,6 +630,23 @@ class CIA1:
         cycles_elapsed = self.cpu.cycles_executed - self.last_cycle_count
         self.last_cycle_count = self.cpu.cycles_executed
 
+        # Fast path: Both timers running with no underflow, TOD not running,
+        # no PB6/PB7 pulse cycles, and timers not in special modes
+        # This is the common case during normal operation
+        timer_a_counter = self.timer_a_counter
+        timer_b_counter = self.timer_b_counter
+        if (self.timer_a_running and not self.timer_a_cnt_mode and
+            timer_a_counter > cycles_elapsed and
+            self.timer_b_running and self.timer_b_input_mode == 0 and
+            timer_b_counter > cycles_elapsed and
+            not self.tod_running and
+            self.pb6_pulse_cycles == 0 and self.pb7_pulse_cycles == 0):
+            # Simple countdown - no underflows, no special handling needed
+            self.timer_a_counter = timer_a_counter - cycles_elapsed
+            self.timer_b_counter = timer_b_counter - cycles_elapsed
+            self.timer_a_underflowed = False
+            return
+
         # Reset Timer A underflow flag for this update cycle
         self.timer_a_underflowed = False
         timer_a_underflow_count = 0
