@@ -308,18 +308,77 @@ class MemoryUnit:
 
 
 class Byte(MemoryUnit):
-    """Byte MemoryUnit()."""
+    """Byte MemoryUnit().
+
+    Uses flyweight pattern: cached instances are returned for values 0-255
+    when using default endianness. This avoids object creation overhead
+    for the common case.
+    """
 
     log: logging.Logger = logging.getLogger("mos6502.memory.Byte")
 
+    # Flyweight cache: pre-created Byte instances for values 0-255
+    # Populated lazily on first access to avoid circular import issues
+    _flyweight_cache: list["Byte"] | None = None
+
+    def __new__(cls, value: int = 0, endianness: str = ENDIANNESS) -> "Byte":
+        """Return cached Byte for common values, or create new instance.
+
+        Flyweight pattern: reuse cached instances for values 0-255 with
+        default endianness. This eliminates object creation overhead for
+        the vast majority of Byte instantiations.
+        """
+        # Use flyweight cache for default endianness values 0-255
+        if endianness == ENDIANNESS:
+            # Normalize value to 0-255 range
+            normalized = int(value) & 0xFF if not isinstance(value, MemoryUnit) else value._value & 0xFF
+
+            # Initialize cache on first use
+            if cls._flyweight_cache is None:
+                cls._initialize_flyweight_cache()
+
+            return cls._flyweight_cache[normalized]
+
+        # Non-default endianness: create new instance
+        instance = super().__new__(cls)
+        return instance
+
+    @classmethod
+    def _initialize_flyweight_cache(cls) -> None:
+        """Initialize the flyweight cache with Byte instances 0-255."""
+        # Create cache list first to avoid recursion
+        cls._flyweight_cache = [None] * 256
+
+        # Create instances directly without going through __new__
+        for i in range(256):
+            instance = super().__new__(cls)
+            # Initialize directly to avoid __init__ overhead during cache build
+            instance._value = i
+            instance._endianness = ENDIANNESS
+            instance._overflow = False
+            instance._underflow = False
+            cls._flyweight_cache[i] = instance
+
     def __init__(self: Self, value: int = 0, endianness: str = ENDIANNESS) -> None:
         """Initialize a Byte().
+
+        Note: For flyweight instances (default endianness, values 0-255),
+        __init__ is called but the instance is already fully initialized
+        from the cache. We skip re-initialization for cached instances.
 
         Arguments:
         ---------
             value: a value between -127 and 255
             endianness: 'big' or 'little' (default: mos6502.memory.ENDIANNESS)
         """
+        # Skip init for cached flyweight instances (already initialized)
+        if endianness == ENDIANNESS and Byte._flyweight_cache is not None:
+            # Check if this is a cached instance by seeing if value matches
+            normalized = int(value) & 0xFF if not isinstance(value, MemoryUnit) else value._value & 0xFF
+            if self is Byte._flyweight_cache[normalized]:
+                return
+
+        # Non-cached instance: full initialization
         super().__init__(value=value, endianness=endianness)
 
     @property
