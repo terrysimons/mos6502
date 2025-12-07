@@ -216,13 +216,6 @@ class IECBus:
             Port A input value (bits 6-7: CLK IN, DATA IN)
         """
         # The input bits read the actual bus state
-        # Bit 6: CLK IN - reflects actual CLK line state
-        # Bit 7: DATA IN - reflects actual DATA line state
-        result = 0xFF  # Start with all high (released)
-
-        if not self.clk:
-            result &= ~0x40  # CLK is low
-        if not self.data:
-            result &= ~0x80  # DATA is low
-
-        return result
+        # Build result directly using bitwise ops for speed
+        # CLK on bit 6, DATA on bit 7 - set means line is HIGH (released)
+        return 0x3F | (0x40 if self.clk else 0) | (0x80 if self.data else 0)

@@ -18,11 +18,11 @@ from __future__ import annotations
 import logging
 import threading
 import time
-from pathlib import Path
 from typing import TYPE_CHECKING, Optional
 
 from .drive1541 import Drive1541, VIA1_DATA_OUT, VIA1_CLK_OUT, VIA1_ATN_ACK
 from .threaded_iec_bus import ThreadedIECBus
+from mos6502.errors import CPUCycleExhaustionError
 
 if TYPE_CHECKING:
     from mos6502.core import MOS6502CPU
@@ -72,6 +72,15 @@ class ThreadedDrive1541(Drive1541):
 
         # Track how many cycles the drive has executed for sync
         self._drive_cycles: int = 0
+
+        # Pre-compute address switch bits (device number 8-11 = bits 5-6)
+        # These never change during operation so cache them
+        addr_offset = device_number - 8
+        self._address_switch_mask = 0
+        if addr_offset & 0x01:
+            self._address_switch_mask |= 0x20  # Bit 5
+        if addr_offset & 0x02:
+            self._address_switch_mask |= 0x40  # Bit 6
 
     def start_thread(self) -> None:
         """Start the drive's execution thread."""
@@ -127,20 +136,23 @@ class ThreadedDrive1541(Drive1541):
         Runs the drive CPU in sync with the C64 by tracking cycle counts.
         The drive only runs when the C64 has run more cycles, keeping them
         in lockstep like the synchronous mode.
+
+        Uses condition variable to efficiently wait for C64 cycles instead
+        of busy-polling with sleep().
         """
         log.debug(f"Drive {self.device_number} thread starting")
 
         while self._running and not self._stop_event.is_set():
             try:
-                # Get C64's current cycle count
+                # Wait for C64 to run ahead of us (uses condition variable)
                 if self._threaded_iec_bus is None:
                     time.sleep(0.001)
                     continue
 
-                c64_cycles = self._threaded_iec_bus.get_c64_cycles()
-
-                # Calculate how many cycles we need to catch up
-                cycles_behind = c64_cycles - self._drive_cycles
+                # Efficiently wait for cycles using condition variable
+                cycles_behind = self._threaded_iec_bus.wait_for_cycles(
+                    self._drive_cycles, timeout=0.001
+                )
 
                 if cycles_behind > 0:
                     # Update our view of the IEC bus state before executing
@@ -161,18 +173,14 @@ class ThreadedDrive1541(Drive1541):
                     if self.cpu:
                         try:
                             self.cpu.execute(cycles=cycles_to_run)
-                        except Exception as e:
-                            if "Exhausted" not in str(e):
-                                raise
+                        except CPUCycleExhaustionError:
+                            pass  # Normal - cycle budget exhausted
 
                     # Track cycles executed
                     self._drive_cycles += cycles_to_run
 
                     # Update our IEC output state to the bus
                     self._update_iec_output_to_bus()
-                else:
-                    # We're caught up - wait briefly for C64 to run more
-                    time.sleep(0.0001)  # 100μs
 
             except Exception as e:
                 log.error(f"Drive {self.device_number} thread error: {e}")
@@ -180,25 +188,6 @@ class ThreadedDrive1541(Drive1541):
                 traceback.print_exc()
 
         log.debug(f"Drive {self.device_number} thread stopping")
-
-    def _execute_batch(self) -> None:
-        """Execute one batch of CPU cycles."""
-        # Update VIA timers
-        self.via1.tick(self.CYCLES_PER_BATCH)
-        self.via2.tick(self.CYCLES_PER_BATCH)
-
-        # Update GCR byte-ready timing if motor is running
-        if self.motor_on and self.gcr_disk:
-            self._update_gcr_read(self.CYCLES_PER_BATCH)
-
-        # Execute CPU
-        if self.cpu:
-            try:
-                self.cpu.execute(cycles=self.CYCLES_PER_BATCH)
-            except Exception as e:
-                # CPUCycleExhaustionError is normal - just means we used our budget
-                if "Exhausted" not in str(e):
-                    raise
 
     def _update_iec_input_from_bus(self) -> None:
         """Update our cached IEC input state from the shared bus."""
@@ -256,8 +245,6 @@ class ThreadedDrive1541(Drive1541):
         Returns:
             Port B input value with current IEC bus state
         """
-        result = 0xFF
-
         # Read live bus state from the threaded bus
         # IMPORTANT: exclude our own device so we don't see our own outputs
         if self._threaded_iec_bus is not None:
@@ -279,40 +266,22 @@ class ThreadedDrive1541(Drive1541):
             clk = self.iec_clk
             data = self.iec_data
 
-        # Bit 0: DATA IN (from bus via 7406 inverter)
-        # Bus DATA LOW (asserted) → inverter → PB0 HIGH (set)
-        # Bus DATA HIGH (released) → inverter → PB0 LOW (clear)
+        # Build result efficiently - start with address switch bits (cached, constant)
+        # IEC signals are active-low on bus but active-high after 7406 inverter
+        # So bus LOW (asserted) -> port bit HIGH
+        result = self._address_switch_mask
+
+        # Bit 0: DATA IN - set when DATA asserted (bus LOW)
         if not data:
-            result |= 0x01  # Set bit 0 when DATA is asserted (bus LOW)
-        else:
-            result &= ~0x01  # Clear bit 0 when DATA is released (bus HIGH)
+            result |= 0x01
 
-        # Bit 2: CLK IN (from bus via 7406 inverter)
-        # Bus CLK LOW (asserted) → inverter → PB2 HIGH (set)
-        # Bus CLK HIGH (released) → inverter → PB2 LOW (clear)
+        # Bit 2: CLK IN - set when CLK asserted (bus LOW)
         if not clk:
-            result |= 0x04  # Set bit 2 when CLK is asserted (bus LOW)
-        else:
-            result &= ~0x04  # Clear bit 2 when CLK is released (bus HIGH)
+            result |= 0x04
 
-        # Bits 5-6: Device address switches
-        addr_offset = self.device_number - 8
-        if addr_offset & 0x01:
-            result |= 0x20
-        else:
-            result &= ~0x20
-        if addr_offset & 0x02:
-            result |= 0x40
-        else:
-            result &= ~0x40
-
-        # Bit 7: ATN IN (from bus through 7406 inverter)
-        # Bus ATN LOW (asserted) → inverter → PB7 HIGH (set)
-        # Bus ATN HIGH (released) → inverter → PB7 LOW (clear)
+        # Bit 7: ATN IN - set when ATN asserted (bus LOW)
         if not atn:
-            result |= 0x80  # Set bit 7 when ATN is asserted (bus LOW)
-        else:
-            result &= ~0x80  # Clear bit 7 when ATN is released (bus HIGH)
+            result |= 0x80
 
         return result
 

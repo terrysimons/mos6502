@@ -47,6 +47,7 @@ from typing import TYPE_CHECKING, Optional
 from .via6522 import VIA6522
 from .d64 import D64Image, SECTORS_PER_TRACK, TRACK_SPEED_ZONE
 from .gcr import GCRDisk
+from mos6502.errors import CPUCycleExhaustionError
 
 if TYPE_CHECKING:
     from mos6502.core import MOS6502CPU
@@ -375,10 +376,8 @@ class Drive1541:
                 try:
                     # Run until we've used our budget (or more)
                     self.cpu.execute(cycles=self._pending_cycles)
-                except Exception as e:
-                    # CPUCycleExhaustionError is normal
-                    if "Exhausted" not in str(e):
-                        log.error(f"1541 CPU error: {e}")
+                except CPUCycleExhaustionError:
+                    pass  # Normal - cycle budget exhausted
 
                 # Deduct the cycles we actually used from the budget
                 # This may go negative, which is fine - we'll wait for more

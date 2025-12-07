@@ -55,6 +55,10 @@ class ThreadedIECBus:
         # Lock for thread-safe access to bus state
         self._lock = threading.Lock()
 
+        # Condition variable for drive thread wakeup
+        # Drives wait on this instead of busy-polling
+        self._cycle_condition = threading.Condition(self._lock)
+
         # Connected devices (protected by lock for modification)
         self.cia2: Optional[CIA2] = None
         self._drives: Dict[int, Drive1541] = {}  # device_number -> drive
@@ -149,7 +153,9 @@ class ThreadedIECBus:
         Args:
             cycles: Current C64 CPU cycle count
         """
-        self._c64_cycles = cycles  # Atomic on most platforms, no lock needed
+        with self._cycle_condition:
+            self._c64_cycles = cycles
+            self._cycle_condition.notify_all()  # Wake up waiting drive threads
 
     def get_c64_cycles(self) -> int:
         """Get the current C64 cycle count.
@@ -158,6 +164,27 @@ class ThreadedIECBus:
             Current C64 CPU cycle count
         """
         return self._c64_cycles
+
+    def wait_for_cycles(self, drive_cycles: int, timeout: float = 0.001) -> int:
+        """Wait for C64 to execute more cycles than the drive.
+
+        Blocks until C64 cycle count exceeds drive_cycles, or timeout.
+        This is more efficient than polling with sleep().
+
+        Args:
+            drive_cycles: Current drive cycle count
+            timeout: Maximum time to wait in seconds (default 1ms)
+
+        Returns:
+            Number of cycles the drive is behind (0 if not behind)
+        """
+        with self._cycle_condition:
+            cycles_behind = self._c64_cycles - drive_cycles
+            if cycles_behind <= 0:
+                # Wait for C64 to run more cycles
+                self._cycle_condition.wait(timeout=timeout)
+                cycles_behind = self._c64_cycles - drive_cycles
+            return max(0, cycles_behind)
 
     def set_drive_outputs(self, device_number: int, clk_out: bool, data_out: bool,
                           atna_out: bool) -> None:
@@ -238,13 +265,9 @@ class ThreadedIECBus:
             Port A input value (bits 6-7: CLK IN, DATA IN)
         """
         # Use stored values from last update() - much faster than recomputing
-        result = 0xFF
-        if not self.clk:
-            result &= ~0x40  # CLK is low
-        if not self.data:
-            result &= ~0x80  # DATA is low
-
-        return result
+        # Build result directly using bitwise ops for speed
+        # CLK on bit 6, DATA on bit 7 - set means line is HIGH (released)
+        return 0x3F | (0x40 if self.clk else 0) | (0x80 if self.data else 0)
 
     def get_drive_input(self, device_number: int) -> tuple:
         """Get bus state for a drive's VIA1 Port B input bits.

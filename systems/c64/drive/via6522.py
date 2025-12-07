@@ -162,6 +162,9 @@ class VIA6522:
         self.port_b_write_callback: Optional[Callable[[int], None]] = None
         self.irq_callback: Optional[Callable[[bool], None]] = None
 
+        # Cache last IRQ state to avoid redundant callbacks
+        self._last_irq_active = False
+
     def reset(self) -> None:
         """Reset VIA to power-on state."""
         self.ora = 0x00
@@ -607,5 +610,8 @@ class VIA6522:
     def _update_irq(self) -> None:
         """Update IRQ output based on IFR and IER."""
         irq_active = bool(self.ifr & self.ier & 0x7F)
-        if self.irq_callback:
-            self.irq_callback(irq_active)
+        # Only call callback if state changed
+        if irq_active != self._last_irq_active:
+            self._last_irq_active = irq_active
+            if self.irq_callback:
+                self.irq_callback(irq_active)
