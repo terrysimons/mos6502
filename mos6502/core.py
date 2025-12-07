@@ -1215,6 +1215,18 @@ class MOS6502CPU(flags.ProcessorStatusFlagsInterface):
             # Default: run 1 cycle (backward compatible)
             self.cycles = 1
 
+        # Cache frequently accessed attributes as local variables for speed
+        # These are looked up on every iteration, so caching saves attribute access overhead
+        verbose_cycles = self.verbose_cycles
+        periodic_callback = self.periodic_callback
+        periodic_callback_interval = self.periodic_callback_interval
+        pre_instruction_callback = self.pre_instruction_callback
+        post_instruction_callback = self.post_instruction_callback
+        opcode_handler_cache = self._opcode_handler_cache
+
+        # Pre-compute whether we can use the fast path (no debug/callbacks)
+        use_fast_path = not (verbose_cycles or pre_instruction_callback or post_instruction_callback)
+
         while True:
             # Check for cycle exhaustion BEFORE fetching the next instruction
             # This prevents PC from being incremented into the next instruction
@@ -1235,18 +1247,19 @@ class MOS6502CPU(flags.ProcessorStatusFlagsInterface):
 
             # Fast path: use opcode -> handler cache when no debug/callbacks needed
             # This avoids OPCODE_LOOKUP dict lookup and isinstance check
-            if not (self.verbose_cycles or self.pre_instruction_callback or self.post_instruction_callback):
-                handler = self._opcode_handler_cache.get(instruction_byte)
+            # Uses pre-computed use_fast_path and cached opcode_handler_cache
+            if use_fast_path:
+                handler = opcode_handler_cache.get(instruction_byte)
                 if handler is not None:
                     handler(self)
                     self.instructions_executed += 1
                     if use_instruction_limit:
                         self.instructions_remaining -= 1
-                    if self.periodic_callback:
+                    if periodic_callback:
                         cycles_since_last = self.cycles_executed - self._last_periodic_callback_cycle
-                        if cycles_since_last >= self.periodic_callback_interval:
+                        if cycles_since_last >= periodic_callback_interval:
                             self._last_periodic_callback_cycle = self.cycles_executed
-                            self.periodic_callback()
+                            periodic_callback()
                     # NMI check (edge-triggered, higher priority than IRQ)
                     if self.nmi_pending and not self._nmi_line_previous:
                         self._nmi_line_previous = True
@@ -1263,7 +1276,7 @@ class MOS6502CPU(flags.ProcessorStatusFlagsInterface):
 
             # Verbose instruction tracing (only when verbose_cycles is enabled)
             # This entire block is for debug output and NOT needed for execution
-            if self.verbose_cycles:
+            if verbose_cycles:
                 instruction_bytes: int = 0
                 machine_code = []
                 operand: memory.MemoryUnit = 0
@@ -1326,18 +1339,18 @@ class MOS6502CPU(flags.ProcessorStatusFlagsInterface):
                 handler = self._load_variant_handler(instruction.package, instruction.function)
 
                 # Populate opcode -> handler cache for fast path
-                if instruction_byte not in self._opcode_handler_cache:
-                    self._opcode_handler_cache[instruction_byte] = handler
+                if instruction_byte not in opcode_handler_cache:
+                    opcode_handler_cache[instruction_byte] = handler
 
                 # Pre-instruction callback (for debugging, profiling, breakpoints)
-                if self.pre_instruction_callback:
-                    self.pre_instruction_callback(self, instruction)
+                if pre_instruction_callback:
+                    pre_instruction_callback(self, instruction)
 
                 handler(self)
 
                 # Post-instruction callback (for debugging, profiling, state validation)
-                if self.post_instruction_callback:
-                    self.post_instruction_callback(self, instruction)
+                if post_instruction_callback:
+                    post_instruction_callback(self, instruction)
             else:
                 # Illegal instruction - not in OPCODE_LOOKUP, just a raw byte
                 self.log.error(f"ILLEGAL INSTRUCTION: {instruction} ({instruction:02X})")
@@ -1356,11 +1369,11 @@ class MOS6502CPU(flags.ProcessorStatusFlagsInterface):
             # This allows external hardware to check cycle count and trigger IRQs
             # Use threshold check instead of modulo to avoid missing callbacks when
             # instructions don't land exactly on the interval boundary
-            if self.periodic_callback:
+            if periodic_callback:
                 cycles_since_last = self.cycles_executed - self._last_periodic_callback_cycle
-                if cycles_since_last >= self.periodic_callback_interval:
+                if cycles_since_last >= periodic_callback_interval:
                     self._last_periodic_callback_cycle = self.cycles_executed
-                    self.periodic_callback()
+                    periodic_callback()
 
             # Check for pending NMI between instructions (after instruction completes)
             # NMI is edge-triggered and cannot be masked by the I flag
