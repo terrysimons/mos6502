@@ -77,6 +77,7 @@ from c64.memory import (
     CIA2_END,
     BASIC_PROGRAM_START,
 )
+from c64.drive import Drive1541, IECBus, D64Image
 
 logging.basicConfig(level=logging.CRITICAL)
 log = logging.getLogger("c64")
@@ -360,6 +361,24 @@ class C64:
             help="Cartridge type: auto (detect from file), 8k, 16k, or ultimax (default: auto)",
         )
 
+        # Disk drive options
+        drive_group = parser.add_argument_group("Disk Drive Options")
+        drive_group.add_argument(
+            "--disk",
+            type=Path,
+            help="D64 disk image to insert into drive 8",
+        )
+        drive_group.add_argument(
+            "--drive-rom",
+            type=Path,
+            help="1541 DOS ROM file (default: <rom-dir>/1541.rom)",
+        )
+        drive_group.add_argument(
+            "--no-drive",
+            action="store_true",
+            help="Disable 1541 drive emulation (faster boot, no disk access)",
+        )
+
         # Execution control options
         exec_group = parser.add_argument_group("Execution Control")
         exec_group.add_argument(
@@ -540,6 +559,11 @@ class C64:
         # Cartridge type string for display purposes
         self.cartridge_type: str = "none"  # "none", "8k", "16k", "error"
 
+        # 1541 Disk Drive support
+        self.iec_bus: Optional[IECBus] = None
+        self.drive8: Optional[Drive1541] = None
+        self.drive_enabled: bool = False  # Set by attach_drive()
+
         # Pygame display attributes
         self.pygame_screen = None
         self.pygame_surface = None
@@ -696,14 +720,19 @@ class C64:
         # Give VIC access to C64Memory for VBlank snapshots
         self.vic.set_memory(self.memory)
 
-        # Set up periodic update callback for VIC, CIA1, and CIA2
+        # Set up periodic update callback for VIC, CIA1, CIA2, and disk drive
         # VIC checks cycle count and triggers raster IRQs
         # CIA1 counts down timers and triggers timer IRQs
         # CIA2 counts down timers and triggers NMIs
+        # IEC bus and drive: The bus updates happen immediately when CIA2 port A
+        # is written, and the drive CPU is synchronized at that time. The periodic
+        # callback just ensures regular updates for VIC/CIA timers.
         def update_peripherals():
             self.vic.update()
             self.cia1.update()
             self.cia2.update()
+            # Note: Drive CPU sync is now handled per-instruction via
+            # post_instruction_callback for cycle-accurate IEC timing
 
         self.cpu.periodic_callback = update_peripherals
         self.cpu.periodic_callback_interval = self.vic.cycles_per_line   # Update every raster line
@@ -714,6 +743,169 @@ class C64:
         # The reset() method handles the complete reset sequence including
         # fetching the vector from $FFFC/$FFFD and setting PC accordingly
         log.info(f"PC initialized to ${self.cpu.PC:04X} (from reset vector at ${self.RESET_VECTOR_ADDR:04X})")
+
+    def attach_drive(self, drive_rom_path: Optional[Path] = None, disk_path: Optional[Path] = None) -> bool:
+        """Attach a 1541 disk drive to the IEC bus.
+
+        Supports multiple ROM formats:
+        - Single 16KB ROM (1541-II style): 1541.rom, 1541-II.251968-03.bin, etc.
+        - Two 8KB ROMs (original 1541): 1541-c000.bin + 1541-e000.bin
+
+        Args:
+            drive_rom_path: Path to 1541 DOS ROM (default: auto-detect in rom_dir)
+            disk_path: Optional D64 disk image to insert
+
+        Returns:
+            True if drive attached successfully, False otherwise
+        """
+        rom_path = drive_rom_path
+        rom_path_e000 = None
+
+        if rom_path is None:
+            # Try to find 1541 ROM(s) in rom_dir
+            # Priority 1: Single 16KB ROM files (most common)
+            rom_16k_names = [
+                "1541.rom",
+                "1541-II.rom",
+                "1541-II.251968-03.bin",  # Most compatible 1541-II ROM
+                "1541C.251968-01.bin",
+                "1541C.251968-02.bin",
+                "1541-II.355640-01.bin",
+                "dos1541",
+                "dos1541.rom",
+            ]
+            for name in rom_16k_names:
+                candidate = self.rom_dir / name
+                if candidate.exists():
+                    rom_path = candidate
+                    break
+
+            # Priority 2: Two 8KB ROM files (original 1541 style)
+            if rom_path is None:
+                # Look for C000 ROM
+                c000_names = [
+                    "1541-c000.325302-01.bin",
+                    "1541-c000.bin",
+                    "1540-c000.325302-01.bin",
+                ]
+                # Look for E000 ROM (multiple revisions available)
+                e000_names = [
+                    "1541-e000.901229-05.bin",  # Short-board, most common
+                    "1541-e000.901229-03.bin",  # Long-board with autoboot
+                    "1541-e000.901229-02.bin",
+                    "1541-e000.901229-01.bin",
+                    "1541-e000.bin",
+                ]
+
+                for c000_name in c000_names:
+                    c000_candidate = self.rom_dir / c000_name
+                    if c000_candidate.exists():
+                        # Found C000 ROM, now look for E000 ROM
+                        for e000_name in e000_names:
+                            e000_candidate = self.rom_dir / e000_name
+                            if e000_candidate.exists():
+                                rom_path = c000_candidate
+                                rom_path_e000 = e000_candidate
+                                break
+                        if rom_path_e000 is not None:
+                            break
+
+        if rom_path is None or not rom_path.exists():
+            log.warning(f"1541 ROM not found in {self.rom_dir}. Drive disabled.")
+            log.warning("  Expected: 1541.rom (16KB) or 1541-c000.bin + 1541-e000.bin (8KB each)")
+            return False
+
+        # Create IEC bus and connect C64
+        self.iec_bus = IECBus()
+        self.iec_bus.connect_c64(self.cia2)
+        self.cia2.set_iec_bus(self.iec_bus)
+
+        # Create drive 8
+        self.drive8 = Drive1541(device_number=8)
+
+        # Create a separate CPU for the drive
+        # The 1541 uses a full 6502 (not 6510)
+        drive_cpu = CPU(cpu_variant=CPUVariant.NMOS_6502, verbose_cycles=False)
+        self.drive8.cpu = drive_cpu
+
+        # Set up drive CPU memory handler
+        drive_cpu.ram.memory_handler = self.drive8.memory
+
+        # Load 1541 ROM (supports both 16KB single file and 8KB+8KB split)
+        try:
+            self.drive8.load_rom(rom_path, rom_path_e000)
+        except Exception as e:
+            log.error(f"Failed to load 1541 ROM: {e}")
+            self.drive8 = None
+            self.iec_bus = None
+            return False
+
+        # Connect drive to IEC bus
+        self.iec_bus.connect_drive(self.drive8)
+
+        # Insert disk if provided
+        if disk_path is not None:
+            try:
+                self.drive8.insert_disk(disk_path)
+            except Exception as e:
+                log.error(f"Failed to insert disk: {e}")
+
+        # Reset drive to initialize
+        self.drive8.reset()
+
+        self.drive_enabled = True
+
+        # Set up cycle-accurate IEC synchronization using post_tick_callback.
+        # The tick() function is called every time the CPU spends cycles, which
+        # is the natural place to synchronize connected hardware.
+        #
+        # The IEC serial bus is bit-banged and requires tight timing between
+        # the C64 and 1541 CPUs. By hooking into tick(), we ensure the drive
+        # runs in lockstep with every cycle the C64 spends.
+
+        def sync_drive_on_tick(cpu, cycles):
+            """Sync drive CPU and IEC bus after each C64 cycle consumption."""
+            if self.drive8 and self.drive8.cpu:
+                # Update IEC bus state so drive sees current C64 outputs
+                self.iec_bus.update()
+
+                # Run drive for the same number of cycles
+                # The drive's tick() method handles its own cycle budget
+                self.drive8.tick(cycles)
+
+                # Update IEC bus again so C64 sees drive's response
+                self.iec_bus.update()
+
+        self.cpu.post_tick_callback = sync_drive_on_tick
+
+        log.info(f"1541 drive 8 attached (ROM: {rom_path.name})")
+
+        return True
+
+    def insert_disk(self, disk_path: Path) -> bool:
+        """Insert a D64 disk image into drive 8.
+
+        Args:
+            disk_path: Path to D64 disk image
+
+        Returns:
+            True if disk inserted successfully
+        """
+        if not self.drive_enabled or self.drive8 is None:
+            log.error("No drive attached. Use --disk or attach_drive() first.")
+            return False
+
+        try:
+            self.drive8.insert_disk(disk_path)
+            return True
+        except Exception as e:
+            log.error(f"Failed to insert disk: {e}")
+            return False
+
+    def eject_disk(self) -> None:
+        """Eject the disk from drive 8."""
+        if self.drive8 is not None:
+            self.drive8.eject_disk()
 
     def load_cartridge(self, path: Path, cart_type: str = "auto") -> None:
         """Load a cartridge ROM file.
@@ -1445,6 +1637,142 @@ class C64:
         else:
             return "???"
 
+    def get_drive_pc_region(self) -> str:
+        """Determine which memory region the drive's PC is currently in.
+
+        1541 memory map:
+        - $0000-$07FF: RAM (2KB)
+        - $1800-$1BFF: VIA1
+        - $1C00-$1FFF: VIA2
+        - $C000-$FFFF: ROM (DOS)
+
+        Returns:
+            String describing the region: "RAM", "VIA1", "VIA2", "DOS", or "???"
+        """
+        if not self.drive8 or not self.drive8.cpu:
+            return "???"
+
+        pc = self.drive8.cpu.PC
+
+        if pc < 0x0800:
+            return "RAM"
+        elif 0x1800 <= pc < 0x1C00:
+            return "VIA1"
+        elif 0x1C00 <= pc < 0x2000:
+            return "VIA2"
+        elif pc >= 0xC000:
+            return "DOS"
+        else:
+            return "???"
+
+    def _format_cpu_status(self, prefix: str = "C64") -> str:
+        """Format C64 CPU status line.
+
+        Args:
+            prefix: Label prefix for the status line
+
+        Returns:
+            Formatted status string
+        """
+        from mos6502.flags import format_flags
+        flags = format_flags(self.cpu._flags.value)
+        region = self.get_pc_region()
+        pc = self.cpu.PC
+
+        # Disassemble current instruction
+        try:
+            inst_str = self.disassemble_instruction(pc)
+            inst_display = inst_str.strip()
+        except (KeyError, ValueError, IndexError):
+            try:
+                b0 = self.cpu.ram[pc]
+                b1 = self.cpu.ram[pc + 1]
+                b2 = self.cpu.ram[pc + 2]
+                inst_display = f"{b0:02X} {b1:02X} {b2:02X}  ???"
+            except IndexError:
+                inst_display = "???"
+
+        return (f"{prefix}: Cycles: {self.cpu.cycles_executed:,} | "
+                f"PC=${pc:04X}[{region}] {inst_display:20s} | "
+                f"A=${self.cpu.A:02X} X=${self.cpu.X:02X} "
+                f"Y=${self.cpu.Y:02X} S=${self.cpu.S & 0xFF:02X} P={flags}")
+
+    def _format_drive_status(self) -> str:
+        """Format 1541 drive CPU status line.
+
+        Returns:
+            Formatted status string, or empty string if no drive attached
+        """
+        if not self.drive8 or not self.drive8.cpu:
+            return ""
+
+        from mos6502.flags import format_flags
+        from mos6502 import instructions
+
+        drive_cpu = self.drive8.cpu
+        flags = format_flags(drive_cpu._flags.value)
+        region = self.get_drive_pc_region()
+        pc = drive_cpu.PC
+
+        # Disassemble current instruction from drive memory
+        try:
+            b0 = self.drive8.memory.read(pc)
+            b1 = self.drive8.memory.read(pc + 1)
+            b2 = self.drive8.memory.read(pc + 2)
+
+            # Use the instruction set to get mnemonic and operand size
+            if b0 in instructions.InstructionSet.map:
+                inst_info = instructions.InstructionSet.map[b0]
+                try:
+                    num_bytes = int(inst_info.get("bytes", 1))
+                except (ValueError, TypeError):
+                    num_bytes = 1
+                assembler = inst_info.get("assembler", "???")
+                mnemonic = assembler.split()[0] if assembler != "???" else "???"
+                mode = inst_info.get("addressing", "")
+            elif b0 in instructions.OPCODE_LOOKUP:
+                opcode_obj = instructions.OPCODE_LOOKUP[b0]
+                func_name = opcode_obj.function
+                mnemonic = func_name.split("_")[0].upper()
+                if "implied" in func_name or "accumulator" in func_name:
+                    num_bytes = 1
+                elif "relative" in func_name or "immediate" in func_name or "zeropage" in func_name:
+                    num_bytes = 2
+                else:
+                    num_bytes = 3
+                mode = ""
+            else:
+                num_bytes = 1
+                mnemonic = "???"
+                mode = ""
+
+            # Build hex dump
+            hex_bytes = [f"{self.drive8.memory.read(pc + i):02X}"
+                        for i in range(min(num_bytes, 3))]
+            hex_str = " ".join(hex_bytes).ljust(8)
+
+            # Build operand display
+            if num_bytes == 1:
+                operand_str = ""
+            elif num_bytes == 2:
+                operand_str = f" ${b1:02X}"
+            else:
+                operand = (b2 << 8) | b1
+                operand_str = f" ${operand:04X}"
+
+            if mode:
+                inst_display = f"{hex_str}  {mnemonic}{operand_str}  ; {mode}"
+            else:
+                inst_display = f"{hex_str}  {mnemonic}{operand_str}"
+
+        except Exception:
+            inst_display = "???"
+
+        return (f"1541: Cycles: {drive_cpu.cycles_executed:,} | "
+                f"PC=${pc:04X}[{region}] {inst_display:20s} | "
+                f"A=${drive_cpu.A:02X} X=${drive_cpu.X:02X} "
+                f"Y=${drive_cpu.Y:02X} S=${drive_cpu.S & 0xFF:02X} P={flags}")
+
     @property
     def basic_ready(self) -> bool:
         """Return True if BASIC input loop has been reached."""
@@ -2059,38 +2387,20 @@ class C64:
                 _sys.stdout.write(char)
 
         # Always update status line (at row 29: 3 header + 25 screen + 1 border)
+        # Add extra row if drive is attached
         status_row = header_offset + rows + 2
-
-        # Get flag values using shared formatter
-        from mos6502.flags import format_flags
-        flags = format_flags(self.cpu._flags.value)
-
-        # Determine what's mapped at PC
-        pc = self.cpu.PC
-        region = self.get_pc_region()
-
-        # Disassemble current instruction
-        try:
-            inst_str = self.disassemble_instruction(pc)
-            inst_display = inst_str.strip()
-        except (KeyError, ValueError, IndexError):
-            # Fallback: just show opcode bytes if disassembly fails
-            try:
-                b0 = self.cpu.ram[pc]
-                b1 = self.cpu.ram[pc+1]
-                b2 = self.cpu.ram[pc+2]
-                inst_display = f"{b0:02X} {b1:02X} {b2:02X}  ???"
-            except IndexError:
-                inst_display = "???"
 
         # Move to status line and update it
         _sys.stdout.write(f"\033[{status_row};1H")
-        status = (f"Cycles: {self.cpu.cycles_executed:,} | "
-                f"PC=${self.cpu.PC:04X}[{region}] {inst_display:20s} | "
-                f"A=${self.cpu.A:02X} X=${self.cpu.X:02X} "
-                f"Y=${self.cpu.Y:02X} S=${self.cpu.S & 0xFF:02X} P={flags}")
+        status = self._format_cpu_status("C64")
         # Clear line and write status
         _sys.stdout.write("\033[K" + status)
+
+        # Add drive status line if drive is attached
+        drive_status = self._format_drive_status()
+        if drive_status:
+            _sys.stdout.write(f"\n\033[K" + drive_status)
+
         _sys.stdout.flush()
 
         # Clear dirty flags after rendering
@@ -2155,31 +2465,15 @@ class C64:
         # Bottom border
         _sys.stdout.write(border_ansi + " " * 44 + ANSI_RESET + "\n")
 
-        # CPU state
-        from mos6502.flags import format_flags
-        flags = format_flags(self.cpu._flags.value)
-        pc = self.cpu.PC
-        region = self.get_pc_region()
-
-        # Disassemble current instruction
-        try:
-            inst_str = self.disassemble_instruction(pc)
-            inst_display = inst_str.strip()
-        except (KeyError, ValueError, IndexError):
-            try:
-                b0 = self.cpu.ram[pc]
-                b1 = self.cpu.ram[pc+1]
-                b2 = self.cpu.ram[pc+2]
-                inst_display = f"{b0:02X} {b1:02X} {b2:02X}  ???"
-            except IndexError:
-                inst_display = "???"
-
-        # Status line
-        status = (f"Cycles: {self.cpu.cycles_executed:,} | "
-                f"PC=${pc:04X}[{region}] {inst_display:20s} | "
-                f"A=${self.cpu.A:02X} X=${self.cpu.X:02X} "
-                f"Y=${self.cpu.Y:02X} S=${self.cpu.S & 0xFF:02X} P={flags}")
+        # C64 CPU status line
+        status = self._format_cpu_status("C64")
         _sys.stdout.write(status + "\n")
+
+        # Drive status line (if drive is attached)
+        drive_status = self._format_drive_status()
+        if drive_status:
+            _sys.stdout.write(drive_status + "\n")
+
         _sys.stdout.flush()
 
     def _render_terminal_repl(self) -> None:
@@ -2296,36 +2590,17 @@ class C64:
         # Always update status line (at row 30: 3 header + 25 screen + 1 border + 1)
         status_row = header_offset + rows + 2
 
-        # Get flag values using shared formatter
-        from mos6502.flags import format_flags
-        flags = format_flags(self.cpu._flags.value)
-
-        # Determine what's mapped at PC
-        pc = self.cpu.PC
-        region = self.get_pc_region()
-
-        # Disassemble current instruction
-        try:
-            inst_str = self.disassemble_instruction(pc)
-            inst_display = inst_str.strip()
-        except (KeyError, ValueError, IndexError):
-            # Fallback: just show opcode bytes if disassembly fails
-            try:
-                b0 = self.cpu.ram[pc]
-                b1 = self.cpu.ram[pc+1]
-                b2 = self.cpu.ram[pc+2]
-                inst_display = f"{b0:02X} {b1:02X} {b2:02X}  ???"
-            except IndexError:
-                inst_display = "???"
-
         # Move to status line and update it
         _sys.stdout.write(f"\033[{status_row};1H")
-        status = (f"Cycles: {self.cpu.cycles_executed:,} | "
-                f"PC=${self.cpu.PC:04X}[{region}] {inst_display:20s} | "
-                f"A=${self.cpu.A:02X} X=${self.cpu.X:02X} "
-                f"Y=${self.cpu.Y:02X} S=${self.cpu.S & 0xFF:02X} P={flags}")
+        status = self._format_cpu_status("C64")
         # Clear line and write status
         _sys.stdout.write("\033[K" + status)
+
+        # Add drive status line if drive is attached
+        drive_status = self._format_drive_status()
+        if drive_status:
+            _sys.stdout.write(f"\n\033[K" + drive_status)
+
         _sys.stdout.flush()
 
         # Clear dirty flags after rendering
@@ -2406,12 +2681,18 @@ class C64:
             # pygame.K_POUND: (6, 0),    # £ (pound symbol on C64, no direct US keyboard equivalent)
             pygame.K_QUOTE: (7, 3),      # Map to '2' key - SHIFT+2 produces " (double quote) for BASIC strings
             pygame.K_ASTERISK: (6, 1),   # *
+            pygame.K_KP_MULTIPLY: (6, 1),  # * on numpad
             pygame.K_SEMICOLON: (6, 2),  # ;
             pygame.K_HOME: (6, 3),       # HOME/CLR
             # pygame.K_CLR: (6, 4),      # CLR (combined with HOME)
             pygame.K_EQUALS: (6, 5),     # =
             pygame.K_UP: (6, 6),         # ↑ (up arrow, mapped to up key)
             pygame.K_SLASH: (6, 7),      # /
+            # US keyboard Shift+number symbols mapped to C64 equivalents
+            # On US keyboard: Shift+8=*, Shift+9=(, Shift+0=)
+            # On C64: Shift+8=(, Shift+9=), * is separate key
+            pygame.K_LEFTPAREN: (3, 3),  # ( -> maps to '8' key (C64: Shift+8 = '(')
+            pygame.K_RIGHTPAREN: (4, 0), # ) -> maps to '9' key (C64: Shift+9 = ')')
 
             # Row 7
             pygame.K_1: (7, 0),
@@ -2473,8 +2754,31 @@ class C64:
                     log.info(f"*** JOYSTICK KEYDOWN: key={key_name}, direction=0x{direction:02X} ***")
                 return  # Don't process as keyboard key
 
-            if event.key in key_map:
-                row, col = key_map[event.key]
+            # US keyboard to C64 symbol remapping when SHIFT is held
+            # US keyboard: Shift+8=*, Shift+9=(, Shift+0=)
+            # C64 keyboard: Shift+8=(, Shift+9=), * is separate key
+            # Remap these to produce expected characters on C64
+            shift_held = bool(event.mod & (pygame.KMOD_LSHIFT | pygame.KMOD_RSHIFT))
+            remapped_key = event.key
+            remap_needs_shift = False
+            remap_suppress_shift = False
+            if shift_held:
+                if event.key == pygame.K_8:
+                    # US Shift+8 = * → C64 * key (must suppress shift!)
+                    remapped_key = pygame.K_ASTERISK
+                    remap_needs_shift = False
+                    remap_suppress_shift = True  # User is holding shift, but we want unshifted *
+                elif event.key == pygame.K_9:
+                    # US Shift+9 = ( → C64 Shift+8
+                    remapped_key = pygame.K_8
+                    remap_needs_shift = True
+                elif event.key == pygame.K_0:
+                    # US Shift+0 = ) → C64 Shift+9
+                    remapped_key = pygame.K_9
+                    remap_needs_shift = True
+
+            if remapped_key in key_map:
+                row, col = key_map[remapped_key]
 
                 # Track physical key state
                 self._pygame_keys_currently_pressed.add(event.key)
@@ -2484,9 +2788,16 @@ class C64:
                     self.cia1.press_key(row, col)
                 else:
                     # Buffer the key for injection with proper timing
-                    needs_shift = (event.key == pygame.K_QUOTE or
-                                   event.key == pygame.K_QUOTEDBL)
-                    self._buffer_pygame_key(row, col, needs_shift)
+                    # Some keys need SHIFT to produce the expected character on C64:
+                    # - Quote/double-quote: SHIFT+2 on C64
+                    # - Parentheses: SHIFT+8 for '(', SHIFT+9 for ')' on C64
+                    # - Remapped shifted number keys (set above)
+                    needs_shift = (remap_needs_shift or
+                                   event.key == pygame.K_QUOTE or
+                                   event.key == pygame.K_QUOTEDBL or
+                                   event.key == pygame.K_LEFTPAREN or
+                                   event.key == pygame.K_RIGHTPAREN)
+                    self._buffer_pygame_key(row, col, needs_shift, remap_suppress_shift)
 
                 if DEBUG_KEYBOARD:
                     petscii_key = self.cia1._get_key_name(row, col)
@@ -3435,13 +3746,21 @@ class C64:
                 still_pending.append((release_cycles, row, col))
         self._pending_key_releases = still_pending
 
-    def _buffer_pygame_key(self, row: int, col: int, needs_shift: bool = False) -> None:
+    def _buffer_pygame_key(self, row: int, col: int, needs_shift: bool = False,
+                            suppress_shift: bool = False) -> None:
         """Buffer a keypress from pygame for injection into CIA.
 
         Keys are buffered and injected one at a time with proper timing
         to ensure the KERNAL sees every keypress.
+
+        Args:
+            row: C64 keyboard matrix row
+            col: C64 keyboard matrix column
+            needs_shift: If True, press SHIFT along with this key
+            suppress_shift: If True, release SHIFT while pressing this key
+                           (for when user is holding shift but we want unshifted char)
         """
-        self._pygame_key_buffer.append((row, col, needs_shift))
+        self._pygame_key_buffer.append((row, col, needs_shift, suppress_shift))
 
     def _process_pygame_key_buffer(self) -> None:
         """Process the pygame key buffer, injecting keys into CIA.
@@ -3456,7 +3775,7 @@ class C64:
 
         # If we have a current injection in progress, check timing
         if self._pygame_current_injection is not None:
-            row, col, needs_shift, start_cycles, released = self._pygame_current_injection
+            row, col, needs_shift, suppress_shift, start_cycles, released = self._pygame_current_injection
 
             if not released:
                 # Key is being held - check if hold cycles elapsed
@@ -3465,8 +3784,14 @@ class C64:
                     self.cia1.release_key(row, col)
                     if needs_shift:
                         self.cia1.release_key(1, 7)  # Release SHIFT
+                    if suppress_shift:
+                        # Re-press shift if user is still holding it physically
+                        import pygame
+                        if pygame.K_LSHIFT in self._pygame_keys_currently_pressed or \
+                           pygame.K_RSHIFT in self._pygame_keys_currently_pressed:
+                            self.cia1.press_key(1, 7)
                     # Mark as released, record release cycle
-                    self._pygame_current_injection = (row, col, needs_shift, current_cycles, True)
+                    self._pygame_current_injection = (row, col, needs_shift, suppress_shift, current_cycles, True)
             else:
                 # Key is released - check if gap cycles elapsed
                 if current_cycles - start_cycles >= self._key_gap_cycles:
@@ -3475,13 +3800,15 @@ class C64:
 
         # If no current injection and buffer has keys, start next one
         if self._pygame_current_injection is None and self._pygame_key_buffer:
-            row, col, needs_shift = self._pygame_key_buffer.pop(0)
+            row, col, needs_shift, suppress_shift = self._pygame_key_buffer.pop(0)
             # Press the key
             if needs_shift:
                 self.cia1.press_key(1, 7)  # Press SHIFT
+            if suppress_shift:
+                self.cia1.release_key(1, 7)  # Release SHIFT even if physically held
             self.cia1.press_key(row, col)
             # Record injection start (not released yet)
-            self._pygame_current_injection = (row, col, needs_shift, current_cycles, False)
+            self._pygame_current_injection = (row, col, needs_shift, suppress_shift, current_cycles, False)
 
     def _handle_terminal_input(self, char: str) -> bool:
         """Handle a single character of terminal input.
@@ -3779,6 +4106,16 @@ def main() -> int | None:
         if args.cartridge:
             c64.load_cartridge(args.cartridge, args.cartridge_type)
             log.info(f"Cartridge type: {c64.cartridge_type}")
+
+        # Attach disk drive if not disabled
+        if not getattr(args, 'no_drive', False):
+            drive_rom = getattr(args, 'drive_rom', None)
+            disk_path = getattr(args, 'disk', None)
+            if c64.attach_drive(drive_rom_path=drive_rom, disk_path=disk_path):
+                if disk_path:
+                    log.info(f"Disk inserted: {disk_path.name}")
+            else:
+                log.info("No 1541 ROM found - disk drive disabled")
 
         # ROMs are automatically loaded in C64.__init__()
         # Reset CPU AFTER ROMs are loaded so reset vector can be read correctly

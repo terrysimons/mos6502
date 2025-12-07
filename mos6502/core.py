@@ -69,6 +69,8 @@ class MOS6502CPU(flags.ProcessorStatusFlagsInterface):
         'pc_callback',
         'pre_instruction_callback',
         'post_instruction_callback',
+        'pre_tick_callback',
+        'post_tick_callback',
         '_opcode_handler_cache',
     )
 
@@ -144,6 +146,14 @@ class MOS6502CPU(flags.ProcessorStatusFlagsInterface):
         # post_instruction_callback: Called after each instruction executes
         self.pre_instruction_callback: callable = None
         self.post_instruction_callback: callable = None
+
+        # Optional callbacks for tick (cycle consumption) hooks
+        # Useful for synchronizing external hardware (e.g., IEC bus)
+        # Signature: callback(cpu, cycles) -> None
+        # pre_tick_callback: Called before cycles are consumed
+        # post_tick_callback: Called after cycles are consumed
+        self.pre_tick_callback: callable = None
+        self.post_tick_callback: callable = None
 
         # Opcode -> handler cache for fast dispatch (per-instance since variant is per-instance)
         # Maps opcode byte directly to handler function, avoiding double dict lookup
@@ -234,11 +244,18 @@ class MOS6502CPU(flags.ProcessorStatusFlagsInterface):
         -------
             The number of cycles remaining (can be negative).
         """
+        # Pre-tick callback (for external hardware synchronization)
+        if self.pre_tick_callback:
+            self.pre_tick_callback(self, cycles)
+
         # Fast path: batch update when not doing per-cycle logging
         if not self.verbose_cycles:
             self.cycles_executed += cycles
             if self.cycles != INFINITE_CYCLES:
                 self.cycles -= cycles
+            # Post-tick callback
+            if self.post_tick_callback:
+                self.post_tick_callback(self, cycles)
             return self.cycles
 
         # Verbose path: per-cycle logging for debugging
@@ -256,6 +273,10 @@ class MOS6502CPU(flags.ProcessorStatusFlagsInterface):
                     f"TICK: Executed Cycles: {self.cycles_executed}, "
                     f"Remaining Cycles: INFINITE",
                 )
+
+        # Post-tick callback
+        if self.post_tick_callback:
+            self.post_tick_callback(self, cycles)
 
         return self.cycles
 

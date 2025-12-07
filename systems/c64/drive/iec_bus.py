@@ -1,0 +1,245 @@
+"""IEC Serial Bus Emulation.
+
+The IEC (IEEE-488 derived) serial bus connects the C64 to disk drives and
+other peripherals. It uses an open-collector design with active-low signaling.
+
+Bus Signals:
+    ATN (Attention): Controlled by C64, signals start of command
+    CLK (Clock): Timing for serial data transmission
+    DATA: Serial data line
+
+Signal Logic:
+    - All lines are active-low (0 = asserted, 1 = released)
+    - Open-collector: any device can pull a line low
+    - Lines go high only when ALL devices release them
+
+C64 Connection (via CIA2 Port A):
+    Bit 3: ATN OUT (directly to bus)
+    Bit 4: CLK OUT (to bus)
+    Bit 5: DATA OUT (to bus)
+    Bit 6: CLK IN (from bus)
+    Bit 7: DATA IN (from bus)
+
+1541 Connection (via VIA1 Port B):
+    Bit 0: DATA IN (from bus)
+    Bit 1: DATA OUT (to bus via inverter)
+    Bit 2: CLK IN (from bus)
+    Bit 3: CLK OUT (to bus via inverter)
+    Bit 7: ATN IN (from bus)
+
+The outputs pass through a 7406 inverter on both ends:
+    - C64: Port bit 1 -> inverter -> bus line LOW
+    - C64: Port bit 0 -> inverter -> bus line HIGH (released)
+    - 1541: Same logic applies
+
+Reference:
+- https://www.pagetable.com/?p=1135 (IEC bus timings)
+- https://www.c64-wiki.com/wiki/Serial_Port
+"""
+
+from __future__ import annotations
+
+import logging
+from typing import TYPE_CHECKING, List, Optional
+
+if TYPE_CHECKING:
+    from ..cia2 import CIA2
+    from .drive1541 import Drive1541
+
+log = logging.getLogger("iec_bus")
+
+
+class IECBus:
+    """IEC Serial Bus connecting C64 to peripheral devices.
+
+    This class manages the electrical state of the IEC bus, handling
+    the open-collector logic where any device can pull a line low.
+    """
+
+    def __init__(self) -> None:
+        """Initialize the IEC bus."""
+        # Connected devices
+        self.cia2: Optional[CIA2] = None  # C64's CIA2
+        self.drives: List[Drive1541] = []
+
+        # Bus line states (True = released/high, False = asserted/low)
+        # These represent the actual bus state after open-collector resolution
+        self.atn = True
+        self.clk = True
+        self.data = True
+
+        # Track what each device is driving (for open-collector logic)
+        # C64's output states (from CIA2 Port A)
+        self._c64_atn_out = False   # Port A bit 3
+        self._c64_clk_out = False   # Port A bit 4
+        self._c64_data_out = False  # Port A bit 5
+
+        # Cycle tracking for drive synchronization
+        # When the C64 writes to the IEC bus, we need to catch the drive up
+        # to the current C64 cycle count before updating bus state
+        self._last_drive_sync_cycle = 0
+
+    def connect_c64(self, cia2: CIA2) -> None:
+        """Connect C64's CIA2 to the bus.
+
+        Args:
+            cia2: C64's CIA2 chip
+        """
+        self.cia2 = cia2
+        log.info("C64 connected to IEC bus")
+
+    def connect_drive(self, drive: Drive1541) -> None:
+        """Connect a drive to the bus.
+
+        Args:
+            drive: 1541 drive to connect
+        """
+        if drive not in self.drives:
+            self.drives.append(drive)
+            drive.iec_bus = self  # Give drive reference to bus for immediate updates
+            log.info(f"Drive {drive.device_number} connected to IEC bus")
+
+    def disconnect_drive(self, drive: Drive1541) -> None:
+        """Disconnect a drive from the bus.
+
+        Args:
+            drive: 1541 drive to disconnect
+        """
+        if drive in self.drives:
+            self.drives.remove(drive)
+            drive.iec_bus = None
+            log.info(f"Drive {drive.device_number} disconnected from IEC bus")
+
+    def sync_drives(self) -> None:
+        """Synchronize drive CPUs to the current C64 cycle count.
+
+        This ensures drives are caught up before we sample/change bus state.
+        Called automatically by update() but can be called manually for
+        tighter synchronization.
+        """
+        if not self.cia2:
+            return
+
+        # Get current C64 cycle count (handle mock CIA2 without cpu attribute)
+        cpu = getattr(self.cia2, 'cpu', None)
+        if cpu is None:
+            return
+
+        c64_cycles = cpu.cycles_executed
+
+        # Calculate cycles elapsed since last sync
+        cycles_to_run = c64_cycles - self._last_drive_sync_cycle
+
+        if cycles_to_run > 0:
+            for drive in self.drives:
+                if drive.cpu is not None:
+                    # Run drive CPU for the elapsed cycles
+                    drive.tick(cycles_to_run)
+
+            self._last_drive_sync_cycle = c64_cycles
+
+    def update(self) -> None:
+        """Update bus state based on all connected devices.
+
+        This implements open-collector logic: the bus line is low if ANY
+        device is pulling it low, and high only if ALL devices release it.
+
+        Note: Drive CPU synchronization is now handled by the C64's
+        post_instruction_callback for cycle-accurate IEC timing.
+        """
+        if not self.cia2:
+            return
+
+        # Read C64's output from CIA2 Port A
+        # The output bits go through inverters, so:
+        # - Port bit = 1 -> inverter -> drives bus LOW
+        # - Port bit = 0 -> inverter -> releases bus (goes HIGH)
+        c64_port_a = self.cia2.port_a
+        c64_ddr_a = self.cia2.ddr_a
+
+        # Only consider bits that are configured as outputs
+        # ATN OUT is bit 3, CLK OUT is bit 4, DATA OUT is bit 5
+        self._c64_atn_out = bool(c64_ddr_a & 0x08) and bool(c64_port_a & 0x08)
+        self._c64_clk_out = bool(c64_ddr_a & 0x10) and bool(c64_port_a & 0x10)
+        self._c64_data_out = bool(c64_ddr_a & 0x20) and bool(c64_port_a & 0x20)
+
+        # Calculate bus state using open-collector logic
+        # ATN: Only C64 can drive ATN (drives can only read it)
+        # The inverter means: C64 bit=1 -> ATN line LOW (asserted)
+        self.atn = not self._c64_atn_out
+
+        # CLK: Both C64 and drives can drive this
+        # Start with C64's contribution (inverted)
+        clk_low = self._c64_clk_out
+
+        # Add each drive's contribution
+        for drive in self.drives:
+            # Drive CLK OUT is VIA1 Port B bit 3, also inverted
+            if drive.via1.ddrb & 0x08:  # If configured as output
+                if drive.via1.orb & 0x08:  # If driving low
+                    clk_low = True
+
+        self.clk = not clk_low
+
+        # DATA: Both C64 and drives can drive this
+        data_low = self._c64_data_out
+
+        for drive in self.drives:
+            # Drive DATA OUT is VIA1 Port B bit 1, inverted
+            if drive.via1.ddrb & 0x02:  # If configured as output
+                if drive.via1.orb & 0x02:  # If driving low
+                    data_low = True
+
+            # Drive ATN ACK (bit 4) - XORed with ATN before affecting DATA
+            # Reference: https://janderogee.com/projects/1541-III/files/pdf/IEC_disected-IEC_1541_info.pdf
+            # "Whenever ATN and ATNA have the same state (true/false), this will
+            # result in data being 'false' [released], but whenever both lines
+            # differ, data will be set to true [asserted/low]."
+            #
+            # IEC bus terminology: "true" = asserted (electrically LOW)
+            # - self.atn: False = ATN asserted (bus LOW, logically "true")
+            # - atna_bit: True = ATNA set (VIA bit HIGH, logically "true")
+            #
+            # The XOR compares logical states:
+            # - ATN logical state: (not self.atn) - True when ATN is asserted
+            # - ATNA logical state: atna_bit - True when ATNA bit is set
+            # - Same logical state → DATA released
+            # - Different logical state → DATA pulled low
+            #
+            # This provides automatic ATN acknowledge:
+            # 1. C64 asserts ATN (self.atn=False, logically "true")
+            # 2. Initially ATNA is clear, so XOR pulls DATA low (acknowledge)
+            # 3. 1541 sets ATNA to match ATN state
+            # 4. Now both "true", DATA automatically releases (device ready)
+            if drive.via1.ddrb & 0x10:  # If configured as output
+                atna_bit = bool(drive.via1.orb & 0x10)
+                atn_logical = not self.atn  # True when ATN is asserted
+                # Different logical states = DATA pulled low
+                if atna_bit != atn_logical:
+                    data_low = True
+
+        self.data = not data_low
+
+        # Update all drives with current bus state
+        for drive in self.drives:
+            drive.set_iec_atn(self.atn)
+            drive.set_iec_clk(self.clk)
+            drive.set_iec_data(self.data)
+
+    def get_c64_input(self) -> int:
+        """Get the bus state for CIA2 Port A input bits.
+
+        Returns:
+            Port A input value (bits 6-7: CLK IN, DATA IN)
+        """
+        # The input bits read the actual bus state
+        # Bit 6: CLK IN - reflects actual CLK line state
+        # Bit 7: DATA IN - reflects actual DATA line state
+        result = 0xFF  # Start with all high (released)
+
+        if not self.clk:
+            result &= ~0x40  # CLK is low
+        if not self.data:
+            result &= ~0x80  # DATA is low
+
+        return result

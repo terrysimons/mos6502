@@ -115,12 +115,23 @@ class CIA2:
         # Reference to other CIA for FLAG pin cross-triggering (IEC bus simulation)
         self.other_cia = None
 
+        # IEC bus reference (optional - if None, use loopback simulation)
+        self.iec_bus = None
+
         # Track last CPU cycle count for timer updates
         self.last_cycle_count = 0
 
     def set_other_cia(self, other_cia) -> None:
         """Set reference to the other CIA for FLAG pin cross-triggering."""
         self.other_cia = other_cia
+
+    def set_iec_bus(self, iec_bus) -> None:
+        """Set reference to the IEC bus for serial communication.
+
+        Args:
+            iec_bus: IECBus instance connecting C64 to drives
+        """
+        self.iec_bus = iec_bus
 
     def trigger_flag_interrupt(self) -> None:
         """Trigger FLAG pin interrupt (bit 4 of ICR).
@@ -155,32 +166,37 @@ class CIA2:
             # Bit 5: DATA OUT (directly to bus, directly to DATA IN via loopback)
             # Bit 6: CLK IN (directly from bus - reflects CLK OUT when no device)
             # Bit 7: DATA IN (directly from bus - reflects DATA OUT when no device)
-            #
-            # IEC bus loopback: With no devices connected, the input pins
-            # reflect the output pin state (active low, accent line)
-            # CLK OUT (bit 4) -> CLK IN (bit 6)
-            # DATA OUT (bit 5) -> DATA IN (bit 7)
 
             # Start with output bits from port_a, input bits pulled high
             result = (self.port_a & self.ddr_a) | (~self.ddr_a & 0xFF)
 
-            # IEC bus loopback for input bits (when configured as input)
-            # The IEC bus uses open-collector logic with a 7406 inverter on outputs:
-            # - Port bit = 1 → inverted → drives bus line LOW
-            # - Port bit = 0 → inverted → releases bus line (goes HIGH via pull-up)
-            # The input bits read the actual bus state directly.
-            # With no devices connected, outputs loop back to inputs:
-            # - CLK OUT (bit 4) = 1 → bus LOW → CLK IN (bit 6) = 0
-            # - CLK OUT (bit 4) = 0 → bus HIGH → CLK IN (bit 6) = 1
-            # Reference: https://www.c64-wiki.com/wiki/Serial_Port
-            if not (self.ddr_a & 0x40):  # Bit 6 is input
-                if self.port_a & 0x10:  # CLK OUT is 1 (driving bus LOW)
-                    result &= ~0x40  # CLK IN goes LOW
-                # else: CLK OUT is 0 (bus released), CLK IN stays HIGH (from pull-up)
-            if not (self.ddr_a & 0x80):  # Bit 7 is input
-                if self.port_a & 0x20:  # DATA OUT is 1 (driving bus LOW)
-                    result &= ~0x80  # DATA IN goes LOW
-                # else: DATA OUT is 0 (bus released), DATA IN stays HIGH (from pull-up)
+            if self.iec_bus is not None:
+                # Update IEC bus state before reading to ensure we see
+                # the drive's current output (especially DATA line for ATN ack)
+                self.iec_bus.update()
+                # Use real IEC bus state from connected devices
+                bus_input = self.iec_bus.get_c64_input()
+                # Apply bus state to input bits (6 and 7)
+                if not (self.ddr_a & 0x40):  # Bit 6 is input
+                    result = (result & ~0x40) | (bus_input & 0x40)
+                if not (self.ddr_a & 0x80):  # Bit 7 is input
+                    result = (result & ~0x80) | (bus_input & 0x80)
+
+            else:
+                # IEC bus loopback for input bits (when configured as input)
+                # No devices connected - outputs loop back to inputs.
+                # The IEC bus uses open-collector logic with a 7406 inverter:
+                # - Port bit = 1 → inverted → drives bus line LOW
+                # - Port bit = 0 → inverted → releases bus line (goes HIGH)
+                # Reference: https://www.c64-wiki.com/wiki/Serial_Port
+                if not (self.ddr_a & 0x40):  # Bit 6 is input
+                    if self.port_a & 0x10:  # CLK OUT is 1 (driving bus LOW)
+                        result &= ~0x40  # CLK IN goes LOW
+                    # else: CLK OUT is 0 (bus released), CLK IN stays HIGH
+                if not (self.ddr_a & 0x80):  # Bit 7 is input
+                    if self.port_a & 0x20:  # DATA OUT is 1 (driving bus LOW)
+                        result &= ~0x80  # DATA IN goes LOW
+                    # else: DATA OUT is 0 (bus released), DATA IN stays HIGH
 
             return result
 
@@ -312,7 +328,10 @@ class CIA2:
             self.port_a = value
             if old_port_a != value:
                 new_bank = self.get_vic_bank()
-                log.info(f"*** CIA2 Port A WRITE: ${value:02X}, VIC bank=${new_bank:04X} ***")
+                log.debug(f"CIA2 Port A WRITE: ${value:02X}, VIC bank=${new_bank:04X}")
+                # Immediately update IEC bus when serial lines change
+                if self.iec_bus is not None:
+                    self.iec_bus.update()
 
         # Port B ($DD01) - User port
         if reg == 0x01:
@@ -320,7 +339,11 @@ class CIA2:
 
         # Port A DDR ($DD02)
         if reg == 0x02:
+            old_ddr_a = self.ddr_a
             self.ddr_a = value
+            # DDR change affects IEC bus outputs
+            if old_ddr_a != value and self.iec_bus is not None:
+                self.iec_bus.update()
 
         # Port B DDR ($DD03)
         if reg == 0x03:
