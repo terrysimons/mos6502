@@ -4255,15 +4255,15 @@ def main() -> int | None:
             c64.load_cartridge(args.cartridge, args.cartridge_type)
             log.info(f"Cartridge type: {c64.cartridge_type}")
 
-        # Attach disk drive if not disabled
-        if not getattr(args, 'no_drive', False):
+        # Attach disk drive only if --disk is specified (and not disabled)
+        # This avoids the overhead of drive emulation when not needed
+        disk_path = getattr(args, 'disk', None)
+        if disk_path and not getattr(args, 'no_drive', False):
             drive_rom = getattr(args, 'drive_rom', None)
-            disk_path = getattr(args, 'disk', None)
             # Use synchronous mode if --sync-drive is specified, otherwise threaded (default)
             use_threaded = not getattr(args, 'sync_drive', False)
             if c64.attach_drive(drive_rom_path=drive_rom, disk_path=disk_path, threaded=use_threaded):
-                if disk_path:
-                    log.info(f"Disk inserted: {disk_path.name}")
+                log.info(f"Disk inserted: {disk_path.name}")
             else:
                 log.info("No 1541 ROM found - disk drive disabled")
 
