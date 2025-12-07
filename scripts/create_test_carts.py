@@ -644,6 +644,171 @@ def create_lightpen_test_cartridge() -> bytes:
     return bytes(crt_header) + bytes(chip_header) + rom
 
 
+def create_joystick_test_cartridge() -> bytes:
+    """Create a test cartridge for verifying joystick input on both ports.
+
+    The cartridge:
+    - Reads CIA1 Port B ($DC01) for joystick 1
+    - Reads CIA1 Port A ($DC00) for joystick 2
+    - Stores values in zero-page for test framework verification:
+      - $05: Joystick 1 bits (from $DC01)
+      - $06: Joystick 2 bits (from $DC00)
+    - Displays values on screen for visual verification
+    - Loops forever (test framework controls execution)
+
+    Memory map for test verification:
+      $02: Standard fail counter (not used by this cart, stays 0x00)
+      $05: Current Joystick 1 bits (updated each loop)
+      $06: Current Joystick 2 bits (updated each loop)
+
+    Joystick bit mapping (active low: 0 = pressed, 1 = released):
+    - Bit 0: Up
+    - Bit 1: Down
+    - Bit 2: Left
+    - Bit 3: Right
+    - Bit 4: Fire
+    Reference: https://www.c64-wiki.com/wiki/Joystick
+
+    Returns:
+        CRT file bytes
+    """
+    from c64.cartridges.rom_builder import (
+        TestROMBuilder,
+        text_to_screen_codes,
+        COLOR_BLUE,
+        COLOR_WHITE,
+        COLOR_YELLOW,
+        COLOR_CYAN,
+        COLOR_GREEN,
+        PERIPHERAL_TEST_ZP_JOY1,
+        PERIPHERAL_TEST_ZP_JOY2,
+    )
+    from mos6502.instructions import (
+        LDA_ABSOLUTE_0xAD,
+        STA_ZEROPAGE_0x85,
+        STA_ABSOLUTE_0x8D,
+        JMP_ABSOLUTE_0x4C,
+        LDA_IMMEDIATE_0xA9,
+        AND_IMMEDIATE_0x29,
+        LSR_ACCUMULATOR_0x4A,
+        ORA_IMMEDIATE_0x09,
+        CLC_IMPLIED_0x18,
+        ADC_IMMEDIATE_0x69,
+        CMP_IMMEDIATE_0xC9,
+        BCC_RELATIVE_0x90,
+        SBC_IMMEDIATE_0xE9,
+        BNE_RELATIVE_0xD0,
+    )
+
+    def emit_nibble_to_hex_screen_code(builder, screen_addr):
+        """Convert nibble in A (0-15) to C64 screen code and store to screen."""
+        builder.code.extend([
+            CMP_IMMEDIATE_0xC9, 0x0A,
+            BCC_RELATIVE_0x90, 0x04,
+            SBC_IMMEDIATE_0xE9, 0x09,
+            BNE_RELATIVE_0xD0, 0x02,
+            ADC_IMMEDIATE_0x69, 0x30,
+            STA_ABSOLUTE_0x8D, screen_addr & 0xFF, (screen_addr >> 8) & 0xFF,
+        ])
+
+    # Hardware addresses
+    CIA1_PRA = 0xDC00  # Port A - Joystick 2
+    CIA1_PRB = 0xDC01  # Port B - Joystick 1
+
+    builder = TestROMBuilder()
+    builder.emit_screen_init()
+    builder.emit_set_border_and_background(COLOR_BLUE)
+
+    # Display title
+    builder.emit_display_text("JOYSTICK TEST", line=1, color=COLOR_WHITE)
+    builder.emit_display_text("MOVE STICK AND FIRE", line=3, color=COLOR_CYAN)
+
+    # Display labels
+    builder.emit_display_text("JOY1:", line=6, color=COLOR_YELLOW, centered=False)
+    builder.emit_display_text("JOY2:", line=8, color=COLOR_YELLOW, centered=False)
+
+    # Mark start of main loop
+    builder.label("main_loop")
+
+    # Read joystick 1 (from $DC01) and store
+    builder.code.extend([
+        LDA_ABSOLUTE_0xAD, CIA1_PRB & 0xFF, (CIA1_PRB >> 8) & 0xFF,
+        STA_ZEROPAGE_0x85, PERIPHERAL_TEST_ZP_JOY1,
+    ])
+
+    # Read joystick 2 (from $DC00) and store
+    builder.code.extend([
+        LDA_ABSOLUTE_0xAD, CIA1_PRA & 0xFF, (CIA1_PRA >> 8) & 0xFF,
+        STA_ZEROPAGE_0x85, PERIPHERAL_TEST_ZP_JOY2,
+    ])
+
+    # Display Joystick 1 as hex (at screen position for line 6, column 6)
+    joy1_screen_addr = 0x0400 + (6 * 40) + 6
+    # High nibble
+    builder.code.extend([
+        LDA_ABSOLUTE_0xAD, PERIPHERAL_TEST_ZP_JOY1, 0x00,
+        LSR_ACCUMULATOR_0x4A,
+        LSR_ACCUMULATOR_0x4A,
+        LSR_ACCUMULATOR_0x4A,
+        LSR_ACCUMULATOR_0x4A,
+    ])
+    emit_nibble_to_hex_screen_code(builder, joy1_screen_addr)
+    # Low nibble
+    builder.code.extend([
+        LDA_ABSOLUTE_0xAD, PERIPHERAL_TEST_ZP_JOY1, 0x00,
+        AND_IMMEDIATE_0x29, 0x0F,
+    ])
+    emit_nibble_to_hex_screen_code(builder, joy1_screen_addr + 1)
+
+    # Display Joystick 2 as hex (at screen position for line 8, column 6)
+    joy2_screen_addr = 0x0400 + (8 * 40) + 6
+    # High nibble
+    builder.code.extend([
+        LDA_ABSOLUTE_0xAD, PERIPHERAL_TEST_ZP_JOY2, 0x00,
+        LSR_ACCUMULATOR_0x4A,
+        LSR_ACCUMULATOR_0x4A,
+        LSR_ACCUMULATOR_0x4A,
+        LSR_ACCUMULATOR_0x4A,
+    ])
+    emit_nibble_to_hex_screen_code(builder, joy2_screen_addr)
+    # Low nibble
+    builder.code.extend([
+        LDA_ABSOLUTE_0xAD, PERIPHERAL_TEST_ZP_JOY2, 0x00,
+        AND_IMMEDIATE_0x29, 0x0F,
+    ])
+    emit_nibble_to_hex_screen_code(builder, joy2_screen_addr + 1)
+
+    # Jump back to main loop
+    loop_addr = builder.labels["main_loop"]
+    builder.code.extend([
+        JMP_ABSOLUTE_0x4C, loop_addr & 0xFF, (loop_addr >> 8) & 0xFF,
+    ])
+
+    # Build the ROM
+    rom = builder.build_rom()
+
+    # Create CRT header
+    crt_header = bytearray(64)
+    crt_header[0:16] = b'C64 CARTRIDGE   '
+    crt_header[16:20] = (64).to_bytes(4, 'big')  # Header length
+    crt_header[20:22] = (0x0100).to_bytes(2, 'big')  # Version 1.0
+    crt_header[22:24] = (0).to_bytes(2, 'big')  # Hardware type 0 (normal)
+    crt_header[24] = 0  # EXROM line (active low, 0 = active)
+    crt_header[25] = 1  # GAME line (active low, 1 = inactive) -> 8K mode
+    crt_header[32:64] = b'JOYSTICK TEST'.ljust(32, b'\x00')
+
+    # CHIP packet
+    chip_header = bytearray(16)
+    chip_header[0:4] = b'CHIP'
+    chip_header[4:8] = (16 + len(rom)).to_bytes(4, 'big')
+    chip_header[8:10] = (0).to_bytes(2, 'big')  # Chip type (ROM)
+    chip_header[10:12] = (0).to_bytes(2, 'big')  # Bank number
+    chip_header[12:14] = (0x8000).to_bytes(2, 'big')  # Load address
+    chip_header[14:16] = len(rom).to_bytes(2, 'big')  # ROM size
+
+    return bytes(crt_header) + bytes(chip_header) + rom
+
+
 def main():
     """Generate all test cartridges."""
     fixtures_dir = project_root / "tests" / "fixtures" / "c64"
@@ -764,6 +929,12 @@ def main():
     lightpen_cart_path = peripheral_test_dir / "test_lightpen_input.crt"
     lightpen_cart_path.write_bytes(lightpen_cart)
     print(f"  - test_lightpen_input.crt")
+
+    # Joystick test cartridge
+    joystick_cart = create_joystick_test_cartridge()
+    joystick_cart_path = peripheral_test_dir / "test_joystick_input.crt"
+    joystick_cart_path.write_bytes(joystick_cart)
+    print(f"  - test_joystick_input.crt")
 
     print(f"  Output directory: {peripheral_test_dir}")
 

@@ -234,7 +234,21 @@ class CIA1:
             # Joystick 2 only uses bits 0-4, bits 5-7 are keyboard-only
             joy2_with_float = (self.joystick_2 & 0x1F) | 0xE0  # Joystick on bits 0-4, bits 5-7 high
             ext_combined = port_a_ext & joy2_with_float  # Combine keyboard rows and joystick
-            result = (self.port_a & self.ddr_a) | (ext_combined & ~self.ddr_a)
+
+            # IMPORTANT: Joystick switches use wired-AND (active low) - when pressed,
+            # they pull the line LOW regardless of DDR setting. The CIA cannot drive
+            # a line HIGH if the joystick is grounding it. This is why joystick 2
+            # works even when Port A is configured as outputs for keyboard scanning.
+            # Reference: https://www.c64-wiki.com/wiki/Joystick
+            cia_output = self.port_a & self.ddr_a  # CIA's driven output (for output bits)
+            external_input = ext_combined & ~self.ddr_a  # External input (for input bits)
+
+            # Joystick can override output bits (wired-AND: pressed switch pulls low)
+            joystick_override = joy2_with_float  # Joystick state for bits 0-4
+
+            # Final result: start with CIA output + external input, then AND with joystick
+            # The AND ensures that if joystick is pressed (bit=0), the result is 0
+            result = (cia_output | external_input) & joystick_override
             return result
 
         # Port B ($DC01) — keyboard matrix column sensing

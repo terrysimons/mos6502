@@ -35,6 +35,11 @@ from c64.cia1 import (
     MOUSE_LEFT_BUTTON,
     MOUSE_RIGHT_BUTTON,
     LIGHTPEN_BUTTON,
+    JOYSTICK_UP,
+    JOYSTICK_DOWN,
+    JOYSTICK_LEFT,
+    JOYSTICK_RIGHT,
+    JOYSTICK_FIRE,
 )
 from c64.cia2 import CIA2
 from c64.sid import SID
@@ -303,6 +308,18 @@ class C64:
             "--lightpen",
             action="store_true",
             help="Enable lightpen emulation using mouse position (pygame mode only, port 1)",
+        )
+        core_group.add_argument(
+            "--joystick",
+            action="store_true",
+            help="Enable keyboard joystick emulation (numpad or WASD+Space)",
+        )
+        core_group.add_argument(
+            "--joystick-port",
+            type=int,
+            choices=[1, 2],
+            default=2,
+            help="Joystick port for keyboard emulation (1 or 2, default: 2)",
         )
 
         # Program loading options
@@ -2416,6 +2433,26 @@ class C64:
             pygame.K_ESCAPE,                    # RUN/STOP
         }
 
+        # Keyboard-to-joystick mappings when joystick emulation is enabled
+        # Numpad: 8=Up, 2=Down, 4=Left, 6=Right, 0=Fire, 5=Fire (alt)
+        # Cursor keys: Up/Down/Left/Right arrows, Right Ctrl=Fire
+        joystick_key_map = {
+            # Numpad
+            pygame.K_KP8: JOYSTICK_UP,
+            pygame.K_KP2: JOYSTICK_DOWN,
+            pygame.K_KP4: JOYSTICK_LEFT,
+            pygame.K_KP6: JOYSTICK_RIGHT,
+            pygame.K_KP0: JOYSTICK_FIRE,
+            pygame.K_KP5: JOYSTICK_FIRE,      # Alt fire on numpad center
+            # Cursor keys (when joystick enabled, these become joystick instead of C64 cursor)
+            pygame.K_UP: JOYSTICK_UP,
+            pygame.K_DOWN: JOYSTICK_DOWN,
+            pygame.K_LEFT: JOYSTICK_LEFT,
+            pygame.K_RIGHT: JOYSTICK_RIGHT,
+            pygame.K_RCTRL: JOYSTICK_FIRE,    # Right Ctrl = Fire
+            pygame.K_KP_ENTER: JOYSTICK_FIRE, # Numpad Enter = Fire
+        }
+
         if event.type == pygame.KEYDOWN:
             # Log all key presses with key code and name
             key_name = pygame.key.name(event.key) if hasattr(pygame.key, 'name') else str(event.key)
@@ -2427,6 +2464,14 @@ class C64:
             except (ValueError, OverflowError):
                 ascii_char = f"<non-printable>"
                 ascii_code = event.key
+
+            # Handle joystick keys first (if joystick enabled)
+            if self._joystick_enabled and event.key in joystick_key_map:
+                direction = joystick_key_map[event.key]
+                self.set_joystick_direction(direction, True)
+                if DEBUG_KEYBOARD:
+                    log.info(f"*** JOYSTICK KEYDOWN: key={key_name}, direction=0x{direction:02X} ***")
+                return  # Don't process as keyboard key
 
             if event.key in key_map:
                 row, col = key_map[event.key]
@@ -2452,6 +2497,15 @@ class C64:
                     log.info(f"*** UNMAPPED KEYDOWN: pygame='{key_name}' (code={event.key}), ASCII='{ascii_char}' ***")
 
         elif event.type == pygame.KEYUP:
+            # Handle joystick keys first (if joystick enabled)
+            if self._joystick_enabled and event.key in joystick_key_map:
+                direction = joystick_key_map[event.key]
+                self.set_joystick_direction(direction, False)
+                if DEBUG_KEYBOARD:
+                    key_name = pygame.key.name(event.key) if hasattr(pygame.key, 'name') else str(event.key)
+                    log.info(f"*** JOYSTICK KEYUP: key={key_name}, direction=0x{direction:02X} ***")
+                return  # Don't process as keyboard key
+
             if event.key in key_map:
                 row, col = key_map[event.key]
 
@@ -3263,6 +3317,65 @@ class C64:
 
         self.cia1.joystick_1 = joystick
 
+    # =========================================================================
+    # Keyboard Joystick Emulation
+    # =========================================================================
+    # Maps keyboard keys to joystick directions and fire button.
+    # Supports both numpad (8/2/4/6/0) and WASD+Space layouts.
+    # Default port is 2 since most C64 games expect joystick in port 2.
+    #
+    # C64 joystick uses active-low logic (0 = pressed, 1 = released):
+    # - Bit 0: Up
+    # - Bit 1: Down
+    # - Bit 2: Left
+    # - Bit 3: Right
+    # - Bit 4: Fire
+    # Reference: https://www.c64-wiki.com/wiki/Joystick
+
+    _joystick_enabled: bool = False
+    _joystick_port: int = 2  # Default to port 2 (most common for C64 games)
+
+    def enable_joystick(self, enabled: bool = True, port: int = 2) -> None:
+        """Enable or disable keyboard joystick emulation.
+
+        When enabled, keyboard keys are mapped to joystick directions:
+        - Numpad: 8=Up, 2=Down, 4=Left, 6=Right, 0=Fire
+        - WASD: W=Up, S=Down, A=Left, D=Right, Space=Fire
+
+        Args:
+            enabled: Whether joystick emulation is enabled
+            port: Which joystick port to emulate (1 or 2, default: 2)
+        """
+        self._joystick_enabled = enabled
+        self._joystick_port = port
+        log.info(f"Keyboard joystick {'enabled' if enabled else 'disabled'} on port {port}")
+
+    def set_joystick_direction(self, direction: int, pressed: bool) -> None:
+        """Set a joystick direction or fire button state.
+
+        Args:
+            direction: Direction bit (JOYSTICK_UP, JOYSTICK_DOWN, etc.)
+            pressed: True if pressed, False if released
+        """
+        if not self._joystick_enabled:
+            return
+
+        if self._joystick_port == 1:
+            joystick = self.cia1.joystick_1
+        else:
+            joystick = self.cia1.joystick_2
+
+        # Active-low logic: 0 = pressed, 1 = released
+        if pressed:
+            joystick &= ~direction  # Clear bit (pressed)
+        else:
+            joystick |= direction   # Set bit (released)
+
+        if self._joystick_port == 1:
+            self.cia1.joystick_1 = joystick
+        else:
+            self.cia1.joystick_2 = joystick
+
     # Pending key releases for non-blocking terminal input
     # Each entry is (release_cycles, row, col) - uses CPU cycles, not wall-clock time
     _pending_key_releases: list = []
@@ -3718,6 +3831,13 @@ def main() -> int | None:
                 c64.enable_lightpen(enabled=True)
             else:
                 log.warning("Lightpen input only available in pygame mode")
+
+        # Enable keyboard joystick emulation if requested
+        if getattr(args, 'joystick', False):
+            c64.enable_joystick(
+                enabled=True,
+                port=getattr(args, 'joystick_port', 2)
+            )
 
         # In no-roms mode, log that we're running headless
         if args.no_roms:

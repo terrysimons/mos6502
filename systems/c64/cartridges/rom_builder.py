@@ -92,7 +92,9 @@ FAIL_COUNTER_ZP = 0x02
 # These are arbitrary locations we chose - not real C64 hardware addresses
 PERIPHERAL_TEST_ZP_X = 0x03       # X-axis value (POTX for mouse/paddle, LPX for lightpen)
 PERIPHERAL_TEST_ZP_Y = 0x04       # Y-axis value (POTY for mouse/paddle, LPY for lightpen)
-PERIPHERAL_TEST_ZP_BUTTONS = 0x05  # Button state (CIA joystick port bits)
+PERIPHERAL_TEST_ZP_BUTTONS = 0x05  # Button state (CIA joystick port 1 bits)
+PERIPHERAL_TEST_ZP_JOY1 = 0x05    # Joystick 1 state (alias for BUTTONS, same location)
+PERIPHERAL_TEST_ZP_JOY2 = 0x06    # Joystick 2 state (CIA Port A bits 0-4)
 
 # RAM address for bank-switch routine
 # $C000 is free RAM on C64 (between BASIC and I/O area)

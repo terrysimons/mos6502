@@ -52,9 +52,9 @@ class SID:
         # Paddle/mouse positions (0-255)
         # For 1351 mouse: values wrap around as mouse moves (relative motion)
         # For paddles: absolute position (0 = full left, 255 = full right)
-        # Default to 0x80 (mid-range) for diagnostic harness compatibility
-        self.pot_x = 0x80
-        self.pot_y = 0x80
+        # Default to 0xFF (no paddle connected = lines float high)
+        self.pot_x = 0xFF
+        self.pot_y = 0xFF
 
         # Mouse input enabled flag
         self.mouse_enabled = False
@@ -94,10 +94,9 @@ class SID:
             return self.pot_y
 
         if reg == 27:  # OSC3 ($D41B)
-            # Simple pseudo-random simulation for diagnostic compatibility
             # Real SID outputs high 8 bits of voice 3 waveform
-            # This gives a changing value on each read to simulate activity
-            self.osc3_output = (self.osc3_output * 1103515245 + 12345) & 0xFF
+            # Without actual synthesis, just return the stored value
+            # Software can set osc3_output directly for testing
             return self.osc3_output
 
         if reg == 28:  # ENV3 ($D41C)
