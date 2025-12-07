@@ -5,9 +5,9 @@ is called multiple times with CPUCycleExhaustionError between calls.
 """
 
 import pytest
-from pathlib import Path
 from mos6502 import errors
 from mos6502.core import MOS6502CPU, INFINITE_CYCLES
+from tests.c64.conftest import C64_ROMS_DIR, requires_c64_roms
 
 
 class TestCPUExecuteContinuation:
@@ -198,17 +198,8 @@ class TestCPUExecuteContinuation:
 class TestCPUExecuteContinuationWithC64:
     """Test execute() continuation with real C64 ROMs."""
 
-    @pytest.fixture
-    def c64_roms_dir(self):
-        """Get C64 ROMs directory if available."""
-        roms_dir = Path(__file__).parent / "fixtures" / "roms" / "c64"
-        if not roms_dir.exists():
-            pytest.skip("C64 ROMs not available")
-        if not (roms_dir / "kernal.901227-03.bin").exists():
-            pytest.skip("C64 KERNAL ROM not available")
-        return roms_dir
-
-    def test_c64_single_vs_multiple_execute(self, c64_roms_dir):
+    @requires_c64_roms
+    def test_c64_single_vs_multiple_execute(self):
         """C64 should behave same with single vs multiple execute calls."""
         from systems.c64 import C64
 
@@ -216,7 +207,7 @@ class TestCPUExecuteContinuationWithC64:
         chunk_size = 10000
 
         # Single execute
-        c64_single = C64(rom_dir=c64_roms_dir, display_mode='headless', video_chip='6569')
+        c64_single = C64(rom_dir=C64_ROMS_DIR, display_mode='headless', video_chip='6569')
         c64_single.cpu.reset()
         c64_single.cpu.periodic_callback = None  # Disable for clean test
         try:
@@ -225,7 +216,7 @@ class TestCPUExecuteContinuationWithC64:
             pass
 
         # Multiple executes
-        c64_multi = C64(rom_dir=c64_roms_dir, display_mode='headless', video_chip='6569')
+        c64_multi = C64(rom_dir=C64_ROMS_DIR, display_mode='headless', video_chip='6569')
         c64_multi.cpu.reset()
         c64_multi.cpu.periodic_callback = None
 
@@ -243,7 +234,8 @@ class TestCPUExecuteContinuationWithC64:
         assert c64_single.cpu.Y == c64_multi.cpu.Y, "Y mismatch"
         assert c64_single.cpu.S == c64_multi.cpu.S, "S mismatch"
 
-    def test_c64_frame_by_frame_execution(self, c64_roms_dir):
+    @requires_c64_roms
+    def test_c64_frame_by_frame_execution(self):
         """C64 should work correctly when executed frame-by-frame.
 
         Note: With atomic instructions, cycle-based execution doesn't guarantee
@@ -259,7 +251,7 @@ class TestCPUExecuteContinuationWithC64:
         total_cycles = cycles_per_frame * num_frames
 
         # Single execute
-        c64_single = C64(rom_dir=c64_roms_dir, display_mode='headless', video_chip='6569')
+        c64_single = C64(rom_dir=C64_ROMS_DIR, display_mode='headless', video_chip='6569')
         c64_single.cpu.reset()
         c64_single.cpu.periodic_callback = None
         try:
@@ -268,7 +260,7 @@ class TestCPUExecuteContinuationWithC64:
             pass
 
         # Frame-by-frame
-        c64_frames = C64(rom_dir=c64_roms_dir, display_mode='headless', video_chip='6569')
+        c64_frames = C64(rom_dir=C64_ROMS_DIR, display_mode='headless', video_chip='6569')
         c64_frames.cpu.reset()
         c64_frames.cpu.periodic_callback = None
 

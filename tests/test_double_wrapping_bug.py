@@ -149,8 +149,8 @@ class TestDoubleWrappingBug(unittest.TestCase):
         # between Python implementations (CPython vs PyPy), JIT warmup, and system load.
         # The important thing is that we're not doing unnecessary double-wrapping,
         # which is verified by the other tests in this class.
-        # We just log the result rather than asserting a specific threshold.
-        print(f"\nPerformance ratio (buggy/current): {slowdown:.2f}x")
+        # The slowdown variable is available for debugging if needed.
+        assert slowdown > 0  # Sanity check that timing worked
 
     def test_byte_isinstance_check_in_memoryunit_init(self):
         """
