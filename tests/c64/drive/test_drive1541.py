@@ -268,3 +268,173 @@ class TestDrive1541Reset:
         assert drive.current_track == 1
         assert drive.via1.ora == 0x00
         assert drive.via2.orb == 0x00
+
+
+class TestDrive1541SyncDetection:
+    """Test GCR sync detection with look-ahead.
+
+    The 1541 drive uses SYNC marks (10+ consecutive $FF bytes) to mark the
+    start of sector headers and data blocks. However, isolated $FF bytes
+    can naturally occur in GCR-encoded data - these should NOT be treated
+    as sync marks.
+
+    The fix uses look-ahead: when encountering $FF, peek at the next byte.
+    If next byte is also $FF, this is a sync mark; otherwise it's data.
+    """
+
+    def test_isolated_ff_byte_is_signaled(self):
+        """Isolated $FF byte in data should be signaled (not treated as sync)."""
+        from systems.c64.drive.gcr import GCRTrack
+
+        drive = Drive1541()
+        drive.motor_on = True
+
+        # Create minimal GCR track with isolated $FF surrounded by non-$FF
+        gcr_track = GCRTrack(1, 21, 3)
+        # Pattern: $55, $FF, $55 - the $FF is isolated data, not sync
+        gcr_track.data[0] = 0x55
+        gcr_track.data[1] = 0xFF  # Isolated $FF - should be signaled
+        gcr_track.data[2] = 0x55
+        gcr_track.byte_position = 0
+
+        drive.gcr_disk = type('MockGCRDisk', (), {'get_track': lambda self, t: gcr_track})()
+
+        # Track byte-ready signals
+        bytes_signaled = []
+        original_signal = drive._signal_byte_ready
+
+        def track_signal():
+            bytes_signaled.append(drive._last_gcr_byte)
+            original_signal()
+
+        drive._signal_byte_ready = track_signal
+
+        # Process enough cycles to read 3 bytes
+        cycles_per_byte = drive._cycles_per_byte[3]  # Speed zone 3
+        drive._update_gcr_read(cycles_per_byte * 3)
+
+        # All 3 bytes should be signaled (including the isolated $FF)
+        assert len(bytes_signaled) == 3
+        assert bytes_signaled == [0x55, 0xFF, 0x55]
+
+    def test_consecutive_ff_bytes_start_sync(self):
+        """Two or more consecutive $FF bytes should start a sync mark."""
+        from systems.c64.drive.gcr import GCRTrack
+
+        drive = Drive1541()
+        drive.motor_on = True
+
+        # Create GCR track with sync mark (consecutive $FF bytes)
+        gcr_track = GCRTrack(1, 21, 3)
+        # Pattern: $55, $FF, $FF, $FF, $52 - the $FF bytes are sync, $52 is first data
+        gcr_track.data[0] = 0x55
+        gcr_track.data[1] = 0xFF  # Sync start
+        gcr_track.data[2] = 0xFF  # Sync continue
+        gcr_track.data[3] = 0xFF  # Sync continue
+        gcr_track.data[4] = 0x52  # Header block marker (first byte after sync)
+        gcr_track.byte_position = 0
+
+        drive.gcr_disk = type('MockGCRDisk', (), {'get_track': lambda self, t: gcr_track})()
+
+        bytes_signaled = []
+        original_signal = drive._signal_byte_ready
+
+        def track_signal():
+            bytes_signaled.append(drive._last_gcr_byte)
+            original_signal()
+
+        drive._signal_byte_ready = track_signal
+
+        # Process enough cycles to read 5 bytes
+        cycles_per_byte = drive._cycles_per_byte[3]
+        drive._update_gcr_read(cycles_per_byte * 5)
+
+        # Only $55 and $52 should be signaled - the $FF bytes are sync (not signaled)
+        assert len(bytes_signaled) == 2
+        assert bytes_signaled == [0x55, 0x52]
+
+    def test_sync_state_cleared_on_first_non_ff(self):
+        """Sync state should be cleared when first non-$FF byte is encountered."""
+        from systems.c64.drive.gcr import GCRTrack
+
+        drive = Drive1541()
+        drive.motor_on = True
+
+        gcr_track = GCRTrack(1, 21, 3)
+        # Sync mark followed by data
+        gcr_track.data[0] = 0xFF
+        gcr_track.data[1] = 0xFF
+        gcr_track.data[2] = 0x55  # First data byte after sync
+        gcr_track.data[3] = 0xAA
+        gcr_track.byte_position = 0
+
+        drive.gcr_disk = type('MockGCRDisk', (), {'get_track': lambda self, t: gcr_track})()
+
+        bytes_signaled = []
+        original_signal = drive._signal_byte_ready
+
+        def track_signal():
+            bytes_signaled.append(drive._last_gcr_byte)
+            original_signal()
+
+        drive._signal_byte_ready = track_signal
+
+        cycles_per_byte = drive._cycles_per_byte[3]
+        drive._update_gcr_read(cycles_per_byte * 4)
+
+        # Only $55 and $AA should be signaled (sync bytes suppressed)
+        assert len(bytes_signaled) == 2
+        assert bytes_signaled == [0x55, 0xAA]
+        assert drive._sync_detected is False
+
+    def test_isolated_ff_does_not_set_sync_state(self):
+        """Isolated $FF byte should not set the sync_detected flag."""
+        from systems.c64.drive.gcr import GCRTrack
+
+        drive = Drive1541()
+        drive.motor_on = True
+
+        gcr_track = GCRTrack(1, 21, 3)
+        gcr_track.data[0] = 0x55
+        gcr_track.data[1] = 0xFF  # Isolated
+        gcr_track.data[2] = 0x55
+        gcr_track.byte_position = 0
+
+        drive.gcr_disk = type('MockGCRDisk', (), {'get_track': lambda self, t: gcr_track})()
+
+        cycles_per_byte = drive._cycles_per_byte[3]
+        drive._update_gcr_read(cycles_per_byte * 3)
+
+        # Sync should NOT be detected for isolated $FF
+        assert drive._sync_detected is False
+
+    def test_sync_via2_port_b_bit7(self):
+        """VIA2 Port B bit 7 should reflect sync state."""
+        from systems.c64.drive.gcr import GCRTrack
+
+        drive = Drive1541()
+        drive.motor_on = True
+
+        gcr_track = GCRTrack(1, 21, 3)
+        # Start with sync mark
+        gcr_track.data[0] = 0xFF
+        gcr_track.data[1] = 0xFF
+        gcr_track.data[2] = 0xFF
+        gcr_track.data[3] = 0x55  # End of sync
+        gcr_track.byte_position = 0
+
+        drive.gcr_disk = type('MockGCRDisk', (), {'get_track': lambda self, t: gcr_track})()
+
+        cycles_per_byte = drive._cycles_per_byte[3]
+
+        # Process first $FF (sync start)
+        drive._update_gcr_read(cycles_per_byte)
+        # VIA2 PB7 = 0 when sync detected (active low)
+        port_b = drive.via2.read(0x00)  # Port B register
+        assert (port_b & 0x80) == 0, "PB7 should be low during sync"
+
+        # Process until sync ends
+        drive._update_gcr_read(cycles_per_byte * 3)
+        # VIA2 PB7 = 1 when no sync (released)
+        port_b = drive.via2.read(0x00)
+        assert (port_b & 0x80) == 0x80, "PB7 should be high when not in sync"

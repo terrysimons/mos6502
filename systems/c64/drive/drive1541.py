@@ -93,15 +93,59 @@ class Drive1541Memory:
     """Memory subsystem for the 1541 drive.
 
     Handles the 1541's memory map including RAM, VIA chips, and ROM.
+    Uses a page table for fast address dispatch.
     """
+
+    # Page type constants for dispatch table
+    PAGE_UNMAPPED = 0
+    PAGE_RAM = 1
+    PAGE_VIA1 = 2
+    PAGE_VIA2 = 3
+    PAGE_ROM = 4
+
+    # Pre-built page table (256 entries, one per 256-byte page)
+    # This is a class variable since the memory map is the same for all 1541s
+    _PAGE_TABLE = None
+
+    @classmethod
+    def _build_page_table(cls) -> list:
+        """Build the 256-entry page table for address dispatch."""
+        table = [cls.PAGE_UNMAPPED] * 256
+
+        # RAM: $0000-$07FF (pages 0x00-0x07)
+        for page in range(0x00, 0x08):
+            table[page] = cls.PAGE_RAM
+
+        # VIA1: $1800-$1BFF (pages 0x18-0x1B)
+        for page in range(0x18, 0x1C):
+            table[page] = cls.PAGE_VIA1
+
+        # VIA2: $1C00-$1FFF (pages 0x1C-0x1F)
+        for page in range(0x1C, 0x20):
+            table[page] = cls.PAGE_VIA2
+
+        # ROM: $C000-$FFFF (pages 0xC0-0xFF)
+        for page in range(0xC0, 0x100):
+            table[page] = cls.PAGE_ROM
+
+        return table
 
     def __init__(self, drive: "Drive1541") -> None:
         self.drive = drive
         self.ram = bytearray(RAM_SIZE)
         self.rom = bytearray(ROM_SIZE)
 
+        # Initialize class-level page table on first instance
+        if Drive1541Memory._PAGE_TABLE is None:
+            Drive1541Memory._PAGE_TABLE = self._build_page_table()
+
+        # Cache page table as instance variable for faster access
+        self._page_table = Drive1541Memory._PAGE_TABLE
+
     def read(self, addr: int) -> int:
         """Read from 1541 memory.
+
+        Uses page table dispatch for fast address decoding.
 
         Args:
             addr: 16-bit address
@@ -110,30 +154,24 @@ class Drive1541Memory:
             Byte value at address
         """
         addr = addr & 0xFFFF
+        page_type = self._page_table[addr >> 8]
 
-        # RAM: $0000-$07FF (mirrored in entire 2KB space)
-        if addr < 0x0800:
+        if page_type == self.PAGE_RAM:
             return self.ram[addr]
-
-        # VIA1: $1800-$1BFF (mirrors every 16 bytes)
-        # VIA2: $1C00-$1FFF (mirrors every 16 bytes)
-        # Note: Check VIA2 first since its range is a subset that was being
-        # incorrectly caught by VIA1's broader range check
-        if 0x1C00 <= addr < 0x2000:
-            return self.drive.via2.read(addr)
-
-        if 0x1800 <= addr < 0x1C00:
-            return self.drive.via1.read(addr)
-
-        # ROM: $C000-$FFFF
-        if addr >= ROM_START:
+        elif page_type == self.PAGE_ROM:
             return self.rom[addr - ROM_START]
-
-        # Unmapped areas return open bus (usually $FF or last value)
-        return 0xFF
+        elif page_type == self.PAGE_VIA2:
+            return self.drive.via2.read(addr)
+        elif page_type == self.PAGE_VIA1:
+            return self.drive.via1.read(addr)
+        else:
+            # Unmapped areas return open bus (usually $FF)
+            return 0xFF
 
     def write(self, addr: int, value: int) -> None:
         """Write to 1541 memory.
+
+        Uses page table dispatch for fast address decoding.
 
         Args:
             addr: 16-bit address
@@ -141,24 +179,15 @@ class Drive1541Memory:
         """
         addr = addr & 0xFFFF
         value = value & 0xFF
+        page_type = self._page_table[addr >> 8]
 
-        # RAM: $0000-$07FF
-        if addr < 0x0800:
+        if page_type == self.PAGE_RAM:
             self.ram[addr] = value
-            return
-
-        # VIA2: $1C00-$1FFF (mirrors every 16 bytes)
-        # Note: Check VIA2 first - see read() comment
-        if 0x1C00 <= addr < 0x2000:
+        elif page_type == self.PAGE_VIA2:
             self.drive.via2.write(addr, value)
-            return
-
-        # VIA1: $1800-$1BFF (mirrors every 16 bytes)
-        if 0x1800 <= addr < 0x1C00:
+        elif page_type == self.PAGE_VIA1:
             self.drive.via1.write(addr, value)
-            return
-
-        # ROM writes are ignored
+        # ROM writes and unmapped writes are ignored
 
 
 class Drive1541:
@@ -232,6 +261,13 @@ class Drive1541:
         self._byte_ready_counter = 0
         self._last_gcr_byte = 0x00
         self._sync_detected = False
+        # Track consecutive $FF bytes for proper SYNC detection.
+        # Real hardware requires 10+ consecutive $FF bytes (80+ 1-bits) to detect SYNC.
+        # A single $FF within data should NOT trigger sync - that's just normal data
+        # where all 8 bits happen to be 1.
+        self._consecutive_ff_count = 0
+        # Minimum consecutive $FF bytes to trigger SYNC (real hardware uses ~10)
+        self._sync_threshold = 2
 
         # Cycles per GCR byte for each speed zone
         self._cycles_per_byte = {
@@ -397,6 +433,11 @@ class Drive1541:
         2. VIA2 CA1 (byte-ready) is pulsed to signal the CPU
         3. If SYNC bytes (0xFF) are detected, the SYNC flag is set
 
+        IMPORTANT: We must process ALL bytes that became ready during the
+        elapsed cycles. If we call tick(100) and bytes come every 26 cycles,
+        we need to process ~4 bytes. Otherwise, the CPU will run for 100
+        cycles expecting multiple bytes but only seeing one.
+
         Args:
             cycles: Number of CPU cycles elapsed
         """
@@ -416,28 +457,52 @@ class Drive1541:
         # Accumulate cycles
         self._byte_ready_counter += cycles
 
-        # Check if a new byte is ready
+        # Process ALL bytes that became ready
+        # This is critical for proper timing - if we only process one byte
+        # per tick() call, but the CPU runs for many cycles, bytes will be
+        # missed and data will be corrupted.
+        gcr_track = self.gcr_disk.get_track(track_int)
+        if not gcr_track:
+            return
+
         while self._byte_ready_counter >= cycles_per_byte:
             self._byte_ready_counter -= cycles_per_byte
 
             # Read next GCR byte from track
-            gcr_track = self.gcr_disk.get_track(track_int)
-            if gcr_track:
-                self._last_gcr_byte = gcr_track.read_byte()
+            self._last_gcr_byte = gcr_track.read_byte()
 
-                # Check for SYNC (0xFF)
-                if self._last_gcr_byte == 0xFF:
-                    self._sync_detected = True
+            # SYNC detection with look-ahead to handle isolated $FF bytes in data.
+            #
+            # Real 1541 hardware requires 10+ consecutive $FF bytes to trigger SYNC.
+            # A single $FF in data is normal and should NOT be treated as SYNC.
+            #
+            # Strategy:
+            # - If already in sync, any $FF continues sync (don't signal)
+            # - If NOT in sync, use look-ahead to check if $FF is isolated or sync start
+            # - For isolated $FF: treat as normal data - signal it
+            # - For sync mark start: set sync, don't signal
+            if self._last_gcr_byte == 0xFF:
+                if self._sync_detected:
+                    # Already in sync - this $FF continues the sync mark
+                    # Don't signal during sync
+                    pass
                 else:
-                    # SYNC ends when we see a non-0xFF byte
-                    if self._sync_detected:
-                        self._sync_detected = False
-                        # Signal byte-ready on first non-sync byte after sync
-                        # This triggers CA1 edge on VIA2
+                    # Not in sync - use look-ahead to determine if this is isolated or sync start
+                    next_byte = gcr_track.data[gcr_track.byte_position]
+                    if next_byte != 0xFF:
+                        # Next byte is NOT $FF - this $FF is isolated data
+                        # Don't set sync, just signal it like normal data
                         self._signal_byte_ready()
                     else:
-                        # Normal byte-ready during data
-                        self._signal_byte_ready()
+                        # Next byte IS $FF - this is start of a sync mark
+                        self._sync_detected = True
+                        # Don't signal during sync
+            else:
+                # Non-$FF byte
+                if self._sync_detected:
+                    # End of SYNC - signal first data byte
+                    self._sync_detected = False
+                self._signal_byte_ready()
 
     def _signal_byte_ready(self) -> None:
         """Signal that a new GCR byte is ready for the CPU.

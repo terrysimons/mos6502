@@ -6,7 +6,7 @@ import sys
 from pathlib import Path
 from typing import Optional
 
-from mos6502 import CPU, CPUVariant, errors
+from mos6502 import CPU, CPUVariant, errors, add_cpu_arguments
 from mos6502.core import INFINITE_CYCLES
 from mos6502.memory import Byte, Word
 
@@ -315,6 +315,9 @@ class C64:
             action="store_true",
             help="Enable keyboard joystick emulation (numpad or WASD+Space)",
         )
+        # CPU variant selection - uses core library function
+        add_cpu_arguments(parser, group_name="CPU Options")
+
         core_group.add_argument(
             "--joystick-port",
             type=int,
@@ -498,11 +501,12 @@ class C64:
             scale=args.scale,
             enable_irq=not getattr(args, 'no_irq', False),
             video_chip=args.video_chip,
+            cpu_variant=getattr(args, 'cpu', '6502'),
             verbose_cycles=getattr(args, 'verbose_cycles', False),
         )
 
 
-    def __init__(self, rom_dir: Path = Path("./roms"), display_mode: str = "pygame", scale: int = 2, enable_irq: bool = True, video_chip: str = "6569", verbose_cycles: bool = False) -> None:
+    def __init__(self, rom_dir: Path = Path("./roms"), display_mode: str = "pygame", scale: int = 2, enable_irq: bool = True, video_chip: str = "6569", cpu_variant: str = "6502", verbose_cycles: bool = False) -> None:
         """Initialize the C64 emulator.
 
         Arguments:
@@ -513,6 +517,9 @@ class C64:
             enable_irq: Enable IRQ injection (default: True)
             video_chip: VIC-II chip variant ("6569" for PAL, "6567R8" for NTSC,
                        "6567R56A" for old NTSC). PAL/NTSC are aliases.
+            cpu_variant: CPU variant to emulate ("6502", "6502A", "6502C", "65C02").
+                        Default is "6502" (NMOS 6502). Note: The C64 uses a 6510
+                        which is essentially a 6502 with I/O ports.
             verbose_cycles: Enable per-cycle CPU logging (default: False)
         """
         self.rom_dir = Path(rom_dir)
@@ -546,8 +553,9 @@ class C64:
                 self.display_mode = "terminal"
 
         # Initialize CPU (6510 is essentially a 6502 with I/O ports)
-        # We'll use NMOS 6502 as the base
-        self.cpu = CPU(cpu_variant=CPUVariant.NMOS_6502, verbose_cycles=verbose_cycles)
+        # Parse the cpu_variant string to get the enum
+        self._cpu_variant = CPUVariant.from_string(cpu_variant)
+        self.cpu = CPU(cpu_variant=self._cpu_variant, verbose_cycles=verbose_cycles)
 
         log.info(f"Initialized CPU: {self.cpu.variant_name}")
 
@@ -1640,6 +1648,59 @@ class C64:
         self.cpu.ram[self.KEYBOARD_BUFFER_SIZE] = len(petscii_text)
 
         log.info(f"Injected '{text.strip()}' into keyboard buffer ({len(petscii_text)} chars)")
+
+    def inject_keyboard_string(self, text: str, cycles_per_chunk: int = 100_000) -> None:
+        """Inject a string into the keyboard buffer, handling strings longer than 10 chars.
+
+        For strings longer than 10 characters, this method injects them in chunks
+        of 10 characters each, running the CPU between chunks to allow KERNAL
+        to process the buffer.
+
+        Arguments:
+            text: String to inject (any length, typically ending with \\r for RETURN)
+            cycles_per_chunk: CPU cycles to run between chunks (default 100,000)
+        """
+        from mos6502.errors import CPUCycleExhaustionError
+
+        # Convert to PETSCII
+        petscii_text = text.replace('\r', '\x0d').replace('\n', '\x0d')
+
+        # Process in chunks of 10 characters
+        chunk_size = 10
+        position = 0
+
+        while position < len(petscii_text):
+            # Wait for keyboard buffer to be empty
+            max_wait_cycles = 1_000_000
+            waited = 0
+            while int(self.cpu.ram[self.KEYBOARD_BUFFER_SIZE]) > 0 and waited < max_wait_cycles:
+                try:
+                    self.cpu.execute(cycles=10_000)
+                except CPUCycleExhaustionError:
+                    pass
+                waited += 10_000
+
+            if waited >= max_wait_cycles:
+                log.warning("Timeout waiting for keyboard buffer to empty")
+                break
+
+            # Inject next chunk
+            chunk = petscii_text[position:position + chunk_size]
+            for i, char in enumerate(chunk):
+                self.cpu.ram[self.KEYBOARD_BUFFER + i] = ord(char)
+            self.cpu.ram[self.KEYBOARD_BUFFER_SIZE] = len(chunk)
+
+            log.debug(f"Injected chunk {position//chunk_size + 1}: {len(chunk)} chars")
+            position += chunk_size
+
+            # Run CPU to process this chunk
+            if position < len(petscii_text):
+                try:
+                    self.cpu.execute(cycles=cycles_per_chunk)
+                except CPUCycleExhaustionError:
+                    pass
+
+        log.info(f"Injected '{text.strip()}' into keyboard buffer ({len(petscii_text)} chars total)")
 
     def reset(self) -> None:
         """Reset the C64 (CPU reset).
