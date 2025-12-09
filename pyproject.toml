@@ -30,6 +30,7 @@ nox = "*"
 nox-poetry = "*"
 pytest = "*"
 pytest-mock = "*"
+pytest-xdist = "*"
 ruff = "*"
 pyupgrade = "*"
 
@@ -166,6 +167,11 @@ fixable=[
 unfixable=[
 ]
 
+
+[tool.pytest.ini_options]
+markers = [
+    "slow: marks tests as slow (deselect with '-m \"not slow\"')",
+]
 
 [build-system]
 requires = ["poetry-core>=1.0.0"]

@@ -33,7 +33,7 @@ from __future__ import annotations
 
 import logging
 from pathlib import Path
-from typing import List, Optional, Tuple
+from typing import List, Optional, Tuple, Union
 from dataclasses import dataclass
 
 log = logging.getLogger("d64")
@@ -375,6 +375,16 @@ class D64Image:
 
         Returns:
             List of DirectoryEntry objects for all valid files
+
+        D64 directory format (per 32-byte entry):
+            $00-$01: Track/sector of next dir sector (only valid in entry 0)
+            $02: File type
+            $03-$04: Track/sector of first data sector
+            $05-$14: Filename (16 bytes, PETSCII, padded with $A0)
+            $15-$16: Side sector track/sector (REL files)
+            $17: REL record length
+            $18-$1D: Unused
+            $1E-$1F: File size in sectors (low/high byte)
         """
         entries = []
         track = DIR_TRACK
@@ -384,37 +394,23 @@ class D64Image:
             data = self.read_sector(track, sector)
 
             # Each sector has 8 directory entries of 32 bytes each
+            # Bytes 0-1 of sector are the link to next directory sector
             for i in range(8):
-                offset = i * 32 if i > 0 else 2  # First entry starts at byte 2
+                base = i * 32
 
-                if i == 0:
-                    # First entry: bytes 0-1 are track/sector link
-                    entry_data = data[2:34]
-                else:
-                    entry_data = data[i * 32:(i + 1) * 32]
-                    if len(entry_data) < 30:
-                        continue
-
-                file_type = entry_data[0] if i > 0 else data[2]
+                # File type is at offset 2 within each 32-byte entry
+                file_type = data[base + 2]
 
                 # Skip empty/deleted entries
                 if file_type == 0x00:
                     continue
 
-                # Parse entry
-                if i == 0:
-                    file_track = data[3]
-                    file_sector = data[4]
-                    filename_bytes = data[5:21]
-                    size_lo = data[28 + 2]
-                    size_hi = data[29 + 2]
-                else:
-                    base = i * 32
-                    file_track = data[base + 1]
-                    file_sector = data[base + 2]
-                    filename_bytes = data[base + 3:base + 19]
-                    size_lo = data[base + 28]
-                    size_hi = data[base + 29]
+                # Parse entry - all entries use the same layout
+                file_track = data[base + 3]
+                file_sector = data[base + 4]
+                filename_bytes = data[base + 5:base + 21]
+                size_lo = data[base + 30]
+                size_hi = data[base + 31]
 
                 # Convert filename (PETSCII with $A0 padding)
                 filename = ""
@@ -447,15 +443,28 @@ class D64Image:
 
         return entries
 
-    def read_file(self, entry: DirectoryEntry) -> bytes:
+    def read_file(self, entry: Union[DirectoryEntry, str]) -> bytes:
         """Read complete file data following the sector chain.
 
         Args:
-            entry: Directory entry for the file
+            entry: Directory entry for the file, or filename string
 
         Returns:
             Raw file data (for PRG, first 2 bytes are load address)
+
+        Raises:
+            FileNotFoundError: If filename string doesn't match any file
         """
+        # If a string was passed, look up the directory entry
+        if isinstance(entry, str):
+            filename = entry.upper()
+            for dir_entry in self.read_directory():
+                if dir_entry.filename == filename:
+                    entry = dir_entry
+                    break
+            else:
+                raise FileNotFoundError(f"File not found: {filename}")
+
         data = bytearray()
         track = entry.track
         sector = entry.sector

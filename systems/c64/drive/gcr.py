@@ -288,12 +288,18 @@ class GCRTrack:
     """
 
     # Track sizes in bytes (raw GCR data) for each speed zone
-    # These are approximate - real disks have slight variations
+    #
+    # Per-sector GCR structure:
+    #   SYNC: 10 bytes, Header GCR: 10 bytes, Header gap: 9 bytes,
+    #   SYNC: 10 bytes, Data GCR: 325 bytes, Data gap: 8 bytes
+    #   Total: 372 bytes per sector
+    #
+    # Buffer must hold: sectors_per_zone × 372 bytes
     TRACK_SIZE_ZONE = {
-        0: 6250,   # Zone 0 (tracks 31-35): 17 sectors
-        1: 6666,   # Zone 1 (tracks 25-30): 18 sectors
-        2: 7142,   # Zone 2 (tracks 18-24): 19 sectors
-        3: 7692,   # Zone 3 (tracks 1-17): 21 sectors
+        0: 6324,   # Zone 0 (tracks 31-35): 17 sectors × 372 = 6324
+        1: 6696,   # Zone 1 (tracks 25-30): 18 sectors × 372 = 6696
+        2: 7068,   # Zone 2 (tracks 18-24): 19 sectors × 372 = 7068
+        3: 7812,   # Zone 3 (tracks 1-17): 21 sectors × 372 = 7812
     }
 
     def __init__(self, track_num: int, num_sectors: int, speed_zone: int) -> None:

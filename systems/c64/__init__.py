@@ -381,10 +381,18 @@ class C64:
             action="store_true",
             help="Disable 1541 drive emulation (faster boot, no disk access)",
         )
-        drive_group.add_argument(
-            "--sync-drive",
+        drive_mode_group = drive_group.add_mutually_exclusive_group()
+        drive_mode_group.add_argument(
+            "--threaded-drive",
             action="store_true",
-            help="Use synchronous IEC bus (original implementation, for benchmarking)",
+            dest="threaded_drive",
+            help="Use threaded IEC bus for drive operations (default)",
+        )
+        drive_mode_group.add_argument(
+            "--synchronous-drive",
+            action="store_true",
+            dest="synchronous_drive",
+            help="Use synchronous IEC bus for drive operations (cycle-accurate)",
         )
 
         # Execution control options
@@ -4321,10 +4329,12 @@ def main() -> int | None:
         disk_path = getattr(args, 'disk', None)
         if disk_path and not getattr(args, 'no_drive', False):
             drive_rom = getattr(args, 'drive_rom', None)
-            # Use synchronous mode if --sync-drive is specified, otherwise threaded (default)
-            use_threaded = not getattr(args, 'sync_drive', False)
+            # Use threaded mode by default, synchronous if --synchronous-drive is specified
+            use_synchronous = getattr(args, 'synchronous_drive', False)
+            use_threaded = not use_synchronous
             if c64.attach_drive(drive_rom_path=drive_rom, disk_path=disk_path, threaded=use_threaded):
-                log.info(f"Disk inserted: {disk_path.name}")
+                mode_str = "synchronous" if use_synchronous else "threaded"
+                log.info(f"Disk inserted: {disk_path.name} (mode: {mode_str})")
             else:
                 log.info("No 1541 ROM found - disk drive disabled")
 

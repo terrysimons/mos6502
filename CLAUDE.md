@@ -26,3 +26,4 @@
 - Remember to switch back to bank 0 when needed for test carts.
 - Remember to audit the cartridge mappers and verify that all of that is correct before worrying about debugging the code.  Debugging CPU instructions is a last resort.
 - When debugging instrucitons you can use --no-throttle to run the emulator faster.
+- When you run pytest, run tests in parallel
