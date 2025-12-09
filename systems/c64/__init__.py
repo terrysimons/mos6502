@@ -1528,7 +1528,7 @@ class C64:
             actual_mhz = cycles_per_second / 1e6
             real_mhz = real_cpu_freq / 1e6
             title = (f"C64 Emulator - {region} ({chip}) - "
-                     f"{actual_mhz:.3f}MHz ({speedup:.1%} of {real_mhz:.3f})")
+                     f"{actual_mhz:.3f}MHz ({speedup:.1%} of {real_mhz:.3f}MHz)")
             pygame.display.set_caption(title)
 
     def _write_rom_to_memory(self, start_addr: int, rom_data: bytes) -> None:
