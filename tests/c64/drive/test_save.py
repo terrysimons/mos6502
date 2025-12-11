@@ -1019,3 +1019,204 @@ class TestSaveFillDisk:
 
             c64.inject_keyboard_string('NEW\r')
             run_cycles(c64, 500_000)
+
+
+@requires_fixtures
+class TestSaveZones:
+    """Test saving to different disk speed zones.
+
+    D64 disk format uses 4 speed zones with different sector counts:
+    - Zone 3: Tracks 1-17 (21 sectors/track) - fastest
+    - Zone 2: Tracks 18-24 (19 sectors/track) - Track 18 is directory
+    - Zone 1: Tracks 25-30 (18 sectors/track)
+    - Zone 0: Tracks 31-35 (17 sectors/track) - slowest
+
+    These tests verify save works correctly when file data is allocated
+    to different zones by pre-filling zone 3 to force allocation elsewhere.
+    """
+
+    @pytest.mark.parametrize("threaded_drive", [
+        pytest.param(False, id="synchronous-drive"),
+    ])
+    def test_save_to_zone_2(self, threaded_drive, tmp_path):
+        """Test saving when allocation is forced to zone 2 (tracks 18-24).
+
+        Pre-fills zone 3 (tracks 1-17) to force new file allocation to zone 2.
+        """
+        # Create a disk with zone 3 pre-filled
+        d64 = D64Image(None)
+
+        # Fill tracks 1-17 (zone 3) by marking them as allocated in BAM
+        # Read the BAM sector
+        bam = bytearray(d64.read_sector(18, 0))
+
+        # BAM format: bytes 4-143 are track entries (4 bytes per track)
+        # Each track entry: free count + 3 bytes bitmap
+        # Mark tracks 1-17 as fully allocated
+        for track in range(1, 18):
+            bam_offset = 4 + (track - 1) * 4
+            bam[bam_offset] = 0  # 0 free sectors
+            bam[bam_offset + 1] = 0  # All sectors allocated
+            bam[bam_offset + 2] = 0
+            bam[bam_offset + 3] = 0
+
+        d64.write_sector(18, 0, bytes(bam))
+
+        test_disk = tmp_path / "zone2test.d64"
+        d64.save(test_disk)
+
+        c64 = create_c64_with_disk(test_disk, threaded_drive=threaded_drive)
+        assert wait_for_ready(c64), "Failed to boot to BASIC"
+
+        # Create a small program (3 sectors to span zone 2)
+        lines = create_program_lines("Z2", 3)
+        for line in lines:
+            c64.inject_keyboard_string(f'{line}\r')
+            run_cycles(c64, 500_000)
+
+        original_size = get_loaded_program_size(c64)
+        basic_start = 0x0801
+        original_bytes = [c64.memory.read(basic_start + i) for i in range(32)]
+
+        # Save the file
+        c64.inject_keyboard_string('SAVE"ZONE2FILE",8\r')
+        success, error_number = wait_for_operation(c64, MAX_SAVE_CYCLES)
+
+        if error_number is None:
+            pytest.fail("SAVE timed out")
+        elif error_number != 0:
+            pytest.fail(f"SAVE failed with error {error_number:02d}")
+
+        # Clear and reload
+        c64.inject_keyboard_string('NEW\r')
+        run_cycles(c64, 500_000)
+
+        c64.inject_keyboard_string('LOAD"ZONE2FILE",8\r')
+        assert wait_for_load(c64), "LOAD timed out"
+
+        # Verify
+        loaded_size = get_loaded_program_size(c64)
+        assert loaded_size == original_size, \
+            f"Zone 2 save: size {loaded_size} != expected {original_size}"
+
+        loaded_bytes = [c64.memory.read(basic_start + i) for i in range(32)]
+        assert loaded_bytes == original_bytes, "Zone 2 save: content mismatch"
+
+    @pytest.mark.parametrize("threaded_drive", [
+        pytest.param(False, id="synchronous-drive"),
+    ])
+    def test_save_to_zone_1(self, threaded_drive, tmp_path):
+        """Test saving when allocation is forced to zone 1 (tracks 25-30).
+
+        Pre-fills zones 3 and 2 to force new file allocation to zone 1.
+        """
+        d64 = D64Image(None)
+        bam = bytearray(d64.read_sector(18, 0))
+
+        # Mark tracks 1-24 (zones 3 and 2) as fully allocated
+        for track in range(1, 25):
+            if track == 18:
+                continue  # Don't touch directory track
+            bam_offset = 4 + (track - 1) * 4
+            bam[bam_offset] = 0
+            bam[bam_offset + 1] = 0
+            bam[bam_offset + 2] = 0
+            bam[bam_offset + 3] = 0
+
+        d64.write_sector(18, 0, bytes(bam))
+
+        test_disk = tmp_path / "zone1test.d64"
+        d64.save(test_disk)
+
+        c64 = create_c64_with_disk(test_disk, threaded_drive=threaded_drive)
+        assert wait_for_ready(c64), "Failed to boot to BASIC"
+
+        lines = create_program_lines("Z1", 3)
+        for line in lines:
+            c64.inject_keyboard_string(f'{line}\r')
+            run_cycles(c64, 500_000)
+
+        original_size = get_loaded_program_size(c64)
+        basic_start = 0x0801
+        original_bytes = [c64.memory.read(basic_start + i) for i in range(32)]
+
+        c64.inject_keyboard_string('SAVE"ZONE1FILE",8\r')
+        success, error_number = wait_for_operation(c64, MAX_SAVE_CYCLES)
+
+        if error_number is None:
+            pytest.fail("SAVE timed out")
+        elif error_number != 0:
+            pytest.fail(f"SAVE failed with error {error_number:02d}")
+
+        c64.inject_keyboard_string('NEW\r')
+        run_cycles(c64, 500_000)
+
+        c64.inject_keyboard_string('LOAD"ZONE1FILE",8\r')
+        assert wait_for_load(c64), "LOAD timed out"
+
+        loaded_size = get_loaded_program_size(c64)
+        assert loaded_size == original_size, \
+            f"Zone 1 save: size {loaded_size} != expected {original_size}"
+
+        loaded_bytes = [c64.memory.read(basic_start + i) for i in range(32)]
+        assert loaded_bytes == original_bytes, "Zone 1 save: content mismatch"
+
+    @pytest.mark.parametrize("threaded_drive", [
+        pytest.param(False, id="synchronous-drive"),
+    ])
+    def test_save_to_zone_0(self, threaded_drive, tmp_path):
+        """Test saving when allocation is forced to zone 0 (tracks 31-35).
+
+        Pre-fills zones 3, 2, and 1 to force new file allocation to zone 0.
+        This is the slowest zone with 17 sectors per track.
+        """
+        d64 = D64Image(None)
+        bam = bytearray(d64.read_sector(18, 0))
+
+        # Mark tracks 1-30 (zones 3, 2, and 1) as fully allocated
+        for track in range(1, 31):
+            if track == 18:
+                continue  # Don't touch directory track
+            bam_offset = 4 + (track - 1) * 4
+            bam[bam_offset] = 0
+            bam[bam_offset + 1] = 0
+            bam[bam_offset + 2] = 0
+            bam[bam_offset + 3] = 0
+
+        d64.write_sector(18, 0, bytes(bam))
+
+        test_disk = tmp_path / "zone0test.d64"
+        d64.save(test_disk)
+
+        c64 = create_c64_with_disk(test_disk, threaded_drive=threaded_drive)
+        assert wait_for_ready(c64), "Failed to boot to BASIC"
+
+        lines = create_program_lines("Z0", 3)
+        for line in lines:
+            c64.inject_keyboard_string(f'{line}\r')
+            run_cycles(c64, 500_000)
+
+        original_size = get_loaded_program_size(c64)
+        basic_start = 0x0801
+        original_bytes = [c64.memory.read(basic_start + i) for i in range(32)]
+
+        c64.inject_keyboard_string('SAVE"ZONE0FILE",8\r')
+        success, error_number = wait_for_operation(c64, MAX_SAVE_CYCLES)
+
+        if error_number is None:
+            pytest.fail("SAVE timed out")
+        elif error_number != 0:
+            pytest.fail(f"SAVE failed with error {error_number:02d}")
+
+        c64.inject_keyboard_string('NEW\r')
+        run_cycles(c64, 500_000)
+
+        c64.inject_keyboard_string('LOAD"ZONE0FILE",8\r')
+        assert wait_for_load(c64), "LOAD timed out"
+
+        loaded_size = get_loaded_program_size(c64)
+        assert loaded_size == original_size, \
+            f"Zone 0 save: size {loaded_size} != expected {original_size}"
+
+        loaded_bytes = [c64.memory.read(basic_start + i) for i in range(32)]
+        assert loaded_bytes == original_bytes, "Zone 0 save: content mismatch"

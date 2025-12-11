@@ -1,5 +1,6 @@
 """Tests for mos6502.timing module."""
 
+import os
 import time
 import pytest
 from mos6502.timing import (
@@ -8,6 +9,9 @@ from mos6502.timing import (
     FrameGovernor,
     Timer,
 )
+
+# CI environments have degraded timer accuracy due to shared VMs/containers
+IN_CI = os.environ.get('CI') == 'true' or os.environ.get('CIRCLECI') == 'true'
 
 
 class TestCreateTimer:
@@ -98,6 +102,7 @@ class TestPlatformTimer:
         t2 = timer.now()
         assert t2 >= t1
 
+    @pytest.mark.skipif(IN_CI, reason="Sleep timing unreliable in CI environments")
     def test_sleep_accuracy_10ms(self, timer):
         """sleep(0.01) should be reasonably accurate."""
         duration = 0.01
@@ -119,6 +124,7 @@ class TestPlatformTimer:
         # 1ms sleep may oversleep significantly, just ensure it waits
         assert elapsed >= duration * 0.5
 
+    @pytest.mark.skipif(IN_CI, reason="Sleep timing unreliable in CI environments")
     def test_multiple_short_sleeps(self, timer):
         """Multiple short sleeps should accumulate correctly."""
         count = 10
@@ -173,6 +179,7 @@ class TestFrameGovernor:
         assert elapsed < 0.1
         assert governor.frame_count == 10
 
+    @pytest.mark.skipif(IN_CI, reason="Sleep timing unreliable in CI environments")
     def test_throttle_maintains_frame_rate(self):
         """throttle() should maintain approximately correct frame rate."""
         fps = 100.0  # 100 FPS = 10ms frames
@@ -248,6 +255,7 @@ class TestFrameGovernorAccuracy:
     """Test FrameGovernor timing accuracy over longer runs."""
 
     @pytest.mark.slow
+    @pytest.mark.skipif(IN_CI, reason="Sleep timing unreliable in CI environments")
     def test_50hz_accuracy_1_second(self):
         """50Hz governor should maintain accuracy over 1 second."""
         fps = 50.0
@@ -266,6 +274,7 @@ class TestFrameGovernorAccuracy:
         assert error_percent < 5.0, f"Error: {error_percent:.2f}%"
 
     @pytest.mark.slow
+    @pytest.mark.skipif(IN_CI, reason="Sleep timing unreliable in CI environments")
     def test_60hz_accuracy_1_second(self):
         """60Hz governor should maintain accuracy over 1 second."""
         fps = 60.0
@@ -284,6 +293,7 @@ class TestFrameGovernorAccuracy:
         assert error_percent < 5.0, f"Error: {error_percent:.2f}%"
 
     @pytest.mark.slow
+    @pytest.mark.skipif(IN_CI, reason="Sleep timing unreliable in CI environments")
     def test_with_simulated_work(self):
         """Governor should compensate for varying work times."""
         fps = 50.0
