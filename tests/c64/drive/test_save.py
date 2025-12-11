@@ -7,9 +7,12 @@ These tests verify:
 4. Sequential file I/O (OPEN/PRINT#/CLOSE)
 """
 
+import logging
 import shutil
 import tempfile
 import pytest
+
+logger = logging.getLogger(__name__)
 from pathlib import Path
 from systems.c64 import C64
 from mos6502 import errors
@@ -204,17 +207,17 @@ def read_drive_status(c64, max_cycles=MAX_LOAD_CYCLES):
 
     for cmd, desc in commands:
         if not inject_command(c64, cmd):
-            print(f"DEBUG: Failed to inject {desc} command")
+            logger.debug(f"Failed to inject {desc} command")
             return None
 
     # RUN the program
     if not inject_command(c64, 'RUN\r'):
-        print("DEBUG: Failed to inject RUN command")
+        logger.debug("Failed to inject RUN command")
         return None
 
     # Wait for program to complete (reading from drive takes time)
     if not wait_for_ready_prompt(c64, max_cycles):
-        print("DEBUG: Timeout waiting for RUN to complete")
+        logger.debug("Timeout waiting for RUN to complete")
         return None
 
     # Find the error number on screen (printed by ?A$)
@@ -241,13 +244,13 @@ def read_drive_status(c64, max_cycles=MAX_LOAD_CYCLES):
                 return error_code
 
     # Debug: show what's on screen if we couldn't find error code
-    print(f"DEBUG: Could not find error code. cursor_line={cursor_line}")
-    print("DEBUG: Screen content:")
+    logger.debug(f"Could not find error code. cursor_line={cursor_line}")
+    logger.debug("Screen content:")
     for line in range(max(0, cursor_line - 8), min(25, cursor_line + 2)):
         chars = [read_screen_char(c64, line, col) for col in range(40)]
         line_text = ''.join(chars).rstrip()
         if line_text:
-            print(f"  {line:2d}: '{line_text}'")
+            logger.debug(f"  {line:2d}: '{line_text}'")
 
     return None
 
@@ -268,10 +271,10 @@ def wait_for_operation(c64, max_cycles):
         - success is True when error 00 or 01 (OK or FILES SCRATCHED)
         - error_number is the drive status code (00-99) or None if timeout
     """
-    print(f"DEBUG wait_for_operation: waiting for ready prompt, max_cycles={max_cycles}")
+    logger.debug(f"wait_for_operation: waiting for ready prompt, max_cycles={max_cycles}")
     # First wait for BASIC to return to direct mode
     if not wait_for_ready_prompt(c64, max_cycles):
-        print("DEBUG wait_for_operation: timeout waiting for ready prompt!")
+        logger.debug("wait_for_operation: timeout waiting for ready prompt!")
         return False, None
 
     # Give BASIC time to fully settle into direct mode
