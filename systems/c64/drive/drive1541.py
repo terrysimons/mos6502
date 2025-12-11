@@ -219,8 +219,10 @@ class Drive1541:
         self.via1.port_b_read_callback = self._via1_port_b_read
         self.via1.port_b_write_callback = self._via1_port_b_write
         self.via2.port_a_read_callback = self._via2_port_a_read
+        self.via2.port_a_write_callback = self._via2_port_a_write
         self.via2.port_b_read_callback = self._via2_port_b_read
         self.via2.port_b_write_callback = self._via2_port_b_write
+        self.via2.pcr_write_callback = self._via2_pcr_write
         self.via1.irq_callback = self._via1_irq
         self.via2.irq_callback = self._via2_irq
 
@@ -276,6 +278,15 @@ class Drive1541:
             2: 28,
             3: 26,  # Fastest (inner tracks)
         }
+
+        # Write mode state
+        # The 1541 uses VIA2 CB2 (PCR bits 7-5) to control read/write mode:
+        #   CB2 LOW (bits 7-5 = 110) = Write mode
+        #   CB2 HIGH (bits 7-5 = 111) = Read mode
+        self._write_mode = False
+        self._gcr_write_buffer: list[int] = []
+        self._write_track = 0  # Track being written to
+        self._d64_path: Optional[Path] = None  # Path for persistence
 
         # ROM loaded flag
         self.rom_loaded = False
@@ -350,6 +361,7 @@ class Drive1541:
             disk_path: Path to D64 disk image
         """
         self.disk = D64Image(disk_path)
+        self._d64_path = disk_path  # Save path for persistence
         # Create GCR-encoded version for low-level emulation
         self.gcr_disk = GCRDisk(self.disk)
         log.info(f"Disk inserted: {self.disk.get_disk_name()} (ID: {self.disk.get_disk_id()})")
@@ -360,6 +372,7 @@ class Drive1541:
             log.info(f"Disk ejected: {self.disk.get_disk_name()}")
         self.disk = None
         self.gcr_disk = None
+        self._d64_path = None
 
     def reset(self) -> None:
         """Reset the drive to power-on state."""
@@ -467,6 +480,14 @@ class Drive1541:
 
         while self._byte_ready_counter >= cycles_per_byte:
             self._byte_ready_counter -= cycles_per_byte
+
+            if self._write_mode:
+                # In write mode: advance position and signal byte-ready
+                # The CPU needs byte-ready (V flag) to know when to send next byte
+                # The actual writes happen in _via2_port_a_write
+                gcr_track.byte_position = (gcr_track.byte_position + 1) % gcr_track.track_size
+                self._signal_byte_ready()
+                continue
 
             # Read next GCR byte from track
             self._last_gcr_byte = gcr_track.read_byte()
@@ -721,6 +742,71 @@ class Drive1541:
         # Bit 3: Drive LED
         self.led_on = bool(value & VIA2_LED)
 
+    def _via2_port_a_write(self, value: int) -> None:
+        """Handle VIA2 Port A write (GCR data to disk).
+
+        In write mode, the DOS writes GCR-encoded bytes to Port A, which are
+        then written to the disk at the current head position.
+
+        IMPORTANT: We write to the current position but do NOT advance it.
+        Position advances happen in _update_gcr_read based on disk rotation
+        timing. The write just happens at wherever the head is at that moment.
+
+        Args:
+            value: GCR byte to write (0-255)
+        """
+        if self._write_mode and self.motor_on and self.gcr_disk:
+            # Capture the GCR byte for later sector processing
+            self._gcr_write_buffer.append(value)
+            self._write_track = int(self.current_track)
+
+            # Write to GCR track at current position (without advancing)
+            # Position will be advanced by disk rotation timing
+            track = int(self.current_track)
+            gcr_track = self.gcr_disk.get_track(track)
+            if gcr_track:
+                gcr_track.data[gcr_track.byte_position] = value & 0xFF
+
+            # Check if we have enough data for a complete sector
+            # A full sector is ~360 GCR bytes (sync + header + gap + sync + data)
+            # Process when buffer gets large enough
+            if len(self._gcr_write_buffer) >= 360:
+                self._process_gcr_write_buffer()
+
+    def _via2_pcr_write(self, value: int) -> None:
+        """Handle VIA2 PCR write (read/write mode control).
+
+        The 1541 uses CB2 (PCR bits 7-5) to control read/write mode:
+        - CB2 LOW output (bits 7-5 = 110) = Write mode
+        - CB2 HIGH output (bits 7-5 = 111) = Read mode
+
+        The 1541 DOS toggles write mode rapidly to write each byte, so we
+        don't clear the buffer on each ENTER. Instead, we accumulate bytes
+        and only process when we have a complete sector.
+
+        Args:
+            value: PCR register value
+        """
+        # Extract CB2 control mode (bits 7-5)
+        cb2_mode = (value >> 5) & 0x07
+
+        # Check if transitioning to/from write mode
+        # CB2 mode 110 (0x06) = LOW output = Write mode
+        # CB2 mode 111 (0x07) = HIGH output = Read mode
+        new_write_mode = (cb2_mode == 0x06)
+
+        if new_write_mode != self._write_mode:
+            if new_write_mode:
+                # Entering write mode - just update state, don't clear buffer
+                # The DOS rapidly toggles write mode for each byte, so we
+                # accumulate bytes across multiple ENTER/EXIT transitions
+                self._write_track = int(self.current_track)
+            # Note: We don't process on EXIT anymore since the DOS toggles
+            # write mode per-byte. Processing happens periodically when we
+            # detect complete sectors in the buffer.
+
+            self._write_mode = new_write_mode
+
     def _via2_irq(self, active: bool) -> None:
         """Handle VIA2 IRQ.
 
@@ -757,6 +843,186 @@ class Drive1541:
 
         # Clamp to valid track range
         self.current_track = max(1, min(35, self.current_track))
+
+    # =========================================================================
+    # GCR Write Processing
+    # =========================================================================
+
+    def _process_gcr_write_buffer(self) -> None:
+        """Process the GCR write buffer to extract and save sector data.
+
+        This is called periodically as bytes accumulate. The buffer contains
+        raw GCR bytes written to the disk.
+
+        SAVE operations write data blocks only (not headers), so we look for
+        data block markers ($07 when decoded) rather than sync marks.
+
+        The format of captured writes is typically:
+        - Optional sync ($FF) and gap ($55) bytes
+        - GCR-encoded data block (325 bytes decoding to 260 bytes:
+          marker $07 + 256 data + checksum + 2 padding)
+
+        Since SAVE doesn't write headers, we get track/sector from the drive's
+        current position, which is set before writing begins.
+        """
+        from .gcr import decode_sector_data
+
+        # Data block is 325 GCR bytes, plus maybe some sync/gap padding
+        if len(self._gcr_write_buffer) < 330:
+            return
+
+        if not self.disk:
+            log.debug("1541: No disk to write to")
+            return
+
+        # Convert buffer to bytes for easier parsing
+        buffer = bytes(self._gcr_write_buffer)
+
+        sectors_written = 0
+        pos = 0
+        last_successful_pos = 0
+
+        # Only log first processing attempt to avoid spam
+        first_attempt = True
+
+        while pos < len(buffer) - 325:
+            # Skip only sync ($FF) bytes - NOT $55 which might be GCR data
+            # (The first GCR byte of a data block starting with $07 is often $55)
+            sync_skipped = 0
+            while pos < len(buffer) and buffer[pos] == 0xFF:
+                sync_skipped += 1
+                pos += 1
+
+            if sync_skipped > 0 and first_attempt:
+                log.debug(f"1541: Skipped {sync_skipped} sync bytes")
+
+            if pos + 325 > len(buffer):
+                # Not enough data for a complete data block
+                if first_attempt:
+                    log.debug(f"1541: Not enough data after sync/gap (need 325, have {len(buffer) - pos})")
+                break
+
+            # Try to decode the data block
+            # GCR data block: 325 bytes -> 260 decoded bytes
+            # Format: $07 marker + 256 data bytes + checksum + 2 padding
+            gcr_data = buffer[pos:pos + 325]
+
+            if first_attempt:
+                log.debug(f"1541: Trying to decode at pos {pos}, first 10 bytes: {gcr_data[:10].hex()}")
+                first_attempt = False
+
+            try:
+                data, data_checksum, data_valid = decode_sector_data(gcr_data)
+            except (ValueError, KeyError) as e:
+                # Not a valid data block at this position, try next byte
+                log.debug(f"1541: Decode failed at pos {pos}: {e}")
+                pos += 1
+                continue
+
+            if not data_valid:
+                log.debug(f"1541: Data checksum error at pos {pos}")
+                pos += 1
+                continue
+
+            # Successfully decoded a data block
+            # Use the track that was current when writing started
+            track = int(self._write_track)
+
+            # The decoded data includes chain pointers and content.
+            # The first 16 bytes tell us about the sector:
+            next_track = data[0]
+            next_sector = data[1]
+
+            # Create a hash of the data to avoid writing duplicate sectors
+            data_hash = hash(data)
+
+            if not hasattr(self, '_written_sectors'):
+                self._written_sectors = set()
+
+            # Only write if we haven't written this exact data before
+            if data_hash not in self._written_sectors:
+                self._written_sectors.add(data_hash)
+                log.debug(f"1541: New unique sector (hash={data_hash})")
+
+                # Find which sector this is by looking at the job queue
+                # The 1541 job queue at RAM $00-$05 contains job info
+                # Format: job code, track, sector, ...
+                # We can read the target track/sector from there
+                job_track = self.memory.ram[0x06] if hasattr(self, 'memory') else track
+                job_sector = self.memory.ram[0x07] if hasattr(self, 'memory') else 0
+
+                if job_track == 0:
+                    job_track = track
+
+                log.info(f"1541: Writing sector T{job_track} S{job_sector}: chain={next_track}/{next_sector}")
+                log.debug(f"1541: Data first 16 bytes: {data[:16].hex()}")
+
+                # Write to D64
+                try:
+                    self.disk.write_sector(job_track, job_sector, data)
+                    sectors_written += 1
+
+                    # Update GCR representation
+                    if self.gcr_disk:
+                        self.gcr_disk.update_sector(job_track, job_sector)
+                except Exception as e:
+                    log.error(f"1541: Failed to write sector: {e}")
+
+            pos += 325
+            last_successful_pos = pos
+
+        # Clear processed data and persist changes
+        if last_successful_pos > 0:
+            self._gcr_write_buffer = list(buffer[last_successful_pos:])
+
+        if sectors_written > 0:
+            self._persist_disk()
+            log.info(f"1541: Persisted {sectors_written} sectors")
+
+        # If buffer is huge but we can't decode anything, clear it
+        if len(self._gcr_write_buffer) > 2000 and sectors_written == 0:
+            log.warning(f"1541: Clearing large write buffer ({len(self._gcr_write_buffer)} bytes)")
+            self._gcr_write_buffer = []
+
+    def _find_sync_mark(self, buffer: bytes, start: int) -> int:
+        """Find the start of a sync mark in the buffer.
+
+        A sync mark is 5+ consecutive $FF bytes.
+
+        Args:
+            buffer: GCR data buffer
+            start: Position to start searching
+
+        Returns:
+            Position of first sync byte, or -1 if not found
+        """
+        from .gcr import SYNC_BYTE
+
+        consecutive = 0
+        for pos in range(start, len(buffer)):
+            if buffer[pos] == SYNC_BYTE:
+                if consecutive == 0:
+                    sync_start = pos
+                consecutive += 1
+                if consecutive >= 5:
+                    return sync_start
+            else:
+                consecutive = 0
+
+        return -1
+
+    def _persist_disk(self) -> None:
+        """Persist D64 changes to the disk file.
+
+        This is called after successful sector writes to ensure changes
+        are saved immediately, like a real floppy disk.
+        """
+        if self.disk and self._d64_path:
+            try:
+                self.disk.save(self._d64_path)
+                log.debug(f"1541: Saved disk to {self._d64_path}")
+            except OSError as e:
+                log.error(f"1541: Failed to save disk: {e}")
 
     # =========================================================================
     # Disk Access (for direct access, not through CPU)

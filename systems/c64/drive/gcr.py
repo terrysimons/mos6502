@@ -205,6 +205,84 @@ def gcr_decode_bytes(gcr_data: bytes) -> bytes:
     return bytes(result)
 
 
+def decode_sector_header(gcr_header: bytes) -> Tuple[int, int, int, bytes, bool]:
+    """Decode a GCR-encoded sector header block.
+
+    Header format (8 bytes after GCR decoding):
+        $08 (Header block ID)
+        Checksum (XOR of track, sector, ID1, ID2)
+        Sector
+        Track
+        ID2
+        ID1
+        $0F
+        $0F
+
+    Args:
+        gcr_header: 10 GCR-encoded header bytes
+
+    Returns:
+        Tuple of (track, sector, checksum, disk_id, checksum_valid)
+    """
+    if len(gcr_header) != 10:
+        raise ValueError(f"GCR header must be 10 bytes, got {len(gcr_header)}")
+
+    # Decode GCR to get 8 raw bytes
+    raw_header = gcr_decode_bytes(gcr_header)
+
+    block_id = raw_header[0]
+    checksum = raw_header[1]
+    sector = raw_header[2]
+    track = raw_header[3]
+    id2 = raw_header[4]
+    id1 = raw_header[5]
+    # raw_header[6] and raw_header[7] are padding ($0F)
+
+    disk_id = bytes([id1, id2])
+
+    # Verify checksum
+    expected_checksum = track ^ sector ^ id1 ^ id2
+    checksum_valid = (checksum == expected_checksum) and (block_id == HEADER_BLOCK_ID)
+
+    return (track, sector, checksum, disk_id, checksum_valid)
+
+
+def decode_sector_data(gcr_data: bytes) -> Tuple[bytes, int, bool]:
+    """Decode a GCR-encoded sector data block.
+
+    Data format (260 bytes after GCR decoding):
+        $07 (Data block ID)
+        256 data bytes
+        Checksum (XOR of all 256 data bytes)
+        $00
+        $00
+
+    Args:
+        gcr_data: 325 GCR-encoded data bytes
+
+    Returns:
+        Tuple of (256_data_bytes, checksum, checksum_valid)
+    """
+    if len(gcr_data) != 325:
+        raise ValueError(f"GCR data block must be 325 bytes, got {len(gcr_data)}")
+
+    # Decode GCR to get 260 raw bytes
+    raw_data = gcr_decode_bytes(gcr_data)
+
+    block_id = raw_data[0]
+    data = raw_data[1:257]  # 256 bytes of actual data
+    checksum = raw_data[257]
+    # raw_data[258] and raw_data[259] are padding ($00)
+
+    # Verify checksum
+    expected_checksum = 0
+    for byte in data:
+        expected_checksum ^= byte
+    checksum_valid = (checksum == expected_checksum) and (block_id == DATA_BLOCK_ID)
+
+    return (bytes(data), checksum, checksum_valid)
+
+
 def encode_sector_header(track: int, sector: int, disk_id: bytes) -> bytes:
     """Encode a sector header block.
 
@@ -432,6 +510,73 @@ class GCRTrack:
         while self.data[self.byte_position] == SYNC_BYTE:
             self.byte_position = (self.byte_position + 1) % self.track_size
 
+    def write_byte(self, value: int) -> None:
+        """Write a byte to the track at current position (advancing position).
+
+        Args:
+            value: GCR byte to write (0-255)
+        """
+        self.data[self.byte_position] = value & 0xFF
+        self.byte_position = (self.byte_position + 1) % self.track_size
+
+    def get_sector_offset(self, sector: int) -> int:
+        """Get the byte offset where a sector starts in the track data.
+
+        Each sector is 372 bytes:
+            SYNC: 10 bytes, Header GCR: 10 bytes, Header gap: 9 bytes,
+            SYNC: 10 bytes, Data GCR: 325 bytes, Data gap: 8 bytes
+
+        Args:
+            sector: Sector number (0 to num_sectors-1)
+
+        Returns:
+            Byte offset in track data
+        """
+        return sector * 372
+
+    def update_sector_from_d64(self, d64: D64Image, sector: int, disk_id: bytes) -> None:
+        """Update a single sector from D64 image data.
+
+        This re-encodes just the specified sector, preserving the rest of the track.
+        Used after a D64 write operation to keep GCR data in sync.
+
+        Args:
+            d64: D64 disk image
+            sector: Sector number to update
+            disk_id: 2-byte disk ID
+        """
+        # Read sector data from D64
+        sector_data = d64.read_sector(self.track_num, sector)
+
+        # Build the sector's GCR data
+        sector_gcr = bytearray()
+
+        # Add sync before header
+        sector_gcr.extend([SYNC_BYTE] * SYNC_LENGTH)
+
+        # Add GCR-encoded header
+        header_gcr = encode_sector_header(self.track_num, sector, disk_id)
+        sector_gcr.extend(header_gcr)
+
+        # Add gap between header and data
+        sector_gcr.extend([GAP_BYTE] * 9)
+
+        # Add sync before data block
+        sector_gcr.extend([SYNC_BYTE] * SYNC_LENGTH)
+
+        # Add GCR-encoded data block
+        data_gcr = encode_sector_data(bytes(sector_data))
+        sector_gcr.extend(data_gcr)
+
+        # Add inter-sector gap
+        sector_gcr.extend([GAP_BYTE] * 8)
+
+        # Copy to track at sector's offset
+        offset = self.get_sector_offset(sector)
+        for i, byte in enumerate(sector_gcr):
+            pos = (offset + i) % self.track_size
+            self.data[pos] = byte
+
 
 class GCRDisk:
     """Complete GCR-encoded disk for 1541 emulation.
@@ -508,3 +653,27 @@ class GCRDisk:
         if gcr_track:
             return gcr_track.is_sync()
         return False
+
+    def update_sector(self, track: int, sector: int) -> None:
+        """Update a sector's GCR data from the D64 image.
+
+        Call this after modifying a sector in the D64 to keep GCR in sync.
+
+        Args:
+            track: Track number (1-35)
+            sector: Sector number
+        """
+        gcr_track = self.get_track(track)
+        if gcr_track and self.d64:
+            gcr_track.update_sector_from_d64(self.d64, sector, self.disk_id)
+
+    def write_byte_at(self, track: int, value: int) -> None:
+        """Write a byte to the specified track at current position.
+
+        Args:
+            track: Track number (1-35)
+            value: GCR byte to write
+        """
+        gcr_track = self.get_track(track)
+        if gcr_track:
+            gcr_track.write_byte(value)

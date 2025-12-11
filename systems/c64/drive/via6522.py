@@ -160,6 +160,7 @@ class VIA6522:
         self.port_b_read_callback: Optional[Callable[[], int]] = None
         self.port_a_write_callback: Optional[Callable[[int], None]] = None
         self.port_b_write_callback: Optional[Callable[[int], None]] = None
+        self.pcr_write_callback: Optional[Callable[[int], None]] = None
         self.irq_callback: Optional[Callable[[bool], None]] = None
 
         # Cache last IRQ state to avoid redundant callbacks
@@ -363,6 +364,8 @@ class VIA6522:
             self.pcr = value
             self._update_ca2_output()
             self._update_cb2_output()
+            if self.pcr_write_callback:
+                self.pcr_write_callback(value)
 
         elif reg == REG_IFR:
             # Writing 1 to a bit clears that interrupt flag
