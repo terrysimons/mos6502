@@ -1,0 +1,296 @@
+# CircleCI Multi-OS Test Configuration
+# Tests on Linux (Ubuntu), macOS (Apple Silicon), and Windows using PyPy 3.11
+version: 2.1
+
+orbs:
+  win: circleci/windows@5.0
+
+# PyPy 3.11 v7.3.20 download URLs
+# Source: https://pypy.org/download.html
+parameters:
+  pypy-version:
+    type: string
+    default: "7.3.20"
+  pypy-python-version:
+    type: string
+    default: "3.11"
+
+jobs:
+  test-linux:
+    machine:
+      image: ubuntu-2204:current
+    resource_class: medium
+    environment:
+      PYPY_URL: "https://downloads.python.org/pypy/pypy3.11-v7.3.20-linux64.tar.bz2"
+      POETRY_HOME: "/opt/poetry"
+    steps:
+      - checkout
+
+      # Restore cached PyPy installation
+      - restore_cache:
+          keys:
+            - pypy-linux-v<< pipeline.parameters.pypy-version >>
+
+      # Install PyPy if not cached
+      - run:
+          name: Install PyPy 3.11
+          command: |
+            if [ ! -d "/opt/pypy" ]; then
+              echo "Downloading PyPy..."
+              curl -L -o pypy.tar.bz2 "$PYPY_URL"
+              tar -xjf pypy.tar.bz2
+              sudo mv pypy3.11-* /opt/pypy
+              rm pypy.tar.bz2
+            fi
+            echo 'export PATH="/opt/pypy/bin:$PATH"' >> "$BASH_ENV"
+
+      # Save PyPy to cache
+      - save_cache:
+          key: pypy-linux-v<< pipeline.parameters.pypy-version >>
+          paths:
+            - /opt/pypy
+
+      # Restore cached Poetry installation
+      - restore_cache:
+          keys:
+            - poetry-linux-v1
+
+      # Install Poetry
+      - run:
+          name: Install Poetry
+          command: |
+            if [ ! -d "$POETRY_HOME" ]; then
+              echo "Installing Poetry..."
+              curl -sSL https://install.python-poetry.org | pypy3 -
+            fi
+            echo "export PATH=\"$POETRY_HOME/bin:\$PATH\"" >> "$BASH_ENV"
+
+      # Save Poetry to cache
+      - save_cache:
+          key: poetry-linux-v1
+          paths:
+            - /opt/poetry
+
+      # Restore cached virtualenv
+      - restore_cache:
+          keys:
+            - venv-linux-{{ checksum "poetry.lock" }}
+            - venv-linux-
+
+      # Configure Poetry and install dependencies
+      - run:
+          name: Install dependencies
+          command: |
+            poetry config virtualenvs.in-project true
+            poetry install --no-interaction --no-ansi
+
+      # Save virtualenv to cache
+      - save_cache:
+          key: venv-linux-{{ checksum "poetry.lock" }}
+          paths:
+            - .venv
+
+      # Run linting
+      - run:
+          name: Run ruff linter
+          command: poetry run ruff check mos6502 tests systems
+
+      # Run tests
+      - run:
+          name: Run pytest
+          command: poetry run pytest tests systems -n auto
+
+  test-macos:
+    macos:
+      xcode: "15.4.0"
+    resource_class: m4pro.medium
+    environment:
+      PYPY_URL: "https://downloads.python.org/pypy/pypy3.11-v7.3.20-macos_arm64.tar.bz2"
+      POETRY_HOME: "/opt/poetry"
+    steps:
+      - checkout
+
+      # Restore cached PyPy installation
+      - restore_cache:
+          keys:
+            - pypy-macos-v<< pipeline.parameters.pypy-version >>
+
+      # Install PyPy if not cached
+      - run:
+          name: Install PyPy 3.11
+          command: |
+            if [ ! -d "/opt/pypy" ]; then
+              echo "Downloading PyPy..."
+              curl -L -o pypy.tar.bz2 "$PYPY_URL"
+              tar -xjf pypy.tar.bz2
+              sudo mv pypy3.11-* /opt/pypy
+              rm pypy.tar.bz2
+            fi
+            echo 'export PATH="/opt/pypy/bin:$PATH"' >> "$BASH_ENV"
+
+      # Save PyPy to cache
+      - save_cache:
+          key: pypy-macos-v<< pipeline.parameters.pypy-version >>
+          paths:
+            - /opt/pypy
+
+      # Restore cached Poetry installation
+      - restore_cache:
+          keys:
+            - poetry-macos-v1
+
+      # Install Poetry
+      - run:
+          name: Install Poetry
+          command: |
+            if [ ! -d "$POETRY_HOME" ]; then
+              echo "Installing Poetry..."
+              curl -sSL https://install.python-poetry.org | pypy3 -
+            fi
+            echo "export PATH=\"$POETRY_HOME/bin:\$PATH\"" >> "$BASH_ENV"
+
+      # Save Poetry to cache
+      - save_cache:
+          key: poetry-macos-v1
+          paths:
+            - /opt/poetry
+
+      # Restore cached virtualenv
+      - restore_cache:
+          keys:
+            - venv-macos-{{ checksum "poetry.lock" }}
+            - venv-macos-
+
+      # Configure Poetry and install dependencies
+      - run:
+          name: Install dependencies
+          command: |
+            poetry config virtualenvs.in-project true
+            poetry install --no-interaction --no-ansi
+
+      # Save virtualenv to cache
+      - save_cache:
+          key: venv-macos-{{ checksum "poetry.lock" }}
+          paths:
+            - .venv
+
+      # Run linting
+      - run:
+          name: Run ruff linter
+          command: poetry run ruff check mos6502 tests systems
+
+      # Run tests
+      - run:
+          name: Run pytest
+          command: poetry run pytest tests systems -n auto
+
+  test-windows:
+    executor:
+      name: win/default
+      size: medium
+    environment:
+      PYPY_URL: "https://downloads.python.org/pypy/pypy3.11-v7.3.20-win64.zip"
+      POETRY_HOME: "C:\\poetry"
+    steps:
+      - checkout
+
+      # Restore cached PyPy installation
+      - restore_cache:
+          keys:
+            - pypy-windows-v<< pipeline.parameters.pypy-version >>
+
+      # Install VC Runtime (required for PyPy on Windows)
+      - run:
+          name: Install VC Runtime
+          command: choco install vcredist140 -y
+          shell: powershell.exe
+
+      # Install PyPy if not cached
+      - run:
+          name: Install PyPy 3.11
+          command: |
+            if (-not (Test-Path "C:\pypy")) {
+              Write-Host "Downloading PyPy..."
+              Invoke-WebRequest -Uri $env:PYPY_URL -OutFile pypy.zip
+              Expand-Archive -Path pypy.zip -DestinationPath C:\
+              Get-ChildItem C:\ -Filter "pypy3.11-*" | Rename-Item -NewName "pypy"
+              Remove-Item pypy.zip
+            }
+            # Add to PATH for this step and subsequent steps
+            $env:PATH = "C:\pypy;$env:PATH"
+            [Environment]::SetEnvironmentVariable("PATH", "C:\pypy;$env:PATH", "User")
+          shell: powershell.exe
+
+      # Save PyPy to cache
+      - save_cache:
+          key: pypy-windows-v<< pipeline.parameters.pypy-version >>
+          paths:
+            - C:\pypy
+
+      # Restore cached Poetry installation
+      - restore_cache:
+          keys:
+            - poetry-windows-v1
+
+      # Install Poetry
+      - run:
+          name: Install Poetry
+          command: |
+            $env:PATH = "C:\pypy;$env:PATH"
+            if (-not (Test-Path $env:POETRY_HOME)) {
+              Write-Host "Installing Poetry..."
+              (Invoke-WebRequest -Uri https://install.python-poetry.org -UseBasicParsing).Content | pypy3 -
+            }
+            $env:PATH = "$env:POETRY_HOME\bin;$env:PATH"
+            [Environment]::SetEnvironmentVariable("PATH", "$env:POETRY_HOME\bin;C:\pypy;$env:PATH", "User")
+          shell: powershell.exe
+
+      # Save Poetry to cache
+      - save_cache:
+          key: poetry-windows-v1
+          paths:
+            - C:\poetry
+
+      # Restore cached virtualenv
+      - restore_cache:
+          keys:
+            - venv-windows-{{ checksum "poetry.lock" }}
+            - venv-windows-
+
+      # Configure Poetry and install dependencies
+      - run:
+          name: Install dependencies
+          command: |
+            $env:PATH = "$env:POETRY_HOME\bin;C:\pypy;$env:PATH"
+            poetry config virtualenvs.in-project true
+            poetry install --no-interaction --no-ansi
+          shell: powershell.exe
+
+      # Save virtualenv to cache
+      - save_cache:
+          key: venv-windows-{{ checksum "poetry.lock" }}
+          paths:
+            - .venv
+
+      # Run linting
+      - run:
+          name: Run ruff linter
+          command: |
+            $env:PATH = "$env:POETRY_HOME\bin;C:\pypy;$env:PATH"
+            poetry run ruff check mos6502 tests systems
+          shell: powershell.exe
+
+      # Run tests
+      - run:
+          name: Run pytest
+          command: |
+            $env:PATH = "$env:POETRY_HOME\bin;C:\pypy;$env:PATH"
+            poetry run pytest tests systems -n auto
+          shell: powershell.exe
+
+workflows:
+  test:
+    jobs:
+      - test-linux
+      - test-macos
+      - test-windows
