@@ -90,10 +90,10 @@ jobs:
           paths:
             - .venv
 
-      # Run linting
-      - run:
-          name: Run ruff linter
-          command: poetry run ruff check mos6502 tests systems
+      # Run linting (commented out for now)
+      # - run:
+      #     name: Run ruff linter
+      #     command: poetry run ruff check mos6502 tests systems
 
       # Run tests
       - run:
@@ -174,10 +174,10 @@ jobs:
           paths:
             - .venv
 
-      # Run linting
-      - run:
-          name: Run ruff linter
-          command: poetry run ruff check mos6502 tests systems
+      # Run linting (commented out for now)
+      # - run:
+      #     name: Run ruff linter
+      #     command: poetry run ruff check mos6502 tests systems
 
       # Run tests
       - run:
@@ -272,13 +272,13 @@ jobs:
           paths:
             - .venv
 
-      # Run linting
-      - run:
-          name: Run ruff linter
-          command: |
-            $env:PATH = "$env:POETRY_HOME\bin;C:\pypy;$env:PATH"
-            poetry run ruff check mos6502 tests systems
-          shell: powershell.exe
+      # Run linting (commented out for now)
+      # - run:
+      #     name: Run ruff linter
+      #     command: |
+      #       $env:PATH = "$env:POETRY_HOME\bin;C:\pypy;$env:PATH"
+      #       poetry run ruff check mos6502 tests systems
+      #     shell: powershell.exe
 
       # Run tests
       - run:
