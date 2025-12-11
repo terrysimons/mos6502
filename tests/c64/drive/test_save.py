@@ -389,3 +389,633 @@ class TestSaveCommand:
         # Content should be different (new file added)
         assert new_data != original_data, \
             "D64 file was not modified after SAVE"
+
+
+def wait_for_load(c64, max_cycles=MAX_LOAD_CYCLES):
+    """Wait for LOAD operation to complete.
+
+    Returns True if load completed successfully.
+    """
+    cycles_run = 0
+    batch_size = 100_000
+
+    initial_basic_end = (c64.memory.read(BASIC_VARTAB_LO) |
+                         (c64.memory.read(BASIC_VARTAB_HI) << 8))
+
+    while cycles_run < max_cycles:
+        run_cycles(c64, batch_size)
+        cycles_run += batch_size
+
+        status = c64.memory.read(BASIC_DIRECT_MODE_FLAG)
+        in_direct_mode = (status & 0x80) != 0
+
+        kernal_status = c64.memory.read(KERNAL_STATUS)
+        no_errors = (kernal_status & KERNAL_STATUS_ERROR_MASK) == 0
+
+        current_basic_end = (c64.memory.read(BASIC_VARTAB_LO) |
+                             (c64.memory.read(BASIC_VARTAB_HI) << 8))
+        data_loaded = current_basic_end != initial_basic_end
+
+        if in_direct_mode and no_errors and data_loaded:
+            return True
+
+    return False
+
+
+def get_loaded_program_size(c64) -> int:
+    """Get the size of the loaded BASIC program in bytes."""
+    basic_start = (c64.memory.read(BASIC_TXTTAB_LO) |
+                   (c64.memory.read(BASIC_TXTTAB_HI) << 8))
+    basic_end = (c64.memory.read(BASIC_VARTAB_LO) |
+                 (c64.memory.read(BASIC_VARTAB_HI) << 8))
+    return basic_end - basic_start
+
+
+def create_basic_program_of_size(target_bytes: int) -> str:
+    """Generate BASIC code that creates a program of approximately the target size.
+
+    Each BASIC line takes approximately:
+    - 4 bytes overhead (next line ptr + line number)
+    - Plus the tokenized statement length
+
+    A line like '10 REM AAAA...' takes: 4 + 1 (REM token) + padding = ~5 + padding bytes
+
+    Returns BASIC commands to type that will create a program of the target size.
+    """
+    if target_bytes <= 0:
+        return ""
+
+    # BASIC program structure:
+    # Each line: 2 bytes next ptr, 2 bytes line num, tokenized code, 0 terminator
+    # Program ends with 0x00 0x00 (null next ptr)
+    # So minimum program with one line: ~8 bytes
+
+    # For simple sizing, we'll use lines of REM statements
+    # REM token is $8F, followed by text
+    # Line overhead: 5 bytes (2 ptr + 2 linenum + 1 terminator)
+    # REM adds 1 byte for token
+
+    # For a program of N bytes, we need content of about N-2 bytes (for final 00 00)
+    content_needed = target_bytes - 2
+
+    if content_needed <= 0:
+        return ""
+
+    commands = []
+    line_num = 10
+    bytes_added = 0
+
+    while bytes_added < content_needed:
+        # Each line: 5 overhead + 1 REM token + padding text
+        # Keep lines under ~80 chars for keyboard buffer
+        remaining = content_needed - bytes_added
+        # Line overhead is ~6 bytes, so text length determines size
+        text_len = min(remaining - 6, 60)  # Max 60 chars of text per line
+        if text_len < 1:
+            text_len = 1
+
+        # Use 'A' repeated for padding text
+        padding = 'A' * text_len
+        commands.append(f'{line_num} REM {padding}\r')
+
+        # Estimate bytes: 5 overhead + 1 REM + space + text_len
+        bytes_added += 6 + text_len + 1
+        line_num += 10
+
+    return commands
+
+
+@requires_fixtures
+class TestSaveSizeBoundaries:
+    """Test SAVE with files of specific sizes to test sector boundaries.
+
+    Each sector holds 254 bytes of file data (256 - 2 byte track/sector link).
+    File includes 2-byte load address, so:
+    - 252 content bytes + 2 load addr = 254 total = 1 sector
+    - 253 content bytes + 2 load addr = 255 total = 2 sectors
+    """
+
+    @pytest.mark.parametrize("threaded_drive", DRIVE_MODES)
+    def test_save_minimal_program(self, threaded_drive, tmp_path):
+        """Save a minimal BASIC program (just one short line).
+
+        Tests that very small files save correctly.
+        """
+        test_disk = tmp_path / "test.d64"
+        shutil.copy(BASE_DISK, test_disk)
+
+        c64 = create_c64_with_disk(test_disk, threaded_drive=threaded_drive)
+        assert wait_for_ready(c64), "Failed to boot to BASIC"
+
+        # Enter minimal program: just '10 ?' which prints a blank line
+        c64.inject_keyboard_string('10 ?\r')
+        run_cycles(c64, 500_000)
+
+        c64.inject_keyboard_string('SAVE"MINIMAL",8\r')
+        success, error_number = wait_for_operation(c64, MAX_SAVE_CYCLES)
+
+        if error_number is None:
+            pytest.fail("SAVE command timed out")
+        elif error_number != 0:
+            pytest.fail(f"SAVE failed with drive error {error_number:02d}")
+
+        assert success
+
+    @pytest.mark.parametrize("threaded_drive", DRIVE_MODES)
+    def test_save_one_sector_program(self, threaded_drive, tmp_path):
+        """Save a program that fits in exactly one sector (~254 bytes).
+
+        Tests the boundary case where file fits in one sector with no overflow.
+        """
+        test_disk = tmp_path / "test.d64"
+        shutil.copy(BASE_DISK, test_disk)
+
+        c64 = create_c64_with_disk(test_disk, threaded_drive=threaded_drive)
+        assert wait_for_ready(c64), "Failed to boot to BASIC"
+
+        # Create a program that's about 240 bytes (well within one sector)
+        # 3 lines of ~80 bytes each
+        for i in range(3):
+            line_num = 10 + i * 10
+            padding = 'A' * 65
+            c64.inject_keyboard_string(f'{line_num} REM {padding}\r')
+            run_cycles(c64, 500_000)
+
+        c64.inject_keyboard_string('SAVE"ONESECTOR",8\r')
+        success, error_number = wait_for_operation(c64, MAX_SAVE_CYCLES)
+
+        if error_number is None:
+            pytest.fail("SAVE command timed out")
+        elif error_number != 0:
+            pytest.fail(f"SAVE failed with drive error {error_number:02d}")
+
+        assert success
+
+    @pytest.mark.parametrize("threaded_drive", DRIVE_MODES)
+    def test_save_two_sector_program(self, threaded_drive, tmp_path):
+        """Save a program that requires exactly two sectors (~300-400 bytes).
+
+        Tests the sector boundary crossing case.
+        """
+        test_disk = tmp_path / "test.d64"
+        shutil.copy(BASE_DISK, test_disk)
+
+        c64 = create_c64_with_disk(test_disk, threaded_drive=threaded_drive)
+        assert wait_for_ready(c64), "Failed to boot to BASIC"
+
+        # Create a program that's about 350 bytes (needs 2 sectors)
+        # 5 lines of ~70 bytes each
+        for i in range(5):
+            line_num = 10 + i * 10
+            padding = 'A' * 60
+            c64.inject_keyboard_string(f'{line_num} REM {padding}\r')
+            run_cycles(c64, 500_000)
+
+        c64.inject_keyboard_string('SAVE"TWOSECTOR",8\r')
+        success, error_number = wait_for_operation(c64, MAX_SAVE_CYCLES)
+
+        if error_number is None:
+            pytest.fail("SAVE command timed out")
+        elif error_number != 0:
+            pytest.fail(f"SAVE failed with drive error {error_number:02d}")
+
+        assert success
+
+    @pytest.mark.parametrize("threaded_drive", DRIVE_MODES)
+    def test_save_multi_sector_program(self, threaded_drive, tmp_path):
+        """Save a program spanning multiple sectors (~1KB, needs 4+ sectors).
+
+        Tests handling of multiple sector writes.
+        """
+        test_disk = tmp_path / "test.d64"
+        shutil.copy(BASE_DISK, test_disk)
+
+        c64 = create_c64_with_disk(test_disk, threaded_drive=threaded_drive)
+        assert wait_for_ready(c64), "Failed to boot to BASIC"
+
+        # Create a program that's about 1000 bytes (needs ~4 sectors)
+        # 14 lines of ~70 bytes each
+        for i in range(14):
+            line_num = 10 + i * 10
+            padding = 'A' * 60
+            c64.inject_keyboard_string(f'{line_num} REM {padding}\r')
+            run_cycles(c64, 500_000)
+
+        c64.inject_keyboard_string('SAVE"MULTISEC",8\r')
+        success, error_number = wait_for_operation(c64, MAX_SAVE_CYCLES)
+
+        if error_number is None:
+            pytest.fail("SAVE command timed out")
+        elif error_number != 0:
+            pytest.fail(f"SAVE failed with drive error {error_number:02d}")
+
+        assert success
+
+
+@requires_fixtures
+class TestSaveLoadRoundtrip:
+    """Test that saved files can be loaded back correctly.
+
+    This is the strongest verification that SAVE works - the data
+    survives a roundtrip through save and load operations.
+    """
+
+    @pytest.mark.parametrize("threaded_drive", DRIVE_MODES)
+    def test_save_load_roundtrip_small(self, threaded_drive, tmp_path):
+        """Save a program, NEW, load it back, verify it's correct.
+
+        Uses a small program with known content.
+        """
+        test_disk = tmp_path / "test.d64"
+        shutil.copy(BASE_DISK, test_disk)
+
+        c64 = create_c64_with_disk(test_disk, threaded_drive=threaded_drive)
+        assert wait_for_ready(c64), "Failed to boot to BASIC"
+
+        # Enter a specific program we can verify
+        c64.inject_keyboard_string('10 PRINT "HELLO"\r')
+        run_cycles(c64, 500_000)
+        c64.inject_keyboard_string('20 PRINT "WORLD"\r')
+        run_cycles(c64, 500_000)
+
+        # Record the program size before saving
+        original_size = get_loaded_program_size(c64)
+
+        # Save the program
+        c64.inject_keyboard_string('SAVE"ROUNDTRIP",8\r')
+        success, error_number = wait_for_operation(c64, MAX_SAVE_CYCLES)
+
+        if error_number is None:
+            pytest.fail("SAVE command timed out")
+        elif error_number != 0:
+            pytest.fail(f"SAVE failed with drive error {error_number:02d}")
+
+        # Clear the program with NEW
+        c64.inject_keyboard_string('NEW\r')
+        run_cycles(c64, 500_000)
+
+        # Verify program is gone
+        size_after_new = get_loaded_program_size(c64)
+        assert size_after_new < original_size, "NEW didn't clear program"
+
+        # Load it back
+        c64.inject_keyboard_string('LOAD"ROUNDTRIP",8\r')
+        assert wait_for_load(c64), "LOAD timed out"
+
+        # Verify program size matches
+        loaded_size = get_loaded_program_size(c64)
+        assert loaded_size == original_size, \
+            f"Loaded size {loaded_size} != original size {original_size}"
+
+    @pytest.mark.parametrize("threaded_drive", DRIVE_MODES)
+    def test_save_load_roundtrip_larger(self, threaded_drive, tmp_path):
+        """Save and load a larger program spanning multiple sectors.
+
+        Tests data integrity across sector boundaries.
+
+        Uses a fresh blank disk to avoid filename conflicts with
+        existing files on BASE_DISK.
+        """
+        # Create a fresh blank disk to avoid filename conflicts
+        d64 = D64Image(None)
+        test_disk = tmp_path / "roundtrip.d64"
+        d64.save(test_disk)
+
+        c64 = create_c64_with_disk(test_disk, threaded_drive=threaded_drive)
+        assert wait_for_ready(c64), "Failed to boot to BASIC"
+
+        # Create a larger program (~800 bytes, ~3 sectors)
+        for i in range(10):
+            line_num = 10 + i * 10
+            padding = 'X' * 60
+            c64.inject_keyboard_string(f'{line_num} REM {padding}\r')
+            run_cycles(c64, 500_000)
+
+        # Record program size and first bytes of memory
+        original_size = get_loaded_program_size(c64)
+
+        # Read first 32 bytes of program for verification
+        basic_start = 0x0801
+        original_bytes = [c64.memory.read(basic_start + i) for i in range(32)]
+
+        # Save
+        c64.inject_keyboard_string('SAVE"BIGPROG",8\r')
+        success, error_number = wait_for_operation(c64, MAX_SAVE_CYCLES)
+
+        if error_number is None:
+            pytest.fail("SAVE command timed out")
+        elif error_number != 0:
+            pytest.fail(f"SAVE failed with drive error {error_number:02d}")
+
+        # Clear with NEW
+        c64.inject_keyboard_string('NEW\r')
+        run_cycles(c64, 500_000)
+
+        # Load back
+        c64.inject_keyboard_string('LOAD"BIGPROG",8\r')
+        assert wait_for_load(c64), "LOAD timed out"
+
+        # Verify size
+        loaded_size = get_loaded_program_size(c64)
+        assert loaded_size == original_size, \
+            f"Loaded size {loaded_size} != original size {original_size}"
+
+        # Verify first 32 bytes match
+        loaded_bytes = [c64.memory.read(basic_start + i) for i in range(32)]
+        assert loaded_bytes == original_bytes, \
+            "Program content doesn't match after roundtrip"
+
+
+@requires_fixtures
+class TestSaveOverwrite:
+    """Test overwriting existing files with SAVE."""
+
+    @pytest.mark.parametrize("threaded_drive", DRIVE_MODES)
+    def test_save_replace_existing(self, threaded_drive, tmp_path):
+        """Save a file, then save a different file with same name using @:.
+
+        The @: prefix tells the drive to replace an existing file.
+        """
+        test_disk = tmp_path / "test.d64"
+        shutil.copy(BASE_DISK, test_disk)
+
+        c64 = create_c64_with_disk(test_disk, threaded_drive=threaded_drive)
+        assert wait_for_ready(c64), "Failed to boot to BASIC"
+
+        # Save first version
+        c64.inject_keyboard_string('10 PRINT "V1"\r')
+        run_cycles(c64, 500_000)
+
+        c64.inject_keyboard_string('SAVE"REPLACE",8\r')
+        success, error_number = wait_for_operation(c64, MAX_SAVE_CYCLES)
+        assert error_number == 0, f"First SAVE failed: error {error_number}"
+
+        # Clear and create second version
+        c64.inject_keyboard_string('NEW\r')
+        run_cycles(c64, 500_000)
+
+        c64.inject_keyboard_string('10 PRINT "V2"\r')
+        run_cycles(c64, 500_000)
+        c64.inject_keyboard_string('20 PRINT "NEW"\r')
+        run_cycles(c64, 500_000)
+
+        second_version_size = get_loaded_program_size(c64)
+
+        # Save with replace prefix @:
+        c64.inject_keyboard_string('SAVE"@:REPLACE",8\r')
+        success, error_number = wait_for_operation(c64, MAX_SAVE_CYCLES)
+
+        if error_number is None:
+            pytest.fail("SAVE @: timed out")
+        elif error_number != 0:
+            pytest.fail(f"SAVE @: failed with error {error_number:02d}")
+
+        # Clear and load to verify we get version 2
+        c64.inject_keyboard_string('NEW\r')
+        run_cycles(c64, 500_000)
+
+        c64.inject_keyboard_string('LOAD"REPLACE",8\r')
+        assert wait_for_load(c64), "LOAD timed out"
+
+        loaded_size = get_loaded_program_size(c64)
+        assert loaded_size == second_version_size, \
+            "Loaded file doesn't match replaced version"
+
+
+# Import D64Image for creating blank disks
+from systems.c64.drive.d64 import D64Image
+
+
+def create_program_lines(identifier: str, target_sectors: int) -> list:
+    """Create BASIC program lines that will produce a program of approximately target_sectors.
+
+    Each sector holds 254 bytes.
+    Each line: ~5 byte overhead + 1 REM token + 1 space + padding
+
+    Args:
+        identifier: Unique string to identify this program
+        target_sectors: Target number of sectors (254 bytes each)
+
+    Returns:
+        List of BASIC line strings to type (without \\r)
+    """
+    target_bytes = target_sectors * 254 - 2  # -2 for load address
+    lines = []
+    line_num = 10
+    bytes_so_far = 0
+
+    # First line identifies the file
+    first_line = f'{line_num} REM FILE{identifier}'
+    lines.append(first_line)
+    bytes_so_far += 7 + len(f'FILE{identifier}')  # overhead + REM + space + text
+    line_num += 10
+
+    # Fill remaining space with padding lines
+    while bytes_so_far < target_bytes:
+        remaining = target_bytes - bytes_so_far
+        # Line overhead ~7 bytes (2 ptr + 2 linenum + 1 REM + 1 space + 1 terminator)
+        padding_len = min(remaining - 7, 55)  # Keep lines manageable
+        if padding_len < 1:
+            break
+
+        padding = 'P' * padding_len
+        line = f'{line_num} REM {padding}'
+        lines.append(line)
+        bytes_so_far += 7 + padding_len
+        line_num += 10
+
+        if line_num > 60000:
+            break  # Safety limit
+
+    return lines
+
+
+@requires_fixtures
+@pytest.mark.slow
+class TestSaveFillDisk:
+    """Test saving multiple files until disk is nearly full.
+
+    A standard 35-track D64 has 664 free sectors (683 total - 19 for BAM/directory).
+    We'll save multiple files of varying sizes to fill the disk, then verify
+    each file survives a save/load roundtrip.
+
+    Note: These tests are marked as slow and skipped in CI. Run with:
+        pytest -m slow tests/c64/drive/test_save.py
+    """
+
+    @pytest.mark.parametrize("threaded_drive", DRIVE_MODES)
+    def test_fill_disk_with_multiple_files(self, threaded_drive, tmp_path):
+        """Save multiple files and verify each via roundtrip.
+
+        Creates 4 files of various sizes to test saving multiple files
+        on a single disk without excessive test duration:
+        - 1 small file (1-2 sectors)
+        - 2 medium files (3-5 sectors)
+        - 1 larger file (8 sectors)
+
+        Total: approximately 20 sectors
+
+        After saving all files, verifies each one by:
+        1. Loading it back
+        2. Comparing size and first 32 bytes of content
+        """
+        # Create a fresh blank disk
+        d64 = D64Image(None)  # Creates formatted blank disk
+        test_disk = tmp_path / "filltest.d64"
+        d64.save(test_disk)
+
+        c64 = create_c64_with_disk(test_disk, threaded_drive=threaded_drive)
+        assert wait_for_ready(c64), "Failed to boot to BASIC"
+
+        # Define files with varying sizes (reduced for test speed)
+        # Format: (filename, sector_count)
+        files_to_save = [
+            ('FILE01', 2),    # ~508 bytes, 2 sectors
+            ('FILE02', 3),    # ~762 bytes, 3 sectors
+            ('FILE03', 5),    # ~1.2KB, 5 sectors
+            ('FILE04', 8),    # ~2KB, 8 sectors
+        ]
+
+        # Store metadata for verification
+        saved_files = []
+
+        for filename, sectors in files_to_save:
+            # Create the program
+            lines = create_program_lines(filename[-2:], sectors)
+
+            # Enter each line
+            for line in lines:
+                c64.inject_keyboard_string(f'{line}\r')
+                run_cycles(c64, 500_000)
+
+            # Record program details before saving
+            program_size = get_loaded_program_size(c64)
+            basic_start = 0x0801
+            first_32_bytes = [c64.memory.read(basic_start + i) for i in range(32)]
+
+            saved_files.append({
+                'filename': filename,
+                'expected_sectors': sectors,
+                'size': program_size,
+                'first_bytes': first_32_bytes,
+            })
+
+            # Save the file
+            c64.inject_keyboard_string(f'SAVE"{filename}",8\r')
+            success, error_number = wait_for_operation(c64, MAX_SAVE_CYCLES)
+
+            if error_number is None:
+                pytest.fail(f"SAVE {filename} timed out")
+            elif error_number != 0:
+                pytest.fail(f"SAVE {filename} failed with error {error_number:02d}")
+
+            # Clear for next file
+            c64.inject_keyboard_string('NEW\r')
+            run_cycles(c64, 500_000)
+
+        # Now verify each file by loading it back
+        for file_info in saved_files:
+            filename = file_info['filename']
+
+            # Load the file
+            c64.inject_keyboard_string(f'LOAD"{filename}",8\r')
+            if not wait_for_load(c64):
+                pytest.fail(f"LOAD {filename} timed out during verification")
+
+            # Verify size
+            loaded_size = get_loaded_program_size(c64)
+            if loaded_size != file_info['size']:
+                pytest.fail(
+                    f"File {filename}: size mismatch. "
+                    f"Expected {file_info['size']}, got {loaded_size}"
+                )
+
+            # Verify first 32 bytes
+            basic_start = 0x0801
+            loaded_bytes = [c64.memory.read(basic_start + i) for i in range(32)]
+            if loaded_bytes != file_info['first_bytes']:
+                pytest.fail(
+                    f"File {filename}: content mismatch in first 32 bytes"
+                )
+
+            # Clear for next file
+            c64.inject_keyboard_string('NEW\r')
+            run_cycles(c64, 500_000)
+
+        # All files verified successfully
+
+    @pytest.mark.parametrize("threaded_drive", [
+        pytest.param(False, id="synchronous-drive"),
+    ])
+    def test_fill_disk_larger_files(self, threaded_drive, tmp_path):
+        """Test saving larger multi-sector files.
+
+        Creates 2 larger files (15-20 sectors each) to test saving
+        files that span many sectors.
+
+        Note: Only runs synchronous mode to save test time since the
+        test_fill_disk_with_multiple_files covers both modes.
+        """
+        # Create a fresh blank disk
+        d64 = D64Image(None)
+        test_disk = tmp_path / "capacity.d64"
+        d64.save(test_disk)
+
+        c64 = create_c64_with_disk(test_disk, threaded_drive=threaded_drive)
+        assert wait_for_ready(c64), "Failed to boot to BASIC"
+
+        # Save 2 larger files
+        files_to_save = [
+            ('BIGF01', 15),  # ~3.8KB, 15 sectors
+            ('BIGF02', 20),  # ~5KB, 20 sectors
+        ]
+        files_saved = []
+
+        for filename, sectors in files_to_save:
+            # Create the program
+            lines = create_program_lines(filename[-2:], sectors)
+
+            for line in lines:
+                c64.inject_keyboard_string(f'{line}\r')
+                run_cycles(c64, 500_000)
+
+            program_size = get_loaded_program_size(c64)
+            basic_start = 0x0801
+            first_bytes = [c64.memory.read(basic_start + j) for j in range(32)]
+
+            files_saved.append({
+                'filename': filename,
+                'size': program_size,
+                'first_bytes': first_bytes,
+            })
+
+            c64.inject_keyboard_string(f'SAVE"{filename}",8\r')
+            success, error_number = wait_for_operation(c64, MAX_SAVE_CYCLES * 2)
+
+            if error_number is None:
+                pytest.fail(f"SAVE {filename} timed out")
+            elif error_number != 0:
+                pytest.fail(f"SAVE {filename} failed with error {error_number:02d}")
+
+            c64.inject_keyboard_string('NEW\r')
+            run_cycles(c64, 500_000)
+
+        # Verify all successfully saved files
+        for file_info in files_saved:
+            filename = file_info['filename']
+
+            c64.inject_keyboard_string(f'LOAD"{filename}",8\r')
+            if not wait_for_load(c64, max_cycles=MAX_LOAD_CYCLES * 2):
+                pytest.fail(f"LOAD {filename} timed out during verification")
+
+            loaded_size = get_loaded_program_size(c64)
+            assert loaded_size == file_info['size'], \
+                f"File {filename}: size {loaded_size} != expected {file_info['size']}"
+
+            basic_start = 0x0801
+            loaded_bytes = [c64.memory.read(basic_start + j) for j in range(32)]
+            assert loaded_bytes == file_info['first_bytes'], \
+                f"File {filename}: content mismatch"
+
+            c64.inject_keyboard_string('NEW\r')
+            run_cycles(c64, 500_000)

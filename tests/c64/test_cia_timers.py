@@ -11,13 +11,6 @@ import pytest
 class TestCIATimerLatchAutoLoad:
     """Test that writing timer latch high byte auto-loads counter when stopped."""
 
-    @pytest.fixture
-    def c64(self):
-        """Create a C64 instance for testing."""
-        from systems.c64 import C64
-        c64 = C64(display_mode="headless", rom_dir="systems/roms")
-        return c64
-
     def test_timer_a_autoload_on_high_byte_write_cia1(self, c64) -> None:
         """CIA1 Timer A: Writing high byte while stopped should load counter."""
         cia1 = c64.cia1
@@ -103,13 +96,6 @@ class TestCIATimerLatchAutoLoad:
 
 class TestCIATimerCountdown:
     """Test that CIA timers count down correctly."""
-
-    @pytest.fixture
-    def c64(self):
-        """Create a C64 instance for testing."""
-        from systems.c64 import C64
-        c64 = C64(display_mode="headless", rom_dir="systems/roms")
-        return c64
 
     def test_timer_a_counts_down_cia1(self, c64) -> None:
         """CIA1 Timer A should count down when running."""
@@ -225,13 +211,6 @@ class TestCIATimerCountdown:
 class TestCIATimerControlRegister:
     """Test CIA timer control register behavior."""
 
-    @pytest.fixture
-    def c64(self):
-        """Create a C64 instance for testing."""
-        from systems.c64 import C64
-        c64 = C64(display_mode="headless", rom_dir="systems/roms")
-        return c64
-
     def test_force_load_loads_counter_cia1(self, c64) -> None:
         """CIA1: Force load bit should load latch into counter."""
         cia1 = c64.cia1
@@ -286,13 +265,6 @@ class TestCIATimerControlRegister:
 class TestCIATimerRead:
     """Test reading CIA timer values."""
 
-    @pytest.fixture
-    def c64(self):
-        """Create a C64 instance for testing."""
-        from systems.c64 import C64
-        c64 = C64(display_mode="headless", rom_dir="systems/roms")
-        return c64
-
     def test_read_timer_counter_cia1(self, c64) -> None:
         """CIA1: Reading timer registers should return counter value."""
         cia1 = c64.cia1
@@ -310,13 +282,6 @@ class TestCIATimerRead:
 
 class TestCIAInterruptIntegration:
     """Test full interrupt flow - timer to IRQ handler."""
-
-    @pytest.fixture
-    def c64(self):
-        """Create a C64 instance for testing."""
-        from systems.c64 import C64
-        c64 = C64(display_mode="headless", rom_dir="systems/roms")
-        return c64
 
     def test_timer_a_irq_fires_and_vectors_to_handler(self, c64) -> None:
         """Full test: Timer A underflow should fire IRQ and vector to handler.
@@ -421,13 +386,6 @@ class TestCIAInterruptIntegration:
 class TestCIAICRBehavior:
     """Test CIA Interrupt Control Register behavior."""
 
-    @pytest.fixture
-    def c64(self):
-        """Create a C64 instance for testing."""
-        from systems.c64 import C64
-        c64 = C64(display_mode="headless", rom_dir="systems/roms")
-        return c64
-
     def test_icr_read_clears_irq_pending_cia1(self, c64) -> None:
         """CIA1: Reading ICR should clear cpu.irq_pending."""
         cia1 = c64.cia1
@@ -503,13 +461,6 @@ class TestCIAICRMaskImmediateInterrupt:
     if the corresponding ICR data bit is already set, the interrupt should
     fire immediately.
     """
-
-    @pytest.fixture
-    def c64(self):
-        """Create a C64 instance for testing."""
-        from systems.c64 import C64
-        c64 = C64(display_mode="headless", rom_dir="systems/roms")
-        return c64
 
     def test_icr_mask_write_triggers_irq_if_data_set_cia1(self, c64) -> None:
         """CIA1: Enabling ICR mask should fire IRQ immediately if data bit already set."""
@@ -614,13 +565,6 @@ class TestCIAFLAGPinCrossTriggering:
     When one CIA outputs serial data, the other CIA should receive
     a FLAG interrupt (simulating IEC bus communication).
     """
-
-    @pytest.fixture
-    def c64(self):
-        """Create a C64 instance for testing."""
-        from systems.c64 import C64
-        c64 = C64(display_mode="headless", rom_dir="systems/roms")
-        return c64
 
     def test_cias_are_linked(self, c64) -> None:
         """CIAs should have references to each other."""
@@ -753,13 +697,6 @@ class TestCIASDROutputModeEnableFLAG:
     When transitioning SDR from input mode to output mode, if data has
     been written to SDR, the other CIA should receive FLAG interrupt.
     """
-
-    @pytest.fixture
-    def c64(self):
-        """Create a C64 instance for testing."""
-        from systems.c64 import C64
-        c64 = C64(display_mode="headless", rom_dir="systems/roms")
-        return c64
 
     def test_enabling_sdr_output_mode_triggers_flag_cia1(self, c64) -> None:
         """CIA1: Enabling SDR output mode should trigger FLAG on CIA2."""

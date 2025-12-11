@@ -26,3 +26,13 @@ requires_c64_roms = pytest.mark.skipif(
     not C64_ROMS_AVAILABLE,
     reason=f"Missing C64 ROMs in {C64_ROMS_DIR_RELATIVE}"
 )
+
+
+@pytest.fixture
+def c64():
+    """Create a C64 instance for testing, skipping if ROMs unavailable."""
+    if not C64_ROMS_AVAILABLE:
+        pytest.skip(f"Missing C64 ROMs in {C64_ROMS_DIR_RELATIVE}")
+
+    from systems.c64 import C64
+    return C64(display_mode="headless", rom_dir=str(C64_ROMS_DIR))

@@ -754,6 +754,9 @@ class C64:
             self.cia2.update()
             # Note: Drive CPU sync is now handled per-instruction via
             # post_instruction_callback for cycle-accurate IEC timing
+            # In headless mode, clear frame_complete since there's no render thread
+            if self.display_mode == "headless" and self.vic.frame_complete.is_set():
+                self.vic.frame_complete.clear()
 
         self.cpu.periodic_callback = update_peripherals
         self.cpu.periodic_callback_interval = self.vic.cycles_per_line   # Update every raster line

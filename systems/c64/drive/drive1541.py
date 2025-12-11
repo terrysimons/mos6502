@@ -944,12 +944,13 @@ class Drive1541:
                 self._written_sectors.add(data_hash)
                 log.debug(f"1541: New unique sector (hash={data_hash})")
 
-                # Find which sector this is by looking at the job queue
-                # The 1541 job queue at RAM $00-$05 contains job info
-                # Format: job code, track, sector, ...
-                # We can read the target track/sector from there
-                job_track = self.memory.ram[0x06] if hasattr(self, 'memory') else track
-                job_sector = self.memory.ram[0x07] if hasattr(self, 'memory') else 0
+                # Find which sector this is by looking at the header block info
+                # The 1541 stores the current track/sector being processed at:
+                # - $18: Header block track
+                # - $19: Header block sector
+                # Reference: https://sta.c64.org/cbm1541mem.html
+                job_track = self.memory.ram[0x18] if hasattr(self, 'memory') else track
+                job_sector = self.memory.ram[0x19] if hasattr(self, 'memory') else 0
 
                 if job_track == 0:
                     job_track = track

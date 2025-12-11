@@ -211,21 +211,13 @@ class TestSIDVoiceRegisters:
 class TestSIDIntegrationWithC64:
     """Test SID integration with C64 system."""
 
-    def test_c64_has_sid_instance(self) -> None:
+    def test_c64_has_sid_instance(self, c64) -> None:
         """C64 creates and uses a SID instance."""
-        from systems.c64 import C64
-
-        c64 = C64(display_mode='headless', rom_dir='systems/roms')
-
         assert hasattr(c64, 'sid')
         assert isinstance(c64.sid, SID)
 
-    def test_sid_read_through_memory(self) -> None:
+    def test_sid_read_through_memory(self, c64) -> None:
         """SID can be read through C64 memory map."""
-        from systems.c64 import C64
-
-        c64 = C64(display_mode='headless', rom_dir='systems/roms')
-
         # Write a value directly to SID
         c64.sid.write(0xD400, 0x42)
 
@@ -235,12 +227,8 @@ class TestSIDIntegrationWithC64:
         result = c64.memory.read(0xD400)
         assert result == 0x42
 
-    def test_sid_write_through_memory(self) -> None:
+    def test_sid_write_through_memory(self, c64) -> None:
         """SID can be written through C64 memory map."""
-        from systems.c64 import C64
-
-        c64 = C64(display_mode='headless', rom_dir='systems/roms')
-
         # Ensure I/O is mapped
         c64.memory.port = 0x35
 
