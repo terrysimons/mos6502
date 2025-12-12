@@ -118,6 +118,26 @@ class TestSAXNMOS:
         assert nmos_cpu.ram[0x4567] == 0xC0
         # Cycles assertion removed - reset adds 7 cycles
 
+    def test_sax_indexed_indirect_x(self, nmos_cpu) -> None:
+        """Test SAX (indirect,X) addressing."""
+        nmos_cpu.reset()
+        nmos_cpu.PC = 0x0400
+        nmos_cpu.A = 0xFF
+        nmos_cpu.X = 0x04
+        # Zero page pointer at $10+$04=$14 points to $2030
+        nmos_cpu.ram[0x14] = 0x30
+        nmos_cpu.ram[0x15] = 0x20
+        nmos_cpu.ram[0x2030] = 0x00  # Pre-set to verify write
+
+        nmos_cpu.ram[nmos_cpu.PC] = instructions.SAX_INDEXED_INDIRECT_X_0x83
+        nmos_cpu.ram[nmos_cpu.PC + 1] = 0x10
+
+        with contextlib.suppress(errors.CPUCycleExhaustionError):
+            nmos_cpu.execute(max_instructions=1)  # cycles=6
+
+        # Verify A & X (0xFF & 0x04 = 0x04) stored to $2030
+        assert nmos_cpu.ram[0x2030] == 0x04
+
 
 class TestSAXCMOS:
     """Test SAX instruction on CMOS variant (65C02) - acts as NOP."""
