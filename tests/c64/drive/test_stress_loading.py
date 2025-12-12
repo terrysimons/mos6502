@@ -61,7 +61,7 @@ requires_reverse_fixtures = pytest.mark.skipif(
 DRIVE_MODES = [
     pytest.param("threaded", id="threaded"),
     pytest.param("synchronous", id="synchronous"),
-    pytest.param("multiprocess", id="multiprocess"),
+    pytest.param("multiprocess", id="multiprocess", marks=pytest.mark.slow),
 ]
 
 # Maximum cycles for operations
