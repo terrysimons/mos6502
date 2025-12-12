@@ -72,6 +72,8 @@ class MOS6502CPU(flags.ProcessorStatusFlagsInterface):
         'pre_tick_callback',
         'post_tick_callback',
         '_opcode_handler_cache',
+        'unstable_config',
+        'halted',
     )
 
     log: logging.Logger = logging.getLogger("mos6502.cpu")
@@ -100,6 +102,13 @@ class MOS6502CPU(flags.ProcessorStatusFlagsInterface):
         else:
             self._variant = cpu_variant
 
+        # Configuration for unstable/highly-unstable illegal opcodes
+        # Users can override this after creation to customize chip behavior
+        self.unstable_config: variants.UnstableOpcodeConfig = variants.UNSTABLE_OPCODE_DEFAULTS.get(
+            self._variant.value,
+            variants.UnstableOpcodeConfig(ane_const=0xFF, unstable_stores_enabled=True)
+        )
+
         self.verbose_cycles: bool = verbose_cycles
         self.endianness: str = "little"
 
@@ -127,6 +136,10 @@ class MOS6502CPU(flags.ProcessorStatusFlagsInterface):
         # Unlike IRQ, NMI cannot be disabled by the I flag
         self.nmi_pending: bool = False
         self._nmi_line_previous: bool = False  # For edge detection
+
+        # CPU halted flag - set by JAM/KIL instructions
+        # When True, CPU execution stops and requires reset
+        self.halted: bool = False
 
         # Optional callback for periodic system updates (e.g., VIC raster counter)
         # Called every N cycles to allow external hardware to update state
@@ -1256,6 +1269,19 @@ class MOS6502CPU(flags.ProcessorStatusFlagsInterface):
         use_fast_path = not (verbose_cycles or pre_instruction_callback or post_instruction_callback)
 
         while True:
+            # Check if CPU is halted (by JAM instruction)
+            # Halted CPU cannot execute until reset
+            if self.halted:
+                # Write back cached counters before raising exception
+                self.instructions_executed = instructions_executed
+                if use_instruction_limit:
+                    self.instructions_remaining = instructions_remaining
+                raise errors.CPUHaltError(
+                    opcode=0x00,  # Unknown - set by JAM instruction
+                    address=int(self.PC),
+                    message="CPU is halted. Call reset() to recover."
+                )
+
             # Check for cycle exhaustion BEFORE fetching the next instruction
             # This prevents PC from being incremented into the next instruction
             # when we don't have enough cycles to execute it
@@ -1574,6 +1600,9 @@ class MOS6502CPU(flags.ProcessorStatusFlagsInterface):
         self.A = 0
         self.X = 0
         self.Y = 0
+
+        # Clear halted flag - CPU can execute again after reset
+        self.halted = False
 
         # VARIANT: 6502 - Reset vector fetch from $FFFC/$FFFD (cycles 2-3)
         # VARIANT: 65C02 - Same as 6502

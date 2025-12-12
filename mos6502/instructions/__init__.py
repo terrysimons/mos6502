@@ -347,6 +347,82 @@ from mos6502.instructions.illegal._las import (
     LAS_ABSOLUTE_Y_0xBB,
     register_las_instructions,
 )
+from mos6502.instructions.illegal._sbc_illegal import (
+    SBC_IMMEDIATE_0xEB,
+    register_sbc_illegal_instructions,
+)
+from mos6502.instructions.illegal._ane import (
+    ANE_IMMEDIATE_0x8B,
+    register_ane_instructions,
+)
+from mos6502.instructions.illegal._sha import (
+    SHA_INDIRECT_INDEXED_Y_0x93,
+    SHA_ABSOLUTE_Y_0x9F,
+    register_sha_instructions,
+)
+from mos6502.instructions.illegal._shx import (
+    SHX_ABSOLUTE_Y_0x9E,
+    register_shx_instructions,
+)
+from mos6502.instructions.illegal._shy import (
+    SHY_ABSOLUTE_X_0x9C,
+    register_shy_instructions,
+)
+from mos6502.instructions.illegal._tas import (
+    TAS_ABSOLUTE_Y_0x9B,
+    register_tas_instructions,
+)
+from mos6502.instructions.illegal._jam import (
+    JAM_IMPLIED_0x02,
+    JAM_IMPLIED_0x12,
+    JAM_IMPLIED_0x22,
+    JAM_IMPLIED_0x32,
+    JAM_IMPLIED_0x42,
+    JAM_IMPLIED_0x52,
+    JAM_IMPLIED_0x62,
+    JAM_IMPLIED_0x72,
+    JAM_IMPLIED_0x92,
+    JAM_IMPLIED_0xB2,
+    JAM_IMPLIED_0xD2,
+    JAM_IMPLIED_0xF2,
+    register_jam_instructions,
+)
+from mos6502.instructions.illegal._nop_illegal import (
+    # 1-byte implied
+    NOP_IMPLIED_0x1A,
+    NOP_IMPLIED_0x3A,
+    NOP_IMPLIED_0x5A,
+    NOP_IMPLIED_0x7A,
+    NOP_IMPLIED_0xDA,
+    NOP_IMPLIED_0xFA,
+    # 2-byte immediate
+    NOP_IMMEDIATE_0x80,
+    NOP_IMMEDIATE_0x82,
+    NOP_IMMEDIATE_0x89,
+    NOP_IMMEDIATE_0xC2,
+    NOP_IMMEDIATE_0xE2,
+    # 2-byte zero page
+    NOP_ZEROPAGE_0x04,
+    NOP_ZEROPAGE_0x44,
+    NOP_ZEROPAGE_0x64,
+    # 2-byte zero page,X
+    NOP_ZEROPAGE_X_0x14,
+    NOP_ZEROPAGE_X_0x34,
+    NOP_ZEROPAGE_X_0x54,
+    NOP_ZEROPAGE_X_0x74,
+    NOP_ZEROPAGE_X_0xD4,
+    NOP_ZEROPAGE_X_0xF4,
+    # 3-byte absolute
+    NOP_ABSOLUTE_0x0C,
+    # 3-byte absolute,X
+    NOP_ABSOLUTE_X_0x1C,
+    NOP_ABSOLUTE_X_0x3C,
+    NOP_ABSOLUTE_X_0x5C,
+    NOP_ABSOLUTE_X_0x7C,
+    NOP_ABSOLUTE_X_0xDC,
+    NOP_ABSOLUTE_X_0xFC,
+    register_nop_illegal_instructions,
+)
 from mos6502.instructions.load._lda import (
     LDA_IMMEDIATE_0xA9,
     LDA_ZEROPAGE_0xA5,
@@ -757,6 +833,68 @@ __all__ = [
     # Illegal: LAS
     "LAS_ABSOLUTE_Y_0xBB",
 
+    # Illegal: SBC duplicate
+    "SBC_IMMEDIATE_0xEB",
+
+    # Illegal: ANE (XAA) - Highly Unstable
+    "ANE_IMMEDIATE_0x8B",
+
+    # Illegal: SHA (AHX) - Unstable
+    "SHA_INDIRECT_INDEXED_Y_0x93",
+    "SHA_ABSOLUTE_Y_0x9F",
+
+    # Illegal: SHX (SXA) - Unstable
+    "SHX_ABSOLUTE_Y_0x9E",
+
+    # Illegal: SHY (SYA) - Unstable
+    "SHY_ABSOLUTE_X_0x9C",
+
+    # Illegal: TAS (XAS, SHS) - Unstable
+    "TAS_ABSOLUTE_Y_0x9B",
+
+    # Illegal: JAM (KIL, HLT) - Halts CPU
+    "JAM_IMPLIED_0x02",
+    "JAM_IMPLIED_0x12",
+    "JAM_IMPLIED_0x22",
+    "JAM_IMPLIED_0x32",
+    "JAM_IMPLIED_0x42",
+    "JAM_IMPLIED_0x52",
+    "JAM_IMPLIED_0x62",
+    "JAM_IMPLIED_0x72",
+    "JAM_IMPLIED_0x92",
+    "JAM_IMPLIED_0xB2",
+    "JAM_IMPLIED_0xD2",
+    "JAM_IMPLIED_0xF2",
+
+    # Illegal: NOP variants
+    "NOP_IMPLIED_0x1A",
+    "NOP_IMPLIED_0x3A",
+    "NOP_IMPLIED_0x5A",
+    "NOP_IMPLIED_0x7A",
+    "NOP_IMPLIED_0xDA",
+    "NOP_IMPLIED_0xFA",
+    "NOP_IMMEDIATE_0x80",
+    "NOP_IMMEDIATE_0x82",
+    "NOP_IMMEDIATE_0x89",
+    "NOP_IMMEDIATE_0xC2",
+    "NOP_IMMEDIATE_0xE2",
+    "NOP_ZEROPAGE_0x04",
+    "NOP_ZEROPAGE_0x44",
+    "NOP_ZEROPAGE_0x64",
+    "NOP_ZEROPAGE_X_0x14",
+    "NOP_ZEROPAGE_X_0x34",
+    "NOP_ZEROPAGE_X_0x54",
+    "NOP_ZEROPAGE_X_0x74",
+    "NOP_ZEROPAGE_X_0xD4",
+    "NOP_ZEROPAGE_X_0xF4",
+    "NOP_ABSOLUTE_0x0C",
+    "NOP_ABSOLUTE_X_0x1C",
+    "NOP_ABSOLUTE_X_0x3C",
+    "NOP_ABSOLUTE_X_0x5C",
+    "NOP_ABSOLUTE_X_0x7C",
+    "NOP_ABSOLUTE_X_0xDC",
+    "NOP_ABSOLUTE_X_0xFC",
+
     # LSR
     "LSR_ACCUMULATOR_0x4A",
     "LSR_ZEROPAGE_0x46",
@@ -902,6 +1040,14 @@ register_alr_instructions(InstructionSet, InstructionSet.map)
 register_arr_instructions(InstructionSet, InstructionSet.map)
 register_sbx_instructions(InstructionSet, InstructionSet.map)
 register_las_instructions(InstructionSet, InstructionSet.map)
+register_nop_illegal_instructions(InstructionSet, InstructionSet.map)
+register_sbc_illegal_instructions(InstructionSet, InstructionSet.map)
+register_ane_instructions(InstructionSet, InstructionSet.map)
+register_sha_instructions(InstructionSet, InstructionSet.map)
+register_shx_instructions(InstructionSet, InstructionSet.map)
+register_shy_instructions(InstructionSet, InstructionSet.map)
+register_tas_instructions(InstructionSet, InstructionSet.map)
+register_jam_instructions(InstructionSet, InstructionSet.map)
 # register_all_arithmetic_instructions(InstructionSet, InstructionSet.map)  # MIGRATED to adc/sbc/inc/dec packages
 register_all_branch_instructions(InstructionSet, InstructionSet.map)  # MIGRATED to individual branch packages
 # register_all_compare_instructions(InstructionSet, InstructionSet.map)  # MIGRATED to cmp/cpx/cpy packages

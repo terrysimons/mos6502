@@ -28,3 +28,31 @@ class CPUBreakError(Exception):
 
 class QuitRequestError(Exception):
     """Raise when user requests to quit (window close, Ctrl+C, etc.)."""
+
+
+class CPUHaltError(Exception):
+    """Raise when JAM/KIL/HLT instruction halts the CPU.
+
+    On real 6502 hardware, this requires a hardware reset to recover.
+    The PC does not advance and the CPU stops executing.
+
+    Attributes:
+    ----------
+        opcode: The JAM opcode that caused the halt (0x02, 0x12, etc.)
+        address: The address where the JAM instruction was executed
+    """
+
+    def __init__(self, opcode: int, address: int, message: str = None) -> None:
+        """Initialize CPUHaltError.
+
+        Arguments:
+        ---------
+            opcode: The JAM opcode that caused the halt
+            address: The address where the JAM instruction was executed
+            message: Optional custom message
+        """
+        self.opcode = opcode
+        self.address = address
+        if message is None:
+            message = f"CPU halted by JAM instruction ${opcode:02X} at ${address:04X}"
+        super().__init__(message)
