@@ -607,6 +607,45 @@ class C64VIC:
             )
 
     # ---------------------------------------------------------------- Rendering /
+    def _get_char_data(self, ram, vic_bank, char_offset, char_code):
+        """Get 8-byte character glyph data from char ROM or RAM.
+
+        The VIC-II can see character ROM at offset $1000-$1FFF within banks 0 and 2:
+        - Bank 0 ($0000): Char ROM at VIC address $1000-$1FFF (CPU $1000-$1FFF)
+        - Bank 1 ($4000): No char ROM - always RAM
+        - Bank 2 ($8000): Char ROM at VIC address $1000-$1FFF (CPU $9000-$9FFF)
+        - Bank 3 ($C000): No char ROM - always RAM
+
+        Args:
+            ram: RAM array
+            vic_bank: VIC bank base address ($0000, $4000, $8000, or $C000)
+            char_offset: Character base offset within VIC bank (from D018 bits 1-3)
+            char_code: Character code (0-255)
+
+        Returns:
+            8-byte character glyph data
+        """
+        glyph_offset = char_code * 8
+
+        # Check if char ROM is visible at this address
+        # Char ROM appears at offset $1000-$1FFF within banks 0 and 2 only
+        char_addr_in_bank = char_offset + glyph_offset
+        use_char_rom = False
+
+        if vic_bank == 0x0000 or vic_bank == 0x8000:
+            # Banks 0 and 2 have char ROM at $1000-$1FFF
+            if 0x1000 <= char_addr_in_bank < 0x2000:
+                use_char_rom = True
+
+        if use_char_rom:
+            # Read from character ROM
+            rom_addr = (char_addr_in_bank - 0x1000) & 0x0FFF
+            return self.char_rom[rom_addr : rom_addr + 8]
+        else:
+            # Read from RAM
+            ram_addr = vic_bank + char_addr_in_bank
+            return bytes(ram[ram_addr + i] for i in range(8))
+
     def render_frame(self, surface, ram, color_ram) -> None:
         """
         Render a full frame into the given pygame surface.
@@ -673,18 +712,18 @@ class C64VIC:
                 self._render_hires_bitmap(surface, ram, bitmap_base, screen_base, x_origin, y_origin)
         elif ecm:
             # Extended background color mode
-            self._render_ecm_text(surface, ram, color_ram, char_bank_offset, screen_base, bg_colors, x_origin, y_origin)
+            self._render_ecm_text(surface, ram, color_ram, vic_bank, char_bank_offset, screen_base, bg_colors, x_origin, y_origin)
         elif mcm:
             # Multicolor text mode
-            self._render_multicolor_text(surface, ram, color_ram, char_bank_offset, screen_base, bg_colors, x_origin, y_origin)
+            self._render_multicolor_text(surface, ram, color_ram, vic_bank, char_bank_offset, screen_base, bg_colors, x_origin, y_origin)
         else:
             # Standard text mode
-            self._render_standard_text(surface, ram, color_ram, char_bank_offset, screen_base, bg_colors[0], x_origin, y_origin)
+            self._render_standard_text(surface, ram, color_ram, vic_bank, char_bank_offset, screen_base, bg_colors[0], x_origin, y_origin)
 
         # Render sprites on top
         self._render_sprites(surface, ram, vic_bank, screen_base, x_origin, y_origin, regs)
 
-    def _render_standard_text(self, surface, ram, color_ram, char_offset, screen_base, bg_color, x_origin, y_origin):
+    def _render_standard_text(self, surface, ram, color_ram, vic_bank, char_offset, screen_base, bg_color, x_origin, y_origin):
         """Render standard 40x25 text mode."""
         for row in range(25):
             for col in range(40):
@@ -698,10 +737,8 @@ class C64VIC:
                 reverse = char_code & 0x80
                 char_code &= 0x7F
 
-                # Fetch 8×8 glyph from char ROM
-                glyph_addr = (char_code * 8) + char_offset
-                glyph_addr &= 0x0FFF
-                glyph = self.char_rom[glyph_addr : glyph_addr + 8]
+                # Fetch 8×8 glyph from char ROM or RAM
+                glyph = self._get_char_data(ram, vic_bank, char_offset, char_code)
 
                 base_x = x_origin + col * 8
                 base_y = y_origin + row * 8
@@ -720,7 +757,7 @@ class C64VIC:
 
                         surface.set_at((base_x + x, base_y + y), fg if bit else bg)
 
-    def _render_multicolor_text(self, surface, ram, color_ram, char_offset, screen_base, bg_colors, x_origin, y_origin):
+    def _render_multicolor_text(self, surface, ram, color_ram, vic_bank, char_offset, screen_base, bg_colors, x_origin, y_origin):
         """Render multicolor text mode (MCM=1, BMM=0, ECM=0)."""
         for row in range(25):
             for col in range(40):
@@ -733,9 +770,8 @@ class C64VIC:
                 # If color bit 3 is set, use multicolor mode for this cell
                 use_multicolor = char_color & 0x08
 
-                glyph_addr = (char_code * 8) + char_offset
-                glyph_addr &= 0x0FFF
-                glyph = self.char_rom[glyph_addr : glyph_addr + 8]
+                # Fetch 8×8 glyph from char ROM or RAM
+                glyph = self._get_char_data(ram, vic_bank, char_offset, char_code)
 
                 base_x = x_origin + col * 8
                 base_y = y_origin + row * 8
@@ -763,7 +799,7 @@ class C64VIC:
                             c = COLORS[char_color] if bit else COLORS[bg_colors[0]]
                             surface.set_at((base_x + x, base_y + y), c)
 
-    def _render_ecm_text(self, surface, ram, color_ram, char_offset, screen_base, bg_colors, x_origin, y_origin):
+    def _render_ecm_text(self, surface, ram, color_ram, vic_bank, char_offset, screen_base, bg_colors, x_origin, y_origin):
         """Render extended background color mode (ECM=1, BMM=0, MCM=0)."""
         for row in range(25):
             for col in range(40):
@@ -777,9 +813,8 @@ class C64VIC:
                 bg_select = (char_code >> 6) & 0x03
                 char_code &= 0x3F  # Only 64 characters available
 
-                glyph_addr = (char_code * 8) + char_offset
-                glyph_addr &= 0x0FFF
-                glyph = self.char_rom[glyph_addr : glyph_addr + 8]
+                # Fetch 8×8 glyph from char ROM or RAM
+                glyph = self._get_char_data(ram, vic_bank, char_offset, char_code)
 
                 base_x = x_origin + col * 8
                 base_y = y_origin + row * 8
