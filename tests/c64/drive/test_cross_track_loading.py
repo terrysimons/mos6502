@@ -46,8 +46,9 @@ requires_cross_track_fixtures = pytest.mark.skipif(
 
 # Drive modes to test
 DRIVE_MODES = [
-    pytest.param(True, id="threaded-drive"),
-    pytest.param(False, id="synchronous-drive"),
+    pytest.param("threaded", id="threaded"),
+    pytest.param("synchronous", id="synchronous"),
+    pytest.param("multiprocess", id="multiprocess"),
 ]
 
 # Maximum cycles for operations
@@ -125,7 +126,7 @@ def wait_for_load(c64, max_cycles=MAX_LOAD_CYCLES):
     return False
 
 
-def create_c64_with_disk(threaded_drive: bool) -> C64:
+def create_c64_with_disk(drive_runner: bool) -> C64:
     """Create a C64 instance with cross-track test disk."""
     c64 = C64(
         rom_dir=C64_ROMS_DIR,
@@ -137,7 +138,7 @@ def create_c64_with_disk(threaded_drive: bool) -> C64:
     c64.attach_drive(
         drive_rom_path=C64_ROMS_DIR / "1541.rom",
         disk_path=CROSS_TRACK_DISK,
-        threaded=threaded_drive,
+        runner=drive_runner,
     )
     return c64
 
@@ -155,14 +156,14 @@ def get_loaded_program_size(c64) -> int:
 class TestCrossTrackSameZone:
     """Test loading files spanning multiple tracks within the same zone."""
 
-    @pytest.mark.parametrize("threaded_drive", DRIVE_MODES)
-    def test_span_tracks_1_2_zone3(self, threaded_drive):
+    @pytest.mark.parametrize("drive_runner", DRIVE_MODES)
+    def test_span_tracks_1_2_zone3(self, drive_runner):
         """Load SPAN1-2: 40 sectors across tracks 1-2 (Zone 3 only).
 
         This replicates the Tank Wars disk layout - a ~10KB file
         spanning the first two tracks, entirely within Zone 3.
         """
-        c64 = create_c64_with_disk(threaded_drive=threaded_drive)
+        c64 = create_c64_with_disk(drive_runner=drive_runner)
 
         assert wait_for_ready(c64), "Failed to boot to BASIC"
 
@@ -184,8 +185,8 @@ class TestCrossTrackSameZone:
 class TestCrossTrackZoneBoundaries:
     """Test loading files that cross zone boundaries (speed transitions)."""
 
-    @pytest.mark.parametrize("threaded_drive", DRIVE_MODES)
-    def test_span_zone3_to_zone2(self, threaded_drive):
+    @pytest.mark.parametrize("drive_runner", DRIVE_MODES)
+    def test_span_zone3_to_zone2(self, drive_runner):
         """Load SPAN17-19: Crosses Zone 3 to Zone 2 boundary.
 
         Track 17 is Zone 3 (21 sectors/track)
@@ -194,7 +195,7 @@ class TestCrossTrackZoneBoundaries:
 
         This tests speed zone transition during loading.
         """
-        c64 = create_c64_with_disk(threaded_drive=threaded_drive)
+        c64 = create_c64_with_disk(drive_runner=drive_runner)
 
         assert wait_for_ready(c64), "Failed to boot to BASIC"
 
@@ -205,14 +206,14 @@ class TestCrossTrackZoneBoundaries:
         program_size = get_loaded_program_size(c64)
         assert program_size > 9000, f"Program should be >9KB, got {program_size} bytes"
 
-    @pytest.mark.parametrize("threaded_drive", DRIVE_MODES)
-    def test_span_zone2_to_zone1(self, threaded_drive):
+    @pytest.mark.parametrize("drive_runner", DRIVE_MODES)
+    def test_span_zone2_to_zone1(self, drive_runner):
         """Load SPAN24-26: Crosses Zone 2 to Zone 1 boundary.
 
         Track 24 is Zone 2 (19 sectors/track)
         Tracks 25-26 are Zone 1 (18 sectors/track)
         """
-        c64 = create_c64_with_disk(threaded_drive=threaded_drive)
+        c64 = create_c64_with_disk(drive_runner=drive_runner)
 
         assert wait_for_ready(c64), "Failed to boot to BASIC"
 
@@ -223,14 +224,14 @@ class TestCrossTrackZoneBoundaries:
         program_size = get_loaded_program_size(c64)
         assert program_size > 8000, f"Program should be >8KB, got {program_size} bytes"
 
-    @pytest.mark.parametrize("threaded_drive", DRIVE_MODES)
-    def test_span_zone1_to_zone0(self, threaded_drive):
+    @pytest.mark.parametrize("drive_runner", DRIVE_MODES)
+    def test_span_zone1_to_zone0(self, drive_runner):
         """Load SPAN30-32: Crosses Zone 1 to Zone 0 boundary.
 
         Track 30 is Zone 1 (18 sectors/track)
         Tracks 31-32 are Zone 0 (17 sectors/track, slowest)
         """
-        c64 = create_c64_with_disk(threaded_drive=threaded_drive)
+        c64 = create_c64_with_disk(drive_runner=drive_runner)
 
         assert wait_for_ready(c64), "Failed to boot to BASIC"
 
@@ -246,10 +247,10 @@ class TestCrossTrackZoneBoundaries:
 class TestCrossTrackDirectoryListing:
     """Test directory listing shows correct file sizes."""
 
-    @pytest.mark.parametrize("threaded_drive", DRIVE_MODES)
-    def test_load_directory(self, threaded_drive):
+    @pytest.mark.parametrize("drive_runner", DRIVE_MODES)
+    def test_load_directory(self, drive_runner):
         """Test LOAD"$",8 shows multi-block files correctly."""
-        c64 = create_c64_with_disk(threaded_drive=threaded_drive)
+        c64 = create_c64_with_disk(drive_runner=drive_runner)
 
         assert wait_for_ready(c64), "Failed to boot to BASIC"
 

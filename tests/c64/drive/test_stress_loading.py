@@ -59,8 +59,9 @@ requires_reverse_fixtures = pytest.mark.skipif(
 
 # Drive modes to test
 DRIVE_MODES = [
-    pytest.param(True, id="threaded-drive"),
-    pytest.param(False, id="synchronous-drive"),
+    pytest.param("threaded", id="threaded"),
+    pytest.param("synchronous", id="synchronous"),
+    pytest.param("multiprocess", id="multiprocess"),
 ]
 
 # Maximum cycles for operations
@@ -142,7 +143,7 @@ def wait_for_load(c64, max_cycles=MAX_LOAD_CYCLES):
     return False
 
 
-def create_c64_with_disk(disk_path: Path, threaded_drive: bool) -> C64:
+def create_c64_with_disk(disk_path: Path, drive_runner: bool) -> C64:
     """Create a C64 instance with the specified disk."""
     c64 = C64(
         rom_dir=C64_ROMS_DIR,
@@ -154,7 +155,7 @@ def create_c64_with_disk(disk_path: Path, threaded_drive: bool) -> C64:
     c64.attach_drive(
         drive_rom_path=C64_ROMS_DIR / "1541.rom",
         disk_path=disk_path,
-        threaded=threaded_drive,
+        runner=drive_runner,
     )
     return c64
 
@@ -163,15 +164,15 @@ def create_c64_with_disk(disk_path: Path, threaded_drive: bool) -> C64:
 class TestCompletelyFullDisk:
     """Test loading from a completely full disk (0 blocks free)."""
 
-    @pytest.mark.parametrize("threaded_drive", DRIVE_MODES)
-    def test_load_from_full_disk(self, threaded_drive):
+    @pytest.mark.parametrize("drive_runner", DRIVE_MODES)
+    def test_load_from_full_disk(self, drive_runner):
         """Load FULLFILE from a completely full disk.
 
         Tests that the emulator handles disks with no free space.
         The file uses 153 sectors (max that fits in BASIC memory $0801-$A000),
         with remaining sectors filled to make disk completely full.
         """
-        c64 = create_c64_with_disk(FULL_DISK, threaded_drive=threaded_drive)
+        c64 = create_c64_with_disk(FULL_DISK, drive_runner=drive_runner)
 
         assert wait_for_ready(c64), "Failed to boot to BASIC"
 
@@ -196,8 +197,8 @@ class TestMemoryOverflow:
     the memory overflow behavior.
     """
 
-    @pytest.mark.parametrize("threaded_drive", DRIVE_MODES)
-    def test_overflow_exceeds_basic_memory(self, threaded_drive):
+    @pytest.mark.parametrize("drive_runner", DRIVE_MODES)
+    def test_overflow_exceeds_basic_memory(self, drive_runner):
         """Load OVERFLOW (154 sectors) - VARTAB should exceed $A000.
 
         This test verifies that loading a 154-sector file causes BASIC's
@@ -205,7 +206,7 @@ class TestMemoryOverflow:
         the normal BASIC memory area. The C64 KERNAL doesn't prevent this -
         it's the programmer's responsibility to not load files too large.
         """
-        c64 = create_c64_with_disk(OVERFLOW_DISK, threaded_drive=threaded_drive)
+        c64 = create_c64_with_disk(OVERFLOW_DISK, drive_runner=drive_runner)
 
         assert wait_for_ready(c64), "Failed to boot to BASIC"
 
@@ -227,13 +228,13 @@ class TestMemoryOverflow:
 class TestMaxDirectoryEntries:
     """Test loading from a disk with maximum directory entries."""
 
-    @pytest.mark.parametrize("threaded_drive", DRIVE_MODES)
-    def test_load_first_of_144_files(self, threaded_drive):
+    @pytest.mark.parametrize("drive_runner", DRIVE_MODES)
+    def test_load_first_of_144_files(self, drive_runner):
         """Load F001 (first file in a 144-file directory).
 
         Tests that the emulator handles maximum directory entries.
         """
-        c64 = create_c64_with_disk(MAX_DIR_DISK, threaded_drive=threaded_drive)
+        c64 = create_c64_with_disk(MAX_DIR_DISK, drive_runner=drive_runner)
 
         assert wait_for_ready(c64), "Failed to boot to BASIC"
 
@@ -245,13 +246,13 @@ class TestMaxDirectoryEntries:
         assert (kernal_status & KERNAL_STATUS_ERROR_MASK) == 0, \
             f"KERNAL error: ${kernal_status:02X}"
 
-    @pytest.mark.parametrize("threaded_drive", DRIVE_MODES)
-    def test_load_last_of_144_files(self, threaded_drive):
+    @pytest.mark.parametrize("drive_runner", DRIVE_MODES)
+    def test_load_last_of_144_files(self, drive_runner):
         """Load F144 (last file in a 144-file directory).
 
         Tests that the emulator can traverse an 18-sector directory chain.
         """
-        c64 = create_c64_with_disk(MAX_DIR_DISK, threaded_drive=threaded_drive)
+        c64 = create_c64_with_disk(MAX_DIR_DISK, drive_runner=drive_runner)
 
         assert wait_for_ready(c64), "Failed to boot to BASIC"
 
@@ -263,13 +264,13 @@ class TestMaxDirectoryEntries:
         assert (kernal_status & KERNAL_STATUS_ERROR_MASK) == 0, \
             f"KERNAL error: ${kernal_status:02X}"
 
-    @pytest.mark.parametrize("threaded_drive", DRIVE_MODES)
-    def test_load_directory_with_144_files(self, threaded_drive):
+    @pytest.mark.parametrize("drive_runner", DRIVE_MODES)
+    def test_load_directory_with_144_files(self, drive_runner):
         """LOAD"$",8 on a disk with 144 files.
 
         Tests directory listing with maximum entries across 18 directory sectors.
         """
-        c64 = create_c64_with_disk(MAX_DIR_DISK, threaded_drive=threaded_drive)
+        c64 = create_c64_with_disk(MAX_DIR_DISK, drive_runner=drive_runner)
 
         assert wait_for_ready(c64), "Failed to boot to BASIC"
 
@@ -288,14 +289,14 @@ class TestMaxDirectoryEntries:
 class TestReverseZoneSpan:
     """Test loading files that span zones in reverse order."""
 
-    @pytest.mark.parametrize("threaded_drive", DRIVE_MODES)
-    def test_reverse_zone_span(self, threaded_drive):
+    @pytest.mark.parametrize("drive_runner", DRIVE_MODES)
+    def test_reverse_zone_span(self, drive_runner):
         """Load REVERSE which spans from Zone 1 back to Zone 2.
 
         Tests that the emulator handles backward zone transitions correctly.
         File starts on track 25 (Zone 1) and jumps back to track 24 (Zone 2).
         """
-        c64 = create_c64_with_disk(REVERSE_DISK, threaded_drive=threaded_drive)
+        c64 = create_c64_with_disk(REVERSE_DISK, drive_runner=drive_runner)
 
         assert wait_for_ready(c64), "Failed to boot to BASIC"
 

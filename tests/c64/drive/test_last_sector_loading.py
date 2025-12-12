@@ -45,8 +45,9 @@ requires_last_sector_fixtures = pytest.mark.skipif(
 
 # Drive modes to test
 DRIVE_MODES = [
-    pytest.param(True, id="threaded-drive"),
-    pytest.param(False, id="synchronous-drive"),
+    pytest.param("threaded", id="threaded"),
+    pytest.param("synchronous", id="synchronous"),
+    pytest.param("multiprocess", id="multiprocess"),
 ]
 
 # Maximum cycles for operations
@@ -117,7 +118,7 @@ def wait_for_load(c64, max_cycles=MAX_LOAD_CYCLES):
     return False
 
 
-def create_c64_with_disk(threaded_drive: bool) -> C64:
+def create_c64_with_disk(drive_runner: bool) -> C64:
     """Create a C64 instance with last-sector test disk."""
     c64 = C64(
         rom_dir=C64_ROMS_DIR,
@@ -129,7 +130,7 @@ def create_c64_with_disk(threaded_drive: bool) -> C64:
     c64.attach_drive(
         drive_rom_path=C64_ROMS_DIR / "1541.rom",
         disk_path=LAST_SECTOR_DISK,
-        threaded=threaded_drive,
+        runner=drive_runner,
     )
     return c64
 
@@ -147,14 +148,14 @@ def get_loaded_program_size(c64) -> int:
 class TestLastSectorZone2:
     """Test loading files that use the last sector in Zone 2 (sector 18)."""
 
-    @pytest.mark.parametrize("threaded_drive", DRIVE_MODES)
-    def test_last_sector_zone2_s18(self, threaded_drive):
+    @pytest.mark.parametrize("drive_runner", DRIVE_MODES)
+    def test_last_sector_zone2_s18(self, drive_runner):
         """Load LASTZ2-T19: Uses all 19 sectors on track 19, including S18.
 
         This tests that sector 18 (the last sector in Zone 2) is readable.
         Zone 2 has 19 sectors per track (0-18).
         """
-        c64 = create_c64_with_disk(threaded_drive=threaded_drive)
+        c64 = create_c64_with_disk(drive_runner=drive_runner)
 
         assert wait_for_ready(c64), "Failed to boot to BASIC"
 
@@ -171,14 +172,14 @@ class TestLastSectorZone2:
 class TestLastSectorZone1:
     """Test loading files that use the last sector in Zone 1 (sector 17)."""
 
-    @pytest.mark.parametrize("threaded_drive", DRIVE_MODES)
-    def test_last_sector_zone1_s17(self, threaded_drive):
+    @pytest.mark.parametrize("drive_runner", DRIVE_MODES)
+    def test_last_sector_zone1_s17(self, drive_runner):
         """Load LASTZ1-T25: Uses all 18 sectors on track 25, including S17.
 
         This tests that sector 17 (the last sector in Zone 1) is readable.
         Zone 1 has 18 sectors per track (0-17).
         """
-        c64 = create_c64_with_disk(threaded_drive=threaded_drive)
+        c64 = create_c64_with_disk(drive_runner=drive_runner)
 
         assert wait_for_ready(c64), "Failed to boot to BASIC"
 
@@ -194,14 +195,14 @@ class TestLastSectorZone1:
 class TestLastSectorZone0:
     """Test loading files that use the last sector in Zone 0 (sector 16)."""
 
-    @pytest.mark.parametrize("threaded_drive", DRIVE_MODES)
-    def test_last_sector_zone0_s16(self, threaded_drive):
+    @pytest.mark.parametrize("drive_runner", DRIVE_MODES)
+    def test_last_sector_zone0_s16(self, drive_runner):
         """Load LASTZ0-T31: Uses all 17 sectors on track 31, including S16.
 
         This tests that sector 16 (the last sector in Zone 0) is readable.
         Zone 0 has 17 sectors per track (0-16).
         """
-        c64 = create_c64_with_disk(threaded_drive=threaded_drive)
+        c64 = create_c64_with_disk(drive_runner=drive_runner)
 
         assert wait_for_ready(c64), "Failed to boot to BASIC"
 

@@ -43,8 +43,9 @@ requires_fixtures = pytest.mark.skipif(
 
 # Drive modes to test
 DRIVE_MODES = [
-    pytest.param(True, id="threaded-drive"),
-    pytest.param(False, id="synchronous-drive"),
+    pytest.param("threaded", id="threaded"),
+    pytest.param("synchronous", id="synchronous"),
+    pytest.param("multiprocess", id="multiprocess"),
 ]
 
 # Maximum cycles for operations
@@ -290,7 +291,7 @@ def wait_for_operation(c64, max_cycles):
     return success, error_number
 
 
-def create_c64_with_disk(disk_path: Path, threaded_drive: bool) -> C64:
+def create_c64_with_disk(disk_path: Path, drive_runner: bool) -> C64:
     """Create a C64 instance with the specified disk."""
     c64 = C64(
         rom_dir=C64_ROMS_DIR,
@@ -302,7 +303,7 @@ def create_c64_with_disk(disk_path: Path, threaded_drive: bool) -> C64:
     c64.attach_drive(
         drive_rom_path=C64_ROMS_DIR / "1541.rom",
         disk_path=disk_path,
-        threaded=threaded_drive,
+        runner=drive_runner,
     )
     return c64
 
@@ -311,8 +312,8 @@ def create_c64_with_disk(disk_path: Path, threaded_drive: bool) -> C64:
 class TestSaveCommand:
     """Test SAVE command functionality."""
 
-    @pytest.mark.parametrize("threaded_drive", DRIVE_MODES)
-    def test_save_command_completes(self, threaded_drive, tmp_path):
+    @pytest.mark.parametrize("drive_runner", DRIVE_MODES)
+    def test_save_command_completes(self, drive_runner, tmp_path):
         """Test that SAVE command completes without error.
 
         This is the basic test that SAVE works - the command completes
@@ -322,7 +323,7 @@ class TestSaveCommand:
         test_disk = tmp_path / "test.d64"
         shutil.copy(BASE_DISK, test_disk)
 
-        c64 = create_c64_with_disk(test_disk, threaded_drive=threaded_drive)
+        c64 = create_c64_with_disk(test_disk, drive_runner=drive_runner)
 
         assert wait_for_ready(c64), "Failed to boot to BASIC"
 
@@ -347,8 +348,8 @@ class TestSaveCommand:
 
         assert success, f"Unexpected error state: error={error_number}"
 
-    @pytest.mark.parametrize("threaded_drive", DRIVE_MODES)
-    def test_disk_file_modified(self, threaded_drive, tmp_path):
+    @pytest.mark.parametrize("drive_runner", DRIVE_MODES)
+    def test_disk_file_modified(self, drive_runner, tmp_path):
         """Verify the D64 file is actually modified after SAVE.
 
         Compares the disk file before and after SAVE to ensure
@@ -363,7 +364,7 @@ class TestSaveCommand:
         with open(test_disk, 'rb') as f:
             original_data = f.read()
 
-        c64 = create_c64_with_disk(test_disk, threaded_drive=threaded_drive)
+        c64 = create_c64_with_disk(test_disk, drive_runner=drive_runner)
 
         assert wait_for_ready(c64), "Failed to boot to BASIC"
 
@@ -498,8 +499,8 @@ class TestSaveSizeBoundaries:
     - 253 content bytes + 2 load addr = 255 total = 2 sectors
     """
 
-    @pytest.mark.parametrize("threaded_drive", DRIVE_MODES)
-    def test_save_minimal_program(self, threaded_drive, tmp_path):
+    @pytest.mark.parametrize("drive_runner", DRIVE_MODES)
+    def test_save_minimal_program(self, drive_runner, tmp_path):
         """Save a minimal BASIC program (just one short line).
 
         Tests that very small files save correctly.
@@ -507,7 +508,7 @@ class TestSaveSizeBoundaries:
         test_disk = tmp_path / "test.d64"
         shutil.copy(BASE_DISK, test_disk)
 
-        c64 = create_c64_with_disk(test_disk, threaded_drive=threaded_drive)
+        c64 = create_c64_with_disk(test_disk, drive_runner=drive_runner)
         assert wait_for_ready(c64), "Failed to boot to BASIC"
 
         # Enter minimal program: just '10 ?' which prints a blank line
@@ -524,8 +525,8 @@ class TestSaveSizeBoundaries:
 
         assert success
 
-    @pytest.mark.parametrize("threaded_drive", DRIVE_MODES)
-    def test_save_one_sector_program(self, threaded_drive, tmp_path):
+    @pytest.mark.parametrize("drive_runner", DRIVE_MODES)
+    def test_save_one_sector_program(self, drive_runner, tmp_path):
         """Save a program that fits in exactly one sector (~254 bytes).
 
         Tests the boundary case where file fits in one sector with no overflow.
@@ -533,7 +534,7 @@ class TestSaveSizeBoundaries:
         test_disk = tmp_path / "test.d64"
         shutil.copy(BASE_DISK, test_disk)
 
-        c64 = create_c64_with_disk(test_disk, threaded_drive=threaded_drive)
+        c64 = create_c64_with_disk(test_disk, drive_runner=drive_runner)
         assert wait_for_ready(c64), "Failed to boot to BASIC"
 
         # Create a program that's about 240 bytes (well within one sector)
@@ -554,8 +555,8 @@ class TestSaveSizeBoundaries:
 
         assert success
 
-    @pytest.mark.parametrize("threaded_drive", DRIVE_MODES)
-    def test_save_two_sector_program(self, threaded_drive, tmp_path):
+    @pytest.mark.parametrize("drive_runner", DRIVE_MODES)
+    def test_save_two_sector_program(self, drive_runner, tmp_path):
         """Save a program that requires exactly two sectors (~300-400 bytes).
 
         Tests the sector boundary crossing case.
@@ -563,7 +564,7 @@ class TestSaveSizeBoundaries:
         test_disk = tmp_path / "test.d64"
         shutil.copy(BASE_DISK, test_disk)
 
-        c64 = create_c64_with_disk(test_disk, threaded_drive=threaded_drive)
+        c64 = create_c64_with_disk(test_disk, drive_runner=drive_runner)
         assert wait_for_ready(c64), "Failed to boot to BASIC"
 
         # Create a program that's about 350 bytes (needs 2 sectors)
@@ -584,8 +585,8 @@ class TestSaveSizeBoundaries:
 
         assert success
 
-    @pytest.mark.parametrize("threaded_drive", DRIVE_MODES)
-    def test_save_multi_sector_program(self, threaded_drive, tmp_path):
+    @pytest.mark.parametrize("drive_runner", DRIVE_MODES)
+    def test_save_multi_sector_program(self, drive_runner, tmp_path):
         """Save a program spanning multiple sectors (~1KB, needs 4+ sectors).
 
         Tests handling of multiple sector writes.
@@ -593,7 +594,7 @@ class TestSaveSizeBoundaries:
         test_disk = tmp_path / "test.d64"
         shutil.copy(BASE_DISK, test_disk)
 
-        c64 = create_c64_with_disk(test_disk, threaded_drive=threaded_drive)
+        c64 = create_c64_with_disk(test_disk, drive_runner=drive_runner)
         assert wait_for_ready(c64), "Failed to boot to BASIC"
 
         # Create a program that's about 1000 bytes (needs ~4 sectors)
@@ -623,8 +624,8 @@ class TestSaveLoadRoundtrip:
     survives a roundtrip through save and load operations.
     """
 
-    @pytest.mark.parametrize("threaded_drive", DRIVE_MODES)
-    def test_save_load_roundtrip_small(self, threaded_drive, tmp_path):
+    @pytest.mark.parametrize("drive_runner", DRIVE_MODES)
+    def test_save_load_roundtrip_small(self, drive_runner, tmp_path):
         """Save a program, NEW, load it back, verify it's correct.
 
         Uses a small program with known content.
@@ -632,7 +633,7 @@ class TestSaveLoadRoundtrip:
         test_disk = tmp_path / "test.d64"
         shutil.copy(BASE_DISK, test_disk)
 
-        c64 = create_c64_with_disk(test_disk, threaded_drive=threaded_drive)
+        c64 = create_c64_with_disk(test_disk, drive_runner=drive_runner)
         assert wait_for_ready(c64), "Failed to boot to BASIC"
 
         # Enter a specific program we can verify
@@ -670,8 +671,8 @@ class TestSaveLoadRoundtrip:
         assert loaded_size == original_size, \
             f"Loaded size {loaded_size} != original size {original_size}"
 
-    @pytest.mark.parametrize("threaded_drive", DRIVE_MODES)
-    def test_save_load_roundtrip_larger(self, threaded_drive, tmp_path):
+    @pytest.mark.parametrize("drive_runner", DRIVE_MODES)
+    def test_save_load_roundtrip_larger(self, drive_runner, tmp_path):
         """Save and load a larger program spanning multiple sectors.
 
         Tests data integrity across sector boundaries.
@@ -684,7 +685,7 @@ class TestSaveLoadRoundtrip:
         test_disk = tmp_path / "roundtrip.d64"
         d64.save(test_disk)
 
-        c64 = create_c64_with_disk(test_disk, threaded_drive=threaded_drive)
+        c64 = create_c64_with_disk(test_disk, drive_runner=drive_runner)
         assert wait_for_ready(c64), "Failed to boot to BASIC"
 
         # Create a larger program (~800 bytes, ~3 sectors)
@@ -733,8 +734,8 @@ class TestSaveLoadRoundtrip:
 class TestSaveOverwrite:
     """Test overwriting existing files with SAVE."""
 
-    @pytest.mark.parametrize("threaded_drive", DRIVE_MODES)
-    def test_save_replace_existing(self, threaded_drive, tmp_path):
+    @pytest.mark.parametrize("drive_runner", DRIVE_MODES)
+    def test_save_replace_existing(self, drive_runner, tmp_path):
         """Save a file, then save a different file with same name using @:.
 
         The @: prefix tells the drive to replace an existing file.
@@ -742,7 +743,7 @@ class TestSaveOverwrite:
         test_disk = tmp_path / "test.d64"
         shutil.copy(BASE_DISK, test_disk)
 
-        c64 = create_c64_with_disk(test_disk, threaded_drive=threaded_drive)
+        c64 = create_c64_with_disk(test_disk, drive_runner=drive_runner)
         assert wait_for_ready(c64), "Failed to boot to BASIC"
 
         # Save first version
@@ -846,8 +847,8 @@ class TestSaveFillDisk:
         pytest -m slow tests/c64/drive/test_save.py
     """
 
-    @pytest.mark.parametrize("threaded_drive", DRIVE_MODES)
-    def test_fill_disk_with_multiple_files(self, threaded_drive, tmp_path):
+    @pytest.mark.parametrize("drive_runner", DRIVE_MODES)
+    def test_fill_disk_with_multiple_files(self, drive_runner, tmp_path):
         """Save multiple files and verify each via roundtrip.
 
         Creates 4 files of various sizes to test saving multiple files
@@ -867,7 +868,7 @@ class TestSaveFillDisk:
         test_disk = tmp_path / "filltest.d64"
         d64.save(test_disk)
 
-        c64 = create_c64_with_disk(test_disk, threaded_drive=threaded_drive)
+        c64 = create_c64_with_disk(test_disk, drive_runner=drive_runner)
         assert wait_for_ready(c64), "Failed to boot to BASIC"
 
         # Define files with varying sizes (reduced for test speed)
@@ -947,10 +948,10 @@ class TestSaveFillDisk:
 
         # All files verified successfully
 
-    @pytest.mark.parametrize("threaded_drive", [
+    @pytest.mark.parametrize("drive_runner", [
         pytest.param(False, id="synchronous-drive"),
     ])
-    def test_fill_disk_larger_files(self, threaded_drive, tmp_path):
+    def test_fill_disk_larger_files(self, drive_runner, tmp_path):
         """Test saving larger multi-sector files.
 
         Creates 2 larger files (15-20 sectors each) to test saving
@@ -964,7 +965,7 @@ class TestSaveFillDisk:
         test_disk = tmp_path / "capacity.d64"
         d64.save(test_disk)
 
-        c64 = create_c64_with_disk(test_disk, threaded_drive=threaded_drive)
+        c64 = create_c64_with_disk(test_disk, drive_runner=drive_runner)
         assert wait_for_ready(c64), "Failed to boot to BASIC"
 
         # Save 2 larger files
@@ -1038,10 +1039,10 @@ class TestSaveZones:
     to different zones by pre-filling zone 3 to force allocation elsewhere.
     """
 
-    @pytest.mark.parametrize("threaded_drive", [
+    @pytest.mark.parametrize("drive_runner", [
         pytest.param(False, id="synchronous-drive"),
     ])
-    def test_save_to_zone_2(self, threaded_drive, tmp_path):
+    def test_save_to_zone_2(self, drive_runner, tmp_path):
         """Test saving when allocation is forced to zone 2 (tracks 18-24).
 
         Pre-fills zone 3 (tracks 1-17) to force new file allocation to zone 2.
@@ -1068,7 +1069,7 @@ class TestSaveZones:
         test_disk = tmp_path / "zone2test.d64"
         d64.save(test_disk)
 
-        c64 = create_c64_with_disk(test_disk, threaded_drive=threaded_drive)
+        c64 = create_c64_with_disk(test_disk, drive_runner=drive_runner)
         assert wait_for_ready(c64), "Failed to boot to BASIC"
 
         # Create a small program (3 sectors to span zone 2)
@@ -1105,10 +1106,10 @@ class TestSaveZones:
         loaded_bytes = [c64.memory.read(basic_start + i) for i in range(32)]
         assert loaded_bytes == original_bytes, "Zone 2 save: content mismatch"
 
-    @pytest.mark.parametrize("threaded_drive", [
+    @pytest.mark.parametrize("drive_runner", [
         pytest.param(False, id="synchronous-drive"),
     ])
-    def test_save_to_zone_1(self, threaded_drive, tmp_path):
+    def test_save_to_zone_1(self, drive_runner, tmp_path):
         """Test saving when allocation is forced to zone 1 (tracks 25-30).
 
         Pre-fills zones 3 and 2 to force new file allocation to zone 1.
@@ -1131,7 +1132,7 @@ class TestSaveZones:
         test_disk = tmp_path / "zone1test.d64"
         d64.save(test_disk)
 
-        c64 = create_c64_with_disk(test_disk, threaded_drive=threaded_drive)
+        c64 = create_c64_with_disk(test_disk, drive_runner=drive_runner)
         assert wait_for_ready(c64), "Failed to boot to BASIC"
 
         lines = create_program_lines("Z1", 3)
@@ -1164,10 +1165,10 @@ class TestSaveZones:
         loaded_bytes = [c64.memory.read(basic_start + i) for i in range(32)]
         assert loaded_bytes == original_bytes, "Zone 1 save: content mismatch"
 
-    @pytest.mark.parametrize("threaded_drive", [
+    @pytest.mark.parametrize("drive_runner", [
         pytest.param(False, id="synchronous-drive"),
     ])
-    def test_save_to_zone_0(self, threaded_drive, tmp_path):
+    def test_save_to_zone_0(self, drive_runner, tmp_path):
         """Test saving when allocation is forced to zone 0 (tracks 31-35).
 
         Pre-fills zones 3, 2, and 1 to force new file allocation to zone 0.
@@ -1191,7 +1192,7 @@ class TestSaveZones:
         test_disk = tmp_path / "zone0test.d64"
         d64.save(test_disk)
 
-        c64 = create_c64_with_disk(test_disk, threaded_drive=threaded_drive)
+        c64 = create_c64_with_disk(test_disk, drive_runner=drive_runner)
         assert wait_for_ready(c64), "Failed to boot to BASIC"
 
         lines = create_program_lines("Z0", 3)

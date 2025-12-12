@@ -41,8 +41,9 @@ requires_wildcard_fixtures = pytest.mark.skipif(
 
 # Drive modes to test
 DRIVE_MODES = [
-    pytest.param(True, id="threaded-drive"),
-    pytest.param(False, id="synchronous-drive"),
+    pytest.param("threaded", id="threaded"),
+    pytest.param("synchronous", id="synchronous"),
+    pytest.param("multiprocess", id="multiprocess"),
 ]
 
 # Maximum cycles for operations
@@ -144,7 +145,7 @@ def wait_for_load_any_address(c64, expected_start: int, max_cycles=MAX_LOAD_CYCL
     return False
 
 
-def create_c64_with_disk(threaded_drive: bool) -> C64:
+def create_c64_with_disk(drive_runner: bool) -> C64:
     """Create a C64 instance with wildcard test disk."""
     c64 = C64(
         rom_dir=C64_ROMS_DIR,
@@ -156,7 +157,7 @@ def create_c64_with_disk(threaded_drive: bool) -> C64:
     c64.attach_drive(
         drive_rom_path=C64_ROMS_DIR / "1541.rom",
         disk_path=WILDCARD_DISK,
-        threaded=threaded_drive,
+        runner=drive_runner,
     )
     return c64
 
@@ -174,14 +175,14 @@ def get_loaded_program_size(c64) -> int:
 class TestWildcardStar:
     """Test LOAD"*",8 - loading first file in directory."""
 
-    @pytest.mark.parametrize("threaded_drive", DRIVE_MODES)
-    def test_load_star(self, threaded_drive):
+    @pytest.mark.parametrize("drive_runner", DRIVE_MODES)
+    def test_load_star(self, drive_runner):
         """LOAD"*",8 loads the first file in directory (FIRST).
 
         This is the most common way users load programs - load whatever
         is first on the disk.
         """
-        c64 = create_c64_with_disk(threaded_drive=threaded_drive)
+        c64 = create_c64_with_disk(drive_runner=drive_runner)
 
         assert wait_for_ready(c64), "Failed to boot to BASIC"
 
@@ -203,13 +204,13 @@ class TestWildcardStar:
 class TestWildcardPattern:
     """Test LOAD with pattern matching wildcards."""
 
-    @pytest.mark.parametrize("threaded_drive", DRIVE_MODES)
-    def test_load_prefix_wildcard(self, threaded_drive):
+    @pytest.mark.parametrize("drive_runner", DRIVE_MODES)
+    def test_load_prefix_wildcard(self, drive_runner):
         """LOAD"TEST*",8 loads first file matching TEST prefix.
 
         Should load TEST-A (first TEST file in directory).
         """
-        c64 = create_c64_with_disk(threaded_drive=threaded_drive)
+        c64 = create_c64_with_disk(drive_runner=drive_runner)
 
         assert wait_for_ready(c64), "Failed to boot to BASIC"
 
@@ -227,8 +228,8 @@ class TestWildcardPattern:
 class TestAbsoluteLoadMode:
     """Test LOAD"FILE",8,1 - loading to file's embedded address."""
 
-    @pytest.mark.parametrize("threaded_drive", DRIVE_MODES)
-    def test_load_absolute_8_1(self, threaded_drive):
+    @pytest.mark.parametrize("drive_runner", DRIVE_MODES)
+    def test_load_absolute_8_1(self, drive_runner):
         """LOAD"HIGHLOAD",8,1 loads to the file's embedded address ($C000).
 
         The ,8,1 parameter tells KERNAL to load to the address specified
@@ -236,7 +237,7 @@ class TestAbsoluteLoadMode:
 
         HIGHLOAD is a program with load address $C000.
         """
-        c64 = create_c64_with_disk(threaded_drive=threaded_drive)
+        c64 = create_c64_with_disk(drive_runner=drive_runner)
 
         assert wait_for_ready(c64), "Failed to boot to BASIC"
 
@@ -267,13 +268,13 @@ class TestAbsoluteLoadMode:
 class TestFilenameEdgeCases:
     """Test loading files with edge case filenames."""
 
-    @pytest.mark.parametrize("threaded_drive", DRIVE_MODES)
-    def test_max_length_filename(self, threaded_drive):
+    @pytest.mark.parametrize("drive_runner", DRIVE_MODES)
+    def test_max_length_filename(self, drive_runner):
         """Load a file with maximum 16-character filename.
 
         Tests that the full filename is matched correctly.
         """
-        c64 = create_c64_with_disk(threaded_drive=threaded_drive)
+        c64 = create_c64_with_disk(drive_runner=drive_runner)
 
         assert wait_for_ready(c64), "Failed to boot to BASIC"
 

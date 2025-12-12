@@ -23,6 +23,8 @@ from .drive1541 import Drive1541
 from .iec_bus import IECBus
 from .threaded_iec_bus import ThreadedIECBus
 from .threaded_drive import ThreadedDrive1541
+from .multiprocess_iec_bus import MultiprocessIECBus, SharedIECState
+from .multiprocess_drive import MultiprocessDrive1541
 
 __all__ = [
     "VIA6522",
@@ -31,4 +33,7 @@ __all__ = [
     "IECBus",
     "ThreadedIECBus",
     "ThreadedDrive1541",
+    "MultiprocessIECBus",
+    "SharedIECState",
+    "MultiprocessDrive1541",
 ]

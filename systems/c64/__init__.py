@@ -77,7 +77,16 @@ from c64.memory import (
     CIA2_END,
     BASIC_PROGRAM_START,
 )
-from c64.drive import Drive1541, IECBus, D64Image, ThreadedDrive1541, ThreadedIECBus
+from c64.drive import (
+    Drive1541,
+    IECBus,
+    D64Image,
+    ThreadedDrive1541,
+    ThreadedIECBus,
+    MultiprocessDrive1541,
+    MultiprocessIECBus,
+    SharedIECState,
+)
 
 logging.basicConfig(level=logging.CRITICAL)
 log = logging.getLogger("c64")
@@ -381,18 +390,12 @@ class C64:
             action="store_true",
             help="Disable 1541 drive emulation (faster boot, no disk access)",
         )
-        drive_mode_group = drive_group.add_mutually_exclusive_group()
-        drive_mode_group.add_argument(
-            "--threaded-drive",
-            action="store_true",
-            dest="threaded_drive",
-            help="Use threaded IEC bus for drive operations (default)",
-        )
-        drive_mode_group.add_argument(
-            "--synchronous-drive",
-            action="store_true",
-            dest="synchronous_drive",
-            help="Use synchronous IEC bus for drive operations (cycle-accurate)",
+        drive_group.add_argument(
+            "--drive-runner",
+            choices=["threaded", "synchronous", "multiprocess"],
+            default="threaded",
+            dest="drive_runner",
+            help="Drive emulation runner: threaded (default), synchronous, or multiprocess",
         )
 
         # Execution control options
@@ -407,6 +410,11 @@ class C64:
             "--stop-on-basic",
             action="store_true",
             help="Stop execution when BASIC prompt is ready (useful for benchmarking boot time)",
+        )
+        exec_group.add_argument(
+            "--stop-on-illegal-instruction",
+            action="store_true",
+            help="Stop and dump crash report when an illegal instruction is executed",
         )
 
         # Output options
@@ -769,7 +777,7 @@ class C64:
         log.info(f"PC initialized to ${self.cpu.PC:04X} (from reset vector at ${self.RESET_VECTOR_ADDR:04X})")
 
     def attach_drive(self, drive_rom_path: Optional[Path] = None, disk_path: Optional[Path] = None,
-                      threaded: bool = True) -> bool:
+                      runner: str = "threaded") -> bool:
         """Attach a 1541 disk drive to the IEC bus.
 
         Supports multiple ROM formats:
@@ -779,8 +787,10 @@ class C64:
         Args:
             drive_rom_path: Path to 1541 DOS ROM (default: auto-detect in rom_dir)
             disk_path: Optional D64 disk image to insert
-            threaded: If True (default), run drive in separate thread for performance.
-                      If False, use synchronous mode for cycle-accurate emulation.
+            runner: Drive execution mode:
+                    - "threaded" (default): Uses ThreadedIECBus for atomic state
+                    - "synchronous": Cycle-accurate emulation
+                    - "multiprocess": Drive runs in separate process (bypasses GIL)
 
         Returns:
             True if drive attached successfully, False otherwise
@@ -842,11 +852,88 @@ class C64:
             log.warning("  Expected: 1541.rom (16KB) or 1541-c000.bin + 1541-e000.bin (8KB each)")
             return False
 
-        # Track whether we're using threaded mode
-        self.drive_threaded = threaded
+        # Track the runner mode
+        self.drive_runner = runner
 
-        if threaded:
-            # Threaded mode: Drive runs in its own thread for better performance
+        if runner == "multiprocess":
+            # Multiprocess mode: Drive runs in separate process (bypasses GIL)
+            import os
+            import time
+
+            # Create shared memory for IEC state (use PID + time for uniqueness)
+            unique_id = f"{os.getpid()}_{int(time.time() * 1000) % 1000000}"
+            self._iec_shared_state = SharedIECState(
+                name=f"iec_bus_{unique_id}",
+                create=True
+            )
+
+            # Create multiprocess IEC bus
+            self.iec_bus = MultiprocessIECBus(self._iec_shared_state)
+            self.iec_bus.connect_c64(self.cia2)
+            self.cia2.set_iec_bus(self.iec_bus)
+
+            # Create and start drive subprocess
+            self.drive8 = MultiprocessDrive1541(device_number=8)
+            self.drive8.start_process(
+                rom_path=rom_path,
+                rom_path_e000=rom_path_e000,
+                disk_path=disk_path,
+                shared_state=self._iec_shared_state,
+            )
+
+            # Wire up tick synchronization Events
+            tick_request, tick_done = self.drive8.get_tick_events()
+            self.iec_bus.set_tick_events(tick_request, tick_done)
+
+            self.drive_enabled = True
+
+            # Set up synchronous tick-based execution
+            # Similar to threaded mode but with batching to reduce IPC overhead
+            self._mp_accumulated_cycles = 0
+            self._mp_batch_size = 100  # Cycles per IPC call (balance timing vs overhead)
+
+            def sync_multiprocess(cpu, cycles):
+                """Accumulate cycles and sync with drive subprocess."""
+                if self.drive8 and self._iec_shared_state:
+                    # Update IEC bus state
+                    self.iec_bus.update()
+
+                    # Accumulate cycles
+                    self._mp_accumulated_cycles += cycles
+
+                    # When batch is full, sync with drive
+                    if self._mp_accumulated_cycles >= self._mp_batch_size:
+                        batch = self._mp_accumulated_cycles
+                        self._mp_accumulated_cycles = 0
+
+                        # Update C64 cycle counter
+                        self._iec_shared_state.set_c64_cycles(cpu.cycles_executed)
+
+                        # Wait for drive to catch up to our cycle count
+                        tick_request, tick_done = self.drive8.get_tick_events()
+                        target_cycles = cpu.cycles_executed
+
+                        # Signal drive and wait for it to process
+                        import time
+                        max_wait = 0.1  # seconds
+                        start = time.time()
+                        while time.time() - start < max_wait:
+                            tick_request.set()
+                            drive_cycles = self._iec_shared_state.get_drive_cycles()
+                            if drive_cycles >= target_cycles - 50:
+                                break
+                            time.sleep(0.00001)  # 10us
+
+                        # Read bus state after drive processed
+                        self.iec_bus.atn, self.iec_bus.clk, self.iec_bus.data = \
+                            self._iec_shared_state.get_bus_state(is_drive=False)
+
+            self.cpu.post_tick_callback = sync_multiprocess
+            log.info(f"1541 drive 8 attached in MULTIPROCESS mode (ROM: {rom_path.name})")
+            return True
+
+        elif runner == "threaded":
+            # Threaded mode: Uses ThreadedIECBus for atomic state updates
             self.iec_bus = ThreadedIECBus()
             self.iec_bus.connect_c64(self.cia2)
             self.cia2.set_iec_bus(self.iec_bus)
@@ -862,7 +949,7 @@ class C64:
             # Create standard drive 8
             self.drive8 = Drive1541(device_number=8)
 
-        # Create a separate CPU for the drive
+        # Create a separate CPU for the drive (for threaded/synchronous modes)
         # The 1541 uses a full 6502 (not 6510)
         drive_cpu = CPU(cpu_variant=CPUVariant.NMOS_6502, verbose_cycles=False)
         self.drive8.cpu = drive_cpu
@@ -880,7 +967,7 @@ class C64:
             return False
 
         # Connect drive to IEC bus
-        if threaded:
+        if runner == "threaded":
             self.drive8.connect_to_threaded_bus(self.iec_bus)
         else:
             self.iec_bus.connect_drive(self.drive8)
@@ -897,7 +984,7 @@ class C64:
 
         self.drive_enabled = True
 
-        if threaded:
+        if runner == "threaded":
             # Threaded mode: Uses ThreadedIECBus for thread-safe state
             # but still runs drive in lockstep via post_tick_callback
             # The threading benefit is that bus state updates are atomic
@@ -970,6 +1057,24 @@ class C64:
         """Eject the disk from drive 8."""
         if self.drive8 is not None:
             self.drive8.eject_disk()
+
+    def cleanup(self) -> None:
+        """Clean up resources (drive subprocess, shared memory, etc.)."""
+        # Stop multiprocess drive if running
+        if self.drive8 is not None:
+            if isinstance(self.drive8, MultiprocessDrive1541):
+                self.drive8.stop_process()
+            elif isinstance(self.drive8, ThreadedDrive1541):
+                self.drive8.stop_thread()
+
+        # Clean up shared memory
+        if hasattr(self, '_iec_shared_state') and self._iec_shared_state is not None:
+            try:
+                self._iec_shared_state.close()
+                self._iec_shared_state.unlink()
+            except Exception:
+                pass
+            self._iec_shared_state = None
 
     def load_cartridge(self, path: Path, cart_type: str = "auto") -> None:
         """Load a cartridge ROM file.
@@ -2004,6 +2109,7 @@ class C64:
         stop_on_basic: bool = False,
         stop_on_kernal_input: bool = False,
         throttle: bool = True,
+        stop_on_illegal_instruction: bool = False,
     ) -> None:
         """Run the C64 emulator.
 
@@ -2014,7 +2120,10 @@ class C64:
             stop_on_kernal_input: If True, stop execution when KERNAL is waiting for keyboard input
             throttle: If True, throttle emulation to real-time speed (default: True)
                      Use --no-throttle for benchmarks to run at maximum speed
+            stop_on_illegal_instruction: If True, dump crash report on illegal instruction
         """
+        # Store for use in error handler
+        self._stop_on_illegal_instruction = stop_on_illegal_instruction
         log.info(f"Starting execution at PC=${self.cpu.PC:04X}")
         log.info("Press Ctrl+C to stop")
 
@@ -2194,15 +2303,20 @@ class C64:
                 log.info("\nExecution interrupted by user")
             log.info(f"PC=${self.cpu.PC:04X}, Cycles={self.cpu.cycles_executed}")
         except (errors.IllegalCPUInstructionError, RuntimeError) as e:
-            log.exception(f"Execution error at PC=${self.cpu.PC:04X}")
-            # Show context around error
-            try:
-                pc_val = int(self.cpu.PC)
-                self.show_disassembly(max(0, pc_val - 10), num_instructions=20)
-                self.dump_memory(max(0, pc_val - 16), min(0xFFFF, pc_val + 16))
-            except (IndexError, KeyError, ValueError):
-                log.exception("Could not display context")
-            raise
+            # Check if we should dump crash report and stop (vs raising)
+            if getattr(self, '_stop_on_illegal_instruction', False) and isinstance(e, errors.IllegalCPUInstructionError):
+                self.dump_crash_report(exception=e)
+                # Don't re-raise - just stop execution cleanly
+            else:
+                log.exception(f"Execution error at PC=${self.cpu.PC:04X}")
+                # Show context around error
+                try:
+                    pc_val = int(self.cpu.PC)
+                    self.show_disassembly(max(0, pc_val - 10), num_instructions=20)
+                    self.dump_memory(max(0, pc_val - 16), min(0xFFFF, pc_val + 16))
+                except (IndexError, KeyError, ValueError):
+                    log.exception("Could not display context")
+                raise
         finally:
             # Record execution end time for speedup calculation
             import time
@@ -2211,6 +2325,8 @@ class C64:
             self._clear_pc_callback()
             # Show screen buffer on termination
             self.show_screen()
+            # Clean up drive subprocess if running
+            self.cleanup()
 
     def dump_memory(self, start: int, end: int, bytes_per_line: int = 16) -> None:
         """Dump memory contents for debugging.
@@ -2235,6 +2351,102 @@ class C64:
                 else:
                     print("   ", end="")
             print()
+
+    def dump_crash_report(self, exception: Exception = None) -> None:
+        """Dump comprehensive crash report for illegal instruction or other CPU errors.
+
+        Arguments:
+            exception: The exception that triggered the crash (optional)
+        """
+        print("\n" + "=" * 70)
+        print("CRASH REPORT - Illegal Instruction")
+        print("=" * 70)
+
+        # Show exception info
+        if exception:
+            print(f"\nException: {type(exception).__name__}: {exception}")
+
+        # CPU state
+        pc = int(self.cpu.PC)
+        opcode = self.cpu.ram[pc]
+        print(f"\nCPU State at crash:")
+        print(f"  PC:     ${pc:04X}  (opcode: ${opcode:02X})")
+        print(f"  A:      ${self.cpu.A:02X}")
+        print(f"  X:      ${self.cpu.X:02X}")
+        print(f"  Y:      ${self.cpu.Y:02X}")
+        print(f"  S:      ${self.cpu.S & 0xFF:02X}  (stack pointer)")
+        print(f"  P:      ${self.cpu._flags.value:02X}  (N={int(self.cpu.N)} V={int(self.cpu.V)} B={int(self.cpu.B)} D={int(self.cpu.D)} I={int(self.cpu.I)} Z={int(self.cpu.Z)} C={int(self.cpu.C)})")
+        print(f"  Cycles: {self.cpu.cycles_executed:,}")
+
+        # Memory region
+        region = "RAM"
+        if 0xA000 <= pc <= 0xBFFF and (self.memory.read(1) & 0x03):
+            region = "BASIC ROM"
+        elif 0xD000 <= pc <= 0xDFFF:
+            region = "I/O" if (self.memory.read(1) & 0x04) else "CHAR ROM"
+        elif 0xE000 <= pc <= 0xFFFF and (self.memory.read(1) & 0x02):
+            region = "KERNAL ROM"
+        print(f"  Region: {region}")
+
+        # Stack contents (show 16 bytes from current SP)
+        sp = self.cpu.S & 0xFF
+        print(f"\nStack (${sp:02X} -> $FF):")
+        stack_addr = 0x0100 + sp
+        print("       ", end="")
+        for i in range(16):
+            print(f" {i:02X}", end="")
+        print()
+        for row_start in range(stack_addr, 0x0200, 16):
+            if row_start >= 0x0200:
+                break
+            print(f"  {row_start:04X}:", end="")
+            for offset in range(16):
+                addr = row_start + offset
+                if addr < 0x0200:
+                    print(f" {self.cpu.ram[addr]:02X}", end="")
+                else:
+                    print("   ", end="")
+            print()
+
+        # Disassembly around crash
+        print(f"\nDisassembly around PC ${pc:04X}:")
+        try:
+            start_addr = max(0, pc - 16)
+            self.show_disassembly(start_addr, num_instructions=20)
+        except Exception as e:
+            print(f"  Could not disassemble: {e}")
+
+        # Memory around PC
+        print(f"\nMemory around PC ${pc:04X}:")
+        mem_start = max(0, pc - 32)
+        mem_end = min(0xFFFF, pc + 32)
+        self.dump_memory(mem_start, mem_end)
+
+        # Zero page (important for 6502)
+        print("\nZero page ($00-$FF):")
+        self.dump_memory(0x00, 0xFF)
+
+        # Key C64 memory locations
+        print("\nKey C64 Memory Locations:")
+        print(f"  $00 (DDR):       ${self.cpu.ram[0x00]:02X}")
+        print(f"  $01 (Bank):      ${self.cpu.ram[0x01]:02X}")
+        print(f"  $90 (KERNAL ST): ${self.cpu.ram[0x90]:02X}")
+        print(f"  $9D (Direct):    ${self.cpu.ram[0x9D]:02X}")
+        print(f"  $2B-$2C (TXTTAB):${self.cpu.ram[0x2B]:02X}{self.cpu.ram[0x2C]:02X}")
+        print(f"  $2D-$2E (VARTAB):${self.cpu.ram[0x2D]:02X}{self.cpu.ram[0x2E]:02X}")
+
+        # Vectors
+        print("\nInterrupt Vectors:")
+        nmi = self.cpu.ram[0xFFFA] | (self.cpu.ram[0xFFFB] << 8)
+        reset = self.cpu.ram[0xFFFC] | (self.cpu.ram[0xFFFD] << 8)
+        irq = self.cpu.ram[0xFFFE] | (self.cpu.ram[0xFFFF] << 8)
+        print(f"  NMI:   ${nmi:04X}")
+        print(f"  RESET: ${reset:04X}")
+        print(f"  IRQ:   ${irq:04X}")
+
+        print("\n" + "=" * 70)
+        print("END CRASH REPORT")
+        print("=" * 70 + "\n")
 
     def get_speed_stats(self) -> Optional[dict]:
         """Calculate CPU execution speed statistics.
@@ -4200,6 +4412,9 @@ class C64:
             _sys.stdout.flush()
             self.show_screen()
 
+            # Clean up drive subprocess if running
+            self.cleanup()
+
             # Re-raise CPU error if any
             if cpu_error:
                 raise cpu_error
@@ -4332,12 +4547,9 @@ def main() -> int | None:
         disk_path = getattr(args, 'disk', None)
         if disk_path and not getattr(args, 'no_drive', False):
             drive_rom = getattr(args, 'drive_rom', None)
-            # Use threaded mode by default, synchronous if --synchronous-drive is specified
-            use_synchronous = getattr(args, 'synchronous_drive', False)
-            use_threaded = not use_synchronous
-            if c64.attach_drive(drive_rom_path=drive_rom, disk_path=disk_path, threaded=use_threaded):
-                mode_str = "synchronous" if use_synchronous else "threaded"
-                log.info(f"Disk inserted: {disk_path.name} (mode: {mode_str})")
+            drive_runner = getattr(args, 'drive_runner', 'threaded')
+            if c64.attach_drive(drive_rom_path=drive_rom, disk_path=disk_path, runner=drive_runner):
+                log.info(f"Disk inserted: {disk_path.name} (runner: {drive_runner})")
             else:
                 log.info("No 1541 ROM found - disk drive disabled")
 
@@ -4435,7 +4647,7 @@ def main() -> int | None:
         if args.run and args.program and not args.no_roms:
             log.info("Auto-run enabled: booting until KERNAL waits for input...")
             # Boot until KERNAL is waiting for keyboard input (more reliable than stop_on_basic)
-            c64.run(max_cycles=args.max_cycles, stop_on_kernal_input=True, throttle=args.throttle)
+            c64.run(max_cycles=args.max_cycles, stop_on_kernal_input=True, throttle=args.throttle, stop_on_illegal_instruction=args.stop_on_illegal_instruction)
             # Re-load the program AFTER boot (KERNAL clears $0801 during boot)
             # This is the same as a real C64's LOAD command
             actual_load_addr, program_end_addr = c64.load_program(
@@ -4452,12 +4664,12 @@ def main() -> int | None:
             if args.display == "repl":
                 c64.run_repl(max_cycles=args.max_cycles)
             else:
-                c64.run(max_cycles=args.max_cycles, throttle=args.throttle)
+                c64.run(max_cycles=args.max_cycles, throttle=args.throttle, stop_on_illegal_instruction=args.stop_on_illegal_instruction)
         elif args.display == "repl":
             # REPL mode: interactive terminal with keyboard input
             c64.run_repl(max_cycles=args.max_cycles)
         else:
-            c64.run(max_cycles=args.max_cycles, stop_on_basic=args.stop_on_basic, throttle=args.throttle)
+            c64.run(max_cycles=args.max_cycles, stop_on_basic=args.stop_on_basic, throttle=args.throttle, stop_on_illegal_instruction=args.stop_on_illegal_instruction)
 
         # Dump final state
         c64.dump_registers()

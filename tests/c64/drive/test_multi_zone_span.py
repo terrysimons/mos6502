@@ -45,8 +45,9 @@ requires_multi_zone_fixtures = pytest.mark.skipif(
 
 # Drive modes to test
 DRIVE_MODES = [
-    pytest.param(True, id="threaded-drive"),
-    pytest.param(False, id="synchronous-drive"),
+    pytest.param("threaded", id="threaded"),
+    pytest.param("synchronous", id="synchronous"),
+    pytest.param("multiprocess", id="multiprocess"),
 ]
 
 # Maximum cycles for operations
@@ -117,7 +118,7 @@ def wait_for_load(c64, max_cycles=MAX_LOAD_CYCLES):
     return False
 
 
-def create_c64_with_disk(threaded_drive: bool) -> C64:
+def create_c64_with_disk(drive_runner: bool) -> C64:
     """Create a C64 instance with multi-zone span test disk."""
     c64 = C64(
         rom_dir=C64_ROMS_DIR,
@@ -129,7 +130,7 @@ def create_c64_with_disk(threaded_drive: bool) -> C64:
     c64.attach_drive(
         drive_rom_path=C64_ROMS_DIR / "1541.rom",
         disk_path=MULTI_ZONE_DISK,
-        threaded=threaded_drive,
+        runner=drive_runner,
     )
     return c64
 
@@ -147,8 +148,8 @@ def get_loaded_program_size(c64) -> int:
 class TestMultiZoneSpan:
     """Test loading files spanning multiple zone boundaries."""
 
-    @pytest.mark.parametrize("threaded_drive", DRIVE_MODES)
-    def test_span_three_zones(self, threaded_drive):
+    @pytest.mark.parametrize("drive_runner", DRIVE_MODES)
+    def test_span_three_zones(self, drive_runner):
         """Load SPAN-3ZONES: Spans Zone 3 -> Zone 2 -> Zone 1.
 
         This file spans tracks 17-25, crossing two zone boundaries:
@@ -161,7 +162,7 @@ class TestMultiZoneSpan:
         Tests that the drive correctly handles multiple speed zone
         transitions during a single file load.
         """
-        c64 = create_c64_with_disk(threaded_drive=threaded_drive)
+        c64 = create_c64_with_disk(drive_runner=drive_runner)
 
         assert wait_for_ready(c64), "Failed to boot to BASIC"
 

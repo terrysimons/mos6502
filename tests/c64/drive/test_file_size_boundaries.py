@@ -48,8 +48,9 @@ requires_file_size_fixtures = pytest.mark.skipif(
 
 # Drive modes to test
 DRIVE_MODES = [
-    pytest.param(True, id="threaded-drive"),
-    pytest.param(False, id="synchronous-drive"),
+    pytest.param("threaded", id="threaded"),
+    pytest.param("synchronous", id="synchronous"),
+    pytest.param("multiprocess", id="multiprocess"),
 ]
 
 # Maximum cycles for operations
@@ -120,7 +121,7 @@ def wait_for_load(c64, max_cycles=MAX_LOAD_CYCLES):
     return False
 
 
-def create_c64_with_disk(threaded_drive: bool) -> C64:
+def create_c64_with_disk(drive_runner: bool) -> C64:
     """Create a C64 instance with file-size test disk."""
     c64 = C64(
         rom_dir=C64_ROMS_DIR,
@@ -132,7 +133,7 @@ def create_c64_with_disk(threaded_drive: bool) -> C64:
     c64.attach_drive(
         drive_rom_path=C64_ROMS_DIR / "1541.rom",
         disk_path=FILE_SIZE_DISK,
-        threaded=threaded_drive,
+        runner=drive_runner,
     )
     return c64
 
@@ -178,15 +179,15 @@ def wait_for_load_or_ready(c64, max_cycles=MAX_LOAD_CYCLES):
 class TestMinimalFiles:
     """Test loading minimal-size files."""
 
-    @pytest.mark.parametrize("threaded_drive", DRIVE_MODES)
-    def test_empty_file(self, threaded_drive):
+    @pytest.mark.parametrize("drive_runner", DRIVE_MODES)
+    def test_empty_file(self, drive_runner):
         """Load SIZE-0: Empty file (0 content bytes).
 
         Tests handling of a file with just a load address and no content.
         Note: Empty files may not change BASIC pointers, so we just check
         that the load completes without error.
         """
-        c64 = create_c64_with_disk(threaded_drive=threaded_drive)
+        c64 = create_c64_with_disk(drive_runner=drive_runner)
 
         assert wait_for_ready(c64), "Failed to boot to BASIC"
 
@@ -200,13 +201,13 @@ class TestMinimalFiles:
         assert (kernal_status & KERNAL_STATUS_ERROR_MASK) == 0, \
             f"KERNAL error: ${kernal_status:02X}"
 
-    @pytest.mark.parametrize("threaded_drive", DRIVE_MODES)
-    def test_one_byte_file(self, threaded_drive):
+    @pytest.mark.parametrize("drive_runner", DRIVE_MODES)
+    def test_one_byte_file(self, drive_runner):
         """Load SIZE-1: Single byte file.
 
         Tests handling of the smallest non-empty file.
         """
-        c64 = create_c64_with_disk(threaded_drive=threaded_drive)
+        c64 = create_c64_with_disk(drive_runner=drive_runner)
 
         assert wait_for_ready(c64), "Failed to boot to BASIC"
 
@@ -222,14 +223,14 @@ class TestMinimalFiles:
 class TestSectorBoundaryFiles:
     """Test loading files at exact sector boundaries."""
 
-    @pytest.mark.parametrize("threaded_drive", DRIVE_MODES)
-    def test_exact_one_sector_252_bytes(self, threaded_drive):
+    @pytest.mark.parametrize("drive_runner", DRIVE_MODES)
+    def test_exact_one_sector_252_bytes(self, drive_runner):
         """Load SIZE-252: Exactly fills one sector (252 content + 2 load addr = 254).
 
         This file fits perfectly in one sector with no overflow.
         Tests the exact boundary case.
         """
-        c64 = create_c64_with_disk(threaded_drive=threaded_drive)
+        c64 = create_c64_with_disk(drive_runner=drive_runner)
 
         assert wait_for_ready(c64), "Failed to boot to BASIC"
 
@@ -240,14 +241,14 @@ class TestSectorBoundaryFiles:
         program_size = get_loaded_program_size(c64)
         assert 250 <= program_size <= 260, f"Program should be ~252 bytes, got {program_size}"
 
-    @pytest.mark.parametrize("threaded_drive", DRIVE_MODES)
-    def test_one_byte_overflow_253_bytes(self, threaded_drive):
+    @pytest.mark.parametrize("drive_runner", DRIVE_MODES)
+    def test_one_byte_overflow_253_bytes(self, drive_runner):
         """Load SIZE-253: One byte overflow (253 content + 2 load addr = 255).
 
         This file overflows into a second sector by exactly 1 byte.
         Tests the boundary+1 case.
         """
-        c64 = create_c64_with_disk(threaded_drive=threaded_drive)
+        c64 = create_c64_with_disk(drive_runner=drive_runner)
 
         assert wait_for_ready(c64), "Failed to boot to BASIC"
 
@@ -258,13 +259,13 @@ class TestSectorBoundaryFiles:
         program_size = get_loaded_program_size(c64)
         assert 250 <= program_size <= 260, f"Program should be ~253 bytes, got {program_size}"
 
-    @pytest.mark.parametrize("threaded_drive", DRIVE_MODES)
-    def test_two_byte_overflow_254_bytes(self, threaded_drive):
+    @pytest.mark.parametrize("drive_runner", DRIVE_MODES)
+    def test_two_byte_overflow_254_bytes(self, drive_runner):
         """Load SIZE-254: Two byte overflow (254 content + 2 load addr = 256).
 
         This file overflows into a second sector by exactly 2 bytes.
         """
-        c64 = create_c64_with_disk(threaded_drive=threaded_drive)
+        c64 = create_c64_with_disk(drive_runner=drive_runner)
 
         assert wait_for_ready(c64), "Failed to boot to BASIC"
 
@@ -280,14 +281,14 @@ class TestSectorBoundaryFiles:
 class TestTrackFillFiles:
     """Test loading files that fill entire tracks."""
 
-    @pytest.mark.parametrize("threaded_drive", DRIVE_MODES)
-    def test_exact_track_fill(self, threaded_drive):
+    @pytest.mark.parametrize("drive_runner", DRIVE_MODES)
+    def test_exact_track_fill(self, drive_runner):
         """Load TRACK-FILL: Fills exactly 21 sectors (one Zone 3 track).
 
         Tests loading a file that uses exactly the capacity of one track
         without overflow to the next track.
         """
-        c64 = create_c64_with_disk(threaded_drive=threaded_drive)
+        c64 = create_c64_with_disk(drive_runner=drive_runner)
 
         assert wait_for_ready(c64), "Failed to boot to BASIC"
 

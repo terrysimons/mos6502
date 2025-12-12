@@ -40,8 +40,9 @@ requires_dir_edge_fixtures = pytest.mark.skipif(
 
 # Drive modes to test
 DRIVE_MODES = [
-    pytest.param(True, id="threaded-drive"),
-    pytest.param(False, id="synchronous-drive"),
+    pytest.param("threaded", id="threaded"),
+    pytest.param("synchronous", id="synchronous"),
+    pytest.param("multiprocess", id="multiprocess", marks=pytest.mark.slow),
 ]
 
 # Maximum cycles for operations
@@ -116,7 +117,7 @@ def wait_for_load(c64, max_cycles=MAX_LOAD_CYCLES):
     return False
 
 
-def create_c64_with_disk(threaded_drive: bool) -> C64:
+def create_c64_with_disk(drive_runner: bool) -> C64:
     """Create a C64 instance with directory edge case test disk."""
     c64 = C64(
         rom_dir=C64_ROMS_DIR,
@@ -128,7 +129,7 @@ def create_c64_with_disk(threaded_drive: bool) -> C64:
     c64.attach_drive(
         drive_rom_path=C64_ROMS_DIR / "1541.rom",
         disk_path=DIR_EDGE_DISK,
-        threaded=threaded_drive,
+        runner=drive_runner,
     )
     return c64
 
@@ -137,13 +138,13 @@ def create_c64_with_disk(threaded_drive: bool) -> C64:
 class TestMultiSectorDirectory:
     """Test loading files from multi-sector directories."""
 
-    @pytest.mark.parametrize("threaded_drive", DRIVE_MODES)
-    def test_load_from_first_directory_sector(self, threaded_drive):
+    @pytest.mark.parametrize("drive_runner", DRIVE_MODES)
+    def test_load_from_first_directory_sector(self, drive_runner):
         """Load FILE-01 from first directory sector.
 
         Tests that files in the first 8 entries (first dir sector) load correctly.
         """
-        c64 = create_c64_with_disk(threaded_drive=threaded_drive)
+        c64 = create_c64_with_disk(drive_runner=drive_runner)
 
         assert wait_for_ready(c64), "Failed to boot to BASIC"
 
@@ -155,14 +156,14 @@ class TestMultiSectorDirectory:
         assert (kernal_status & KERNAL_STATUS_ERROR_MASK) == 0, \
             f"KERNAL error: ${kernal_status:02X}"
 
-    @pytest.mark.parametrize("threaded_drive", DRIVE_MODES)
-    def test_load_from_second_directory_sector(self, threaded_drive):
+    @pytest.mark.parametrize("drive_runner", DRIVE_MODES)
+    def test_load_from_second_directory_sector(self, drive_runner):
         """Load FILE-11 from second directory sector.
 
         Tests that files in entries 9+ (second dir sector) load correctly.
         The drive must follow the directory chain from sector 1 to sector 2.
         """
-        c64 = create_c64_with_disk(threaded_drive=threaded_drive)
+        c64 = create_c64_with_disk(drive_runner=drive_runner)
 
         assert wait_for_ready(c64), "Failed to boot to BASIC"
 
@@ -174,13 +175,13 @@ class TestMultiSectorDirectory:
         assert (kernal_status & KERNAL_STATUS_ERROR_MASK) == 0, \
             f"KERNAL error: ${kernal_status:02X}"
 
-    @pytest.mark.parametrize("threaded_drive", DRIVE_MODES)
-    def test_load_last_file_in_directory(self, threaded_drive):
+    @pytest.mark.parametrize("drive_runner", DRIVE_MODES)
+    def test_load_last_file_in_directory(self, drive_runner):
         """Load FILE-12 (last file in directory).
 
         Tests that the last file in a multi-sector directory loads correctly.
         """
-        c64 = create_c64_with_disk(threaded_drive=threaded_drive)
+        c64 = create_c64_with_disk(drive_runner=drive_runner)
 
         assert wait_for_ready(c64), "Failed to boot to BASIC"
 
@@ -197,14 +198,14 @@ class TestMultiSectorDirectory:
 class TestDeletedFileEntries:
     """Test directory parsing with deleted file entries."""
 
-    @pytest.mark.parametrize("threaded_drive", DRIVE_MODES)
-    def test_load_file_after_deleted_entry(self, threaded_drive):
+    @pytest.mark.parametrize("drive_runner", DRIVE_MODES)
+    def test_load_file_after_deleted_entry(self, drive_runner):
         """Load FILE-06 which comes after a deleted entry (FILE-05).
 
         Tests that the drive correctly skips deleted entries ($00 file type)
         when searching for files.
         """
-        c64 = create_c64_with_disk(threaded_drive=threaded_drive)
+        c64 = create_c64_with_disk(drive_runner=drive_runner)
 
         assert wait_for_ready(c64), "Failed to boot to BASIC"
 
@@ -216,13 +217,13 @@ class TestDeletedFileEntries:
         assert (kernal_status & KERNAL_STATUS_ERROR_MASK) == 0, \
             f"KERNAL error: ${kernal_status:02X}"
 
-    @pytest.mark.parametrize("threaded_drive", DRIVE_MODES)
-    def test_load_file_after_multiple_deletions(self, threaded_drive):
+    @pytest.mark.parametrize("drive_runner", DRIVE_MODES)
+    def test_load_file_after_multiple_deletions(self, drive_runner):
         """Load FILE-11 which comes after FILE-10 (deleted in second sector).
 
         Tests directory parsing across sectors with deleted entries.
         """
-        c64 = create_c64_with_disk(threaded_drive=threaded_drive)
+        c64 = create_c64_with_disk(drive_runner=drive_runner)
 
         assert wait_for_ready(c64), "Failed to boot to BASIC"
 
@@ -239,13 +240,13 @@ class TestDeletedFileEntries:
 class TestDirectoryListing:
     """Test directory listing with edge cases."""
 
-    @pytest.mark.parametrize("threaded_drive", DRIVE_MODES)
-    def test_load_directory_multi_sector(self, threaded_drive):
+    @pytest.mark.parametrize("drive_runner", DRIVE_MODES)
+    def test_load_directory_multi_sector(self, drive_runner):
         """LOAD"$",8 on a disk with multi-sector directory.
 
         Tests that directory listing correctly follows sector chain.
         """
-        c64 = create_c64_with_disk(threaded_drive=threaded_drive)
+        c64 = create_c64_with_disk(drive_runner=drive_runner)
 
         assert wait_for_ready(c64), "Failed to boot to BASIC"
 

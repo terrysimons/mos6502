@@ -41,8 +41,9 @@ requires_sector_chain_fixtures = pytest.mark.skipif(
 
 # Drive modes to test
 DRIVE_MODES = [
-    pytest.param(True, id="threaded-drive"),
-    pytest.param(False, id="synchronous-drive"),
+    pytest.param("threaded", id="threaded"),
+    pytest.param("synchronous", id="synchronous"),
+    pytest.param("multiprocess", id="multiprocess"),
 ]
 
 # Maximum cycles for operations
@@ -113,7 +114,7 @@ def wait_for_load(c64, max_cycles=MAX_LOAD_CYCLES):
     return False
 
 
-def create_c64_with_disk(threaded_drive: bool) -> C64:
+def create_c64_with_disk(drive_runner: bool) -> C64:
     """Create a C64 instance with sector-chain test disk."""
     c64 = C64(
         rom_dir=C64_ROMS_DIR,
@@ -125,7 +126,7 @@ def create_c64_with_disk(threaded_drive: bool) -> C64:
     c64.attach_drive(
         drive_rom_path=C64_ROMS_DIR / "1541.rom",
         disk_path=SECTOR_CHAIN_DISK,
-        threaded=threaded_drive,
+        runner=drive_runner,
     )
     return c64
 
@@ -143,15 +144,15 @@ def get_loaded_program_size(c64) -> int:
 class TestInterleavePattern:
     """Test loading files with interleaved sector allocation."""
 
-    @pytest.mark.parametrize("threaded_drive", DRIVE_MODES)
-    def test_interleaved_sector_chain(self, threaded_drive):
+    @pytest.mark.parametrize("drive_runner", DRIVE_MODES)
+    def test_interleaved_sector_chain(self, drive_runner):
         """Load INTERLEAVE: Sectors allocated with interleave 10 pattern.
 
         Sector chain: S0, S10, S20, S9, S19, S8, S18, S7, S17, S6, ...
         This is the standard 1541 allocation pattern for performance.
         Tests that non-sequential sector reads work correctly.
         """
-        c64 = create_c64_with_disk(threaded_drive=threaded_drive)
+        c64 = create_c64_with_disk(drive_runner=drive_runner)
 
         assert wait_for_ready(c64), "Failed to boot to BASIC"
 
@@ -167,14 +168,14 @@ class TestInterleavePattern:
 class TestWraparoundPattern:
     """Test loading files where sector chain wraps within a track."""
 
-    @pytest.mark.parametrize("threaded_drive", DRIVE_MODES)
-    def test_wraparound_sector_chain(self, threaded_drive):
+    @pytest.mark.parametrize("drive_runner", DRIVE_MODES)
+    def test_wraparound_sector_chain(self, drive_runner):
         """Load WRAPAROUND: Sector chain wraps S20 -> S0 within track.
 
         Sector chain: S15, S16, S17, S18, S19, S20, S0, S1, S2, ...
         Tests that the drive correctly handles sector number wrap-around.
         """
-        c64 = create_c64_with_disk(threaded_drive=threaded_drive)
+        c64 = create_c64_with_disk(drive_runner=drive_runner)
 
         assert wait_for_ready(c64), "Failed to boot to BASIC"
 
@@ -190,14 +191,14 @@ class TestWraparoundPattern:
 class TestFragmentedFile:
     """Test loading files with non-contiguous sector allocation."""
 
-    @pytest.mark.parametrize("threaded_drive", DRIVE_MODES)
-    def test_fragmented_file_load(self, threaded_drive):
+    @pytest.mark.parametrize("drive_runner", DRIVE_MODES)
+    def test_fragmented_file_load(self, drive_runner):
         """Load FRAGMENTED: Sectors scattered across multiple tracks.
 
         Sector chain jumps between tracks 3, 4, 5 in non-sequential order.
         Tests head seeking during file load.
         """
-        c64 = create_c64_with_disk(threaded_drive=threaded_drive)
+        c64 = create_c64_with_disk(drive_runner=drive_runner)
 
         assert wait_for_ready(c64), "Failed to boot to BASIC"
 
@@ -213,14 +214,14 @@ class TestFragmentedFile:
 class TestBackwardTrackReferences:
     """Test loading files with backward track references in chain."""
 
-    @pytest.mark.parametrize("threaded_drive", DRIVE_MODES)
-    def test_backward_track_chain(self, threaded_drive):
+    @pytest.mark.parametrize("drive_runner", DRIVE_MODES)
+    def test_backward_track_chain(self, drive_runner):
         """Load BACKWARD: Sector chain includes backward track jumps.
 
         Chain pattern: T6/S0 -> T5/S0 -> T4/S0 -> T6/S1 -> T5/S1 -> ...
         Tests that the drive correctly handles head movement in both directions.
         """
-        c64 = create_c64_with_disk(threaded_drive=threaded_drive)
+        c64 = create_c64_with_disk(drive_runner=drive_runner)
 
         assert wait_for_ready(c64), "Failed to boot to BASIC"
 
