@@ -1893,6 +1893,50 @@ class C64:
         else:
             return "???"
 
+    def _get_instruction_color(self, opcode: int) -> str:
+        """Get ANSI color code for instruction based on type.
+
+        Args:
+            opcode: The instruction opcode byte
+
+        Returns:
+            ANSI escape sequence for the instruction color:
+            - Light blue (96): Common instructions identical across variants
+            - Yellow (93): Instructions that differ between variants (ADC, SBC, JMP, BRK)
+            - Red (91): Illegal/undocumented instructions
+        """
+        from mos6502 import instructions
+
+        # ANSI color codes
+        LIGHT_BLUE = "\033[96m"  # Light cyan/blue
+        YELLOW = "\033[93m"      # Yellow
+        RED = "\033[91m"         # Red
+        RESET = "\033[0m"
+
+        if opcode not in instructions.OPCODE_LOOKUP:
+            return RED  # Unknown opcode
+
+        opcode_obj = instructions.OPCODE_LOOKUP[opcode]
+        package = opcode_obj.package
+
+        # Check if it's an illegal instruction
+        if ".illegal." in package:
+            return RED
+
+        # Check if it's a variant-specific instruction
+        # These have different implementations for 6502 vs 65C02
+        variant_instructions = {
+            "_adc",   # Decimal mode differs
+            "_sbc",   # Decimal mode differs
+            "_jmp",   # Indirect JMP page boundary bug
+            "_brk",   # Flag handling differs
+        }
+        for variant_inst in variant_instructions:
+            if variant_inst in package:
+                return YELLOW
+
+        return LIGHT_BLUE
+
     def _format_cpu_status(self, prefix: str = "C64") -> str:
         """Format C64 CPU status line.
 
@@ -1900,12 +1944,25 @@ class C64:
             prefix: Label prefix for the status line
 
         Returns:
-            Formatted status string
+            Formatted status string with colorized instruction display:
+            - Light blue: Common instructions identical across variants
+            - Yellow: Instructions that differ between variants (ADC, SBC, JMP, BRK)
+            - Red: Illegal/undocumented instructions
         """
         from mos6502.flags import format_flags
+        RESET = "\033[0m"
+
         flags = format_flags(self.cpu._flags.value)
         region = self.get_pc_region()
         pc = self.cpu.PC
+
+        # Get opcode for colorization
+        try:
+            opcode = self.cpu.ram[pc]
+            color = self._get_instruction_color(opcode)
+        except (KeyError, IndexError):
+            color = "\033[91m"  # Red for unknown
+            opcode = None
 
         # Disassemble current instruction
         try:
@@ -1920,8 +1977,11 @@ class C64:
             except IndexError:
                 inst_display = "???"
 
+        # Apply color to instruction display
+        colored_inst = f"{color}{inst_display:20s}{RESET}"
+
         return (f"{prefix}: Cycles: {self.cpu.cycles_executed:,} | "
-                f"PC=${pc:04X}[{region}] {inst_display:20s} | "
+                f"PC=${pc:04X}[{region}] {colored_inst} | "
                 f"A=${self.cpu.A:02X} X=${self.cpu.X:02X} "
                 f"Y=${self.cpu.Y:02X} S=${self.cpu.S & 0xFF:02X} P={flags}")
 
@@ -1929,13 +1989,18 @@ class C64:
         """Format 1541 drive CPU status line.
 
         Returns:
-            Formatted status string, or empty string if no drive attached
+            Formatted status string with colorized instruction display:
+            - Light blue: Common instructions identical across variants
+            - Yellow: Instructions that differ between variants (ADC, SBC, JMP, BRK)
+            - Red: Illegal/undocumented instructions
+            Empty string if no drive attached.
         """
         if not self.drive8 or not self.drive8.cpu:
             return ""
 
         from mos6502.flags import format_flags
         from mos6502 import instructions
+        RESET = "\033[0m"
 
         drive_cpu = self.drive8.cpu
         flags = format_flags(drive_cpu._flags.value)
@@ -1947,6 +2012,9 @@ class C64:
             b0 = self.drive8.memory.read(pc)
             b1 = self.drive8.memory.read(pc + 1)
             b2 = self.drive8.memory.read(pc + 2)
+
+            # Get color for this opcode
+            color = self._get_instruction_color(b0)
 
             # Use the instruction set to get mnemonic and operand size
             if b0 in instructions.InstructionSet.map:
@@ -1995,9 +2063,13 @@ class C64:
 
         except Exception:
             inst_display = "???"
+            color = "\033[91m"  # Red for errors
+
+        # Apply color to instruction display
+        colored_inst = f"{color}{inst_display:20s}{RESET}"
 
         return (f"1541: Cycles: {drive_cpu.cycles_executed:,} | "
-                f"PC=${pc:04X}[{region}] {inst_display:20s} | "
+                f"PC=${pc:04X}[{region}] {colored_inst} | "
                 f"A=${drive_cpu.A:02X} X=${drive_cpu.X:02X} "
                 f"Y=${drive_cpu.Y:02X} S=${drive_cpu.S & 0xFF:02X} P={flags}")
 
