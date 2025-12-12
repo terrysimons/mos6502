@@ -392,6 +392,11 @@ class C64VIC:
         self.ram_snapshot = None
         self.ram_snapshot_bank = 0  # Base address of snapshotted bank
         self.color_snapshot = None
+        # VIC register snapshot for consistent scroll/mode during render
+        # Games like Pitfall change scroll mid-frame; we capture at VBlank
+        self.regs_snapshot = None
+        # VIC bank snapshot (from CIA2) - games may switch banks mid-frame
+        self.vic_bank_snapshot = None
         self.c64_memory = None  # Set later via set_memory()
 
         self.log.info(
@@ -427,6 +432,16 @@ class C64VIC:
         new_raster = total_lines % self.raster_lines
 
         if new_raster != self.current_raster:
+            # Snapshot VIC registers at first visible line (~51 on PAL)
+            # This captures scroll/mode values when the game has set them for display
+            # Games like Pitfall change scroll during visible area, reset during border
+            # Snapshotting at VBlank would catch inconsistent values
+            first_visible_line = 51  # First line of display area on PAL/NTSC
+            if self.current_raster < first_visible_line <= new_raster:
+                # Crossed into visible area - snapshot registers now
+                self.regs_snapshot = bytes(self.regs)
+                self.vic_bank_snapshot = self.get_vic_bank()
+
             # Detect frame completion (VBlank) when raster wraps back to 0
             # This happens when new_raster < current_raster (wrapped around)
             if new_raster < self.current_raster:
@@ -604,15 +619,19 @@ class C64VIC:
         - Multicolor bitmap mode (160x200)
         - 8 hardware sprites with priority and collision
         """
+        # Use snapshotted registers if available (captured at VBlank)
+        # This prevents "bouncing" in games like Pitfall that change scroll mid-frame
+        regs = self.regs_snapshot if self.regs_snapshot is not None else self.regs
+
         # Border colour
-        border_color = self.regs[0x20] & 0x0F
+        border_color = regs[0x20] & 0x0F
         surface.fill(COLORS[border_color])
 
-        # Get VIC bank from CIA2
-        vic_bank = self.get_vic_bank()
+        # Get VIC bank - use snapshot if available, otherwise read live from CIA2
+        vic_bank = self.vic_bank_snapshot if self.vic_bank_snapshot is not None else self.get_vic_bank()
 
         # Decode $D018: video matrix base + character/bitmap offset
-        mem_control = self.regs[0x18]
+        mem_control = regs[0x18]
 
         # Bits 4-7: screen base in 1 KB blocks (within VIC bank)
         screen_base = vic_bank + ((mem_control & 0xF0) >> 4) * 0x0400
@@ -621,22 +640,22 @@ class C64VIC:
         char_bank_offset = ((mem_control & 0x0E) >> 1) * 0x0800
 
         # Mode flags from $D011 and $D016
-        ecm = bool(self.regs[0x11] & 0x40)  # Extended Color Mode
-        bmm = bool(self.regs[0x11] & 0x20)  # Bitmap Mode
-        den = bool(self.regs[0x11] & 0x10)  # Display Enable
-        mcm = bool(self.regs[0x16] & 0x10)  # Multicolor Mode
+        ecm = bool(regs[0x11] & 0x40)  # Extended Color Mode
+        bmm = bool(regs[0x11] & 0x20)  # Bitmap Mode
+        den = bool(regs[0x11] & 0x10)  # Display Enable
+        mcm = bool(regs[0x16] & 0x10)  # Multicolor Mode
 
         # Background colours
         bg_colors = [
-            self.regs[0x21] & 0x0F,
-            self.regs[0x22] & 0x0F,
-            self.regs[0x23] & 0x0F,
-            self.regs[0x24] & 0x0F,
+            regs[0x21] & 0x0F,
+            regs[0x22] & 0x0F,
+            regs[0x23] & 0x0F,
+            regs[0x24] & 0x0F,
         ]
 
         # Fine scroll values
-        hscroll = self.regs[0x16] & 0x07
-        vscroll = self.regs[0x11] & 0x07
+        hscroll = regs[0x16] & 0x07
+        vscroll = regs[0x11] & 0x07
 
         x_origin = self.border_left - hscroll
         y_origin = self.border_top - vscroll
@@ -663,7 +682,7 @@ class C64VIC:
             self._render_standard_text(surface, ram, color_ram, char_bank_offset, screen_base, bg_colors[0], x_origin, y_origin)
 
         # Render sprites on top
-        self._render_sprites(surface, ram, vic_bank, screen_base, x_origin, y_origin)
+        self._render_sprites(surface, ram, vic_bank, screen_base, x_origin, y_origin, regs)
 
     def _render_standard_text(self, surface, ram, color_ram, char_offset, screen_base, bg_color, x_origin, y_origin):
         """Render standard 40x25 text mode."""
@@ -821,17 +840,21 @@ class C64VIC:
                         surface.set_at((base_x + x * 2, base_y + y), c)
                         surface.set_at((base_x + x * 2 + 1, base_y + y), c)
 
-    def _render_sprites(self, surface, ram, vic_bank, screen_base, x_origin, y_origin):
+    def _render_sprites(self, surface, ram, vic_bank, screen_base, x_origin, y_origin, regs=None):
         """Render all 8 sprites with priority handling."""
-        sprite_enable = self.regs[0x15]
-        sprite_priority = self.regs[0x1B]  # 0 = sprite in front, 1 = behind
-        sprite_multicolor = self.regs[0x1C]
-        sprite_x_expand = self.regs[0x1D]
-        sprite_y_expand = self.regs[0x17]
-        sprite_x_msb = self.regs[0x10]
+        # Use provided regs (snapshot) or fall back to live regs
+        if regs is None:
+            regs = self.regs
 
-        mc_color0 = self.regs[0x25] & 0x0F
-        mc_color1 = self.regs[0x26] & 0x0F
+        sprite_enable = regs[0x15]
+        sprite_priority = regs[0x1B]  # 0 = sprite in front, 1 = behind
+        sprite_multicolor = regs[0x1C]
+        sprite_x_expand = regs[0x1D]
+        sprite_y_expand = regs[0x17]
+        sprite_x_msb = regs[0x10]
+
+        mc_color0 = regs[0x25] & 0x0F
+        mc_color1 = regs[0x26] & 0x0F
 
         # Sprite pointer base is at end of screen RAM
         sprite_ptr_base = screen_base + 0x3F8
@@ -842,10 +865,10 @@ class C64VIC:
                 continue
 
             # Get sprite position
-            x_pos = self.regs[sprite_num * 2]
+            x_pos = regs[sprite_num * 2]
             if sprite_x_msb & (1 << sprite_num):
                 x_pos += 256
-            y_pos = self.regs[sprite_num * 2 + 1]
+            y_pos = regs[sprite_num * 2 + 1]
 
             # Convert to screen coordinates
             sprite_x = x_pos - 24 + self.border_left
@@ -856,7 +879,7 @@ class C64VIC:
             sprite_data_addr = vic_bank + sprite_ptr * 64
 
             # Get sprite color
-            sprite_color = self.regs[0x27 + sprite_num] & 0x0F
+            sprite_color = regs[0x27 + sprite_num] & 0x0F
 
             # Check expand flags
             x_expand = bool(sprite_x_expand & (1 << sprite_num))
