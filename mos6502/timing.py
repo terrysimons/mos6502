@@ -24,10 +24,10 @@ Usage:
 """
 
 import ctypes
-import logging
+from mos6502.compat import logging
 import sys
 import time
-from typing import Protocol, Optional
+from mos6502.compat import Protocol, Optional
 
 log = logging.getLogger(__name__)
 

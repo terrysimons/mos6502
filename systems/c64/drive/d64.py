@@ -29,12 +29,11 @@ Reference:
 - https://www.c64-wiki.com/wiki/D64
 """
 
-from __future__ import annotations
 
-import logging
+from mos6502.compat import logging
 from pathlib import Path
-from typing import List, Optional, Tuple, Union
-from dataclasses import dataclass
+from mos6502.compat import List, Optional, Tuple, Union
+from mos6502.compat import dataclass
 
 log = logging.getLogger("d64")
 

@@ -1,16 +1,15 @@
 #!/usr/bin/env python3
 """PHP instruction implementation for all 6502 variants."""
 
-from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from mos6502.compat import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from mos6502.core import MOS6502CPU
     from mos6502.memory import Byte
 
 
-def php_implied_0x08(cpu: MOS6502CPU) -> None:
+def php_implied_0x08(cpu: "MOS6502CPU") -> None:
     """Execute PHP (Push Processor Status on Stack) - Implied addressing mode.
 
     Opcode: 0x08
@@ -32,7 +31,7 @@ def php_implied_0x08(cpu: MOS6502CPU) -> None:
     from mos6502.memory import Byte
 
     # Push processor status with B flag set
-    status_with_b: Byte = Byte(cpu.flags.value | 0b00110000)
+    status_with_b: "Byte" = Byte(cpu.flags.value | 0b00110000)
     cpu.write_byte(address=cpu.S, data=status_with_b)
     cpu.S -= 1
     cpu.log.info("i")

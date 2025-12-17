@@ -8,11 +8,10 @@ This module contains:
 - Color constants and ANSI conversion utilities
 """
 
-from __future__ import annotations
 
-import logging
+from mos6502.compat import logging
 import multiprocessing
-from typing import TYPE_CHECKING, NamedTuple
+from mos6502.compat import TYPE_CHECKING, NamedTuple
 
 if TYPE_CHECKING:
     from c64.cia2 import CIA2
@@ -258,7 +257,7 @@ class C64VIC:
     - Light pen registers
     """
 
-    def __init__(self, char_rom, cpu: MOS6502CPU, cia2: CIA2 = None, video_timing: VideoTiming = None) -> None:
+    def __init__(self, char_rom, cpu: "MOS6502CPU", cia2: "CIA2" = None, video_timing: VideoTiming = None) -> None:
         self.log = logging.getLogger("c64.vic")
         self.regs = [0] * 0x40
         self.char_rom = char_rom
@@ -407,7 +406,7 @@ class C64VIC:
             self.cycles_per_frame,
         )
 
-    def set_cia2(self, cia2: CIA2) -> None:
+    def set_cia2(self, cia2: "CIA2") -> None:
         """Set reference to CIA2 for VIC bank selection."""
         self.cia2 = cia2
 

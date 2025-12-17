@@ -5,8 +5,7 @@ Performance optimization: Flags are stored as a plain int, not a bitarray.
 Bit operations use simple masking instead of bitarray indexing.
 """
 
-import logging
-from typing import Self
+from mos6502.compat import logging
 
 # Dedicated logger for flag modifications
 flag_logger = logging.getLogger("mos6502.cpu.flags")
@@ -78,7 +77,7 @@ class FlagsRegister:
 
     __slots__ = ('_value', '_last_logged_value')
 
-    def __init__(self: Self, value: int = 0, endianness: str = "little") -> None:
+    def __init__(self, value: int = 0, endianness: str = "little") -> None:
         """Initialize FlagsRegister.
 
         Args:
@@ -95,20 +94,20 @@ class FlagsRegister:
         self._last_logged_value: int = self._value
 
     @property
-    def value(self: Self) -> int:
+    def value(self) -> int:
         """Return the flags register value as an int (0x00-0xFF)."""
         return self._value
 
     @value.setter
-    def value(self: Self, new_value: int) -> None:
+    def value(self, new_value: int) -> None:
         """Set the flags register value."""
         self._value = int(new_value) & 0xFF
 
-    def __getitem__(self: Self, bit_index: int) -> int:
+    def __getitem__(self, bit_index: int) -> int:
         """Get a flag bit by index. Returns 0 or 1."""
         return (self._value >> bit_index) & 1
 
-    def __setitem__(self: Self, bit_index: int, bit_value: int) -> None:
+    def __setitem__(self, bit_index: int, bit_value: int) -> None:
         """Set a flag bit by index.
 
         Args:
@@ -134,19 +133,19 @@ class FlagsRegister:
             flag_logger.info(f"⎿ {format_flags(self._value)} (0x{self._value:02X})")
             self._last_logged_value = self._value
 
-    def __int__(self: Self) -> int:
+    def __int__(self) -> int:
         """Return the flags value as an int."""
         return self._value
 
-    def __and__(self: Self, other: int) -> int:
+    def __and__(self, other: int) -> int:
         """Bitwise AND with an int."""
         return self._value & other
 
-    def __or__(self: Self, other: int) -> int:
+    def __or__(self, other: int) -> int:
         """Bitwise OR with an int."""
         return self._value | other
 
-    def __eq__(self: Self, other: object) -> bool:
+    def __eq__(self, other: object) -> bool:
         """Compare equality with another FlagsRegister or int."""
         if isinstance(other, FlagsRegister):
             return self._value == other._value
@@ -154,7 +153,7 @@ class FlagsRegister:
             return self._value == other
         return NotImplemented
 
-    def __repr__(self: Self) -> str:
+    def __repr__(self) -> str:
         """Return a string representation."""
         return f"FlagsRegister(0x{self._value:02X})"
 
@@ -191,71 +190,71 @@ class ProcessorStatusFlagsInterface:
     __slots__ = ()  # No instance attributes - just property accessors
 
     @property
-    def C(self: Self) -> bool:  # noqa: N802
+    def C(self) -> bool:  # noqa: N802
         """C is True if the Carry flag is set."""
         return bool(self._flags[C])
 
     @C.setter
-    def C(self: Self, flag: int) -> None:  # noqa: N802
+    def C(self, flag: int) -> None:  # noqa: N802
         """Set the Carry flag."""
         self._flags[C] = flag
 
     @property
-    def Z(self: Self) -> bool:  # noqa: N802
+    def Z(self) -> bool:  # noqa: N802
         """Z is True if the Zero flag is set."""
         return bool(self._flags[Z])
 
     @Z.setter
-    def Z(self: Self, flag: int) -> None:  # noqa: N802
+    def Z(self, flag: int) -> None:  # noqa: N802
         """Set the Zero flag."""
         self._flags[Z] = flag
 
     @property
-    def I(self: Self) -> bool:  # noqa: E743 N802
+    def I(self) -> bool:  # noqa: E743 N802
         """I is True if the IRQ Disable flag is set."""
         return bool(self._flags[I])
 
     @I.setter
-    def I(self: Self, flag: int) -> None:  # noqa: E743 N802
+    def I(self, flag: int) -> None:  # noqa: E743 N802
         """Set the IRQ Disable flag."""
         self._flags[I] = flag
 
     @property
-    def D(self: Self) -> bool:  # noqa: N802
+    def D(self) -> bool:  # noqa: N802
         """D is True if the Decimal Mode flag is set."""
         return bool(self._flags[D])
 
     @D.setter
-    def D(self: Self, flag: int) -> None:  # noqa: N802
+    def D(self, flag: int) -> None:  # noqa: N802
         """Set the Decimal Mode flag."""
         self._flags[D] = flag
 
     @property
-    def B(self: Self) -> bool:  # noqa: N802
+    def B(self) -> bool:  # noqa: N802
         """B is True if the Break flag is set."""
         return bool(self._flags[B])
 
     @B.setter
-    def B(self: Self, flag: int) -> None:  # noqa: N802
+    def B(self, flag: int) -> None:  # noqa: N802
         """Set the Break flag."""
         self._flags[B] = flag
 
     @property
-    def V(self: Self) -> bool:  # noqa: N802
+    def V(self) -> bool:  # noqa: N802
         """V is True if the Overflow flag is set."""
         return bool(self._flags[V])
 
     @V.setter
-    def V(self: Self, flag: int) -> None:  # noqa: N802
+    def V(self, flag: int) -> None:  # noqa: N802
         """Set the Overflow flag."""
         self._flags[V] = flag
 
     @property
-    def N(self: Self) -> bool:  # noqa: N802
+    def N(self) -> bool:  # noqa: N802
         """N is True if the Negative flag is set."""
         return bool(self._flags[N])
 
     @N.setter
-    def N(self: Self, flag: int) -> None:  # noqa: N802
+    def N(self, flag: int) -> None:  # noqa: N802
         """Set the Negative flag."""
         self._flags[N] = flag

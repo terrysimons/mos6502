@@ -1,15 +1,14 @@
 #!/usr/bin/env python3
 """RTS instruction implementation for all 6502 variants."""
 
-from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from mos6502.compat import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from mos6502.core import MOS6502CPU
 
 
-def rts_implied_0x60(cpu: MOS6502CPU) -> None:
+def rts_implied_0x60(cpu: "MOS6502CPU") -> None:
     """Execute RTS (Return from Subroutine) - Implied addressing mode.
 
     Opcode: 0x60

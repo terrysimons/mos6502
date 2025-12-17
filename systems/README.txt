@@ -1,0 +1,1 @@
+{Commodore Zif Diagnostic Cart Case %!s(bool=true)} by {netsurge %!s(bool=true)} on Thingiverse: https://www.thingiverse.com/thing:4085017

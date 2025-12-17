@@ -1,15 +1,14 @@
 #!/usr/bin/env python3
 """LDY instruction implementation for all 6502 variants."""
 
-from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from mos6502.compat import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from mos6502.core import MOS6502CPU
 
 
-def ldy_immediate_0xa0(cpu: MOS6502CPU) -> None:
+def ldy_immediate_0xa0(cpu: "MOS6502CPU") -> None:
     """Execute LDY (Load Y Register with Memory) - Immediate addressing mode.
 
     Opcode: 0xA0
@@ -33,7 +32,7 @@ def ldy_immediate_0xa0(cpu: MOS6502CPU) -> None:
     cpu.log.info("i")
 
 
-def ldy_zeropage_0xa4(cpu: MOS6502CPU) -> None:
+def ldy_zeropage_0xa4(cpu: "MOS6502CPU") -> None:
     """Execute LDY (Load Y Register with Memory) - Zeropage addressing mode.
 
     Opcode: 0xA4
@@ -58,7 +57,7 @@ def ldy_zeropage_0xa4(cpu: MOS6502CPU) -> None:
     cpu.log.info("i")
 
 
-def ldy_zeropage_x_0xb4(cpu: MOS6502CPU) -> None:
+def ldy_zeropage_x_0xb4(cpu: "MOS6502CPU") -> None:
     """Execute LDY (Load Y Register with Memory) - Zeropage,X addressing mode.
 
     Opcode: 0xB4
@@ -83,7 +82,7 @@ def ldy_zeropage_x_0xb4(cpu: MOS6502CPU) -> None:
     cpu.log.info("i")
 
 
-def ldy_absolute_0xac(cpu: MOS6502CPU) -> None:
+def ldy_absolute_0xac(cpu: "MOS6502CPU") -> None:
     """Execute LDY (Load Y Register with Memory) - Absolute addressing mode.
 
     Opcode: 0xAC
@@ -108,7 +107,7 @@ def ldy_absolute_0xac(cpu: MOS6502CPU) -> None:
     cpu.log.info("i")
 
 
-def ldy_absolute_x_0xbc(cpu: MOS6502CPU) -> None:
+def ldy_absolute_x_0xbc(cpu: "MOS6502CPU") -> None:
     """Execute LDY (Load Y Register with Memory) - Absolute,X addressing mode.
 
     Opcode: 0xBC

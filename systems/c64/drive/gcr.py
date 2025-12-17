@@ -33,10 +33,9 @@ Reference:
 - http://www.baltissen.org/newhtm/1541c.htm
 """
 
-from __future__ import annotations
 
-import logging
-from typing import List, Optional, Tuple, TYPE_CHECKING
+from mos6502.compat import logging
+from mos6502.compat import List, Optional, Tuple, TYPE_CHECKING
 
 if TYPE_CHECKING:
     from .d64 import D64Image
@@ -404,7 +403,7 @@ class GCRTrack:
         for i in range(self.track_size):
             self.data[i] = GAP_BYTE
 
-    def build_from_d64(self, d64: D64Image, disk_id: bytes) -> None:
+    def build_from_d64(self, d64: "D64Image", disk_id: bytes) -> None:
         """Build GCR track data from D64 image.
 
         Args:
@@ -534,7 +533,7 @@ class GCRTrack:
         """
         return sector * 372
 
-    def update_sector_from_d64(self, d64: D64Image, sector: int, disk_id: bytes) -> None:
+    def update_sector_from_d64(self, d64: "D64Image", sector: int, disk_id: bytes) -> None:
         """Update a single sector from D64 image data.
 
         This re-encodes just the specified sector, preserving the rest of the track.
@@ -585,7 +584,7 @@ class GCRDisk:
     to read/write data.
     """
 
-    def __init__(self, d64: Optional[D64Image] = None) -> None:
+    def __init__(self, d64: Optional["D64Image"] = None) -> None:
         """Initialize GCR disk.
 
         Args:

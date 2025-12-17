@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """CPU variant definitions for the MOS 6502 family."""
 
-import enum
-from typing import Self
+from mos6502.compat import enum
+from mos6502.compat import Union, Dict
 
 
 # =============================================================================
@@ -28,7 +28,9 @@ class UnstableOpcodeConfig:
         unstable_stores_enabled: Whether SHA/SHX/SHY/TAS are enabled (False for CMOS).
     """
 
-    def __init__(self, ane_const: int | None, unstable_stores_enabled: bool = True) -> None:
+    __slots__ = ('ane_const', 'unstable_stores_enabled')
+
+    def __init__(self, ane_const: Union[int, None], unstable_stores_enabled: bool = True) -> None:
         """Initialize unstable opcode configuration.
 
         Arguments:
@@ -42,7 +44,7 @@ class UnstableOpcodeConfig:
 
 # Default configurations for each CPU variant
 # Users can override these by modifying cpu.unstable_config after creation
-UNSTABLE_OPCODE_DEFAULTS: dict[str, UnstableOpcodeConfig] = {
+UNSTABLE_OPCODE_DEFAULTS: Dict[str, UnstableOpcodeConfig] = {
     "6502": UnstableOpcodeConfig(ane_const=0xFF, unstable_stores_enabled=True),
     "6502A": UnstableOpcodeConfig(ane_const=0xFF, unstable_stores_enabled=True),
     "6502C": UnstableOpcodeConfig(ane_const=0xEE, unstable_stores_enabled=True),  # Some 6502C chips use 0xEE
@@ -59,7 +61,7 @@ class CPUVariant(enum.Enum):
     CMOS_65C02 = "65C02"  # CMOS 65C02 with bug fixes and new instructions
 
     @classmethod
-    def from_string(cls: type[Self], variant: str) -> Self:
+    def from_string(cls, variant: str) -> "CPUVariant":
         """Parse variant string to enum value.
 
         Arguments:
@@ -80,6 +82,6 @@ class CPUVariant(enum.Enum):
             raise ValueError(f"Unknown CPU variant: {variant}. Valid variants: {valid_variants}")
         return variant_map[variant]
 
-    def __str__(self: Self) -> str:
+    def __str__(self) -> str:
         """Return string representation of variant."""
         return self.value

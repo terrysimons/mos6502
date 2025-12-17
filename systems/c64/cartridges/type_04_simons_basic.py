@@ -4,13 +4,13 @@ CRT hardware type 4. A simple 16KB cartridge that extends Commodore BASIC
 with additional commands.
 """
 
-from __future__ import annotations
 
-import logging
+from mos6502.compat import logging
 
 from .base import Cartridge, CartridgeVariant, CartridgeImage, ROML_START, ROML_SIZE, ROMH_START, ROMH_SIZE
 from .rom_builder import TestROMBuilder
 from c64.colors import COLOR_BLUE, COLOR_YELLOW, COLOR_WHITE
+from mos6502.compat import List
 
 log = logging.getLogger("c64.cartridge")
 
@@ -114,7 +114,7 @@ class SimonsBasicCartridge(Cartridge):
     # --- Test cartridge generation ---
 
     @classmethod
-    def get_cartridge_variants(cls) -> list[CartridgeVariant]:
+    def get_cartridge_variants(cls) -> List[CartridgeVariant]:
         """Return all valid configuration variants for Type 4."""
         return [
             CartridgeVariant("", exrom=0, game=1),  # 8KB mode initially

@@ -8,15 +8,14 @@ This module provides the foundation for cartridge emulation including:
 - Error cartridge ROM generation utilities
 """
 
-from __future__ import annotations
 
-import logging
+from mos6502.compat import logging
 import re
 import struct
 from abc import ABC, abstractmethod
-from dataclasses import dataclass, field
-from enum import IntEnum
-from typing import Protocol
+from mos6502.compat import dataclass, field
+from mos6502.compat import IntEnum
+from mos6502.compat import Protocol, Union, List, Dict, Tuple
 
 log = logging.getLogger("c64.cartridge")
 
@@ -236,7 +235,7 @@ class CartridgeImage(CartridgeVariant):
     Inherits variant configuration and adds ROM data and serialization.
     This is the result of calling create_test_cartridge().
     """
-    rom_data: dict = None  # {"roml": bytes, "romh": bytes} or {"banks": list[bytes]}
+    rom_data: dict = None  # {"roml": bytes, "romh": bytes} or {"banks": List[bytes]}
     hardware_type: int = 0
 
     def __post_init__(self):
@@ -376,7 +375,7 @@ class CartridgeImage(CartridgeVariant):
 
 # Mapper requirements for each hardware type
 # This defines what each mapper type needs to function
-MAPPER_REQUIREMENTS: dict[int | CartridgeType, MapperRequirements] = {
+MAPPER_REQUIREMENTS: Union[Dict[int, CartridgeType], MapperRequirements] = {
     # Type 0: Static ROM - simplest type, no banking
     CartridgeType.NORMAL: MapperRequirements(
         uses_roml=True,
@@ -495,7 +494,7 @@ MAPPER_REQUIREMENTS: dict[int | CartridgeType, MapperRequirements] = {
 }
 
 
-def generate_mapper_tests(hw_type: int) -> list[MapperTest]:
+def generate_mapper_tests(hw_type: int) -> List[MapperTest]:
     """Generate the list of tests for a mapper type.
 
     This is the single source of truth for both:
@@ -599,7 +598,7 @@ class CartridgeTestResults:
         if self.mapper_addresses is None:
             self.mapper_addresses = {}
 
-    def to_display_lines(self) -> list[str]:
+    def to_display_lines(self) -> List[str]:
         """Convert results to display lines for error cartridge.
 
         Uses generate_mapper_tests() as the single source of truth for
@@ -712,7 +711,7 @@ class CartridgeTestResults:
         return lines
 
 
-def parse_color_markup(text: str) -> list[tuple[str, int]]:
+def parse_color_markup(text: str) -> List[Tuple[str, int]]:
     """Parse color markup in text and return list of (char, color) tuples.
 
     Color markup codes:
@@ -763,7 +762,7 @@ def parse_color_markup(text: str) -> list[tuple[str, int]]:
     return result
 
 
-def create_error_cartridge_rom(error_lines: list[str], border_color: int = 0x02) -> bytes:
+def create_error_cartridge_rom(error_lines: List[str], border_color: int = 0x02) -> bytes:
     """Create an 8KB cartridge ROM that displays an error/info message.
 
     This is the single source of truth for error cartridge generation,
@@ -1052,7 +1051,7 @@ class Cartridge(ABC):
     # --- Test cartridge generation ---
 
     @classmethod
-    def get_cartridge_variants(cls) -> list[CartridgeVariant]:
+    def get_cartridge_variants(cls) -> List[CartridgeVariant]:
         """Return all valid configuration variants for this cartridge type.
 
         Each variant represents a different mode or configuration that should

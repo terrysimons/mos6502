@@ -1,15 +1,14 @@
 #!/usr/bin/env python3
 """SBC instruction implementation for NMOS 6502 variants (6502, 6502A, 6502C)."""
 
-from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from mos6502.compat import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from mos6502.core import MOS6502CPU
 
 
-def sbc_immediate_0xe9(cpu: MOS6502CPU) -> None:
+def sbc_immediate_0xe9(cpu: "MOS6502CPU") -> None:
     """Execute SBC (Subtract with Carry) - Immediate addressing mode.
 
     Opcode: 0xE9
@@ -54,7 +53,7 @@ def sbc_immediate_0xe9(cpu: MOS6502CPU) -> None:
     cpu.log.info("i")
 
 
-def sbc_zeropage_0xe5(cpu: MOS6502CPU) -> None:
+def sbc_zeropage_0xe5(cpu: "MOS6502CPU") -> None:
     """Execute SBC (Subtract with Carry) - Zero Page addressing mode.
 
     Opcode: 0xE5
@@ -86,7 +85,7 @@ def sbc_zeropage_0xe5(cpu: MOS6502CPU) -> None:
     cpu.log.info("z")
 
 
-def sbc_zeropage_x_0xf5(cpu: MOS6502CPU) -> None:
+def sbc_zeropage_x_0xf5(cpu: "MOS6502CPU") -> None:
     """Execute SBC (Subtract with Carry) - Zero Page,X addressing mode.
 
     Opcode: 0xF5
@@ -118,7 +117,7 @@ def sbc_zeropage_x_0xf5(cpu: MOS6502CPU) -> None:
     cpu.log.info("zx")
 
 
-def sbc_absolute_0xed(cpu: MOS6502CPU) -> None:
+def sbc_absolute_0xed(cpu: "MOS6502CPU") -> None:
     """Execute SBC (Subtract with Carry) - Absolute addressing mode.
 
     Opcode: 0xED
@@ -150,7 +149,7 @@ def sbc_absolute_0xed(cpu: MOS6502CPU) -> None:
     cpu.log.info("a")
 
 
-def sbc_absolute_x_0xfd(cpu: MOS6502CPU) -> None:
+def sbc_absolute_x_0xfd(cpu: "MOS6502CPU") -> None:
     """Execute SBC (Subtract with Carry) - Absolute,X addressing mode.
 
     Opcode: 0xFD
@@ -182,7 +181,7 @@ def sbc_absolute_x_0xfd(cpu: MOS6502CPU) -> None:
     cpu.log.info("ax")
 
 
-def sbc_absolute_y_0xf9(cpu: MOS6502CPU) -> None:
+def sbc_absolute_y_0xf9(cpu: "MOS6502CPU") -> None:
     """Execute SBC (Subtract with Carry) - Absolute,Y addressing mode.
 
     Opcode: 0xF9
@@ -214,7 +213,7 @@ def sbc_absolute_y_0xf9(cpu: MOS6502CPU) -> None:
     cpu.log.info("ay")
 
 
-def sbc_indexed_indirect_x_0xe1(cpu: MOS6502CPU) -> None:
+def sbc_indexed_indirect_x_0xe1(cpu: "MOS6502CPU") -> None:
     """Execute SBC (Subtract with Carry) - Indexed Indirect (X) addressing mode.
 
     Opcode: 0xE1
@@ -246,7 +245,7 @@ def sbc_indexed_indirect_x_0xe1(cpu: MOS6502CPU) -> None:
     cpu.log.info("ix")
 
 
-def sbc_indirect_indexed_y_0xf1(cpu: MOS6502CPU) -> None:
+def sbc_indirect_indexed_y_0xf1(cpu: "MOS6502CPU") -> None:
     """Execute SBC (Subtract with Carry) - Indirect Indexed (Y) addressing mode.
 
     Opcode: 0xF1

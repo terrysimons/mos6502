@@ -4,9 +4,8 @@ CRT hardware type 3. The Final Cartridge III is a popular freezer/utility
 cartridge with 64KB ROM organized as 4 x 16KB banks.
 """
 
-from __future__ import annotations
 
-import logging
+from mos6502.compat import logging
 
 from .base import (
     Cartridge,
@@ -21,6 +20,7 @@ from .base import (
 )
 from .rom_builder import TestROMBuilder
 from c64.colors import COLOR_BLUE, COLOR_YELLOW, COLOR_WHITE
+from mos6502.compat import List
 
 log = logging.getLogger("c64.cartridge")
 
@@ -66,7 +66,7 @@ class FinalCartridgeIIICartridge(Cartridge):
     BANK_SIZE = ROML_SIZE + ROMH_SIZE  # 16KB per bank
     NUM_BANKS = 4
 
-    def __init__(self, banks: list[bytes], name: str = ""):
+    def __init__(self, banks: List[bytes], name: str = ""):
         """Initialize Final Cartridge III.
 
         Args:
@@ -228,7 +228,7 @@ class FinalCartridgeIIICartridge(Cartridge):
     SIGNATURE_ADDR = 0x9FF5    # Each bank has its bank number here
 
     @classmethod
-    def get_cartridge_variants(cls) -> list[CartridgeVariant]:
+    def get_cartridge_variants(cls) -> List[CartridgeVariant]:
         """Return all valid configuration variants for Type 3."""
         return [
             CartridgeVariant("", exrom=0, game=0, extra={"bank_count": 4}),

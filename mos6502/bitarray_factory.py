@@ -22,7 +22,7 @@ performance (PyPy's JIT works better with pure Python code).
 
 import os
 import sys
-from typing import Literal
+from mos6502.compat import Literal, Union
 
 # Auto-detect PyPy and force pure-Python mode
 # PyPy's JIT compiler works much better with pure Python than with C extensions
@@ -30,7 +30,7 @@ if sys.implementation.name == "pypy":
     os.environ.setdefault("MOS6502_PURE_PYTHON", "1")
 
 # Configuration - can be overridden before first use
-_USE_NATIVE: bool | None = None  # None means auto-detect
+_USE_NATIVE: Union[bool, None]= None  # None means auto-detect
 _NATIVE_AVAILABLE: bool = False
 
 # Try to import native bitarray
@@ -71,7 +71,7 @@ def _should_use_native() -> bool:
     return _NATIVE_AVAILABLE
 
 
-def configure(*, use_native: bool | None = None) -> None:
+def configure(*, use_native: Union[bool, None]= None) -> None:
     """Configure which bitarray implementation to use.
 
     Args:

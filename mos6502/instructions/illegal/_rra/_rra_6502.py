@@ -13,15 +13,14 @@ References:
   - http://www.oxyron.de/html/opcodes02.html
 """
 
-from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from mos6502.compat import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from mos6502.core import MOS6502CPU
 
 
-def rra_zeropage_0x67(cpu: MOS6502CPU) -> None:
+def rra_zeropage_0x67(cpu: "MOS6502CPU") -> None:
     """Execute RRA (Rotate Right and Add with Carry) - Zero Page addressing mode.
 
     Opcode: 0x67
@@ -72,7 +71,7 @@ def rra_zeropage_0x67(cpu: MOS6502CPU) -> None:
     cpu.log.info("i")
 
 
-def rra_zeropage_x_0x77(cpu: MOS6502CPU) -> None:
+def rra_zeropage_x_0x77(cpu: "MOS6502CPU") -> None:
     """Execute RRA (Rotate Right and Add with Carry) - Zero Page,X addressing mode.
 
     Opcode: 0x77
@@ -113,7 +112,7 @@ def rra_zeropage_x_0x77(cpu: MOS6502CPU) -> None:
     cpu.log.info("i")
 
 
-def rra_indexed_indirect_x_0x63(cpu: MOS6502CPU) -> None:
+def rra_indexed_indirect_x_0x63(cpu: "MOS6502CPU") -> None:
     """Execute RRA (Rotate Right and Add with Carry) - (Indirect,X) addressing mode.
 
     Opcode: 0x63
@@ -154,7 +153,7 @@ def rra_indexed_indirect_x_0x63(cpu: MOS6502CPU) -> None:
     cpu.log.info("i")
 
 
-def rra_indirect_indexed_y_0x73(cpu: MOS6502CPU) -> None:
+def rra_indirect_indexed_y_0x73(cpu: "MOS6502CPU") -> None:
     """Execute RRA (Rotate Right and Add with Carry) - (Indirect),Y addressing mode.
 
     Opcode: 0x73
@@ -195,7 +194,7 @@ def rra_indirect_indexed_y_0x73(cpu: MOS6502CPU) -> None:
     cpu.log.info("i")
 
 
-def rra_absolute_0x6f(cpu: MOS6502CPU) -> None:
+def rra_absolute_0x6f(cpu: "MOS6502CPU") -> None:
     """Execute RRA (Rotate Right and Add with Carry) - Absolute addressing mode.
 
     Opcode: 0x6F
@@ -236,7 +235,7 @@ def rra_absolute_0x6f(cpu: MOS6502CPU) -> None:
     cpu.log.info("i")
 
 
-def rra_absolute_x_0x7f(cpu: MOS6502CPU) -> None:
+def rra_absolute_x_0x7f(cpu: "MOS6502CPU") -> None:
     """Execute RRA (Rotate Right and Add with Carry) - Absolute,X addressing mode.
 
     Opcode: 0x7F
@@ -285,7 +284,7 @@ def rra_absolute_x_0x7f(cpu: MOS6502CPU) -> None:
     cpu.log.info("ax")
 
 
-def rra_absolute_y_0x7b(cpu: MOS6502CPU) -> None:
+def rra_absolute_y_0x7b(cpu: "MOS6502CPU") -> None:
     """Execute RRA (Rotate Right and Add with Carry) - Absolute,Y addressing mode.
 
     Opcode: 0x7B

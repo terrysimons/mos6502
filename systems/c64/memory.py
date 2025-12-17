@@ -6,10 +6,9 @@ This module contains:
 - C64Memory class that implements the C64's memory banking and I/O mapping
 """
 
-from __future__ import annotations
 
-import logging
-from typing import TYPE_CHECKING, Optional
+from mos6502.compat import logging
+from mos6502.compat import TYPE_CHECKING, Optional
 
 from c64.cartridges import (
     Cartridge,

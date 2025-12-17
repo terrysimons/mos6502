@@ -11,15 +11,14 @@ References:
   - http://www.oxyron.de/html/opcodes02.html
 """
 
-from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from mos6502.compat import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from mos6502.core import MOS6502CPU
 
 
-def isc_zeropage_0xe7(cpu: MOS6502CPU) -> None:
+def isc_zeropage_0xe7(cpu: "MOS6502CPU") -> None:
     """Execute ISC (Increment and Subtract with Carry) - Zero Page addressing mode.
 
     Opcode: 0xE7
@@ -44,7 +43,7 @@ def isc_zeropage_0xe7(cpu: MOS6502CPU) -> None:
     cpu.log.info("i")
 
 
-def isc_zeropage_x_0xf7(cpu: MOS6502CPU) -> None:
+def isc_zeropage_x_0xf7(cpu: "MOS6502CPU") -> None:
     """Execute ISC (Increment and Subtract with Carry) - Zero Page,X addressing mode.
 
     Opcode: 0xF7
@@ -70,7 +69,7 @@ def isc_zeropage_x_0xf7(cpu: MOS6502CPU) -> None:
     cpu.log.info("i")
 
 
-def isc_indexed_indirect_x_0xe3(cpu: MOS6502CPU) -> None:
+def isc_indexed_indirect_x_0xe3(cpu: "MOS6502CPU") -> None:
     """Execute ISC (Increment and Subtract with Carry) - (Indirect,X) addressing mode.
 
     Opcode: 0xE3
@@ -98,7 +97,7 @@ def isc_indexed_indirect_x_0xe3(cpu: MOS6502CPU) -> None:
     cpu.log.info("i")
 
 
-def isc_indirect_indexed_y_0xf3(cpu: MOS6502CPU) -> None:
+def isc_indirect_indexed_y_0xf3(cpu: "MOS6502CPU") -> None:
     """Execute ISC (Increment and Subtract with Carry) - (Indirect),Y addressing mode.
 
     Opcode: 0xF3
@@ -126,7 +125,7 @@ def isc_indirect_indexed_y_0xf3(cpu: MOS6502CPU) -> None:
     cpu.log.info("i")
 
 
-def isc_absolute_0xef(cpu: MOS6502CPU) -> None:
+def isc_absolute_0xef(cpu: "MOS6502CPU") -> None:
     """Execute ISC (Increment and Subtract with Carry) - Absolute addressing mode.
 
     Opcode: 0xEF
@@ -152,7 +151,7 @@ def isc_absolute_0xef(cpu: MOS6502CPU) -> None:
     cpu.log.info("i")
 
 
-def isc_absolute_x_0xff(cpu: MOS6502CPU) -> None:
+def isc_absolute_x_0xff(cpu: "MOS6502CPU") -> None:
     """Execute ISC (Increment and Subtract with Carry) - Absolute,X addressing mode.
 
     Opcode: 0xFF
@@ -179,7 +178,7 @@ def isc_absolute_x_0xff(cpu: MOS6502CPU) -> None:
     cpu.log.info("i")
 
 
-def isc_absolute_y_0xfb(cpu: MOS6502CPU) -> None:
+def isc_absolute_y_0xfb(cpu: "MOS6502CPU") -> None:
     """Execute ISC (Increment and Subtract with Carry) - Absolute,Y addressing mode.
 
     Opcode: 0xFB

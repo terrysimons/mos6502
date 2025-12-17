@@ -4,14 +4,14 @@ CRT hardware type 17. Dinamic cartridges are functionally similar to
 Ocean Type 1 cartridges but with a 4-bit bank select (max 16 banks).
 """
 
-from __future__ import annotations
 
-import logging
+from mos6502.compat import logging
 
 from .base import CartridgeVariant, CartridgeImage, ROML_START, ROML_SIZE
 from .rom_builder import TestROMBuilder
 from .type_05_ocean import OceanType1Cartridge
 from c64.colors import COLOR_BLUE, COLOR_YELLOW, COLOR_WHITE
+from mos6502.compat import List
 
 log = logging.getLogger("c64.cartridge")
 
@@ -65,7 +65,7 @@ class DinamicCartridge(OceanType1Cartridge):
     SIGNATURE_ADDR = 0x9FF5  # Each bank has its bank number here
 
     @classmethod
-    def get_cartridge_variants(cls) -> list[CartridgeVariant]:
+    def get_cartridge_variants(cls) -> List[CartridgeVariant]:
         """Return all valid configuration variants for Type 17."""
         return [
             CartridgeVariant("128k", exrom=0, game=1, extra={"bank_count": 16}),

@@ -1,15 +1,14 @@
 #!/usr/bin/env python3
 """CPY instruction implementation for all 6502 variants."""
 
-from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from mos6502.compat import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from mos6502.core import MOS6502CPU
 
 
-def cpy_immediate_0xc0(cpu: MOS6502CPU) -> None:
+def cpy_immediate_0xc0(cpu: "MOS6502CPU") -> None:
     """Execute CPY (Compare Y Register with Memory) - Immediate addressing mode.
 
     Opcode: 0xC0
@@ -37,7 +36,7 @@ def cpy_immediate_0xc0(cpu: MOS6502CPU) -> None:
     cpu.log.info("i")
 
 
-def cpy_zeropage_0xc4(cpu: MOS6502CPU) -> None:
+def cpy_zeropage_0xc4(cpu: "MOS6502CPU") -> None:
     """Execute CPY (Compare Y Register with Memory) - Zeropage addressing mode.
 
     Opcode: 0xC4
@@ -65,7 +64,7 @@ def cpy_zeropage_0xc4(cpu: MOS6502CPU) -> None:
     cpu.log.info("i")
 
 
-def cpy_absolute_0xcc(cpu: MOS6502CPU) -> None:
+def cpy_absolute_0xcc(cpu: "MOS6502CPU") -> None:
     """Execute CPY (Compare Y Register with Memory) - Absolute addressing mode.
 
     Opcode: 0xCC

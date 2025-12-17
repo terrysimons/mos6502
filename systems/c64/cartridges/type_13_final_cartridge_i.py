@@ -4,9 +4,8 @@ CRT hardware type 13. The Final Cartridge I is a simple 16KB utility
 cartridge with IO-based enable/disable mechanism.
 """
 
-from __future__ import annotations
 
-import logging
+from mos6502.compat import logging
 
 from .base import (
     Cartridge,
@@ -19,6 +18,7 @@ from .base import (
 )
 from .rom_builder import TestROMBuilder
 from c64.colors import COLOR_BLUE, COLOR_YELLOW, COLOR_WHITE
+from mos6502.compat import List, Union
 
 log = logging.getLogger("c64.cartridge")
 
@@ -62,7 +62,7 @@ class FinalCartridgeICartridge(Cartridge):
     def __init__(
         self,
         roml_data: bytes,
-        romh_data: bytes | None = None,
+        romh_data: Union[bytes, None]= None,
         name: str = "",
     ):
         """Initialize Final Cartridge I.
@@ -185,7 +185,7 @@ class FinalCartridgeICartridge(Cartridge):
     # --- Test cartridge generation ---
 
     @classmethod
-    def get_cartridge_variants(cls) -> list[CartridgeVariant]:
+    def get_cartridge_variants(cls) -> List[CartridgeVariant]:
         """Return all valid configuration variants for Type 13."""
         return [
             CartridgeVariant("", exrom=0, game=0),  # 16KB mode

@@ -11,15 +11,14 @@ References:
   - http://www.oxyron.de/html/opcodes02.html
 """
 
-from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from mos6502.compat import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from mos6502.core import MOS6502CPU
 
 
-def anc_immediate_0x0b(cpu: MOS6502CPU) -> None:
+def anc_immediate_0x0b(cpu: "MOS6502CPU") -> None:
     """Execute ANC (AND with Carry) - Immediate addressing mode.
 
     Opcode: 0x0B
@@ -55,7 +54,7 @@ def anc_immediate_0x0b(cpu: MOS6502CPU) -> None:
     cpu.log.info("i")
 
 
-def anc_immediate_0x2b(cpu: MOS6502CPU) -> None:
+def anc_immediate_0x2b(cpu: "MOS6502CPU") -> None:
     """Execute ANC (AND with Carry) - Immediate addressing mode (duplicate).
 
     Opcode: 0x2B

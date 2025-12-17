@@ -12,7 +12,6 @@ References:
   - https://www.nesdev.org/wiki/CPU_unofficial_opcodes
 """
 
-from __future__ import annotations
 
 # 65C02 illegal NOP behavior is identical to NMOS - just import all handlers
 from mos6502.instructions.illegal._nop_illegal._nop_illegal_6502 import (

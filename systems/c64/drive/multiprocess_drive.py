@@ -10,15 +10,14 @@ Process Model:
     - Commands (disk insert/eject) via multiprocessing.Queue
 """
 
-from __future__ import annotations
 
-import logging
+from mos6502.compat import logging
 import multiprocessing
 import os
 import sys
 import time
 from pathlib import Path
-from typing import Optional
+from mos6502.compat import Optional
 
 # Use fork context on POSIX for better performance
 # (spawn has overhead of reimporting modules)

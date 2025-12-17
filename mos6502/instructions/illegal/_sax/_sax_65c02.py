@@ -12,15 +12,14 @@ References:
   - https://wilsonminesco.com/NMOS-CMOSdif/
 """
 
-from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from mos6502.compat import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from mos6502.core import MOS6502CPU
 
 
-def sax_zeropage_0x87(cpu: MOS6502CPU) -> None:
+def sax_zeropage_0x87(cpu: "MOS6502CPU") -> None:
     """Execute SAX - Zero Page (acts as NOP on 65C02).
 
     Opcode: 0x87
@@ -47,7 +46,7 @@ def sax_zeropage_0x87(cpu: MOS6502CPU) -> None:
     # No registers, flags, or memory modified
 
 
-def sax_zeropage_y_0x97(cpu: MOS6502CPU) -> None:
+def sax_zeropage_y_0x97(cpu: "MOS6502CPU") -> None:
     """Execute SAX - Zero Page,Y (acts as NOP on 65C02).
 
     Opcode: 0x97
@@ -75,7 +74,7 @@ def sax_zeropage_y_0x97(cpu: MOS6502CPU) -> None:
     # No registers, flags, or memory modified
 
 
-def sax_indexed_indirect_x_0x83(cpu: MOS6502CPU) -> None:
+def sax_indexed_indirect_x_0x83(cpu: "MOS6502CPU") -> None:
     """Execute SAX - (Indirect,X) (acts as NOP on 65C02).
 
     Opcode: 0x83
@@ -102,7 +101,7 @@ def sax_indexed_indirect_x_0x83(cpu: MOS6502CPU) -> None:
     # No registers, flags, or memory modified
 
 
-def sax_absolute_0x8f(cpu: MOS6502CPU) -> None:
+def sax_absolute_0x8f(cpu: "MOS6502CPU") -> None:
     """Execute SAX - Absolute (acts as NOP on 65C02).
 
     Opcode: 0x8F

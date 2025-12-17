@@ -37,10 +37,9 @@ Reference:
 - https://www.c64-wiki.com/wiki/Serial_Port
 """
 
-from __future__ import annotations
 
-import logging
-from typing import TYPE_CHECKING, List, Optional
+from mos6502.compat import logging
+from mos6502.compat import TYPE_CHECKING, List, Optional
 
 if TYPE_CHECKING:
     from ..cia2 import CIA2
@@ -59,8 +58,8 @@ class IECBus:
     def __init__(self) -> None:
         """Initialize the IEC bus."""
         # Connected devices
-        self.cia2: Optional[CIA2] = None  # C64's CIA2
-        self.drives: List[Drive1541] = []
+        self.cia2: Optional["CIA2"] = None  # C64's CIA2
+        self.drives: List["Drive1541"] = []
 
         # Bus line states (True = released/high, False = asserted/low)
         # These represent the actual bus state after open-collector resolution
@@ -83,7 +82,7 @@ class IECBus:
         # Avoids recomputing bus state when nothing has changed
         self._last_input_state = None  # Invalid initial value to force first update
 
-    def connect_c64(self, cia2: CIA2) -> None:
+    def connect_c64(self, cia2: "CIA2") -> None:
         """Connect C64's CIA2 to the bus.
 
         Args:
@@ -92,7 +91,7 @@ class IECBus:
         self.cia2 = cia2
         log.info("C64 connected to IEC bus")
 
-    def connect_drive(self, drive: Drive1541) -> None:
+    def connect_drive(self, drive: "Drive1541") -> None:
         """Connect a drive to the bus.
 
         Args:
@@ -103,7 +102,7 @@ class IECBus:
             drive.iec_bus = self  # Give drive reference to bus for immediate updates
             log.info(f"Drive {drive.device_number} connected to IEC bus")
 
-    def disconnect_drive(self, drive: Drive1541) -> None:
+    def disconnect_drive(self, drive: "Drive1541") -> None:
         """Disconnect a drive from the bus.
 
         Args:

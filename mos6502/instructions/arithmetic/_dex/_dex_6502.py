@@ -1,15 +1,14 @@
 #!/usr/bin/env python3
 """DEX instruction implementation for all 6502 variants."""
 
-from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from mos6502.compat import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from mos6502.core import MOS6502CPU
 
 
-def dex_implied_0xca(cpu: MOS6502CPU) -> None:
+def dex_implied_0xca(cpu: "MOS6502CPU") -> None:
     """Execute DEX (Decrement Index X by One) - Implied addressing mode.
 
     Opcode: 0xCA

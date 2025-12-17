@@ -12,15 +12,14 @@ References:
   - http://www.oxyron.de/html/opcodes02.html
 """
 
-from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from mos6502.compat import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from mos6502.core import MOS6502CPU
 
 
-def sre_zeropage_0x47(cpu: MOS6502CPU) -> None:
+def sre_zeropage_0x47(cpu: "MOS6502CPU") -> None:
     """Execute SRE (Shift Right and EOR) - Zero Page addressing mode.
 
     Opcode: 0x47
@@ -61,7 +60,7 @@ def sre_zeropage_0x47(cpu: MOS6502CPU) -> None:
     cpu.log.info("i")
 
 
-def sre_zeropage_x_0x57(cpu: MOS6502CPU) -> None:
+def sre_zeropage_x_0x57(cpu: "MOS6502CPU") -> None:
     """Execute SRE (Shift Right and EOR) - Zero Page,X addressing mode.
 
     Opcode: 0x57
@@ -98,7 +97,7 @@ def sre_zeropage_x_0x57(cpu: MOS6502CPU) -> None:
     cpu.log.info("i")
 
 
-def sre_indexed_indirect_x_0x43(cpu: MOS6502CPU) -> None:
+def sre_indexed_indirect_x_0x43(cpu: "MOS6502CPU") -> None:
     """Execute SRE (Shift Right and EOR) - (Indirect,X) addressing mode.
 
     Opcode: 0x43
@@ -135,7 +134,7 @@ def sre_indexed_indirect_x_0x43(cpu: MOS6502CPU) -> None:
     cpu.log.info("i")
 
 
-def sre_indirect_indexed_y_0x53(cpu: MOS6502CPU) -> None:
+def sre_indirect_indexed_y_0x53(cpu: "MOS6502CPU") -> None:
     """Execute SRE (Shift Right and EOR) - (Indirect),Y addressing mode.
 
     Opcode: 0x53
@@ -172,7 +171,7 @@ def sre_indirect_indexed_y_0x53(cpu: MOS6502CPU) -> None:
     cpu.log.info("i")
 
 
-def sre_absolute_0x4f(cpu: MOS6502CPU) -> None:
+def sre_absolute_0x4f(cpu: "MOS6502CPU") -> None:
     """Execute SRE (Shift Right and EOR) - Absolute addressing mode.
 
     Opcode: 0x4F
@@ -209,7 +208,7 @@ def sre_absolute_0x4f(cpu: MOS6502CPU) -> None:
     cpu.log.info("i")
 
 
-def sre_absolute_x_0x5f(cpu: MOS6502CPU) -> None:
+def sre_absolute_x_0x5f(cpu: "MOS6502CPU") -> None:
     """Execute SRE (Shift Right and EOR) - Absolute,X addressing mode.
 
     Opcode: 0x5F
@@ -253,7 +252,7 @@ def sre_absolute_x_0x5f(cpu: MOS6502CPU) -> None:
     cpu.log.info("ax")
 
 
-def sre_absolute_y_0x5b(cpu: MOS6502CPU) -> None:
+def sre_absolute_y_0x5b(cpu: "MOS6502CPU") -> None:
     """Execute SRE (Shift Right and EOR) - Absolute,Y addressing mode.
 
     Opcode: 0x5B

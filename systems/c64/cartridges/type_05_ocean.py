@@ -4,13 +4,13 @@ CRT hardware type 5. Ocean Type 1 cartridges support up to 512KB ROM
 organized as up to 64 x 8KB banks.
 """
 
-from __future__ import annotations
 
-import logging
+from mos6502.compat import logging
 
 from .base import Cartridge, CartridgeVariant, CartridgeImage, ROML_START, ROML_SIZE, ROMH_START
 from .rom_builder import TestROMBuilder
 from c64.colors import COLOR_BLUE, COLOR_YELLOW, COLOR_WHITE
+from mos6502.compat import List
 
 log = logging.getLogger("c64.cartridge")
 
@@ -49,7 +49,7 @@ class OceanType1Cartridge(Cartridge):
     HARDWARE_TYPE = 5
     BANK_SIZE = ROML_SIZE  # 8KB banks
 
-    def __init__(self, banks: list[bytes], name: str = "", use_16kb_mode: bool = False):
+    def __init__(self, banks: List[bytes], name: str = "", use_16kb_mode: bool = False):
         """Initialize Ocean Type 1 cartridge.
 
         Args:
@@ -125,7 +125,7 @@ class OceanType1Cartridge(Cartridge):
     # --- Test cartridge generation ---
 
     @classmethod
-    def get_cartridge_variants(cls) -> list[CartridgeVariant]:
+    def get_cartridge_variants(cls) -> List[CartridgeVariant]:
         """Return all valid configuration variants for Type 5."""
         return [
             CartridgeVariant("128k", exrom=0, game=1, extra={"bank_count": 16}),

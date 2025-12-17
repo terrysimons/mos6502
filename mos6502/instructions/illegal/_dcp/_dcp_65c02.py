@@ -11,15 +11,14 @@ References:
   - http://www.oxyron.de/html/opcodes02.html
 """
 
-from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from mos6502.compat import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from mos6502.core import MOS6502CPU
 
 
-def dcp_zeropage_0xc7(cpu: MOS6502CPU) -> None:
+def dcp_zeropage_0xc7(cpu: "MOS6502CPU") -> None:
     """Execute DCP (Decrement and Compare) - Zero Page addressing mode.
 
     Opcode: 0xC7
@@ -44,7 +43,7 @@ def dcp_zeropage_0xc7(cpu: MOS6502CPU) -> None:
     cpu.log.info("i")
 
 
-def dcp_zeropage_x_0xd7(cpu: MOS6502CPU) -> None:
+def dcp_zeropage_x_0xd7(cpu: "MOS6502CPU") -> None:
     """Execute DCP (Decrement and Compare) - Zero Page,X addressing mode.
 
     Opcode: 0xD7
@@ -70,7 +69,7 @@ def dcp_zeropage_x_0xd7(cpu: MOS6502CPU) -> None:
     cpu.log.info("i")
 
 
-def dcp_indexed_indirect_x_0xc3(cpu: MOS6502CPU) -> None:
+def dcp_indexed_indirect_x_0xc3(cpu: "MOS6502CPU") -> None:
     """Execute DCP (Decrement and Compare) - (Indirect,X) addressing mode.
 
     Opcode: 0xC3
@@ -98,7 +97,7 @@ def dcp_indexed_indirect_x_0xc3(cpu: MOS6502CPU) -> None:
     cpu.log.info("i")
 
 
-def dcp_indirect_indexed_y_0xd3(cpu: MOS6502CPU) -> None:
+def dcp_indirect_indexed_y_0xd3(cpu: "MOS6502CPU") -> None:
     """Execute DCP (Decrement and Compare) - (Indirect),Y addressing mode.
 
     Opcode: 0xD3
@@ -126,7 +125,7 @@ def dcp_indirect_indexed_y_0xd3(cpu: MOS6502CPU) -> None:
     cpu.log.info("i")
 
 
-def dcp_absolute_0xcf(cpu: MOS6502CPU) -> None:
+def dcp_absolute_0xcf(cpu: "MOS6502CPU") -> None:
     """Execute DCP (Decrement and Compare) - Absolute addressing mode.
 
     Opcode: 0xCF
@@ -152,7 +151,7 @@ def dcp_absolute_0xcf(cpu: MOS6502CPU) -> None:
     cpu.log.info("i")
 
 
-def dcp_absolute_x_0xdf(cpu: MOS6502CPU) -> None:
+def dcp_absolute_x_0xdf(cpu: "MOS6502CPU") -> None:
     """Execute DCP (Decrement and Compare) - Absolute,X addressing mode.
 
     Opcode: 0xDF
@@ -179,7 +178,7 @@ def dcp_absolute_x_0xdf(cpu: MOS6502CPU) -> None:
     cpu.log.info("i")
 
 
-def dcp_absolute_y_0xdb(cpu: MOS6502CPU) -> None:
+def dcp_absolute_y_0xdb(cpu: "MOS6502CPU") -> None:
     """Execute DCP (Decrement and Compare) - Absolute,Y addressing mode.
 
     Opcode: 0xDB

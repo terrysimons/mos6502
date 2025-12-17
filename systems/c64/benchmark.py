@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
 """Benchmark C64 CPU execution speed."""
 import argparse
-import logging
+from mos6502.compat import logging
 import sys
 import time
 from pathlib import Path
-from typing import Optional
+from mos6502.compat import Optional, Tuple
 
 from c64 import C64, PAL, NTSC, c64_to_ansi_fg, c64_to_ansi_bg, ANSI_RESET
 from mos6502 import errors
@@ -24,7 +24,7 @@ for logger_name in ['c64', 'c64.vic', 'mos6502', 'mos6502.cpu', 'mos6502.cpu.fla
     logging.getLogger(logger_name).setLevel(logging.CRITICAL)
 
 
-def benchmark_c64(rom_dir: str, max_cycles: int, video_chip: str = "6569", verbose_cycles: bool = False, throttle: bool = False) -> tuple[float, int]:
+def benchmark_c64(rom_dir: str, max_cycles: int, video_chip: str = "6569", verbose_cycles: bool = False, throttle: bool = False) -> Tuple[float, int]:
     """Benchmark C64 execution.
 
     Args:
@@ -74,7 +74,7 @@ def benchmark_c64(rom_dir: str, max_cycles: int, video_chip: str = "6569", verbo
     return stats["elapsed_seconds"], stats["cycles_executed"]
 
 
-def benchmark_boot(rom_dir: str, video_chip: str = "6569", debug: bool = False, verbose_cycles: bool = False, throttle: bool = False) -> tuple[float, int, int, str]:
+def benchmark_boot(rom_dir: str, video_chip: str = "6569", debug: bool = False, verbose_cycles: bool = False, throttle: bool = False) -> Tuple[float, int, int, str]:
     """Benchmark C64 boot time until BASIC is ready.
 
     Args:
@@ -213,7 +213,7 @@ def benchmark_disk_load(
     drive_rom: Optional[Path] = None,
     sync_drive: bool = False,
     throttle: bool = False
-) -> tuple[float, int, str]:
+) -> Tuple[float, int, str]:
     """Benchmark loading from disk (LOAD"*",8,1 then RUN).
 
     Args:

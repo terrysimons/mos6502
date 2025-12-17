@@ -11,15 +11,14 @@ References:
   - http://www.oxyron.de/html/opcodes02.html
 """
 
-from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from mos6502.compat import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from mos6502.core import MOS6502CPU
 
 
-def rla_zeropage_0x27(cpu: MOS6502CPU) -> None:
+def rla_zeropage_0x27(cpu: "MOS6502CPU") -> None:
     """Execute RLA (Rotate Left and AND) - Zero Page addressing mode.
 
     Opcode: 0x27
@@ -41,7 +40,7 @@ def rla_zeropage_0x27(cpu: MOS6502CPU) -> None:
     cpu.log.info("i")
 
 
-def rla_zeropage_x_0x37(cpu: MOS6502CPU) -> None:
+def rla_zeropage_x_0x37(cpu: "MOS6502CPU") -> None:
     """Execute RLA (Rotate Left and AND) - Zero Page,X addressing mode.
 
     Opcode: 0x37
@@ -64,7 +63,7 @@ def rla_zeropage_x_0x37(cpu: MOS6502CPU) -> None:
     cpu.log.info("i")
 
 
-def rla_indexed_indirect_x_0x23(cpu: MOS6502CPU) -> None:
+def rla_indexed_indirect_x_0x23(cpu: "MOS6502CPU") -> None:
     """Execute RLA (Rotate Left and AND) - (Indirect,X) addressing mode.
 
     Opcode: 0x23
@@ -89,7 +88,7 @@ def rla_indexed_indirect_x_0x23(cpu: MOS6502CPU) -> None:
     cpu.log.info("i")
 
 
-def rla_indirect_indexed_y_0x33(cpu: MOS6502CPU) -> None:
+def rla_indirect_indexed_y_0x33(cpu: "MOS6502CPU") -> None:
     """Execute RLA (Rotate Left and AND) - (Indirect),Y addressing mode.
 
     Opcode: 0x33
@@ -114,7 +113,7 @@ def rla_indirect_indexed_y_0x33(cpu: MOS6502CPU) -> None:
     cpu.log.info("i")
 
 
-def rla_absolute_0x2f(cpu: MOS6502CPU) -> None:
+def rla_absolute_0x2f(cpu: "MOS6502CPU") -> None:
     """Execute RLA (Rotate Left and AND) - Absolute addressing mode.
 
     Opcode: 0x2F
@@ -137,7 +136,7 @@ def rla_absolute_0x2f(cpu: MOS6502CPU) -> None:
     cpu.log.info("i")
 
 
-def rla_absolute_x_0x3f(cpu: MOS6502CPU) -> None:
+def rla_absolute_x_0x3f(cpu: "MOS6502CPU") -> None:
     """Execute RLA (Rotate Left and AND) - Absolute,X addressing mode.
 
     Opcode: 0x3F
@@ -161,7 +160,7 @@ def rla_absolute_x_0x3f(cpu: MOS6502CPU) -> None:
     cpu.log.info("i")
 
 
-def rla_absolute_y_0x3b(cpu: MOS6502CPU) -> None:
+def rla_absolute_y_0x3b(cpu: "MOS6502CPU") -> None:
     """Execute RLA (Rotate Left and AND) - Absolute,Y addressing mode.
 
     Opcode: 0x3B

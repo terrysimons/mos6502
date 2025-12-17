@@ -5,10 +5,9 @@ The simplest cartridge type where ROM is directly mapped to fixed
 addresses with no banking hardware.
 """
 
-from __future__ import annotations
 
-import logging
-from typing import Optional
+from mos6502.compat import logging
+from mos6502.compat import Optional, List
 
 from .base import (
     Cartridge,
@@ -135,7 +134,7 @@ class StaticROMCartridge(Cartridge):
     # --- Test cartridge generation ---
 
     @classmethod
-    def get_cartridge_variants(cls) -> list[CartridgeVariant]:
+    def get_cartridge_variants(cls) -> List[CartridgeVariant]:
         """Return all valid configuration variants for Type 0."""
         return [
             CartridgeVariant("8k", exrom=0, game=1),

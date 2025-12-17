@@ -11,15 +11,14 @@ References:
   - http://www.oxyron.de/html/opcodes02.html
 """
 
-from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from mos6502.compat import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from mos6502.core import MOS6502CPU
 
 
-def sax_zeropage_0x87(cpu: MOS6502CPU) -> None:
+def sax_zeropage_0x87(cpu: "MOS6502CPU") -> None:
     """Execute SAX (Store A AND X) - Zero Page addressing mode.
 
     Opcode: 0x87
@@ -51,7 +50,7 @@ def sax_zeropage_0x87(cpu: MOS6502CPU) -> None:
     cpu.log.info("i")
 
 
-def sax_zeropage_y_0x97(cpu: MOS6502CPU) -> None:
+def sax_zeropage_y_0x97(cpu: "MOS6502CPU") -> None:
     """Execute SAX (Store A AND X) - Zero Page,Y addressing mode.
 
     Opcode: 0x97
@@ -83,7 +82,7 @@ def sax_zeropage_y_0x97(cpu: MOS6502CPU) -> None:
     cpu.log.info("i")
 
 
-def sax_indexed_indirect_x_0x83(cpu: MOS6502CPU) -> None:
+def sax_indexed_indirect_x_0x83(cpu: "MOS6502CPU") -> None:
     """Execute SAX (Store A AND X) - (Indirect,X) addressing mode.
 
     Opcode: 0x83
@@ -115,7 +114,7 @@ def sax_indexed_indirect_x_0x83(cpu: MOS6502CPU) -> None:
     cpu.log.info("i")
 
 
-def sax_absolute_0x8f(cpu: MOS6502CPU) -> None:
+def sax_absolute_0x8f(cpu: "MOS6502CPU") -> None:
     """Execute SAX (Store A AND X) - Absolute addressing mode.
 
     Opcode: 0x8F

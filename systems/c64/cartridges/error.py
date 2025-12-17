@@ -4,7 +4,6 @@ When an unsupported cartridge type is loaded, an error cartridge
 is created to display information about the unsupported type.
 """
 
-from __future__ import annotations
 
 from .type_00_normal import StaticROMCartridge
 

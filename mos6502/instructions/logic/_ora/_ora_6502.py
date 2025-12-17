@@ -1,15 +1,14 @@
 #!/usr/bin/env python3
 """ORA instruction implementation for all 6502 variants."""
 
-from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from mos6502.compat import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from mos6502.core import MOS6502CPU
 
 
-def ora_immediate_0x09(cpu: MOS6502CPU) -> None:
+def ora_immediate_0x09(cpu: "MOS6502CPU") -> None:
     """Execute ORA (Bitwise OR with Accumulator) - Immediate addressing mode.
 
     Opcode: 0x09
@@ -31,7 +30,7 @@ def ora_immediate_0x09(cpu: MOS6502CPU) -> None:
     cpu.log.info("i")
 
 
-def ora_zeropage_0x05(cpu: MOS6502CPU) -> None:
+def ora_zeropage_0x05(cpu: "MOS6502CPU") -> None:
     """Execute ORA (Bitwise OR with Accumulator) - Zeropage addressing mode.
 
     Opcode: 0x05
@@ -54,7 +53,7 @@ def ora_zeropage_0x05(cpu: MOS6502CPU) -> None:
     cpu.log.info("i")
 
 
-def ora_zeropage_x_0x15(cpu: MOS6502CPU) -> None:
+def ora_zeropage_x_0x15(cpu: "MOS6502CPU") -> None:
     """Execute ORA (Bitwise OR with Accumulator) - Zeropage,X addressing mode.
 
     Opcode: 0x15
@@ -77,7 +76,7 @@ def ora_zeropage_x_0x15(cpu: MOS6502CPU) -> None:
     cpu.log.info("i")
 
 
-def ora_absolute_0x0d(cpu: MOS6502CPU) -> None:
+def ora_absolute_0x0d(cpu: "MOS6502CPU") -> None:
     """Execute ORA (Bitwise OR with Accumulator) - Absolute addressing mode.
 
     Opcode: 0x0D
@@ -100,7 +99,7 @@ def ora_absolute_0x0d(cpu: MOS6502CPU) -> None:
     cpu.log.info("i")
 
 
-def ora_absolute_x_0x1d(cpu: MOS6502CPU) -> None:
+def ora_absolute_x_0x1d(cpu: "MOS6502CPU") -> None:
     """Execute ORA (Bitwise OR with Accumulator) - Absolute,X addressing mode.
 
     Opcode: 0x1D
@@ -123,7 +122,7 @@ def ora_absolute_x_0x1d(cpu: MOS6502CPU) -> None:
     cpu.log.info("i")
 
 
-def ora_absolute_y_0x19(cpu: MOS6502CPU) -> None:
+def ora_absolute_y_0x19(cpu: "MOS6502CPU") -> None:
     """Execute ORA (Bitwise OR with Accumulator) - Absolute,Y addressing mode.
 
     Opcode: 0x19
@@ -146,7 +145,7 @@ def ora_absolute_y_0x19(cpu: MOS6502CPU) -> None:
     cpu.log.info("i")
 
 
-def ora_indexed_indirect_x_0x01(cpu: MOS6502CPU) -> None:
+def ora_indexed_indirect_x_0x01(cpu: "MOS6502CPU") -> None:
     """Execute ORA (Bitwise OR with Accumulator) - (Indirect,X) addressing mode.
 
     Opcode: 0x01
@@ -169,7 +168,7 @@ def ora_indexed_indirect_x_0x01(cpu: MOS6502CPU) -> None:
     cpu.log.info("i")
 
 
-def ora_indirect_indexed_y_0x11(cpu: MOS6502CPU) -> None:
+def ora_indirect_indexed_y_0x11(cpu: "MOS6502CPU") -> None:
     """Execute ORA (Bitwise OR with Accumulator) - (Indirect),Y addressing mode.
 
     Opcode: 0x11

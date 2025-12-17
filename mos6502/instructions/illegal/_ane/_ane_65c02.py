@@ -12,15 +12,14 @@ References:
   - https://www.nesdev.org/wiki/CPU_unofficial_opcodes
 """
 
-from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from mos6502.compat import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from mos6502.core import MOS6502CPU
 
 
-def ane_immediate_0x8b(cpu: MOS6502CPU) -> None:
+def ane_immediate_0x8b(cpu: "MOS6502CPU") -> None:
     """Execute ANE (XAA) - Immediate addressing mode - 65C02 variant.
 
     Opcode: 0x8B
