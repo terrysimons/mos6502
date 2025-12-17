@@ -19,12 +19,11 @@ Signal Logic:
     - Lines go high only when ALL devices release them
 """
 
-from __future__ import annotations
 
-import logging
+from mos6502.compat import logging
 import struct
 from multiprocessing import shared_memory
-from typing import TYPE_CHECKING, Optional
+from mos6502.compat import TYPE_CHECKING, Optional, Tuple
 
 if TYPE_CHECKING:
     from ..cia2 import CIA2
@@ -141,7 +140,7 @@ class SharedIECState:
             value |= C64_DATA_OUT_BIT
         self._shm.buf[OFFSET_C64_OUTPUTS] = value
 
-    def get_c64_outputs(self) -> tuple[bool, bool, bool]:
+    def get_c64_outputs(self) -> Tuple[bool, bool, bool]:
         """Get C64's IEC output state.
 
         Returns:
@@ -173,7 +172,7 @@ class SharedIECState:
             value |= DRIVE_ATNA_OUT_BIT
         self._shm.buf[OFFSET_DRIVE_OUTPUTS] = value
 
-    def get_drive_outputs(self) -> tuple[bool, bool, bool]:
+    def get_drive_outputs(self) -> Tuple[bool, bool, bool]:
         """Get drive's IEC output state.
 
         Returns:
@@ -188,7 +187,7 @@ class SharedIECState:
 
     # --- Bus State Computation ---
 
-    def get_bus_state(self, is_drive: bool = False) -> tuple[bool, bool, bool]:
+    def get_bus_state(self, is_drive: bool = False) -> Tuple[bool, bool, bool]:
         """Compute combined bus state using open-collector logic.
 
         Args:
@@ -353,14 +352,14 @@ class MultiprocessIECBus:
             shared_state: SharedIECState instance for IPC
         """
         self._shared = shared_state
-        self.cia2: Optional[CIA2] = None
+        self.cia2: Optional["CIA2"] = None
 
         # Cached bus state for get_c64_input() speed
         self.atn = True
         self.clk = True
         self.data = True
 
-    def connect_c64(self, cia2: CIA2) -> None:
+    def connect_c64(self, cia2: "CIA2") -> None:
         """Connect C64's CIA2 to the bus.
 
         Args:

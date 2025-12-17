@@ -24,20 +24,32 @@ def add_clv_to_instruction_set_enum(instruction_set_class) -> None:
     # Create a pseudo-enum member that has a .name attribute
     # We can't create a true enum member after class definition, but we can
     # create an object that behaves like one for lookup purposes
-    class PseudoEnumMember(int):
-        def __new__(cls, value, name) -> "InstructionSet":
-            obj = int.__new__(cls, value)
-            obj._name = name
-            obj._value_ = value
-            return obj
+    class PseudoEnumMember:
+        """MicroPython-compatible pseudo-enum member."""
+        __slots__ = ('_value_', '_name')
+
+        def __init__(self, value, name):
+            self._value_ = int(value)
+            self._name = name
 
         @property
-        def name(self) -> str:
+        def name(self):
             return self._name
 
         @property
-        def value(self) -> int:
+        def value(self):
             return self._value_
+
+        def __int__(self):
+            return self._value_
+
+        def __eq__(self, other):
+            if isinstance(other, int):
+                return self._value_ == other
+            return NotImplemented
+
+        def __hash__(self):
+            return hash(self._value_)
 
     clv_member = PseudoEnumMember(CLV_IMPLIED_0xB8, "CLV_IMPLIED_0xB8")
     instruction_set_class._value2member_map_[CLV_IMPLIED_0xB8] = clv_member

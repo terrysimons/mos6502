@@ -7,7 +7,6 @@ This module implements the mos6502 register set.
 Performance optimization: Registers are stored as plain ints, not Byte/Word objects.
 This eliminates object creation and bitarray conversion overhead on every access.
 """
-from typing import Self
 
 
 class Registers:
@@ -23,7 +22,7 @@ class Registers:
     __slots__ = ('_PC', '_S', '_A', '_X', '_Y')
 
     def __init__(
-        self: Self,
+        self,
         endianness: str = "little",  # Kept for API compatibility, not used
         PC: int = 0x0000,  # noqa: N803
         S: int = 0x0000,  # noqa: N803
@@ -51,17 +50,17 @@ class Registers:
         self._Y: int = Y & 0xFF
 
     @property
-    def PC(self: Self) -> int:  # noqa: N802
+    def PC(self) -> int:  # noqa: N802
         """Return the PC register as an int (16-bit)."""
         return self._PC
 
     @PC.setter
-    def PC(self: Self, value: int) -> None:  # noqa: N802
+    def PC(self, value: int) -> None:  # noqa: N802
         """Set the PC register (16-bit, masked to 0x0000-0xFFFF)."""
         self._PC = value & 0xFFFF
 
     @property
-    def S(self: Self) -> int:  # noqa: N802
+    def S(self) -> int:  # noqa: N802
         """Return the S (stack pointer) register as an int.
 
         The stack pointer is 8-bit in hardware but stored with the page 1
@@ -70,36 +69,36 @@ class Registers:
         return self._S
 
     @S.setter
-    def S(self: Self, value: int) -> None:  # noqa: N802
+    def S(self, value: int) -> None:  # noqa: N802
         """Set the S register (masked to 9 bits: 0x0100-0x01FF range)."""
         self._S = value & 0x1FF
 
     @property
-    def A(self: Self) -> int:  # noqa: N802
+    def A(self) -> int:  # noqa: N802
         """Return the A (accumulator) register as an int (8-bit)."""
         return self._A
 
     @A.setter
-    def A(self: Self, value: int) -> None:  # noqa: N802
+    def A(self, value: int) -> None:  # noqa: N802
         """Set the A register (8-bit, masked to 0x00-0xFF)."""
         self._A = value & 0xFF
 
     @property
-    def X(self: Self) -> int:  # noqa: N802
+    def X(self) -> int:  # noqa: N802
         """Return the X index register as an int (8-bit)."""
         return self._X
 
     @X.setter
-    def X(self: Self, value: int) -> None:  # noqa: N802
+    def X(self, value: int) -> None:  # noqa: N802
         """Set the X register (8-bit, masked to 0x00-0xFF)."""
         self._X = value & 0xFF
 
     @property
-    def Y(self: Self) -> int:  # noqa: N802
+    def Y(self) -> int:  # noqa: N802
         """Return the Y index register as an int (8-bit)."""
         return self._Y
 
     @Y.setter
-    def Y(self: Self, value: int) -> None:  # noqa: N802
+    def Y(self, value: int) -> None:  # noqa: N802
         """Set the Y register (8-bit, masked to 0x00-0xFF)."""
         self._Y = value & 0xFF

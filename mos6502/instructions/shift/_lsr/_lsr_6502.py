@@ -1,15 +1,14 @@
 #!/usr/bin/env python3
 """LSR instruction implementation for all 6502 variants."""
 
-from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from mos6502.compat import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from mos6502.core import MOS6502CPU
 
 
-def lsr_accumulator_0x4a(cpu: MOS6502CPU) -> None:
+def lsr_accumulator_0x4a(cpu: "MOS6502CPU") -> None:
     """Execute LSR (Logical Shift Right) - Accumulator addressing mode.
 
     Opcode: 0x4A
@@ -39,7 +38,7 @@ def lsr_accumulator_0x4a(cpu: MOS6502CPU) -> None:
     cpu.log.info("i")
 
 
-def lsr_zeropage_0x46(cpu: MOS6502CPU) -> None:
+def lsr_zeropage_0x46(cpu: "MOS6502CPU") -> None:
     """Execute LSR (Logical Shift Right) - Zero Page addressing mode.
 
     Opcode: 0x46
@@ -64,7 +63,7 @@ def lsr_zeropage_0x46(cpu: MOS6502CPU) -> None:
     cpu.log.info("z")
 
 
-def lsr_zeropage_x_0x56(cpu: MOS6502CPU) -> None:
+def lsr_zeropage_x_0x56(cpu: "MOS6502CPU") -> None:
     """Execute LSR (Logical Shift Right) - Zero Page,X addressing mode.
 
     Opcode: 0x56
@@ -89,7 +88,7 @@ def lsr_zeropage_x_0x56(cpu: MOS6502CPU) -> None:
     cpu.log.info("zx")
 
 
-def lsr_absolute_0x4e(cpu: MOS6502CPU) -> None:
+def lsr_absolute_0x4e(cpu: "MOS6502CPU") -> None:
     """Execute LSR (Logical Shift Right) - Absolute addressing mode.
 
     Opcode: 0x4E
@@ -117,7 +116,7 @@ def lsr_absolute_0x4e(cpu: MOS6502CPU) -> None:
     cpu.log.info("a")
 
 
-def lsr_absolute_x_0x5e(cpu: MOS6502CPU) -> None:
+def lsr_absolute_x_0x5e(cpu: "MOS6502CPU") -> None:
     """Execute LSR (Logical Shift Right) - Absolute,X addressing mode.
 
     Opcode: 0x5E

@@ -12,7 +12,6 @@ References:
   - https://masswerk.at/6502/6502_instruction_set.html#ARR
   - http://www.oxyron.de/html/opcodes02.html
 """
-from __future__ import annotations
 
 from mos6502.instructions import InstructionOpcode
 from mos6502.memory import Byte
@@ -27,20 +26,32 @@ ARR_IMMEDIATE_0x6B = InstructionOpcode(0x6B, "mos6502.instructions.illegal._arr"
 
 def add_arr_to_instruction_set_enum(instruction_set_class) -> None:
     """Add ARR instruction to the InstructionSet enum dynamically."""
-    class PseudoEnumMember(int):
-        def __new__(cls, value, name) -> "InstructionSet":
-            obj = int.__new__(cls, value)
-            obj._name = name
-            obj._value_ = value
-            return obj
+    class PseudoEnumMember:
+        """MicroPython-compatible pseudo-enum member."""
+        __slots__ = ('_value_', '_name')
+
+        def __init__(self, value, name):
+            self._value_ = int(value)
+            self._name = name
 
         @property
-        def name(self) -> str:
+        def name(self):
             return self._name
 
         @property
-        def value(self) -> int:
+        def value(self):
             return self._value_
+
+        def __int__(self):
+            return self._value_
+
+        def __eq__(self, other):
+            if isinstance(other, int):
+                return self._value_ == other
+            return NotImplemented
+
+        def __hash__(self):
+            return hash(self._value_)
 
     member = PseudoEnumMember(ARR_IMMEDIATE_0x6B, "ARR_IMMEDIATE_0x6B")
     instruction_set_class._value2member_map_[ARR_IMMEDIATE_0x6B] = member

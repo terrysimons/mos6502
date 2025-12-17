@@ -4,9 +4,8 @@ This module provides the mapping of hardware types to cartridge classes
 and the factory function for creating cartridge instances.
 """
 
-from __future__ import annotations
 
-from typing import Optional
+from mos6502.compat import Optional, Union, Dict, List
 
 from .base import Cartridge, CartridgeType
 from .type_00_normal import StaticROMCartridge
@@ -22,7 +21,7 @@ from .type_19_magic_desk import MagicDeskCartridge
 
 
 # Registry of cartridge classes by hardware type
-CARTRIDGE_TYPES: dict[int | CartridgeType, type[Cartridge]] = {
+CARTRIDGE_TYPES: Union[Dict[int, CartridgeType], type[Cartridge]] = {
     CartridgeType.NORMAL: StaticROMCartridge,
     CartridgeType.ACTION_REPLAY: ActionReplayCartridge,
     CartridgeType.FINAL_CARTRIDGE_III: FinalCartridgeIIICartridge,
@@ -41,7 +40,7 @@ def create_cartridge(
     roml_data: Optional[bytes] = None,
     romh_data: Optional[bytes] = None,
     ultimax_romh_data: Optional[bytes] = None,
-    banks: Optional[list[bytes]] = None,
+    banks: Optional[List[bytes]] = None,
     name: str = "",
 ) -> Cartridge:
     """Factory function to create appropriate cartridge instance.

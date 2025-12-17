@@ -1,15 +1,14 @@
 #!/usr/bin/env python3
 """NOP instruction implementation for all 6502 variants."""
 
-from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from mos6502.compat import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from mos6502.core import MOS6502CPU
 
 
-def nop_implied_0xea(cpu: MOS6502CPU) -> None:
+def nop_implied_0xea(cpu: "MOS6502CPU") -> None:
     """Execute NOP (No Operation) - Implied addressing mode.
 
     Opcode: 0xEA

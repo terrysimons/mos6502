@@ -9,15 +9,14 @@ References:
   - http://www.oxyron.de/html/opcodes02.html
 """
 
-from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from mos6502.compat import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from mos6502.core import MOS6502CPU
 
 
-def tas_absolute_y_0x9b(cpu: MOS6502CPU) -> None:
+def tas_absolute_y_0x9b(cpu: "MOS6502CPU") -> None:
     """Execute TAS (XAS, SHS) - Absolute Y addressing mode - 65C02 variant.
 
     Opcode: 0x9B

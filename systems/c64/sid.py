@@ -23,9 +23,8 @@ On the real SID, reading write-only registers returns the last
 value written to ANY SID register (due to data bus capacitance).
 """
 
-from __future__ import annotations
 
-import logging
+from mos6502.compat import logging
 
 
 class SID:

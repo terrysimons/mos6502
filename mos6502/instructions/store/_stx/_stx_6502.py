@@ -1,15 +1,14 @@
 #!/usr/bin/env python3
 """STX instruction implementation for all 6502 variants."""
 
-from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from mos6502.compat import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from mos6502.core import MOS6502CPU
 
 
-def stx_zeropage_0x86(cpu: MOS6502CPU) -> None:
+def stx_zeropage_0x86(cpu: "MOS6502CPU") -> None:
     """Execute STX (Store X Register in Memory) - Zeropage addressing mode.
 
     Opcode: 0x86
@@ -30,7 +29,7 @@ def stx_zeropage_0x86(cpu: MOS6502CPU) -> None:
     cpu.log.info("i")
 
 
-def stx_zeropage_y_0x96(cpu: MOS6502CPU) -> None:
+def stx_zeropage_y_0x96(cpu: "MOS6502CPU") -> None:
     """Execute STX (Store X Register in Memory) - Zeropage,Y addressing mode.
 
     Opcode: 0x96
@@ -51,7 +50,7 @@ def stx_zeropage_y_0x96(cpu: MOS6502CPU) -> None:
     cpu.log.info("i")
 
 
-def stx_absolute_0x8e(cpu: MOS6502CPU) -> None:
+def stx_absolute_0x8e(cpu: "MOS6502CPU") -> None:
     """Execute STX (Store X Register in Memory) - Absolute addressing mode.
 
     Opcode: 0x8E

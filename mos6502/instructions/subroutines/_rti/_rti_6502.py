@@ -1,15 +1,14 @@
 #!/usr/bin/env python3
 """RTI instruction implementation for all 6502 variants."""
 
-from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from mos6502.compat import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from mos6502.core import MOS6502CPU
 
 
-def rti_implied_0x40(cpu: MOS6502CPU) -> None:
+def rti_implied_0x40(cpu: "MOS6502CPU") -> None:
     """Execute RTI (Return from Interrupt) - Implied addressing mode.
 
     Opcode: 0x40

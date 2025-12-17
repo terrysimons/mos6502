@@ -1,10 +1,7 @@
 #!/usr/bin/env python3
 """CPU core for the mos6502."""
 
-import contextlib
-import importlib
-import logging
-from typing import TYPE_CHECKING, Callable, Literal, Self
+from mos6502.compat import contextlib, logging, import_module, TYPE_CHECKING, Callable, Literal, Union, Dict, Tuple
 
 from mos6502.bitarray_factory import ba2int
 
@@ -79,10 +76,10 @@ class MOS6502CPU(flags.ProcessorStatusFlagsInterface):
     log: logging.Logger = logging.getLogger("mos6502.cpu")
 
     def __init__(
-        self: Self,
-        cpu_variant: str | variants.CPUVariant = variants.CPUVariant.NMOS_6502,
+        self,
+        cpu_variant: Union[str, variants.CPUVariant]= variants.CPUVariant.NMOS_6502,
         verbose_cycles: bool = False,
-    ) -> Self:
+    ) -> "MOS6502CPU":
         """Instantiate a mos6502 CPU core.
 
         Arguments:
@@ -116,7 +113,7 @@ class MOS6502CPU(flags.ProcessorStatusFlagsInterface):
         # for newly created Byte/Word/etc... objects here
         memory.ENDIANNESS = self.endianness
 
-        self._registers: Registers = registers.Registers(endianness=self.endianness)
+        self._registers: "Registers" = registers.Registers(endianness=self.endianness)
         from mos6502.flags import FlagsRegister
         self._flags: FlagsRegister = FlagsRegister()
         self.ram: RAM = RAM(endianness=self.endianness)
@@ -174,23 +171,23 @@ class MOS6502CPU(flags.ProcessorStatusFlagsInterface):
         self._opcode_handler_cache: list = self._build_opcode_handler_table()
 
     @property
-    def variant(self: Self) -> variants.CPUVariant:
+    def variant(self) -> variants.CPUVariant:
         """Return the CPU variant being emulated."""
         return self._variant
 
     @property
-    def variant_name(self: Self) -> str:
+    def variant_name(self) -> str:
         """Return the CPU variant name as a string."""
         return str(self._variant)
 
     # Variant handler cache: {(instruction_package_name, function_name, variant): handler}
-    _variant_handler_cache: dict[tuple[str, str, variants.CPUVariant], Callable[[Self], None]] = {}
+    _variant_handler_cache: Dict[Tuple[str, str, variants.CPUVariant], Callable[["MOS6502CPU"], None]] = {}
 
     def _load_variant_handler(
-        self: Self,
+        self,
         instruction_package: str,
         function_name: str,
-    ) -> Callable[[Self], None]:
+    ) -> Callable[["MOS6502CPU"], None]:
         """Dynamically load variant-specific handler for an instruction.
 
         Tries to load <instruction>_<variant>.py, falls back to <instruction>_6502.py if not found.
@@ -216,13 +213,13 @@ class MOS6502CPU(flags.ProcessorStatusFlagsInterface):
 
         # Try to load variant-specific module
         try:
-            module = importlib.import_module(
+            module = import_module(
                 f".{instruction_name}_{variant_name}",
                 package=instruction_package,
             )
         except ImportError:
             # Fall back to _6502 (default implementation)
-            module = importlib.import_module(
+            module = import_module(
                 f".{instruction_name}_6502",
                 package=instruction_package,
             )
@@ -231,7 +228,7 @@ class MOS6502CPU(flags.ProcessorStatusFlagsInterface):
         self._variant_handler_cache[cache_key] = handler
         return handler
 
-    def _build_opcode_handler_table(self: Self) -> list:
+    def _build_opcode_handler_table(self) -> list:
         """Build a 256-entry opcode handler table for fast dispatch.
 
         Pre-populates handlers for all legal opcodes using OPCODE_LOOKUP.
@@ -249,14 +246,14 @@ class MOS6502CPU(flags.ProcessorStatusFlagsInterface):
 
         return table
 
-    def __enter__(self: Self) -> Self:
+    def __enter__(self) -> "MOS6502CPU":
         """With entrypoint."""
         return self
 
-    def __exit__(self: Self, *args: list, **kwargs: dict) -> None:
+    def __exit__(self, *args: list, **kwargs: dict) -> None:
         """With exitpoint."""
 
-    def tick(self: Self, cycles: int) -> int:
+    def tick(self, cycles: int) -> int:
         """
         Tick {cycles} cycles.
 
@@ -312,7 +309,7 @@ class MOS6502CPU(flags.ProcessorStatusFlagsInterface):
 
         return self.cycles
 
-    def spend_cpu_cycles(self: Self, cost: int) -> None:
+    def spend_cpu_cycles(self, cost: int) -> None:
         """
         Tick the CPU and spend {cost} cycles.
 
@@ -330,7 +327,7 @@ class MOS6502CPU(flags.ProcessorStatusFlagsInterface):
             self.log.info("*" * cost)
         self.tick(cost)
 
-    def fetch_byte(self: Self) -> int:
+    def fetch_byte(self) -> int:
         """
         Fetch a byte from RAM[self.PC].
 
@@ -360,7 +357,7 @@ class MOS6502CPU(flags.ProcessorStatusFlagsInterface):
 
         return byte
 
-    def fetch_word(self: Self) -> int:
+    def fetch_word(self) -> int:
         """
         Fetch a word from RAM[self.PC].
 
@@ -397,7 +394,7 @@ class MOS6502CPU(flags.ProcessorStatusFlagsInterface):
 
         return word
 
-    def read_byte(self: Self, address: int) -> int:
+    def read_byte(self, address: int) -> int:
         """
         Read a byte from RAM at location RAM[address].
 
@@ -419,7 +416,7 @@ class MOS6502CPU(flags.ProcessorStatusFlagsInterface):
             self.log.debug(f"read_byte({memory_section}[0x{address:02x}]): {data}")
         return data
 
-    def peek_byte(self: Self, address: Word) -> Byte:
+    def peek_byte(self, address: Word) -> Byte:
         """
         Read a Byte() from RAM at location RAM[address].
 
@@ -436,7 +433,7 @@ class MOS6502CPU(flags.ProcessorStatusFlagsInterface):
         data: Byte = self.ram[int(address)]
         return data
 
-    def write_byte(self: Self, address: Word, data: Byte) -> Byte:
+    def write_byte(self, address: Word, data: Byte) -> Byte:
         """
         Write a Byte() to RAM at location RAM[address].
 
@@ -460,7 +457,7 @@ class MOS6502CPU(flags.ProcessorStatusFlagsInterface):
                 self.log.warning(f"*** write_byte SCREEN: addr=${addr_int:04X}, data=${data & 0xFF:02X} ***")
             self.log.info("w")
 
-    def read_word(self: Self, address: Word) -> int:
+    def read_word(self, address: Word) -> int:
         """
         Read a 16-bit word from RAM at location RAM[address].
 
@@ -485,7 +482,7 @@ class MOS6502CPU(flags.ProcessorStatusFlagsInterface):
             self.log.debug(f"read_word({memory_section}[0x{address:02x}]): 0x{data:04X} ({data})")
         return data
 
-    def read_word_zeropage(self: Self, address: Byte) -> int:
+    def read_word_zeropage(self, address: Byte) -> int:
         """
         Read a 16-bit word from zero page at location RAM[address].
 
@@ -515,7 +512,7 @@ class MOS6502CPU(flags.ProcessorStatusFlagsInterface):
             self.log.debug(f"read_word(zeropage[0x{address & 0xFF:02x}]): 0x{data:04X} ({data})")
         return data
 
-    def peek_word(self: Self, address: Word) -> int:
+    def peek_word(self, address: Word) -> int:
         """
         Read a 16-bit word from RAM at location RAM[address].
 
@@ -533,7 +530,7 @@ class MOS6502CPU(flags.ProcessorStatusFlagsInterface):
         highbyte: int = self.ram[int(address) + 1]
         return (highbyte << 8) + lowbyte
 
-    def write_word(self: Self, address: Word, data: Word) -> None:
+    def write_word(self, address: Word, data: Word) -> None:
         """
         Write a Word() to RAM at location RAM[address].
 
@@ -561,7 +558,7 @@ class MOS6502CPU(flags.ProcessorStatusFlagsInterface):
         if self.verbose_cycles:
             self.log.info("ww")
 
-    def read_register(self: Self, register_name: str) -> Byte | Word:
+    def read_register(self, register_name: str) -> Union[Byte, Word]:
         """
         Read the value of a register.
 
@@ -580,7 +577,7 @@ class MOS6502CPU(flags.ProcessorStatusFlagsInterface):
 
         return getattr(self, register_name) & 0xFF
 
-    def write_register(self: Self, register_name: str, data: int) -> None:
+    def write_register(self, register_name: str, data: int) -> None:
         """
         Write a value to a register.
 
@@ -600,7 +597,7 @@ class MOS6502CPU(flags.ProcessorStatusFlagsInterface):
 
         setattr(self, register_name, data & 0xFF)
 
-    def write_register_to_ram(self: Self, register_name: str, address: int) -> None:
+    def write_register_to_ram(self, register_name: str, address: int) -> None:
         """
         Write a register value to ram.
 
@@ -627,7 +624,7 @@ class MOS6502CPU(flags.ProcessorStatusFlagsInterface):
 
         self.write_byte(address=address, data=getattr(self, register_name) & 0xFF)
 
-    def write_ram_to_register(self: Self, address: int, register_name: str) -> None:
+    def write_ram_to_register(self, address: int, register_name: str) -> None:
         """
         Write a ram value to a register.
 
@@ -653,7 +650,7 @@ class MOS6502CPU(flags.ProcessorStatusFlagsInterface):
 
         setattr(self, register_name, self.fetch_byte(address=address) & 0xFF)
 
-    def set_store_status_flags(self: Self, register_name: str) -> None:
+    def set_store_status_flags(self, register_name: str) -> None:
         """
         Set the status flags for store operations.
 
@@ -663,7 +660,7 @@ class MOS6502CPU(flags.ProcessorStatusFlagsInterface):
         """
         # No flag modifications for store instructions
 
-    def set_load_status_flags(self: Self, register_name: str) -> None:
+    def set_load_status_flags(self, register_name: str) -> None:
         """
         Set the status flags for load operations.
 
@@ -679,7 +676,7 @@ class MOS6502CPU(flags.ProcessorStatusFlagsInterface):
         self.N = flags.ProcessorStatusFlags.N[flags.N] \
             if (register & 128) else not flags.ProcessorStatusFlags.N[flags.N]
 
-    def fetch_zeropage_mode_address(self: Self, offset_register_name: str) -> int:
+    def fetch_zeropage_mode_address(self, offset_register_name: str) -> int:
         """
         Read from RAM @ RAM:ZEROPAGE[PC].
 
@@ -704,7 +701,7 @@ class MOS6502CPU(flags.ProcessorStatusFlagsInterface):
 
         return zeropage_address
 
-    def fetch_immediate_mode_address(self: Self) -> int:
+    def fetch_immediate_mode_address(self) -> int:
         """
         Read from RAM @ RAM[PC].
 
@@ -720,7 +717,7 @@ class MOS6502CPU(flags.ProcessorStatusFlagsInterface):
 
         return data
 
-    def fetch_absolute_mode_address(self: Self, offset_register_name: str) -> int:
+    def fetch_absolute_mode_address(self, offset_register_name: str) -> int:
         """
         Read from RAM @ RAM[(PC:PC + 1)].
 
@@ -751,7 +748,7 @@ class MOS6502CPU(flags.ProcessorStatusFlagsInterface):
 
         return address
 
-    def fetch_indexed_indirect_mode_address(self: Self) -> int:
+    def fetch_indexed_indirect_mode_address(self) -> int:
         """
         Read from RAM @ RAM[(PC:PC + 1) + X].
 
@@ -775,7 +772,7 @@ class MOS6502CPU(flags.ProcessorStatusFlagsInterface):
 
         return address
 
-    def fetch_indirect_indexed_mode_address(self: Self) -> int:
+    def fetch_indirect_indexed_mode_address(self) -> int:
         """
         Read from RAM @ RAM:[ZEROPAGE[PC] << 8 + ZEROPAGE[PC + 1] + Y.
 
@@ -808,7 +805,7 @@ class MOS6502CPU(flags.ProcessorStatusFlagsInterface):
 
         return address
 
-    def execute_load_immediate(self: Self, instruction: instructions.InstructionSet,
+    def execute_load_immediate(self, instruction: instructions.InstructionSet,
                                register_name: str) -> None:
         """
         Instruction execution for "immediate LD[A, X, Y] #oper".
@@ -842,7 +839,7 @@ class MOS6502CPU(flags.ProcessorStatusFlagsInterface):
             f"{Byte(value=getattr(self, register_name))}",
         )
 
-    def execute_store_zeropage(self: Self, instruction: instructions.InstructionSet,
+    def execute_store_zeropage(self, instruction: instructions.InstructionSet,
                                register_name: str, offset_register_name: str) -> None:
         """
         Instruction execution for store zeropage.
@@ -879,7 +876,7 @@ class MOS6502CPU(flags.ProcessorStatusFlagsInterface):
 
         self.log.debug(f"{instructions.InstructionSet(int(instruction)).name}: {Byte(value=data)}")
 
-    def execute_load_zeropage(self: Self, instruction: instructions.InstructionSet,
+    def execute_load_zeropage(self, instruction: instructions.InstructionSet,
                               register_name: str, offset_register_name: str) -> None:
         """
         Instruction execution for load zeropage.
@@ -915,7 +912,7 @@ class MOS6502CPU(flags.ProcessorStatusFlagsInterface):
 
         self.log.debug(f"{instructions.InstructionSet(int(instruction)).name}: {Byte(value=register)}")
 
-    def execute_store_absolute(self: Self, instruction: instructions.InstructionSet,
+    def execute_store_absolute(self, instruction: instructions.InstructionSet,
                                register_name: str, offset_register_name: str) -> None:
         """
         Instruction execution for store absolute.
@@ -942,7 +939,7 @@ class MOS6502CPU(flags.ProcessorStatusFlagsInterface):
 
         self.log.debug(f"{instructions.InstructionSet(int(instruction)).name}: {Byte(value=register)}")
 
-    def execute_load_absolute(self: Self, instruction: instructions.InstructionSet,
+    def execute_load_absolute(self, instruction: instructions.InstructionSet,
                               register_name: str, offset_register_name: str) -> None:
         """
         Instruction execution for load absolute.
@@ -977,7 +974,7 @@ class MOS6502CPU(flags.ProcessorStatusFlagsInterface):
 
         self.log.debug(f"{instructions.InstructionSet(int(instruction)).name}: {Byte(value=register)}")
 
-    def execute_store_indexed_indirect(self: Self, instruction: instructions.InstructionSet,
+    def execute_store_indexed_indirect(self, instruction: instructions.InstructionSet,
                                        register_name: str) -> None:
         """
         Instruction execution for "(indirect,X) ST[A, X, Y] (oper,X)".
@@ -1012,7 +1009,7 @@ class MOS6502CPU(flags.ProcessorStatusFlagsInterface):
             f"{Byte(value=self.ram[address])}",
         )
 
-    def execute_load_indexed_indirect(self: Self, instruction: instructions.InstructionSet,
+    def execute_load_indexed_indirect(self, instruction: instructions.InstructionSet,
                                       register_name: str) -> None:
         """
         Instruction execution for "(indirect,X) LD[A, X, Y] (oper,X)".
@@ -1047,7 +1044,7 @@ class MOS6502CPU(flags.ProcessorStatusFlagsInterface):
             f"{Byte(value=register)}",
         )
 
-    def execute_store_indirect_indexed(self: Self, instruction: instructions.InstructionSet,
+    def execute_store_indirect_indexed(self, instruction: instructions.InstructionSet,
                                        register_name: str) -> None:
         """
         Instruction execution for "(indirect),Y LD[A, X, Y] (oper),Y".
@@ -1081,7 +1078,7 @@ class MOS6502CPU(flags.ProcessorStatusFlagsInterface):
             f"{Byte(value=self.ram[address & 0xFFFF])}",
         )
 
-    def execute_load_indirect_indexed(self: Self, instruction: instructions.InstructionSet,
+    def execute_load_indirect_indexed(self, instruction: instructions.InstructionSet,
                                       register_name: str) -> None:
         """
         Instruction execution for "(indirect),Y LD[A, X, Y] (oper),Y".
@@ -1114,7 +1111,7 @@ class MOS6502CPU(flags.ProcessorStatusFlagsInterface):
 
         self.log.debug(f"{instructions.InstructionSet(int(instruction)).name}: {Byte(value=register)}")
 
-    def _adc_bcd(self: Self, a: int, value: int, carry_in: int) -> tuple[int, int, int, int]:
+    def _adc_bcd(self, a: int, value: int, carry_in: int) -> Tuple[int, int, int, int]:
         """
         Perform BCD (Binary-Coded Decimal) addition.
 
@@ -1161,7 +1158,7 @@ class MOS6502CPU(flags.ProcessorStatusFlagsInterface):
 
         return result, carry_out, overflow, binary_result
 
-    def _sbc_bcd(self: Self, a: int, value: int, carry_in: int) -> tuple[int, int, int, int]:
+    def _sbc_bcd(self, a: int, value: int, carry_in: int) -> Tuple[int, int, int, int]:
         """
         Perform BCD (Binary-Coded Decimal) subtraction.
 
@@ -1208,7 +1205,7 @@ class MOS6502CPU(flags.ProcessorStatusFlagsInterface):
 
         return result, carry_out, overflow, binary_result
 
-    def execute(self: Self, cycles: int = None, max_instructions: int = None) -> int:  # noqa: C901
+    def execute(self, cycles: int = None, max_instructions: int = None) -> int:  # noqa: C901
         """
         Fetch and execute CPU instructions.
 
@@ -1453,7 +1450,7 @@ class MOS6502CPU(flags.ProcessorStatusFlagsInterface):
             if self.irq_pending and not self.I:
                 handle_irq()
 
-    def _handle_irq(self: Self) -> None:
+    def _handle_irq(self) -> None:
         """Handle a pending hardware IRQ.
 
         This implements the 6502 IRQ sequence:
@@ -1499,7 +1496,7 @@ class MOS6502CPU(flags.ProcessorStatusFlagsInterface):
 
         self.log.info(f"*** IRQ HANDLER CALLED: PC ${old_pc:04X} -> ${irq_vector:04X}, I flag now set ***")
 
-    def _handle_nmi(self: Self) -> None:
+    def _handle_nmi(self) -> None:
         """Handle a pending NMI (Non-Maskable Interrupt).
 
         This implements the 6502 NMI sequence:
@@ -1548,10 +1545,10 @@ class MOS6502CPU(flags.ProcessorStatusFlagsInterface):
 
         self.log.info(f"*** NMI HANDLER CALLED: PC ${old_pc:04X} -> ${nmi_vector:04X}, I flag now set ***")
 
-    def push_pc_to_stack(self: Self) -> None:
+    def push_pc_to_stack(self) -> None:
         """Push the PC to the stack."""
 
-    def reset(self: Self) -> None:
+    def reset(self) -> None:
         """
         Reset the CPU.
 
@@ -1629,7 +1626,7 @@ class MOS6502CPU(flags.ProcessorStatusFlagsInterface):
         self.log.info(f"Reset complete: PC=${self.PC:04X}, S=${self.S & 0xFF:02X}, P=0x34, 7 cycles consumed")
 
     @property
-    def flags(self: Self) -> Byte:
+    def flags(self) -> Byte:
         """
         Return the CPU flags register.
 
@@ -1640,7 +1637,7 @@ class MOS6502CPU(flags.ProcessorStatusFlagsInterface):
         return self._flags
 
     @flags.setter
-    def flags(self: Self, flags: int) -> None:
+    def flags(self, flags: int) -> None:
         """
         Set the CPU flags register.
 
@@ -1657,7 +1654,7 @@ class MOS6502CPU(flags.ProcessorStatusFlagsInterface):
 
         setattr(self._flags, flags)
     @property
-    def PC(self: Self) -> int:  # noqa: N802
+    def PC(self) -> int:  # noqa: N802
         """
         Return the CPU PC register.
 
@@ -1670,7 +1667,7 @@ class MOS6502CPU(flags.ProcessorStatusFlagsInterface):
         return self._registers.PC
 
     @PC.setter
-    def PC(self: Self, PC: int) -> None:  # noqa: N802 N803
+    def PC(self, PC: int) -> None:  # noqa: N802 N803
         """
         Set the CPU PC register.
 
@@ -1691,7 +1688,7 @@ class MOS6502CPU(flags.ProcessorStatusFlagsInterface):
             self.pc_callback(self._registers.PC)
 
     @property
-    def S(self: Self) -> int:  # noqa: N802
+    def S(self) -> int:  # noqa: N802
         """
         Return the CPU S register.
 
@@ -1708,7 +1705,7 @@ class MOS6502CPU(flags.ProcessorStatusFlagsInterface):
         return self._registers.S
 
     @S.setter
-    def S(self: Self, S: int) -> None:  # noqa: N802 N803
+    def S(self, S: int) -> None:  # noqa: N802 N803
         """
         Set the CPU S register.
 
@@ -1730,7 +1727,7 @@ class MOS6502CPU(flags.ProcessorStatusFlagsInterface):
             self.log.info(f"S -> 0x{self._registers.S & 0xFF:02X}")
 
     @property
-    def A(self: Self) -> int:  # noqa: N802
+    def A(self) -> int:  # noqa: N802
         """
         Return the CPU A register.
 
@@ -1743,7 +1740,7 @@ class MOS6502CPU(flags.ProcessorStatusFlagsInterface):
         return self._registers.A
 
     @A.setter
-    def A(self: Self, A: int) -> None:  # noqa: N802 N803
+    def A(self, A: int) -> None:  # noqa: N802 N803
         """
         Set the CPU A register.
 
@@ -1760,7 +1757,7 @@ class MOS6502CPU(flags.ProcessorStatusFlagsInterface):
             self.log.info(f"A -> 0x{self._registers.A:02X}")
 
     @property
-    def X(self: Self) -> int:  # noqa: N802
+    def X(self) -> int:  # noqa: N802
         """
         Return the CPU X register.
 
@@ -1773,7 +1770,7 @@ class MOS6502CPU(flags.ProcessorStatusFlagsInterface):
         return self._registers.X
 
     @X.setter
-    def X(self: Self, X: int) -> None:  # noqa: N802 N803
+    def X(self, X: int) -> None:  # noqa: N802 N803
         """
         Set the CPU X register.
 
@@ -1790,7 +1787,7 @@ class MOS6502CPU(flags.ProcessorStatusFlagsInterface):
             self.log.info(f"X -> 0x{self._registers.X:02X}")
 
     @property
-    def Y(self: Self) -> int:  # noqa: N802
+    def Y(self) -> int:  # noqa: N802
         """
         Return the CPU Y register.
 
@@ -1803,7 +1800,7 @@ class MOS6502CPU(flags.ProcessorStatusFlagsInterface):
         return self._registers.Y
 
     @Y.setter
-    def Y(self: Self, Y: int) -> None:  # noqa: N802 N803
+    def Y(self, Y: int) -> None:  # noqa: N802 N803
         """
         Set the CPU Y register.
 
@@ -1819,7 +1816,7 @@ class MOS6502CPU(flags.ProcessorStatusFlagsInterface):
         if self.verbose_cycles:
             self.log.info(f"Y -> 0x{self._registers.Y:02X}")
 
-    def __str__(self: Self) -> str:
+    def __str__(self) -> str:
         """Return the CPU status."""
         description: str = f"{type(self).__name__}\n"
         description += f"\tPC: 0x{self.PC:04X}\n"

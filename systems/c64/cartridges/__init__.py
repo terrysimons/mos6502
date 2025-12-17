@@ -31,6 +31,7 @@ References:
 """
 
 # Base classes, enums, and data structures
+from mos6502.compat import Dict
 from .base import (
     # ABC and runtime classes
     Cartridge,
@@ -162,7 +163,7 @@ from .type_85_magic_desk_16 import MagicDesk16Cartridge
 from .registry import CARTRIDGE_TYPES, create_cartridge
 
 # Map of unimplemented cartridge types for test cart generation
-UNIMPLEMENTED_CARTRIDGE_TYPES: dict[int, type[Cartridge]] = {
+UNIMPLEMENTED_CARTRIDGE_TYPES: Dict[int, type[Cartridge]] = {
     2: KcsPowerCartridge,
     6: ExpertCartridge,
     7: FunPlayPowerPlayCartridge,

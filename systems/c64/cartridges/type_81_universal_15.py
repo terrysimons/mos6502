@@ -3,7 +3,6 @@
 NOT YET IMPLEMENTED - This is a placeholder that generates error cartridges.
 """
 
-from __future__ import annotations
 
 from .base import (
     Cartridge,
@@ -12,6 +11,7 @@ from .base import (
     ROML_SIZE,
     create_error_cartridge_rom,
 )
+from mos6502.compat import List
 
 
 class UniversalCartridge15Cartridge(Cartridge):
@@ -33,7 +33,7 @@ class UniversalCartridge15Cartridge(Cartridge):
         return 0xFF
 
     @classmethod
-    def get_cartridge_variants(cls) -> list[CartridgeVariant]:
+    def get_cartridge_variants(cls) -> List[CartridgeVariant]:
         """Return single variant for error cart generation."""
         return [CartridgeVariant("", exrom=0, game=1)]
 

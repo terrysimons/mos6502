@@ -1,15 +1,14 @@
 #!/usr/bin/env python3
 """DEC instruction implementation for all 6502 variants."""
 
-from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from mos6502.compat import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from mos6502.core import MOS6502CPU
 
 
-def dec_zeropage_0xc6(cpu: MOS6502CPU) -> None:
+def dec_zeropage_0xc6(cpu: "MOS6502CPU") -> None:
     """Execute DEC (Decrement Memory) - Zero Page addressing mode.
 
     Opcode: 0xC6
@@ -35,7 +34,7 @@ def dec_zeropage_0xc6(cpu: MOS6502CPU) -> None:
     cpu.log.info("z")
 
 
-def dec_zeropage_x_0xd6(cpu: MOS6502CPU) -> None:
+def dec_zeropage_x_0xd6(cpu: "MOS6502CPU") -> None:
     """Execute DEC (Decrement Memory) - Zero Page,X addressing mode.
 
     Opcode: 0xD6
@@ -57,7 +56,7 @@ def dec_zeropage_x_0xd6(cpu: MOS6502CPU) -> None:
     cpu.log.info("zx")
 
 
-def dec_absolute_0xce(cpu: MOS6502CPU) -> None:
+def dec_absolute_0xce(cpu: "MOS6502CPU") -> None:
     """Execute DEC (Decrement Memory) - Absolute addressing mode.
 
     Opcode: 0xCE
@@ -82,7 +81,7 @@ def dec_absolute_0xce(cpu: MOS6502CPU) -> None:
     cpu.log.info("a")
 
 
-def dec_absolute_x_0xde(cpu: MOS6502CPU) -> None:
+def dec_absolute_x_0xde(cpu: "MOS6502CPU") -> None:
     """Execute DEC (Decrement Memory) - Absolute,X addressing mode.
 
     Opcode: 0xDE

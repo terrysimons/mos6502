@@ -1,0 +1,11 @@
+BASE: diag_586220ted
+MOD:  3 byte patch to achieve compatibility with Retrofan's font
+
+BASE: diag_586220ted_kinzi
+MOD:  6 byte patch to swap "U1 BAD" and "U2 BAD" in INTERRUPT TEST (obviously 35++ years old bug)
+
+BASE: diag_586220ted_kinzi_2
+MOD:  1 byte patch to correct not printing "INTERRUPT BAD" on interrupt test @94C0: replace RTS(60) by NOP(EA)
+
+BASE: diag_586220ted_kinzi_3
+MOD:  Changed identification string to "C-64 DIAG 586220 KINZI 004"

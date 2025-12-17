@@ -1,15 +1,14 @@
 #!/usr/bin/env python3
 """ROR instruction implementation for all 6502 variants."""
 
-from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from mos6502.compat import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from mos6502.core import MOS6502CPU
 
 
-def ror_accumulator_0x6a(cpu: MOS6502CPU) -> None:
+def ror_accumulator_0x6a(cpu: "MOS6502CPU") -> None:
     """Execute ROR (Rotate Right) - Accumulator addressing mode.
 
     Opcode: 0x6A
@@ -41,7 +40,7 @@ def ror_accumulator_0x6a(cpu: MOS6502CPU) -> None:
     cpu.log.info("i")
 
 
-def ror_zeropage_0x66(cpu: MOS6502CPU) -> None:
+def ror_zeropage_0x66(cpu: "MOS6502CPU") -> None:
     """Execute ROR (Rotate Right) - Zero Page addressing mode.
 
     Opcode: 0x66
@@ -68,7 +67,7 @@ def ror_zeropage_0x66(cpu: MOS6502CPU) -> None:
     cpu.log.info("z")
 
 
-def ror_zeropage_x_0x76(cpu: MOS6502CPU) -> None:
+def ror_zeropage_x_0x76(cpu: "MOS6502CPU") -> None:
     """Execute ROR (Rotate Right) - Zero Page,X addressing mode.
 
     Opcode: 0x76
@@ -95,7 +94,7 @@ def ror_zeropage_x_0x76(cpu: MOS6502CPU) -> None:
     cpu.log.info("zx")
 
 
-def ror_absolute_0x6e(cpu: MOS6502CPU) -> None:
+def ror_absolute_0x6e(cpu: "MOS6502CPU") -> None:
     """Execute ROR (Rotate Right) - Absolute addressing mode.
 
     Opcode: 0x6E
@@ -125,7 +124,7 @@ def ror_absolute_0x6e(cpu: MOS6502CPU) -> None:
     cpu.log.info("a")
 
 
-def ror_absolute_x_0x7e(cpu: MOS6502CPU) -> None:
+def ror_absolute_x_0x7e(cpu: "MOS6502CPU") -> None:
     """Execute ROR (Rotate Right) - Absolute,X addressing mode.
 
     Opcode: 0x7E

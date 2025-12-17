@@ -13,12 +13,11 @@ This provides significant performance improvement when the C64 is not
 actively accessing the disk, as the two CPUs can run in parallel.
 """
 
-from __future__ import annotations
 
-import logging
+from mos6502.compat import logging
 import threading
 import time
-from typing import TYPE_CHECKING, Optional
+from mos6502.compat import TYPE_CHECKING, Optional
 
 from .drive1541 import Drive1541, VIA1_DATA_OUT, VIA1_CLK_OUT, VIA1_ATN_ACK
 from .threaded_iec_bus import ThreadedIECBus

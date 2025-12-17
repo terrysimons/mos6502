@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """Instruction set for the mos6502 CPU."""
-import enum
-from dataclasses import dataclass
-from typing import Literal, NoReturn, Self
+from mos6502.compat import enum
+from mos6502.compat import dataclass
+from mos6502.compat import Literal, NoReturn, List, Dict
 
 from mos6502.errors import IllegalCPUInstructionError
 
@@ -47,6 +47,12 @@ class CPUInstruction:
 
     """
 
+    # Explicit field order for MicroPython compatibility (annotations may not work)
+    _field_order_ = ('opcode', 'mnemonic', 'addressing', 'assembler', 'bytes',
+                     'base_cycles', 'affected_flags', 'package', 'function',
+                     'page_boundary_penalty')
+    _field_defaults_ = {'page_boundary_penalty': False}
+
     opcode: int
     mnemonic: str
     addressing: AddressingMode
@@ -58,7 +64,7 @@ class CPUInstruction:
     function: str
     page_boundary_penalty: bool = False
 
-    def __post_init__(self: Self) -> None:
+    def __post_init__(self) -> None:
         """Validate instruction metadata after initialization."""
         if not 0x00 <= self.opcode <= 0xFF:
             msg = f"Opcode must be 0x00-0xFF, got: 0x{self.opcode:02X}"
@@ -79,7 +85,7 @@ class CPUInstruction:
             raise ValueError(msg)
 
     @property
-    def name(self: Self) -> str:
+    def name(self) -> str:
         """Generate canonical name like LDA_IMMEDIATE_0xA9."""
         addr_map = {
             "implied": "IMPLIED",
@@ -100,43 +106,43 @@ class CPUInstruction:
         return f"{self.mnemonic}_{addr_name}_0x{self.opcode:02X}"
 
     @property
-    def cycles_display(self: Self) -> str:
+    def cycles_display(self) -> str:
         """Return cycles as display string (e.g., '4' or '4*' for page penalty)."""
         if self.page_boundary_penalty:
             return f"{self.base_cycles}*"
         return str(self.base_cycles)
 
     @property
-    def affects_n(self: Self) -> bool:
+    def affects_n(self) -> bool:
         """True if instruction affects Negative flag."""
         return "N" in self.affected_flags
 
     @property
-    def affects_v(self: Self) -> bool:
+    def affects_v(self) -> bool:
         """True if instruction affects Overflow flag."""
         return "V" in self.affected_flags
 
     @property
-    def affects_z(self: Self) -> bool:
+    def affects_z(self) -> bool:
         """True if instruction affects Zero flag."""
         return "Z" in self.affected_flags
 
     @property
-    def affects_c(self: Self) -> bool:
+    def affects_c(self) -> bool:
         """True if instruction affects Carry flag."""
         return "C" in self.affected_flags
 
     @property
-    def affects_i(self: Self) -> bool:
+    def affects_i(self) -> bool:
         """True if instruction affects Interrupt Disable flag."""
         return "I" in self.affected_flags
 
     @property
-    def affects_d(self: Self) -> bool:
+    def affects_d(self) -> bool:
         """True if instruction affects Decimal flag."""
         return "D" in self.affected_flags
 
-    def to_legacy_dict(self: Self) -> dict:
+    def to_legacy_dict(self) -> dict:
         """Convert to legacy instruction_map dictionary format."""
         from mos6502 import flags as flag_bits
         from mos6502.memory import Byte
@@ -164,34 +170,62 @@ class CPUInstruction:
             "flags": flags_byte,
         }
 
-    def __int__(self: Self) -> int:
+    def __int__(self) -> int:
         """Allow using CPUInstruction where an int opcode is expected."""
         return self.opcode
 
-    def __hash__(self: Self) -> int:
+    def __hash__(self) -> int:
         """Hash by opcode for use in sets and as dict keys."""
         return hash(self.opcode)
 
 
-class PseudoEnumMember(int):
-    """Allows dynamic addition of members to IntEnum classes."""
+class PseudoEnumMember:
+    """Allows dynamic addition of members to IntEnum classes.
 
-    def __new__(cls, value: int, name: str) -> "PseudoEnumMember":
+    Note: Does not inherit from int for MicroPython compatibility.
+    Implements __int__, __eq__, __hash__, and __index__ to behave like an int.
+    """
+
+    __slots__ = ('_value_', '_name')
+
+    def __init__(self, value: int, name: str) -> None:
         """Create a pseudo-enum member with the given value and name."""
-        obj = int.__new__(cls, value)
-        obj._name = name
-        obj._value_ = value
-        return obj
+        self._value_ = value
+        self._name = name
 
     @property
-    def name(self: Self) -> str:
+    def name(self) -> str:
         """Return the member name."""
         return self._name
 
     @property
-    def value(self: Self) -> int:
+    def value(self) -> int:
         """Return the member value."""
         return self._value_
+
+    def __int__(self) -> int:
+        """Return the integer value."""
+        return self._value_
+
+    def __eq__(self, other: object) -> bool:
+        """Compare equality with int or another PseudoEnumMember."""
+        if isinstance(other, int):
+            return self._value_ == other
+        if isinstance(other, PseudoEnumMember):
+            return self._value_ == other._value_
+        return NotImplemented
+
+    def __hash__(self) -> int:
+        """Hash by value for use in sets and as dict keys."""
+        return hash(self._value_)
+
+    def __index__(self) -> int:
+        """Allow use in slices and hex()."""
+        return self._value_
+
+    def __repr__(self) -> str:
+        """Return string representation."""
+        return f"<{self._name}: {self._value_}>"
 
 
 def register_instruction(
@@ -207,7 +241,7 @@ def register_instruction(
 
 
 def register_instructions(
-    instructions: list[CPUInstruction],
+    instructions: List[CPUInstruction],
     instruction_set_class: type,
     instruction_map: dict,
 ) -> None:
@@ -216,11 +250,14 @@ def register_instructions(
         register_instruction(instruction, instruction_set_class, instruction_map)
 
 
-class InstructionOpcode(int):
+class InstructionOpcode:
     """Instruction opcode that carries its variant metadata.
 
-    This class extends int to carry package and function names for variant dispatch,
-    while remaining fully compatible with existing code that expects plain integers.
+    This class stores the opcode value and carries package and function names
+    for variant dispatch, while remaining compatible with code that expects integers.
+
+    Note: Does not inherit from int for MicroPython compatibility.
+    Implements __int__, __eq__, __hash__, and __index__ to behave like an int.
 
     Example:
     -------
@@ -231,7 +268,9 @@ class InstructionOpcode(int):
         )
     """
 
-    def __new__(cls, value: int, package: str, function: str) -> "InstructionSet":
+    __slots__ = ('_value', 'package', 'function')
+
+    def __init__(self, value: int, package: str, function: str) -> None:
         """Create instruction opcode with metadata.
 
         Arguments:
@@ -240,10 +279,33 @@ class InstructionOpcode(int):
             package: Package name (e.g., "mos6502.instructions.nop")
             function: Function name (e.g., "nop_implied_0xea")
         """
-        obj = int.__new__(cls, value)
-        obj.package = package  # type: ignore
-        obj.function = function  # type: ignore
-        return obj
+        self._value = value
+        self.package = package
+        self.function = function
+
+    def __int__(self) -> int:
+        """Return the integer opcode value."""
+        return self._value
+
+    def __eq__(self, other: object) -> bool:
+        """Compare equality with int or another InstructionOpcode."""
+        if isinstance(other, int):
+            return self._value == other
+        if isinstance(other, InstructionOpcode):
+            return self._value == other._value
+        return NotImplemented
+
+    def __hash__(self) -> int:
+        """Hash by opcode value for use in sets and as dict keys."""
+        return hash(self._value)
+
+    def __index__(self) -> int:
+        """Allow use in slices and hex()."""
+        return self._value
+
+    def __repr__(self) -> str:
+        """Return string representation."""
+        return f"InstructionOpcode(0x{self._value:02X}, {self.package!r}, {self.function!r})"
 
 # Import from individual instruction modules
 from mos6502.instructions._bit import BIT_ZEROPAGE_0x24, BIT_ABSOLUTE_0x2C, register_bit_instructions
@@ -993,8 +1055,9 @@ class InstructionSet(enum.IntEnum):
         raise IllegalCPUInstructionError(f"{value} ({value:02X}) is not a valid {cls}.")
 
 
-# Initialize instruction map
+# Initialize instruction map and _value2member_map_ (needed for MicroPython compatibility)
 InstructionSet.map = {}
+InstructionSet._value2member_map_ = {}
 
 # Register instruction modules
 register_bit_instructions(InstructionSet, InstructionSet.map)
@@ -1061,7 +1124,7 @@ register_all_transfer_instructions(InstructionSet, InstructionSet.map)  # MIGRAT
 
 # Build opcode lookup map for variant dispatch
 # This maps int opcode values to InstructionOpcode objects with metadata
-def _build_opcode_lookup() -> dict[int, InstructionOpcode]:
+def _build_opcode_lookup() -> Dict[int, InstructionOpcode]:
     """Build lookup map from opcode values to InstructionOpcode objects.
 
     This allows converting fetched instruction bytes to InstructionOpcode objects

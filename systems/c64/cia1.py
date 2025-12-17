@@ -10,11 +10,10 @@ Handles:
 - IRQ generation
 """
 
-from __future__ import annotations
 
-import logging
+from mos6502.compat import logging
 import threading
-from typing import TYPE_CHECKING
+from mos6502.compat import TYPE_CHECKING, Union
 
 if TYPE_CHECKING:
     from mos6502.core import MOS6502CPU
@@ -70,7 +69,7 @@ class CIA1:
     - IRQ generation
     """
 
-    def __init__(self, cpu: MOS6502CPU) -> None:
+    def __init__(self, cpu: "MOS6502CPU") -> None:
         # 16 registers, mirrored through $DC00–$DC0F
         self.regs = [0x00] * 16
 
@@ -1045,7 +1044,7 @@ class CIA1:
                 # Clear press time tracking
                 self._key_press_times.pop((row, col), None)
 
-    def get_key_press_time(self, row: int, col: int) -> float | None:
+    def get_key_press_time(self, row: int, col: int) -> Union[float, None]:
         """Get when a key was pressed, or None if not pressed.
 
         Used to enforce minimum key hold duration for fast typists.

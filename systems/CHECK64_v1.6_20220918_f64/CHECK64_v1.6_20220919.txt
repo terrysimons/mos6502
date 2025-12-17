@@ -1,0 +1,6 @@
+Schalterstellungen
+
+1. 101011 ULTIMAX-RAM-CHECKER by GI-Joe / Mac Bacon
+2. 101001 C-64 Dead Test Rev 781220 kinzi 006
+3. 010110 C-64 Diag Rev 586220 kinzi 004
+4. 000100 C128 Diagnostic Rev. 789010

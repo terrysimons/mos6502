@@ -30,10 +30,9 @@ Reference:
 - http://archive.6502.org/datasheets/mos_6522_preliminary_nov_1977.pdf
 """
 
-from __future__ import annotations
 
-import logging
-from typing import TYPE_CHECKING, Callable, Optional
+from mos6502.compat import logging
+from mos6502.compat import TYPE_CHECKING, Callable, Optional
 
 if TYPE_CHECKING:
     pass

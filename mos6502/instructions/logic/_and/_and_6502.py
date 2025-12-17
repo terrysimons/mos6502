@@ -1,15 +1,14 @@
 #!/usr/bin/env python3
 """AND instruction implementation for all 6502 variants."""
 
-from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from mos6502.compat import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from mos6502.core import MOS6502CPU
 
 
-def and_immediate_0x29(cpu: MOS6502CPU) -> None:
+def and_immediate_0x29(cpu: "MOS6502CPU") -> None:
     """Execute AND (Logical AND with Accumulator) - Immediate addressing mode.
 
     Opcode: 0x29
@@ -31,7 +30,7 @@ def and_immediate_0x29(cpu: MOS6502CPU) -> None:
     cpu.log.info("i")
 
 
-def and_zeropage_0x25(cpu: MOS6502CPU) -> None:
+def and_zeropage_0x25(cpu: "MOS6502CPU") -> None:
     """Execute AND (Logical AND with Accumulator) - Zeropage addressing mode.
 
     Opcode: 0x25
@@ -54,7 +53,7 @@ def and_zeropage_0x25(cpu: MOS6502CPU) -> None:
     cpu.log.info("i")
 
 
-def and_zeropage_x_0x35(cpu: MOS6502CPU) -> None:
+def and_zeropage_x_0x35(cpu: "MOS6502CPU") -> None:
     """Execute AND (Logical AND with Accumulator) - Zeropage,X addressing mode.
 
     Opcode: 0x35
@@ -77,7 +76,7 @@ def and_zeropage_x_0x35(cpu: MOS6502CPU) -> None:
     cpu.log.info("i")
 
 
-def and_absolute_0x2d(cpu: MOS6502CPU) -> None:
+def and_absolute_0x2d(cpu: "MOS6502CPU") -> None:
     """Execute AND (Logical AND with Accumulator) - Absolute addressing mode.
 
     Opcode: 0x2D
@@ -100,7 +99,7 @@ def and_absolute_0x2d(cpu: MOS6502CPU) -> None:
     cpu.log.info("i")
 
 
-def and_absolute_x_0x3d(cpu: MOS6502CPU) -> None:
+def and_absolute_x_0x3d(cpu: "MOS6502CPU") -> None:
     """Execute AND (Logical AND with Accumulator) - Absolute,X addressing mode.
 
     Opcode: 0x3D
@@ -123,7 +122,7 @@ def and_absolute_x_0x3d(cpu: MOS6502CPU) -> None:
     cpu.log.info("i")
 
 
-def and_absolute_y_0x39(cpu: MOS6502CPU) -> None:
+def and_absolute_y_0x39(cpu: "MOS6502CPU") -> None:
     """Execute AND (Logical AND with Accumulator) - Absolute,Y addressing mode.
 
     Opcode: 0x39
@@ -146,7 +145,7 @@ def and_absolute_y_0x39(cpu: MOS6502CPU) -> None:
     cpu.log.info("i")
 
 
-def and_indexed_indirect_x_0x21(cpu: MOS6502CPU) -> None:
+def and_indexed_indirect_x_0x21(cpu: "MOS6502CPU") -> None:
     """Execute AND (Logical AND with Accumulator) - (Indirect,X) addressing mode.
 
     Opcode: 0x21
@@ -169,7 +168,7 @@ def and_indexed_indirect_x_0x21(cpu: MOS6502CPU) -> None:
     cpu.log.info("i")
 
 
-def and_indirect_indexed_y_0x31(cpu: MOS6502CPU) -> None:
+def and_indirect_indexed_y_0x31(cpu: "MOS6502CPU") -> None:
     """Execute AND (Logical AND with Accumulator) - (Indirect),Y addressing mode.
 
     Opcode: 0x31

@@ -1,15 +1,14 @@
 #!/usr/bin/env python3
 """BVC instruction implementation for all 6502 variants."""
 
-from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from mos6502.compat import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from mos6502.core import MOS6502CPU
 
 
-def bvc_relative_0x50(cpu: MOS6502CPU) -> None:
+def bvc_relative_0x50(cpu: "MOS6502CPU") -> None:
     """Execute BVC (Branch on Overflow Clear) - Relative addressing mode.
 
     Opcode: 0x50

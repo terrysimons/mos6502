@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
 """Commodore 64 Emulator using the mos6502 CPU package."""
 
-import logging
+from mos6502.compat import logging
 import sys
 from pathlib import Path
-from typing import Optional
+from mos6502.compat import Optional, Union, List, Dict, Tuple
 
 from mos6502 import CPU, CPUVariant, errors, add_cpu_arguments
 from mos6502.core import INFINITE_CYCLES
@@ -1211,7 +1211,7 @@ class C64:
 
         log.info(f"Loaded raw {cart_type.upper()} cartridge: {path.name} ({size} bytes)")
 
-    def _create_error_cartridge(self, error_lines: list[str]) -> bytes:
+    def _create_error_cartridge(self, error_lines: List[str]) -> bytes:
         """Create an 8KB cartridge ROM that displays an error message.
 
         This is used when an unsupported cartridge type is loaded, to give
@@ -1324,7 +1324,7 @@ class C64:
         ultimax_romh_data = None
 
         # For banked cartridges (Type 1+)
-        banks: dict[int, bytes] = {}  # bank_number -> rom_data
+        banks: Dict[int, bytes] = {}  # bank_number -> rom_data
 
         # Ultimax mode detection from CRT header
         # EXROM=1, GAME=0 indicates Ultimax mode
@@ -1661,7 +1661,7 @@ class C64:
 
     def load_program(
         self, program_path: Path, load_address: Optional[int] = None
-    ) -> tuple[int, int]:
+    ) -> Tuple[int, int]:
         """Load a program into memory.
 
         Arguments:
@@ -2588,7 +2588,7 @@ class C64:
                   f"({stats['speedup']:.1%} of {region} ({chip}) C64 @ "
                   f"{stats['real_cpu_freq']/1e6:.3f}MHz)")
 
-    def disassemble_at(self, address: int, num_instructions: int = 10) -> list[str]:
+    def disassemble_at(self, address: int, num_instructions: int = 10) -> List[str]:
         """Disassemble instructions starting at address.
 
         Arguments:
@@ -4125,7 +4125,7 @@ class C64:
     # Stores (row, col, needs_shift) tuples for keys waiting to be injected
     _pygame_key_buffer: list = []
     _pygame_keys_currently_pressed: set = set()  # Track physical key state
-    _pygame_current_injection: tuple | None = None  # (row, col, needs_shift, start_cycles, released)
+    _pygame_current_injection: Union[tuple, None]= None  # (row, col, needs_shift, start_cycles, released)
 
     # Timing in CPU cycles (not wall-clock) so keys inject correctly at any emulator speed
     # KERNAL scans keyboard once per frame (~17000-20000 cycles). We need to span one scan.
@@ -4566,7 +4566,7 @@ class C64:
             return f"{hex_str}  {mnemonic}{operand_str}  ; {mode}"
 
 
-def main() -> int | None:
+def main() -> Union[int, None]:
     """Run the C64 emulator CLI."""
     import argparse
 

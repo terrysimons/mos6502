@@ -11,15 +11,14 @@ References:
   - http://www.oxyron.de/html/opcodes02.html
 """
 
-from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from mos6502.compat import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from mos6502.core import MOS6502CPU
 
 
-def sbx_immediate_0xcb(cpu: MOS6502CPU) -> None:
+def sbx_immediate_0xcb(cpu: "MOS6502CPU") -> None:
     """Execute SBX (Subtract from X) - Immediate addressing mode.
 
     Opcode: 0xCB

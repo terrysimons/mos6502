@@ -1,15 +1,14 @@
 #!/usr/bin/env python3
 """BRK instruction implementation for 65C02 variant."""
 
-from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from mos6502.compat import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from mos6502.core import MOS6502CPU
 
 
-def brk_implied_0x00(cpu: MOS6502CPU) -> None:
+def brk_implied_0x00(cpu: "MOS6502CPU") -> None:
     """Execute BRK (Force Break) - Implied addressing mode - 65C02 variant.
 
     Opcode: 0x00

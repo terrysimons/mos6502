@@ -1,15 +1,14 @@
 #!/usr/bin/env python3
 """TAX instruction implementation for all 6502 variants."""
 
-from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from mos6502.compat import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from mos6502.core import MOS6502CPU
 
 
-def tax_implied_0xaa(cpu: MOS6502CPU) -> None:
+def tax_implied_0xaa(cpu: "MOS6502CPU") -> None:
     """Execute TAX (Transfer Accumulator to Index X) - Implied addressing mode.
 
     Opcode: 0xAA

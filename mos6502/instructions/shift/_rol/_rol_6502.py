@@ -1,15 +1,14 @@
 #!/usr/bin/env python3
 """ROL instruction implementation for all 6502 variants."""
 
-from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from mos6502.compat import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from mos6502.core import MOS6502CPU
 
 
-def rol_accumulator_0x2a(cpu: MOS6502CPU) -> None:
+def rol_accumulator_0x2a(cpu: "MOS6502CPU") -> None:
     """Execute ROL (Rotate Left) - Accumulator addressing mode.
 
     Opcode: 0x2A
@@ -41,7 +40,7 @@ def rol_accumulator_0x2a(cpu: MOS6502CPU) -> None:
     cpu.log.info("i")
 
 
-def rol_zeropage_0x26(cpu: MOS6502CPU) -> None:
+def rol_zeropage_0x26(cpu: "MOS6502CPU") -> None:
     """Execute ROL (Rotate Left) - Zero Page addressing mode.
 
     Opcode: 0x26
@@ -68,7 +67,7 @@ def rol_zeropage_0x26(cpu: MOS6502CPU) -> None:
     cpu.log.info("z")
 
 
-def rol_zeropage_x_0x36(cpu: MOS6502CPU) -> None:
+def rol_zeropage_x_0x36(cpu: "MOS6502CPU") -> None:
     """Execute ROL (Rotate Left) - Zero Page,X addressing mode.
 
     Opcode: 0x36
@@ -95,7 +94,7 @@ def rol_zeropage_x_0x36(cpu: MOS6502CPU) -> None:
     cpu.log.info("zx")
 
 
-def rol_absolute_0x2e(cpu: MOS6502CPU) -> None:
+def rol_absolute_0x2e(cpu: "MOS6502CPU") -> None:
     """Execute ROL (Rotate Left) - Absolute addressing mode.
 
     Opcode: 0x2E
@@ -125,7 +124,7 @@ def rol_absolute_0x2e(cpu: MOS6502CPU) -> None:
     cpu.log.info("a")
 
 
-def rol_absolute_x_0x3e(cpu: MOS6502CPU) -> None:
+def rol_absolute_x_0x3e(cpu: "MOS6502CPU") -> None:
     """Execute ROL (Rotate Left) - Absolute,X addressing mode.
 
     Opcode: 0x3E

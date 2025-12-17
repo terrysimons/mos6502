@@ -12,15 +12,14 @@ References:
   - http://www.oxyron.de/html/opcodes02.html
 """
 
-from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from mos6502.compat import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from mos6502.core import MOS6502CPU
 
 
-def slo_zeropage_0x07(cpu: MOS6502CPU) -> None:
+def slo_zeropage_0x07(cpu: "MOS6502CPU") -> None:
     """Execute SLO (Shift Left and OR) - Zero Page addressing mode.
 
     Opcode: 0x07
@@ -65,7 +64,7 @@ def slo_zeropage_0x07(cpu: MOS6502CPU) -> None:
     cpu.log.info("i")
 
 
-def slo_zeropage_x_0x17(cpu: MOS6502CPU) -> None:
+def slo_zeropage_x_0x17(cpu: "MOS6502CPU") -> None:
     """Execute SLO (Shift Left and OR) - Zero Page,X addressing mode.
 
     Opcode: 0x17
@@ -110,7 +109,7 @@ def slo_zeropage_x_0x17(cpu: MOS6502CPU) -> None:
     cpu.log.info("i")
 
 
-def slo_indexed_indirect_x_0x03(cpu: MOS6502CPU) -> None:
+def slo_indexed_indirect_x_0x03(cpu: "MOS6502CPU") -> None:
     """Execute SLO (Shift Left and OR) - (Indirect,X) addressing mode.
 
     Opcode: 0x03
@@ -155,7 +154,7 @@ def slo_indexed_indirect_x_0x03(cpu: MOS6502CPU) -> None:
     cpu.log.info("i")
 
 
-def slo_indirect_indexed_y_0x13(cpu: MOS6502CPU) -> None:
+def slo_indirect_indexed_y_0x13(cpu: "MOS6502CPU") -> None:
     """Execute SLO (Shift Left and OR) - (Indirect),Y addressing mode.
 
     Opcode: 0x13
@@ -200,7 +199,7 @@ def slo_indirect_indexed_y_0x13(cpu: MOS6502CPU) -> None:
     cpu.log.info("i")
 
 
-def slo_absolute_0x0f(cpu: MOS6502CPU) -> None:
+def slo_absolute_0x0f(cpu: "MOS6502CPU") -> None:
     """Execute SLO (Shift Left and OR) - Absolute addressing mode.
 
     Opcode: 0x0F
@@ -245,7 +244,7 @@ def slo_absolute_0x0f(cpu: MOS6502CPU) -> None:
     cpu.log.info("i")
 
 
-def slo_absolute_x_0x1f(cpu: MOS6502CPU) -> None:
+def slo_absolute_x_0x1f(cpu: "MOS6502CPU") -> None:
     """Execute SLO (Shift Left and OR) - Absolute,X addressing mode.
 
     Opcode: 0x1F
@@ -295,7 +294,7 @@ def slo_absolute_x_0x1f(cpu: MOS6502CPU) -> None:
     cpu.log.info("ax")
 
 
-def slo_absolute_y_0x1b(cpu: MOS6502CPU) -> None:
+def slo_absolute_y_0x1b(cpu: "MOS6502CPU") -> None:
     """Execute SLO (Shift Left and OR) - Absolute,Y addressing mode.
 
     Opcode: 0x1B

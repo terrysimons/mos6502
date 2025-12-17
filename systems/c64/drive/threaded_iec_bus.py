@@ -27,11 +27,10 @@ Reference:
 - https://www.c64-wiki.com/wiki/Serial_Port
 """
 
-from __future__ import annotations
 
-import logging
+from mos6502.compat import logging
 import threading
-from typing import TYPE_CHECKING, Dict, Optional
+from mos6502.compat import TYPE_CHECKING, Dict, Optional
 
 if TYPE_CHECKING:
     from ..cia2 import CIA2
@@ -60,8 +59,8 @@ class ThreadedIECBus:
         self._cycle_condition = threading.Condition(self._lock)
 
         # Connected devices (protected by lock for modification)
-        self.cia2: Optional[CIA2] = None
-        self._drives: Dict[int, Drive1541] = {}  # device_number -> drive
+        self.cia2: Optional["CIA2"] = None
+        self._drives: Dict[int, "Drive1541"] = {}  # device_number -> drive
         self._drives_list: list = []  # Cached list for fast iteration in update()
 
         # Bus line states (True = released/high, False = asserted/low)
@@ -96,7 +95,7 @@ class ThreadedIECBus:
         with self._lock:
             return list(self._drives.values())
 
-    def connect_c64(self, cia2: CIA2) -> None:
+    def connect_c64(self, cia2: "CIA2") -> None:
         """Connect C64's CIA2 to the bus.
 
         Args:
@@ -106,7 +105,7 @@ class ThreadedIECBus:
             self.cia2 = cia2
         log.info("C64 connected to threaded IEC bus")
 
-    def connect_drive(self, drive: Drive1541) -> None:
+    def connect_drive(self, drive: "Drive1541") -> None:
         """Connect a drive to the bus.
 
         Args:
@@ -120,7 +119,7 @@ class ThreadedIECBus:
                 drive.iec_bus = self
         log.info(f"Drive {drive.device_number} connected to threaded IEC bus")
 
-    def disconnect_drive(self, drive: Drive1541) -> None:
+    def disconnect_drive(self, drive: "Drive1541") -> None:
         """Disconnect a drive from the bus.
 
         Args:

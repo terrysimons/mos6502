@@ -1,15 +1,14 @@
 #!/usr/bin/env python3
 """INC instruction implementation for all 6502 variants."""
 
-from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from mos6502.compat import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from mos6502.core import MOS6502CPU
 
 
-def inc_zeropage_0xe6(cpu: MOS6502CPU) -> None:
+def inc_zeropage_0xe6(cpu: "MOS6502CPU") -> None:
     """Execute INC (Increment Memory) - Zero Page addressing mode.
 
     Opcode: 0xE6
@@ -35,7 +34,7 @@ def inc_zeropage_0xe6(cpu: MOS6502CPU) -> None:
     cpu.log.info("z")
 
 
-def inc_zeropage_x_0xf6(cpu: MOS6502CPU) -> None:
+def inc_zeropage_x_0xf6(cpu: "MOS6502CPU") -> None:
     """Execute INC (Increment Memory) - Zero Page,X addressing mode.
 
     Opcode: 0xF6
@@ -57,7 +56,7 @@ def inc_zeropage_x_0xf6(cpu: MOS6502CPU) -> None:
     cpu.log.info("zx")
 
 
-def inc_absolute_0xee(cpu: MOS6502CPU) -> None:
+def inc_absolute_0xee(cpu: "MOS6502CPU") -> None:
     """Execute INC (Increment Memory) - Absolute addressing mode.
 
     Opcode: 0xEE
@@ -82,7 +81,7 @@ def inc_absolute_0xee(cpu: MOS6502CPU) -> None:
     cpu.log.info("a")
 
 
-def inc_absolute_x_0xfe(cpu: MOS6502CPU) -> None:
+def inc_absolute_x_0xfe(cpu: "MOS6502CPU") -> None:
     """Execute INC (Increment Memory) - Absolute,X addressing mode.
 
     Opcode: 0xFE

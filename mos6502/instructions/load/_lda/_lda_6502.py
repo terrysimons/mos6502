@@ -1,15 +1,14 @@
 #!/usr/bin/env python3
 """LDA instruction implementation for all 6502 variants."""
 
-from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from mos6502.compat import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from mos6502.core import MOS6502CPU
 
 
-def lda_immediate_0xa9(cpu: MOS6502CPU) -> None:
+def lda_immediate_0xa9(cpu: "MOS6502CPU") -> None:
     """Execute LDA (Load Accumulator with Memory) - Immediate addressing mode.
 
     Opcode: 0xA9
@@ -33,7 +32,7 @@ def lda_immediate_0xa9(cpu: MOS6502CPU) -> None:
     cpu.log.info("i")
 
 
-def lda_zeropage_0xa5(cpu: MOS6502CPU) -> None:
+def lda_zeropage_0xa5(cpu: "MOS6502CPU") -> None:
     """Execute LDA (Load Accumulator with Memory) - Zeropage addressing mode.
 
     Opcode: 0xA5
@@ -58,7 +57,7 @@ def lda_zeropage_0xa5(cpu: MOS6502CPU) -> None:
     cpu.log.info("i")
 
 
-def lda_zeropage_x_0xb5(cpu: MOS6502CPU) -> None:
+def lda_zeropage_x_0xb5(cpu: "MOS6502CPU") -> None:
     """Execute LDA (Load Accumulator with Memory) - Zeropage,X addressing mode.
 
     Opcode: 0xB5
@@ -83,7 +82,7 @@ def lda_zeropage_x_0xb5(cpu: MOS6502CPU) -> None:
     cpu.log.info("i")
 
 
-def lda_absolute_0xad(cpu: MOS6502CPU) -> None:
+def lda_absolute_0xad(cpu: "MOS6502CPU") -> None:
     """Execute LDA (Load Accumulator with Memory) - Absolute addressing mode.
 
     Opcode: 0xAD
@@ -108,7 +107,7 @@ def lda_absolute_0xad(cpu: MOS6502CPU) -> None:
     cpu.log.info("i")
 
 
-def lda_absolute_x_0xbd(cpu: MOS6502CPU) -> None:
+def lda_absolute_x_0xbd(cpu: "MOS6502CPU") -> None:
     """Execute LDA (Load Accumulator with Memory) - Absolute,X addressing mode.
 
     Opcode: 0xBD
@@ -133,7 +132,7 @@ def lda_absolute_x_0xbd(cpu: MOS6502CPU) -> None:
     cpu.log.info("i")
 
 
-def lda_absolute_y_0xb9(cpu: MOS6502CPU) -> None:
+def lda_absolute_y_0xb9(cpu: "MOS6502CPU") -> None:
     """Execute LDA (Load Accumulator with Memory) - Absolute,Y addressing mode.
 
     Opcode: 0xB9
@@ -158,7 +157,7 @@ def lda_absolute_y_0xb9(cpu: MOS6502CPU) -> None:
     cpu.log.info("i")
 
 
-def lda_indexed_indirect_x_0xa1(cpu: MOS6502CPU) -> None:
+def lda_indexed_indirect_x_0xa1(cpu: "MOS6502CPU") -> None:
     """Execute LDA (Load Accumulator with Memory) - (Indirect,X) addressing mode.
 
     Opcode: 0xA1
@@ -183,7 +182,7 @@ def lda_indexed_indirect_x_0xa1(cpu: MOS6502CPU) -> None:
     cpu.log.info("i")
 
 
-def lda_indirect_indexed_y_0xb1(cpu: MOS6502CPU) -> None:
+def lda_indirect_indexed_y_0xb1(cpu: "MOS6502CPU") -> None:
     """Execute LDA (Load Accumulator with Memory) - (Indirect),Y addressing mode.
 
     Opcode: 0xB1

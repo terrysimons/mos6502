@@ -4,9 +4,8 @@ CRT hardware type 1. The Action Replay is a freezer cartridge with
 32KB ROM organized as 4 x 8KB banks, plus 8KB RAM.
 """
 
-from __future__ import annotations
 
-import logging
+from mos6502.compat import logging
 
 from .base import (
     Cartridge,
@@ -19,6 +18,7 @@ from .base import (
 )
 from .rom_builder import TestROMBuilder
 from c64.colors import COLOR_BLUE, COLOR_YELLOW, COLOR_WHITE
+from mos6502.compat import List
 
 log = logging.getLogger("c64.cartridge")
 
@@ -54,7 +54,7 @@ class ActionReplayCartridge(Cartridge):
     HARDWARE_TYPE = 1
     ACTIVE_BANK_SIZE = ROML_SIZE  # 8KB banks
 
-    def __init__(self, banks: list[bytes], name: str = ""):
+    def __init__(self, banks: List[bytes], name: str = ""):
         """Initialize Action Replay cartridge.
 
         Args:
@@ -210,7 +210,7 @@ class ActionReplayCartridge(Cartridge):
     SIGNATURE_ADDR = 0x9FF5  # Each bank has its bank number here
 
     @classmethod
-    def get_cartridge_variants(cls) -> list[CartridgeVariant]:
+    def get_cartridge_variants(cls) -> List[CartridgeVariant]:
         """Return all valid configuration variants for Type 1."""
         return [
             CartridgeVariant("", exrom=0, game=0, extra={"bank_count": 4}),
