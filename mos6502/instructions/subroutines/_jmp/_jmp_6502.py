@@ -63,13 +63,13 @@ def jmp_indirect_0x6c(cpu: "MOS6502CPU") -> None:
 
     if (indirect_address & 0xFF) == 0xFF:
         # On page boundary - 6502 has the bug
-        low_byte = cpu.read_byte(address=indirect_address)
+        low_byte = cpu.read_byte(indirect_address)
         # Wrap to start of same page instead of next page
-        high_byte = cpu.read_byte(address=indirect_address & 0xFF00)
+        high_byte = cpu.read_byte(indirect_address & 0xFF00)
         jump_address: int = (high_byte << 8) | low_byte
     else:
         # Not on page boundary - all variants behave the same
-        jump_address: "Word" = cpu.read_word(address=indirect_address)
+        jump_address: "Word" = cpu.read_word(indirect_address)
 
     cpu.PC = jump_address
     cpu.log.info("i")

@@ -64,7 +64,7 @@ def sha_indirect_indexed_y_0x93(cpu: "MOS6502CPU") -> None:
     value: int = int(cpu.A) & int(cpu.X) & ((high_byte + 1) & 0xFF)
 
     # Store the value
-    cpu.write_byte(address=effective_address, data=value)
+    cpu.write_byte(effective_address, value)
 
     cpu.log.info("i")
 
@@ -105,6 +105,6 @@ def sha_absolute_y_0x9f(cpu: "MOS6502CPU") -> None:
     value: int = int(cpu.A) & int(cpu.X) & ((high_byte + 1) & 0xFF)
 
     # Store the value
-    cpu.write_byte(address=effective_address, data=value)
+    cpu.write_byte(effective_address, value)
 
     cpu.log.info("i")

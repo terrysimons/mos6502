@@ -41,16 +41,16 @@ def dcp_zeropage_0xc7(cpu: "MOS6502CPU") -> None:
     from mos6502 import flags
 
     # Fetch zero page address
-    address: int = cpu.fetch_zeropage_mode_address(offset_register_name=None)
+    address: int = cpu.fetch_zeropage_mode_address(None)
 
     # Read value from memory
-    value: int = cpu.read_byte(address=address)
+    value: int = cpu.read_byte(address)
 
     # Decrement value
     decremented: int = (value - 1) & 0xFF
 
     # Write decremented value back to memory
-    cpu.write_byte(address=address, data=decremented)
+    cpu.write_byte(address, decremented)
 
     # Compare A with decremented value (like CMP)
     result: int = (int(cpu.A) - decremented) & 0xFF
@@ -84,16 +84,16 @@ def dcp_zeropage_x_0xd7(cpu: "MOS6502CPU") -> None:
     from mos6502 import flags
 
     # Fetch zero page,X address
-    address: int = cpu.fetch_zeropage_mode_address(offset_register_name="X")
+    address: int = cpu.fetch_zeropage_mode_address("X")
 
     # Read value from memory
-    value: int = cpu.read_byte(address=address)
+    value: int = cpu.read_byte(address)
 
     # Decrement value
     decremented: int = (value - 1) & 0xFF
 
     # Write decremented value back to memory
-    cpu.write_byte(address=address, data=decremented)
+    cpu.write_byte(address, decremented)
 
     # Compare A with decremented value
     result: int = (int(cpu.A) - decremented) & 0xFF
@@ -130,13 +130,13 @@ def dcp_indexed_indirect_x_0xc3(cpu: "MOS6502CPU") -> None:
     address: int = cpu.fetch_indexed_indirect_mode_address()
 
     # Read value from memory
-    value: int = cpu.read_byte(address=address)
+    value: int = cpu.read_byte(address)
 
     # Decrement value
     decremented: int = (value - 1) & 0xFF
 
     # Write decremented value back to memory
-    cpu.write_byte(address=address & 0xFFFF, data=decremented)
+    cpu.write_byte(address & 0xFFFF, decremented)
 
     # Compare A with decremented value
     result: int = (int(cpu.A) - decremented) & 0xFF
@@ -173,13 +173,13 @@ def dcp_indirect_indexed_y_0xd3(cpu: "MOS6502CPU") -> None:
     address: int = cpu.fetch_indirect_indexed_mode_address()
 
     # Read value from memory
-    value: int = cpu.read_byte(address=address)
+    value: int = cpu.read_byte(address)
 
     # Decrement value
     decremented: int = (value - 1) & 0xFF
 
     # Write decremented value back to memory
-    cpu.write_byte(address=address & 0xFFFF, data=decremented)
+    cpu.write_byte(address & 0xFFFF, decremented)
 
     # Compare A with decremented value
     result: int = (int(cpu.A) - decremented) & 0xFF
@@ -213,16 +213,16 @@ def dcp_absolute_0xcf(cpu: "MOS6502CPU") -> None:
     from mos6502 import flags
 
     # Fetch absolute address
-    address: int = cpu.fetch_absolute_mode_address(offset_register_name=None)
+    address: int = cpu.fetch_absolute_mode_address(None)
 
     # Read value from memory
-    value: int = cpu.read_byte(address=address)
+    value: int = cpu.read_byte(address)
 
     # Decrement value
     decremented: int = (value - 1) & 0xFF
 
     # Write decremented value back to memory
-    cpu.write_byte(address=address & 0xFFFF, data=decremented)
+    cpu.write_byte(address & 0xFFFF, decremented)
 
     # Compare A with decremented value
     result: int = (int(cpu.A) - decremented) & 0xFF
@@ -256,13 +256,13 @@ def dcp_absolute_x_0xdf(cpu: "MOS6502CPU") -> None:
     from mos6502 import flags
 
     # Use existing helper for absolute X addressing
-    address: int = cpu.fetch_absolute_mode_address(offset_register_name="X")
+    address: int = cpu.fetch_absolute_mode_address("X")
 
     # Read-Modify-Write with Absolute,X always does a dummy read regardless of page crossing
     cpu.spend_cpu_cycles(1)
 
     # Read value from memory
-    value: int = cpu.read_byte(address=address)
+    value: int = cpu.read_byte(address)
 
     # Internal processing cycle for RMW operation
     cpu.spend_cpu_cycles(1)
@@ -271,7 +271,7 @@ def dcp_absolute_x_0xdf(cpu: "MOS6502CPU") -> None:
     decremented: int = (value - 1) & 0xFF
 
     # Write decremented value back to memory
-    cpu.write_byte(address=address & 0xFFFF, data=decremented)
+    cpu.write_byte(address & 0xFFFF, decremented)
 
     # Compare A with decremented value
     result: int = (int(cpu.A) - decremented) & 0xFF
@@ -304,13 +304,13 @@ def dcp_absolute_y_0xdb(cpu: "MOS6502CPU") -> None:
     from mos6502 import flags
 
     # Use existing helper for absolute Y addressing
-    address: int = cpu.fetch_absolute_mode_address(offset_register_name="Y")
+    address: int = cpu.fetch_absolute_mode_address("Y")
 
     # Read-Modify-Write with Absolute,Y always does a dummy read regardless of page crossing
     cpu.spend_cpu_cycles(1)
 
     # Read value from memory
-    value: int = cpu.read_byte(address=address & 0xFFFF)
+    value: int = cpu.read_byte(address & 0xFFFF)
 
     # Internal processing cycle for RMW operation
     cpu.spend_cpu_cycles(1)
@@ -319,7 +319,7 @@ def dcp_absolute_y_0xdb(cpu: "MOS6502CPU") -> None:
     decremented: int = (value - 1) & 0xFF
 
     # Write decremented value back to memory
-    cpu.write_byte(address=address & 0xFFFF, data=decremented)
+    cpu.write_byte(address & 0xFFFF, decremented)
 
     # Compare A with decremented value
     result: int = (int(cpu.A) - decremented) & 0xFF

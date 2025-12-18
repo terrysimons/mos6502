@@ -34,7 +34,7 @@ def nop_implied_0x1a(cpu: "MOS6502CPU") -> None:
     Flags: None affected
     """
     cpu.log.info("i")
-    cpu.spend_cpu_cycles(cost=1)
+    cpu.spend_cpu_cycles(1)
 
 
 def nop_implied_0x3a(cpu: "MOS6502CPU") -> None:
@@ -46,7 +46,7 @@ def nop_implied_0x3a(cpu: "MOS6502CPU") -> None:
     Flags: None affected
     """
     cpu.log.info("i")
-    cpu.spend_cpu_cycles(cost=1)
+    cpu.spend_cpu_cycles(1)
 
 
 def nop_implied_0x5a(cpu: "MOS6502CPU") -> None:
@@ -58,7 +58,7 @@ def nop_implied_0x5a(cpu: "MOS6502CPU") -> None:
     Flags: None affected
     """
     cpu.log.info("i")
-    cpu.spend_cpu_cycles(cost=1)
+    cpu.spend_cpu_cycles(1)
 
 
 def nop_implied_0x7a(cpu: "MOS6502CPU") -> None:
@@ -70,7 +70,7 @@ def nop_implied_0x7a(cpu: "MOS6502CPU") -> None:
     Flags: None affected
     """
     cpu.log.info("i")
-    cpu.spend_cpu_cycles(cost=1)
+    cpu.spend_cpu_cycles(1)
 
 
 def nop_implied_0xda(cpu: "MOS6502CPU") -> None:
@@ -82,7 +82,7 @@ def nop_implied_0xda(cpu: "MOS6502CPU") -> None:
     Flags: None affected
     """
     cpu.log.info("i")
-    cpu.spend_cpu_cycles(cost=1)
+    cpu.spend_cpu_cycles(1)
 
 
 def nop_implied_0xfa(cpu: "MOS6502CPU") -> None:
@@ -94,7 +94,7 @@ def nop_implied_0xfa(cpu: "MOS6502CPU") -> None:
     Flags: None affected
     """
     cpu.log.info("i")
-    cpu.spend_cpu_cycles(cost=1)
+    cpu.spend_cpu_cycles(1)
 
 
 # =============================================================================
@@ -173,7 +173,7 @@ def nop_zeropage_0x04(cpu: "MOS6502CPU") -> None:
     Bytes: 2
     Flags: None affected
     """
-    address: int = cpu.fetch_zeropage_mode_address(offset_register_name=None)
+    address: int = cpu.fetch_zeropage_mode_address(None)
     cpu.read_byte(address)  # Dummy read
     cpu.log.info("i")
 
@@ -186,7 +186,7 @@ def nop_zeropage_0x44(cpu: "MOS6502CPU") -> None:
     Bytes: 2
     Flags: None affected
     """
-    address: int = cpu.fetch_zeropage_mode_address(offset_register_name=None)
+    address: int = cpu.fetch_zeropage_mode_address(None)
     cpu.read_byte(address)  # Dummy read
     cpu.log.info("i")
 
@@ -199,7 +199,7 @@ def nop_zeropage_0x64(cpu: "MOS6502CPU") -> None:
     Bytes: 2
     Flags: None affected
     """
-    address: int = cpu.fetch_zeropage_mode_address(offset_register_name=None)
+    address: int = cpu.fetch_zeropage_mode_address(None)
     cpu.read_byte(address)  # Dummy read
     cpu.log.info("i")
 
@@ -216,7 +216,7 @@ def nop_zeropage_x_0x14(cpu: "MOS6502CPU") -> None:
     Bytes: 2
     Flags: None affected
     """
-    address: int = cpu.fetch_zeropage_mode_address(offset_register_name="X")
+    address: int = cpu.fetch_zeropage_mode_address("X")
     cpu.read_byte(address)  # Dummy read
     cpu.log.info("i")
 
@@ -229,7 +229,7 @@ def nop_zeropage_x_0x34(cpu: "MOS6502CPU") -> None:
     Bytes: 2
     Flags: None affected
     """
-    address: int = cpu.fetch_zeropage_mode_address(offset_register_name="X")
+    address: int = cpu.fetch_zeropage_mode_address("X")
     cpu.read_byte(address)  # Dummy read
     cpu.log.info("i")
 
@@ -242,7 +242,7 @@ def nop_zeropage_x_0x54(cpu: "MOS6502CPU") -> None:
     Bytes: 2
     Flags: None affected
     """
-    address: int = cpu.fetch_zeropage_mode_address(offset_register_name="X")
+    address: int = cpu.fetch_zeropage_mode_address("X")
     cpu.read_byte(address)  # Dummy read
     cpu.log.info("i")
 
@@ -255,7 +255,7 @@ def nop_zeropage_x_0x74(cpu: "MOS6502CPU") -> None:
     Bytes: 2
     Flags: None affected
     """
-    address: int = cpu.fetch_zeropage_mode_address(offset_register_name="X")
+    address: int = cpu.fetch_zeropage_mode_address("X")
     cpu.read_byte(address)  # Dummy read
     cpu.log.info("i")
 
@@ -268,7 +268,7 @@ def nop_zeropage_x_0xd4(cpu: "MOS6502CPU") -> None:
     Bytes: 2
     Flags: None affected
     """
-    address: int = cpu.fetch_zeropage_mode_address(offset_register_name="X")
+    address: int = cpu.fetch_zeropage_mode_address("X")
     cpu.read_byte(address)  # Dummy read
     cpu.log.info("i")
 
@@ -281,7 +281,7 @@ def nop_zeropage_x_0xf4(cpu: "MOS6502CPU") -> None:
     Bytes: 2
     Flags: None affected
     """
-    address: int = cpu.fetch_zeropage_mode_address(offset_register_name="X")
+    address: int = cpu.fetch_zeropage_mode_address("X")
     cpu.read_byte(address)  # Dummy read
     cpu.log.info("i")
 
@@ -298,7 +298,7 @@ def nop_absolute_0x0c(cpu: "MOS6502CPU") -> None:
     Bytes: 3
     Flags: None affected
     """
-    address: int = cpu.fetch_absolute_mode_address(offset_register_name=None)
+    address: int = cpu.fetch_absolute_mode_address(None)
     cpu.read_byte(address)  # Dummy read
     cpu.log.info("i")
 
@@ -316,7 +316,7 @@ def nop_absolute_x_0x1c(cpu: "MOS6502CPU") -> None:
     Bytes: 3
     Flags: None affected
     """
-    address: int = cpu.fetch_absolute_mode_address(offset_register_name="X")
+    address: int = cpu.fetch_absolute_mode_address("X")
     cpu.read_byte(address)  # Dummy read
     cpu.log.info("i")
 
@@ -329,7 +329,7 @@ def nop_absolute_x_0x3c(cpu: "MOS6502CPU") -> None:
     Bytes: 3
     Flags: None affected
     """
-    address: int = cpu.fetch_absolute_mode_address(offset_register_name="X")
+    address: int = cpu.fetch_absolute_mode_address("X")
     cpu.read_byte(address)  # Dummy read
     cpu.log.info("i")
 
@@ -342,7 +342,7 @@ def nop_absolute_x_0x5c(cpu: "MOS6502CPU") -> None:
     Bytes: 3
     Flags: None affected
     """
-    address: int = cpu.fetch_absolute_mode_address(offset_register_name="X")
+    address: int = cpu.fetch_absolute_mode_address("X")
     cpu.read_byte(address)  # Dummy read
     cpu.log.info("i")
 
@@ -355,7 +355,7 @@ def nop_absolute_x_0x7c(cpu: "MOS6502CPU") -> None:
     Bytes: 3
     Flags: None affected
     """
-    address: int = cpu.fetch_absolute_mode_address(offset_register_name="X")
+    address: int = cpu.fetch_absolute_mode_address("X")
     cpu.read_byte(address)  # Dummy read
     cpu.log.info("i")
 
@@ -368,7 +368,7 @@ def nop_absolute_x_0xdc(cpu: "MOS6502CPU") -> None:
     Bytes: 3
     Flags: None affected
     """
-    address: int = cpu.fetch_absolute_mode_address(offset_register_name="X")
+    address: int = cpu.fetch_absolute_mode_address("X")
     cpu.read_byte(address)  # Dummy read
     cpu.log.info("i")
 
@@ -381,6 +381,6 @@ def nop_absolute_x_0xfc(cpu: "MOS6502CPU") -> None:
     Bytes: 3
     Flags: None affected
     """
-    address: int = cpu.fetch_absolute_mode_address(offset_register_name="X")
+    address: int = cpu.fetch_absolute_mode_address("X")
     cpu.read_byte(address)  # Dummy read
     cpu.log.info("i")

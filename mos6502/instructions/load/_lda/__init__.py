@@ -26,10 +26,10 @@ LDA_INSTRUCTIONS = [
     CPUInstruction(0xA5, "LDA", "zeropage", "LDA {oper}", 2, 3, "NZ", _PKG, "lda_zeropage_0xa5"),
     CPUInstruction(0xB5, "LDA", "zeropage,X", "LDA {oper},X", 2, 4, "NZ", _PKG, "lda_zeropage_x_0xb5"),
     CPUInstruction(0xAD, "LDA", "absolute", "LDA {oper}", 3, 4, "NZ", _PKG, "lda_absolute_0xad"),
-    CPUInstruction(0xBD, "LDA", "absolute,X", "LDA {oper},X", 3, 4, "NZ", _PKG, "lda_absolute_x_0xbd", page_boundary_penalty=True),
-    CPUInstruction(0xB9, "LDA", "absolute,Y", "LDA {oper},Y", 3, 4, "NZ", _PKG, "lda_absolute_y_0xb9", page_boundary_penalty=True),
+    CPUInstruction(0xBD, "LDA", "absolute,X", "LDA {oper},X", 3, 4, "NZ", _PKG, "lda_absolute_x_0xbd", True),
+    CPUInstruction(0xB9, "LDA", "absolute,Y", "LDA {oper},Y", 3, 4, "NZ", _PKG, "lda_absolute_y_0xb9", True),
     CPUInstruction(0xA1, "LDA", "(indirect,X)", "LDA ({oper},X)", 2, 6, "NZ", _PKG, "lda_indexed_indirect_x_0xa1"),
-    CPUInstruction(0xB1, "LDA", "(indirect),Y", "LDA ({oper}),Y", 2, 5, "NZ", _PKG, "lda_indirect_indexed_y_0xb1", page_boundary_penalty=True),
+    CPUInstruction(0xB1, "LDA", "(indirect),Y", "LDA ({oper}),Y", 2, 5, "NZ", _PKG, "lda_indirect_indexed_y_0xb1", True),
 ]
 
 # InstructionOpcode instances for variant dispatch (backward compatibility)

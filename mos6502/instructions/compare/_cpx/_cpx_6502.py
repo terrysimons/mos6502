@@ -52,8 +52,8 @@ def cpx_zeropage_0xe4(cpu: "MOS6502CPU") -> None:
     ---------
         cpu: The CPU instance to operate on
     """
-    address: int = cpu.fetch_zeropage_mode_address(offset_register_name=None)
-    value: int = cpu.read_byte(address=address)
+    address: int = cpu.fetch_zeropage_mode_address(None)
+    value: int = cpu.read_byte(address)
     result: int = (cpu.X - value) & 0xFF
 
     from mos6502 import flags
@@ -80,8 +80,8 @@ def cpx_absolute_0xec(cpu: "MOS6502CPU") -> None:
     ---------
         cpu: The CPU instance to operate on
     """
-    address: int = cpu.fetch_absolute_mode_address(offset_register_name=None)
-    value: int = cpu.read_byte(address=address)
+    address: int = cpu.fetch_absolute_mode_address(None)
+    value: int = cpu.read_byte(address)
     result: int = (cpu.X - value) & 0xFF
 
     from mos6502 import flags

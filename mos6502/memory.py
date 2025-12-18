@@ -97,7 +97,7 @@ class MemoryUnit:
 
     def bits(self) -> bitarray:
         """Return a bitarray of size self.size_bits with endianness self.endianness."""
-        return int2ba(self._value, length=self.size_bits, endian=self._endianness)
+        return int2ba(self._value, self.size_bits, self._endianness)
 
     @property
     def lowbyte(self) -> int:
@@ -107,7 +107,7 @@ class MemoryUnit:
     @property
     def lowbyte_bits(self) -> bitarray:
         """Return the low byte of this data type as a bitarray."""
-        return int2ba(self._value & 0xFF, length=8, endian=self._endianness)
+        return int2ba(self._value & 0xFF, 8, self._endianness)
 
     @property
     def highbyte(self) -> Union[int, None]:
@@ -120,7 +120,7 @@ class MemoryUnit:
     def highbyte_bits(self) -> Union[bitarray, None]:
         """Return the high byte of this data type as a bitarray or None."""
         if self.size_bits > 8:
-            return int2ba((self._value >> 8) & 0xFF, length=8, endian=self._endianness)
+            return int2ba((self._value >> 8) & 0xFF, 8, self._endianness)
         return None
 
     """ Math Operators"""
@@ -129,16 +129,16 @@ class MemoryUnit:
         # Get int value from rvalue
         if isinstance(rvalue, int):
             if rvalue == 0:
-                return type(self)(self._value, endianness=self._endianness)
+                return type(self)(self._value, self._endianness)
             local_rvalue = rvalue
         elif isinstance(rvalue, MemoryUnit):
             if rvalue._value == 0:  # noqa: SLF001
-                return type(self)(self._value, endianness=self._endianness)
+                return type(self)(self._value, self._endianness)
             local_rvalue = rvalue._value  # noqa: SLF001
         elif is_bitarray(rvalue):
             local_rvalue = ba2int(rvalue)
             if local_rvalue == 0:
-                return type(self)(self._value, endianness=self._endianness)
+                return type(self)(self._value, self._endianness)
         else:
             local_rvalue = int(rvalue)
 
@@ -148,7 +148,7 @@ class MemoryUnit:
         if isinstance(self, Word):
             initial_msb = (self._value >> 8) & 0xFF
             new_value = (self._value + local_rvalue) & 0xFFFF
-            result = Word(new_value, endianness=self._endianness)
+            result = Word(new_value, self._endianness)
             result_msb = (new_value >> 8) & 0xFF
 
             if result_msb > initial_msb:
@@ -163,7 +163,7 @@ class MemoryUnit:
 
         elif isinstance(self, Byte):
             new_value = (self._value + local_rvalue) & 0xFF
-            result = Byte(new_value, endianness=self._endianness)
+            result = Byte(new_value, self._endianness)
 
         return result
 
@@ -172,21 +172,21 @@ class MemoryUnit:
         # Get int value from rvalue
         if isinstance(rvalue, int):
             if rvalue == 0:
-                return type(self)(self._value, endianness=self._endianness)
+                return type(self)(self._value, self._endianness)
             local_rvalue = rvalue
         elif isinstance(rvalue, MemoryUnit):
             if rvalue._value == 0:  # noqa: SLF001
-                return type(self)(self._value, endianness=self._endianness)
+                return type(self)(self._value, self._endianness)
             local_rvalue = rvalue._value  # noqa: SLF001
         elif is_bitarray(rvalue):
             local_rvalue = ba2int(rvalue)
             if local_rvalue == 0:
-                return type(self)(self._value, endianness=self._endianness)
+                return type(self)(self._value, self._endianness)
         else:
             local_rvalue = int(rvalue)
 
         new_value = (self._value - local_rvalue) & self._mask
-        return type(self)(new_value, endianness=self._endianness)
+        return type(self)(new_value, self._endianness)
 
     """ Bitwise Operators """
     def __or__(self, rvalue: Union[int, bitarray]) -> int:
@@ -379,7 +379,7 @@ class Byte(MemoryUnit):
                 return
 
         # Non-cached instance: full initialization
-        super().__init__(value=value, endianness=endianness)
+        super().__init__(value, endianness)
 
     @property
     def size_bits(self) -> Literal[8]:
@@ -405,7 +405,7 @@ class Word(MemoryUnit):
             value: a value between -32767 and 65535 (automatically masked to 16 bits)
             endianness: 'big' or 'little' (default: mos6502.memory.ENDIANNESS)
         """
-        super().__init__(value=value, endianness=endianness)
+        super().__init__(value, endianness)
 
     @property
     def size_bits(self) -> Literal[16]:
@@ -423,11 +423,21 @@ class RAM(MutableSequence):
 
     log: logging.Logger = logging.getLogger("mos6502.memory.RAM")
 
-    def __init__(self, endianness: str = ENDIANNESS, save_state: List[list] = None) -> None:
-        """Instantiate a mos6502 RAM bank."""
+    def __init__(self, endianness: str = ENDIANNESS, save_state: List[list] = None,
+                 preallocated_buffer: bytearray = None) -> None:
+        """Instantiate a mos6502 RAM bank.
+
+        Arguments:
+            endianness: Byte order ('little' or 'big')
+            save_state: Optional saved state to restore
+            preallocated_buffer: Optional pre-allocated 64KB bytearray to use.
+                                 Useful on memory-constrained systems like Pico
+                                 where we need to allocate before imports fragment the heap.
+        """
         super().__init__()
         self.endianness: str = endianness
         self.memory_handler = None  # Optional external memory handler (for C64 banking, etc.)
+        self._preallocated = preallocated_buffer
         self._data: bytearray = bytearray()  # Will be initialized in initialize()
         self.initialize()
 
@@ -441,8 +451,18 @@ class RAM(MutableSequence):
         if self.memory_handler is not None:
             return
 
+        # Use pre-allocated buffer if provided (for memory-constrained systems)
+        if self._preallocated is not None:
+            self._data = self._preallocated
+            # Fill with 0xFF
+            for i in range(len(self._data)):
+                self._data[i] = 0xFF
+            return
+
         # Flat bytearray for performance - eliminates branching on every access
-        self._data: bytearray = bytearray([0xFF] * 0x10000)
+        # Use bytes multiplication to avoid creating a huge temporary list
+        # (bytearray([0xFF] * 0x10000) would create a 262KB list first!)
+        self._data: bytearray = bytearray(b'\xff' * 0x10000)
 
     @property
     def zeropage(self) -> memoryview:

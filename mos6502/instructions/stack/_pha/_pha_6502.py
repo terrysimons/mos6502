@@ -24,7 +24,7 @@ def pha_implied_0x48(cpu: "MOS6502CPU") -> None:
     ---------
         cpu: The CPU instance to operate on
     """
-    cpu.write_byte(address=cpu.S, data=cpu.A)
+    cpu.write_byte(cpu.S, cpu.A)
     cpu.S -= 1
     cpu.log.info("i")
     cpu.spend_cpu_cycles(1)

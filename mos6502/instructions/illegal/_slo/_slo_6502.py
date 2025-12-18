@@ -41,17 +41,17 @@ def slo_zeropage_0x07(cpu: "MOS6502CPU") -> None:
     from mos6502 import flags
 
     # Fetch zero page address
-    address: int = cpu.fetch_zeropage_mode_address(offset_register_name=None)
+    address: int = cpu.fetch_zeropage_mode_address(None)
 
     # Read value from memory
-    value: int = cpu.read_byte(address=address)
+    value: int = cpu.read_byte(address)
 
     # Shift left (bit 7 goes to carry)
     cpu.flags[flags.C] = 1 if (value & 0x80) else 0
     shifted: int = (value << 1) & 0xFF
 
     # Write shifted value back to memory
-    cpu.write_byte(address=address, data=shifted)
+    cpu.write_byte(address, shifted)
 
     # OR with accumulator
     cpu.A = int(cpu.A) | shifted
@@ -86,17 +86,17 @@ def slo_zeropage_x_0x17(cpu: "MOS6502CPU") -> None:
     from mos6502 import flags
 
     # Fetch zero page,X address
-    address: int = cpu.fetch_zeropage_mode_address(offset_register_name="X")
+    address: int = cpu.fetch_zeropage_mode_address("X")
 
     # Read value from memory
-    value: int = cpu.read_byte(address=address)
+    value: int = cpu.read_byte(address)
 
     # Shift left (bit 7 goes to carry)
     cpu.flags[flags.C] = 1 if (value & 0x80) else 0
     shifted: int = (value << 1) & 0xFF
 
     # Write shifted value back to memory
-    cpu.write_byte(address=address, data=shifted)
+    cpu.write_byte(address, shifted)
 
     # OR with accumulator
     cpu.A = int(cpu.A) | shifted
@@ -134,14 +134,14 @@ def slo_indexed_indirect_x_0x03(cpu: "MOS6502CPU") -> None:
     address: int = cpu.fetch_indexed_indirect_mode_address()
 
     # Read value from memory
-    value: int = cpu.read_byte(address=address)
+    value: int = cpu.read_byte(address)
 
     # Shift left (bit 7 goes to carry)
     cpu.flags[flags.C] = 1 if (value & 0x80) else 0
     shifted: int = (value << 1) & 0xFF
 
     # Write shifted value back to memory
-    cpu.write_byte(address=address & 0xFFFF, data=shifted)
+    cpu.write_byte(address & 0xFFFF, shifted)
 
     # OR with accumulator
     cpu.A = int(cpu.A) | shifted
@@ -179,14 +179,14 @@ def slo_indirect_indexed_y_0x13(cpu: "MOS6502CPU") -> None:
     address: int = cpu.fetch_indirect_indexed_mode_address()
 
     # Read value from memory
-    value: int = cpu.read_byte(address=address)
+    value: int = cpu.read_byte(address)
 
     # Shift left (bit 7 goes to carry)
     cpu.flags[flags.C] = 1 if (value & 0x80) else 0
     shifted: int = (value << 1) & 0xFF
 
     # Write shifted value back to memory
-    cpu.write_byte(address=address & 0xFFFF, data=shifted)
+    cpu.write_byte(address & 0xFFFF, shifted)
 
     # OR with accumulator
     cpu.A = int(cpu.A) | shifted
@@ -221,17 +221,17 @@ def slo_absolute_0x0f(cpu: "MOS6502CPU") -> None:
     from mos6502 import flags
 
     # Fetch absolute address
-    address: int = cpu.fetch_absolute_mode_address(offset_register_name=None)
+    address: int = cpu.fetch_absolute_mode_address(None)
 
     # Read value from memory
-    value: int = cpu.read_byte(address=address)
+    value: int = cpu.read_byte(address)
 
     # Shift left (bit 7 goes to carry)
     cpu.flags[flags.C] = 1 if (value & 0x80) else 0
     shifted: int = (value << 1) & 0xFF
 
     # Write shifted value back to memory
-    cpu.write_byte(address=address & 0xFFFF, data=shifted)
+    cpu.write_byte(address & 0xFFFF, shifted)
 
     # OR with accumulator
     cpu.A = int(cpu.A) | shifted
@@ -266,13 +266,13 @@ def slo_absolute_x_0x1f(cpu: "MOS6502CPU") -> None:
     from mos6502 import flags
 
     # Use existing helper for absolute X addressing
-    address: int = cpu.fetch_absolute_mode_address(offset_register_name="X")
+    address: int = cpu.fetch_absolute_mode_address("X")
 
     # Read-Modify-Write with Absolute,X always does a dummy read regardless of page crossing
     cpu.spend_cpu_cycles(1)
 
     # Read value from memory
-    value: int = cpu.read_byte(address=address)
+    value: int = cpu.read_byte(address)
 
     # Internal processing cycle for RMW operation
     cpu.spend_cpu_cycles(1)
@@ -282,7 +282,7 @@ def slo_absolute_x_0x1f(cpu: "MOS6502CPU") -> None:
     shifted: int = (value << 1) & 0xFF
 
     # Write shifted value back to memory
-    cpu.write_byte(address=address & 0xFFFF, data=shifted)
+    cpu.write_byte(address & 0xFFFF, shifted)
 
     # OR with accumulator
     cpu.A = int(cpu.A) | shifted
@@ -316,13 +316,13 @@ def slo_absolute_y_0x1b(cpu: "MOS6502CPU") -> None:
     from mos6502 import flags
 
     # Use existing helper for absolute Y addressing
-    address: int = cpu.fetch_absolute_mode_address(offset_register_name="Y")
+    address: int = cpu.fetch_absolute_mode_address("Y")
 
     # Read-Modify-Write with Absolute,Y always does a dummy read regardless of page crossing
     cpu.spend_cpu_cycles(1)
 
     # Read value from memory
-    value: int = cpu.read_byte(address=address & 0xFFFF)
+    value: int = cpu.read_byte(address & 0xFFFF)
 
     # Internal processing cycle for RMW operation
     cpu.spend_cpu_cycles(1)
@@ -332,7 +332,7 @@ def slo_absolute_y_0x1b(cpu: "MOS6502CPU") -> None:
     shifted: int = (value << 1) & 0xFF
 
     # Write shifted value back to memory
-    cpu.write_byte(address=address & 0xFFFF, data=shifted)
+    cpu.write_byte(address & 0xFFFF, shifted)
 
     # OR with accumulator
     cpu.A = int(cpu.A) | shifted

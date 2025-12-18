@@ -30,15 +30,15 @@ def rti_implied_0x40(cpu: "MOS6502CPU") -> None:
     # S is incremented first, then we read from the new S location.
     # The S setter ensures S stays in page 1 ($0100-$01FF), so cpu.S is always valid.
     cpu.S += 1
-    cpu._flags = FlagsRegister(cpu.read_byte(address=cpu.S))
+    cpu._flags = FlagsRegister(cpu.read_byte(cpu.S))
 
     # Pull PC from stack (2 bytes: low byte first, then high byte)
     # IMPORTANT: Stack always wraps within page 1 ($0100-$01FF)
     # We must read byte-by-byte to ensure proper wrapping at page boundary
     cpu.S += 1
-    pc_low = cpu.read_byte(address=cpu.S)
+    pc_low = cpu.read_byte(cpu.S)
     cpu.S += 1
-    pc_high = cpu.read_byte(address=cpu.S)
+    pc_high = cpu.read_byte(cpu.S)
     return_pc = (pc_high << 8) | pc_low
     cpu.PC = return_pc
 

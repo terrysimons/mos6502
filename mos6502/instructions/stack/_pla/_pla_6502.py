@@ -25,7 +25,7 @@ def pla_implied_0x68(cpu: "MOS6502CPU") -> None:
         cpu: The CPU instance to operate on
     """
     cpu.S += 1
-    cpu.A = cpu.read_byte(address=cpu.S)
-    cpu.set_load_status_flags(register_name="A")
+    cpu.A = cpu.read_byte(cpu.S)
+    cpu.set_load_status_flags("A")
     cpu.log.info("i")
     cpu.spend_cpu_cycles(2)

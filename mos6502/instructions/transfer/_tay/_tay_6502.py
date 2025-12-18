@@ -25,6 +25,6 @@ def tay_implied_0xa8(cpu: "MOS6502CPU") -> None:
         cpu: The CPU instance to operate on
     """
     cpu.Y = cpu.A
-    cpu.set_load_status_flags(register_name="Y")
+    cpu.set_load_status_flags("Y")
     cpu.log.info("i")
     cpu.spend_cpu_cycles(1)

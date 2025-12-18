@@ -25,6 +25,6 @@ def txa_implied_0x8a(cpu: "MOS6502CPU") -> None:
         cpu: The CPU instance to operate on
     """
     cpu.A = cpu.X
-    cpu.set_load_status_flags(register_name="A")
+    cpu.set_load_status_flags("A")
     cpu.log.info("i")
     cpu.spend_cpu_cycles(1)

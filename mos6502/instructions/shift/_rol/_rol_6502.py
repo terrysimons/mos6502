@@ -49,8 +49,8 @@ def rol_zeropage_0x26(cpu: "MOS6502CPU") -> None:
     """
     from mos6502 import flags
 
-    address: int = cpu.fetch_zeropage_mode_address(offset_register_name=None)
-    value: int = cpu.read_byte(address=address)
+    address: int = cpu.fetch_zeropage_mode_address(None)
+    value: int = cpu.read_byte(address)
     carry_in: int = cpu.flags[flags.C]
 
     # Bit 7 goes to carry flag
@@ -58,7 +58,7 @@ def rol_zeropage_0x26(cpu: "MOS6502CPU") -> None:
 
     # Rotate left: shift left and add carry to bit 0
     result: int = ((value << 1) | carry_in) & 0xFF
-    cpu.write_byte(address=address, data=result)
+    cpu.write_byte(address, result)
 
     # Set N and Z flags
     cpu.flags[flags.Z] = 1 if result == 0 else 0
@@ -76,8 +76,8 @@ def rol_zeropage_x_0x36(cpu: "MOS6502CPU") -> None:
     """
     from mos6502 import flags
 
-    address: int = cpu.fetch_zeropage_mode_address(offset_register_name="X")
-    value: int = cpu.read_byte(address=address)
+    address: int = cpu.fetch_zeropage_mode_address("X")
+    value: int = cpu.read_byte(address)
     carry_in: int = cpu.flags[flags.C]
 
     # Bit 7 goes to carry flag
@@ -85,7 +85,7 @@ def rol_zeropage_x_0x36(cpu: "MOS6502CPU") -> None:
 
     # Rotate left: shift left and add carry to bit 0
     result: int = ((value << 1) | carry_in) & 0xFF
-    cpu.write_byte(address=address, data=result)
+    cpu.write_byte(address, result)
 
     # Set N and Z flags
     cpu.flags[flags.Z] = 1 if result == 0 else 0
@@ -103,8 +103,8 @@ def rol_absolute_0x2e(cpu: "MOS6502CPU") -> None:
     """
     from mos6502 import flags
 
-    address: int = cpu.fetch_absolute_mode_address(offset_register_name=None)
-    value: int = cpu.read_byte(address=address)
+    address: int = cpu.fetch_absolute_mode_address(None)
+    value: int = cpu.read_byte(address)
     carry_in: int = cpu.flags[flags.C]
 
     # Read-Modify-Write operations have an internal processing cycle
@@ -115,7 +115,7 @@ def rol_absolute_0x2e(cpu: "MOS6502CPU") -> None:
 
     # Rotate left: shift left and add carry to bit 0
     result: int = ((value << 1) | carry_in) & 0xFF
-    cpu.write_byte(address=address & 0xFFFF, data=result)
+    cpu.write_byte(address & 0xFFFF, result)
 
     # Set N and Z flags
     cpu.flags[flags.Z] = 1 if result == 0 else 0
@@ -133,12 +133,12 @@ def rol_absolute_x_0x3e(cpu: "MOS6502CPU") -> None:
     """
     from mos6502 import flags
 
-    address: int = cpu.fetch_absolute_mode_address(offset_register_name="X")
+    address: int = cpu.fetch_absolute_mode_address("X")
 
     # Read-Modify-Write with Absolute,X always does a dummy read regardless of page crossing
     cpu.spend_cpu_cycles(1)
 
-    value: int = cpu.read_byte(address=address)
+    value: int = cpu.read_byte(address)
     carry_in: int = cpu.flags[flags.C]
 
     # Internal processing cycle for RMW operation
@@ -149,7 +149,7 @@ def rol_absolute_x_0x3e(cpu: "MOS6502CPU") -> None:
 
     # Rotate left: shift left and add carry to bit 0
     result: int = ((value << 1) | carry_in) & 0xFF
-    cpu.write_byte(address=address & 0xFFFF, data=result)
+    cpu.write_byte(address & 0xFFFF, result)
 
     # Set N and Z flags
     cpu.flags[flags.Z] = 1 if result == 0 else 0

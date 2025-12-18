@@ -25,6 +25,6 @@ def tsx_implied_0xba(cpu: "MOS6502CPU") -> None:
         cpu: The CPU instance to operate on
     """
     cpu.X = cpu.S & 0xFF
-    cpu.set_load_status_flags(register_name="X")
+    cpu.set_load_status_flags("X")
     cpu.log.info("i")
     cpu.spend_cpu_cycles(1)

@@ -81,10 +81,10 @@ def drive_process_main(
         shared_state = SharedIECState(name=shared_mem_name, create=False)
 
         # Create drive instance
-        drive = Drive1541(device_number=device_number)
+        drive = Drive1541(device_number)
 
         # Create CPU for the drive (1541 uses standard 6502)
-        drive_cpu = CPU(cpu_variant=CPUVariant.NMOS_6502, verbose_cycles=False)
+        drive_cpu = CPU(CPUVariant.NMOS_6502, False)
         drive.cpu = drive_cpu
         drive_cpu.ram.memory_handler = drive.memory
 

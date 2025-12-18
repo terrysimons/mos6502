@@ -28,7 +28,7 @@ def lda_immediate_0xa9(cpu: "MOS6502CPU") -> None:
 
     data: int = int(cpu.fetch_immediate_mode_address())
     cpu.A = data
-    cpu.set_load_status_flags(register_name="A")
+    cpu.set_load_status_flags("A")
     cpu.log.info("i")
 
 
@@ -50,10 +50,10 @@ def lda_zeropage_0xa5(cpu: "MOS6502CPU") -> None:
     """
     from mos6502 import flags
 
-    address: int = cpu.fetch_zeropage_mode_address(offset_register_name=None)
-    data: int = cpu.read_byte(address=address)
+    address: int = cpu.fetch_zeropage_mode_address(None)
+    data: int = cpu.read_byte(address)
     cpu.A = data
-    cpu.set_load_status_flags(register_name="A")
+    cpu.set_load_status_flags("A")
     cpu.log.info("i")
 
 
@@ -75,10 +75,10 @@ def lda_zeropage_x_0xb5(cpu: "MOS6502CPU") -> None:
     """
     from mos6502 import flags
 
-    address: int = cpu.fetch_zeropage_mode_address(offset_register_name="X")
-    data: int = cpu.read_byte(address=address)
+    address: int = cpu.fetch_zeropage_mode_address("X")
+    data: int = cpu.read_byte(address)
     cpu.A = data
-    cpu.set_load_status_flags(register_name="A")
+    cpu.set_load_status_flags("A")
     cpu.log.info("i")
 
 
@@ -100,10 +100,10 @@ def lda_absolute_0xad(cpu: "MOS6502CPU") -> None:
     """
     from mos6502 import flags
 
-    address: int = cpu.fetch_absolute_mode_address(offset_register_name=None)
-    data: int = cpu.read_byte(address=address)
+    address: int = cpu.fetch_absolute_mode_address(None)
+    data: int = cpu.read_byte(address)
     cpu.A = data
-    cpu.set_load_status_flags(register_name="A")
+    cpu.set_load_status_flags("A")
     cpu.log.info("i")
 
 
@@ -125,10 +125,10 @@ def lda_absolute_x_0xbd(cpu: "MOS6502CPU") -> None:
     """
     from mos6502 import flags
 
-    address: int = cpu.fetch_absolute_mode_address(offset_register_name="X")
-    data: int = cpu.read_byte(address=address)
+    address: int = cpu.fetch_absolute_mode_address("X")
+    data: int = cpu.read_byte(address)
     cpu.A = data
-    cpu.set_load_status_flags(register_name="A")
+    cpu.set_load_status_flags("A")
     cpu.log.info("i")
 
 
@@ -150,10 +150,10 @@ def lda_absolute_y_0xb9(cpu: "MOS6502CPU") -> None:
     """
     from mos6502 import flags
 
-    address: int = cpu.fetch_absolute_mode_address(offset_register_name="Y")
-    data: int = cpu.read_byte(address=address)
+    address: int = cpu.fetch_absolute_mode_address("Y")
+    data: int = cpu.read_byte(address)
     cpu.A = data
-    cpu.set_load_status_flags(register_name="A")
+    cpu.set_load_status_flags("A")
     cpu.log.info("i")
 
 
@@ -176,9 +176,9 @@ def lda_indexed_indirect_x_0xa1(cpu: "MOS6502CPU") -> None:
     from mos6502 import flags
 
     address: int = cpu.fetch_indexed_indirect_mode_address()
-    data: int = cpu.read_byte(address=address)
+    data: int = cpu.read_byte(address)
     cpu.A = data
-    cpu.set_load_status_flags(register_name="A")
+    cpu.set_load_status_flags("A")
     cpu.log.info("i")
 
 
@@ -201,7 +201,7 @@ def lda_indirect_indexed_y_0xb1(cpu: "MOS6502CPU") -> None:
     from mos6502 import flags
 
     address: int = cpu.fetch_indirect_indexed_mode_address()
-    data: int = cpu.read_byte(address=address)
+    data: int = cpu.read_byte(address)
     cpu.A = data
-    cpu.set_load_status_flags(register_name="A")
+    cpu.set_load_status_flags("A")
     cpu.log.info("i")

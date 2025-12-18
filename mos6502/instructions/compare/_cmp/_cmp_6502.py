@@ -53,8 +53,8 @@ def cmp_zeropage_0xc5(cpu: "MOS6502CPU") -> None:
     ---------
         cpu: The CPU instance to operate on
     """
-    address: int = cpu.fetch_zeropage_mode_address(offset_register_name=None)
-    value: int = cpu.read_byte(address=address)
+    address: int = cpu.fetch_zeropage_mode_address(None)
+    value: int = cpu.read_byte(address)
     result: int = (cpu.A - value) & 0xFF
 
     from mos6502 import flags
@@ -81,8 +81,8 @@ def cmp_zeropage_x_0xd5(cpu: "MOS6502CPU") -> None:
     ---------
         cpu: The CPU instance to operate on
     """
-    address: int = cpu.fetch_zeropage_mode_address(offset_register_name="X")
-    value: int = cpu.read_byte(address=address)
+    address: int = cpu.fetch_zeropage_mode_address("X")
+    value: int = cpu.read_byte(address)
     result: int = (cpu.A - value) & 0xFF
 
     from mos6502 import flags
@@ -109,8 +109,8 @@ def cmp_absolute_0xcd(cpu: "MOS6502CPU") -> None:
     ---------
         cpu: The CPU instance to operate on
     """
-    address: int = cpu.fetch_absolute_mode_address(offset_register_name=None)
-    value: int = cpu.read_byte(address=address)
+    address: int = cpu.fetch_absolute_mode_address(None)
+    value: int = cpu.read_byte(address)
     result: int = (cpu.A - value) & 0xFF
 
     from mos6502 import flags
@@ -137,8 +137,8 @@ def cmp_absolute_x_0xdd(cpu: "MOS6502CPU") -> None:
     ---------
         cpu: The CPU instance to operate on
     """
-    address: int = cpu.fetch_absolute_mode_address(offset_register_name="X")
-    value: int = cpu.read_byte(address=address)
+    address: int = cpu.fetch_absolute_mode_address("X")
+    value: int = cpu.read_byte(address)
     result: int = (cpu.A - value) & 0xFF
 
     from mos6502 import flags
@@ -165,8 +165,8 @@ def cmp_absolute_y_0xd9(cpu: "MOS6502CPU") -> None:
     ---------
         cpu: The CPU instance to operate on
     """
-    address: int = cpu.fetch_absolute_mode_address(offset_register_name="Y")
-    value: int = cpu.read_byte(address=address)
+    address: int = cpu.fetch_absolute_mode_address("Y")
+    value: int = cpu.read_byte(address)
     result: int = (cpu.A - value) & 0xFF
 
     from mos6502 import flags
@@ -194,7 +194,7 @@ def cmp_indexed_indirect_x_0xc1(cpu: "MOS6502CPU") -> None:
         cpu: The CPU instance to operate on
     """
     address: int = cpu.fetch_indexed_indirect_mode_address()
-    value: int = cpu.read_byte(address=address)
+    value: int = cpu.read_byte(address)
     result: int = (cpu.A - value) & 0xFF
 
     from mos6502 import flags
@@ -222,7 +222,7 @@ def cmp_indirect_indexed_y_0xd1(cpu: "MOS6502CPU") -> None:
         cpu: The CPU instance to operate on
     """
     address: int = cpu.fetch_indirect_indexed_mode_address()
-    value: int = cpu.read_byte(address=address)
+    value: int = cpu.read_byte(address)
     result: int = (cpu.A - value) & 0xFF
 
     from mos6502 import flags

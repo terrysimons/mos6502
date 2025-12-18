@@ -40,8 +40,8 @@ def rla_zeropage_0x27(cpu: "MOS6502CPU") -> None:
     """
     from mos6502 import flags
 
-    address: int = cpu.fetch_zeropage_mode_address(offset_register_name=None)
-    value: int = cpu.read_byte(address=address)
+    address: int = cpu.fetch_zeropage_mode_address(None)
+    value: int = cpu.read_byte(address)
     carry_in: int = cpu.flags[flags.C]
 
     # Rotate left (bit 7 goes to carry, carry goes to bit 0)
@@ -49,7 +49,7 @@ def rla_zeropage_0x27(cpu: "MOS6502CPU") -> None:
     rotated: int = ((value << 1) | carry_in) & 0xFF
 
     # Write rotated value back to memory
-    cpu.write_byte(address=address, data=rotated)
+    cpu.write_byte(address, rotated)
 
     # AND with accumulator
     cpu.A = int(cpu.A) & rotated
@@ -82,14 +82,14 @@ def rla_zeropage_x_0x37(cpu: "MOS6502CPU") -> None:
     """
     from mos6502 import flags
 
-    address: int = cpu.fetch_zeropage_mode_address(offset_register_name="X")
-    value: int = cpu.read_byte(address=address)
+    address: int = cpu.fetch_zeropage_mode_address("X")
+    value: int = cpu.read_byte(address)
     carry_in: int = cpu.flags[flags.C]
 
     cpu.flags[flags.C] = 1 if (value & 0x80) else 0
     rotated: int = ((value << 1) | carry_in) & 0xFF
 
-    cpu.write_byte(address=address, data=rotated)
+    cpu.write_byte(address, rotated)
 
     cpu.A = int(cpu.A) & rotated
 
@@ -121,13 +121,13 @@ def rla_indexed_indirect_x_0x23(cpu: "MOS6502CPU") -> None:
     from mos6502 import flags
 
     address: int = cpu.fetch_indexed_indirect_mode_address()
-    value: int = cpu.read_byte(address=address)
+    value: int = cpu.read_byte(address)
     carry_in: int = cpu.flags[flags.C]
 
     cpu.flags[flags.C] = 1 if (value & 0x80) else 0
     rotated: int = ((value << 1) | carry_in) & 0xFF
 
-    cpu.write_byte(address=address & 0xFFFF, data=rotated)
+    cpu.write_byte(address & 0xFFFF, rotated)
 
     cpu.A = int(cpu.A) & rotated
 
@@ -159,13 +159,13 @@ def rla_indirect_indexed_y_0x33(cpu: "MOS6502CPU") -> None:
     from mos6502 import flags
 
     address: int = cpu.fetch_indirect_indexed_mode_address()
-    value: int = cpu.read_byte(address=address)
+    value: int = cpu.read_byte(address)
     carry_in: int = cpu.flags[flags.C]
 
     cpu.flags[flags.C] = 1 if (value & 0x80) else 0
     rotated: int = ((value << 1) | carry_in) & 0xFF
 
-    cpu.write_byte(address=address & 0xFFFF, data=rotated)
+    cpu.write_byte(address & 0xFFFF, rotated)
 
     cpu.A = int(cpu.A) & rotated
 
@@ -196,14 +196,14 @@ def rla_absolute_0x2f(cpu: "MOS6502CPU") -> None:
     """
     from mos6502 import flags
 
-    address: int = cpu.fetch_absolute_mode_address(offset_register_name=None)
-    value: int = cpu.read_byte(address=address)
+    address: int = cpu.fetch_absolute_mode_address(None)
+    value: int = cpu.read_byte(address)
     carry_in: int = cpu.flags[flags.C]
 
     cpu.flags[flags.C] = 1 if (value & 0x80) else 0
     rotated: int = ((value << 1) | carry_in) & 0xFF
 
-    cpu.write_byte(address=address & 0xFFFF, data=rotated)
+    cpu.write_byte(address & 0xFFFF, rotated)
 
     cpu.A = int(cpu.A) & rotated
 
@@ -234,12 +234,12 @@ def rla_absolute_x_0x3f(cpu: "MOS6502CPU") -> None:
     """
     from mos6502 import flags
 
-    address: int = cpu.fetch_absolute_mode_address(offset_register_name="X")
+    address: int = cpu.fetch_absolute_mode_address("X")
 
     # Read-Modify-Write with Absolute,X always does a dummy read regardless of page crossing
     cpu.spend_cpu_cycles(1)
 
-    value: int = cpu.read_byte(address=address)
+    value: int = cpu.read_byte(address)
 
     # Internal processing cycle for RMW operation
     cpu.spend_cpu_cycles(1)
@@ -249,7 +249,7 @@ def rla_absolute_x_0x3f(cpu: "MOS6502CPU") -> None:
     cpu.flags[flags.C] = 1 if (value & 0x80) else 0
     rotated: int = ((value << 1) | carry_in) & 0xFF
 
-    cpu.write_byte(address=address & 0xFFFF, data=rotated)
+    cpu.write_byte(address & 0xFFFF, rotated)
 
     cpu.A = int(cpu.A) & rotated
 
@@ -280,12 +280,12 @@ def rla_absolute_y_0x3b(cpu: "MOS6502CPU") -> None:
     """
     from mos6502 import flags
 
-    address: int = cpu.fetch_absolute_mode_address(offset_register_name="Y")
+    address: int = cpu.fetch_absolute_mode_address("Y")
 
     # Read-Modify-Write with Absolute,Y always does a dummy read regardless of page crossing
     cpu.spend_cpu_cycles(1)
 
-    value: int = cpu.read_byte(address=address & 0xFFFF)
+    value: int = cpu.read_byte(address & 0xFFFF)
 
     # Internal processing cycle for RMW operation
     cpu.spend_cpu_cycles(1)
@@ -295,7 +295,7 @@ def rla_absolute_y_0x3b(cpu: "MOS6502CPU") -> None:
     cpu.flags[flags.C] = 1 if (value & 0x80) else 0
     rotated: int = ((value << 1) | carry_in) & 0xFF
 
-    cpu.write_byte(address=address & 0xFFFF, data=rotated)
+    cpu.write_byte(address & 0xFFFF, rotated)
 
     cpu.A = int(cpu.A) & rotated
 

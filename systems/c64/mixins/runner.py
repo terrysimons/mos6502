@@ -145,9 +145,8 @@ class C64RunnerMixin:
 
         # Set up PC callback for BASIC/KERNAL detection if requested
         if stop_on_basic or stop_on_kernal_input:
-            self._setup_pc_callback(
-                stop_on_basic=stop_on_basic, stop_on_kernal_input=stop_on_kernal_input
-            )
+            # Use positional args - kwargs don't work in MicroPython frozen modules
+            self._setup_pc_callback(stop_on_basic, stop_on_kernal_input)
 
         try:
             # Execute with cycle counter display
@@ -174,10 +173,8 @@ class C64RunnerMixin:
             stop_cpu = threading.Event()
 
             # Create frame governor for real-time throttling
-            governor = FrameGovernor(
-                fps=self.video_timing.refresh_hz,
-                enabled=throttle
-            )
+            # Use positional args - kwargs don't work in MicroPython frozen modules
+            governor = FrameGovernor(self.video_timing.refresh_hz, throttle)
             cycles_per_frame = self.video_timing.cycles_per_frame
 
             def cpu_thread() -> None:
@@ -190,7 +187,7 @@ class C64RunnerMixin:
                         # Execute one frame's worth of cycles
                         cycles_this_frame = min(cycles_per_frame, cycles_remaining)
                         try:
-                            self.cpu.execute(cycles=cycles_this_frame)
+                            self.cpu.execute(cycles_this_frame)
                         except errors.CPUCycleExhaustionError:
                             pass  # Normal - frame completed
                         cycles_remaining -= cycles_this_frame
@@ -321,14 +318,14 @@ class C64RunnerMixin:
         except (errors.IllegalCPUInstructionError, RuntimeError) as e:
             # Check if we should dump crash report and stop (vs raising)
             if getattr(self, '_stop_on_illegal_instruction', False) and isinstance(e, errors.IllegalCPUInstructionError):
-                self.dump_crash_report(exception=e)
+                self.dump_crash_report(e)
                 # Don't re-raise - just stop execution cleanly
             else:
                 log.exception(f"Execution error at PC=${self.cpu.PC:04X}")
                 # Show context around error
                 try:
                     pc_val = int(self.cpu.PC)
-                    self.show_disassembly(max(0, pc_val - 10), num_instructions=20)
+                    self.show_disassembly(max(0, pc_val - 10), 20)
                     self.dump_memory(max(0, pc_val - 16), min(0xFFFF, pc_val + 16))
                 except (IndexError, KeyError, ValueError):
                     log.exception("Could not display context")
@@ -384,7 +381,7 @@ class C64RunnerMixin:
             """Run CPU in background thread."""
             nonlocal cpu_error
             try:
-                self.cpu.execute(cycles=max_cycles)
+                self.cpu.execute(max_cycles)
             except errors.CPUCycleExhaustionError:
                 pass  # Normal termination when max_cycles reached
             except Exception as e:
@@ -441,7 +438,6 @@ class C64RunnerMixin:
 
             # Clear screen and show final state
             _sys.stdout.write("\033[2J\033[H")
-            _sys.stdout.flush()
             self.show_screen()
 
             # Clean up drive subprocess if running

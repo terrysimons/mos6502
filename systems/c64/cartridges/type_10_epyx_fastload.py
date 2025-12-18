@@ -160,7 +160,7 @@ class EpyxFastloadCartridge(Cartridge):
     def get_cartridge_variants(cls) -> List[CartridgeVariant]:
         """Return all valid configuration variants for Type 10."""
         return [
-            CartridgeVariant("", exrom=0, game=1),  # 8KB mode
+            CartridgeVariant("", 0, 1),  # 8KB mode
         ]
 
     @classmethod
@@ -208,11 +208,8 @@ class EpyxFastloadCartridge(Cartridge):
         # IO2 signature at $1FF0 (maps to $DFF0 via IO2 mirror)
         rom_data[0x1FF0:0x1FF8] = b"IO-SIGN!"
 
+        # CartridgeImage field order: description, exrom, game, extra, rom_data, hardware_type
         return CartridgeImage(
-            description=variant.description,
-            exrom=variant.exrom,
-            game=variant.game,
-            extra=variant.extra,
-            rom_data={"roml": bytes(rom_data)},
-            hardware_type=cls.HARDWARE_TYPE,
+            variant.description, variant.exrom, variant.game, variant.extra,
+            {"roml": bytes(rom_data)}, cls.HARDWARE_TYPE
         )

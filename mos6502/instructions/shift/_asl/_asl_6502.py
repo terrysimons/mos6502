@@ -47,14 +47,14 @@ def asl_zeropage_0x06(cpu: "MOS6502CPU") -> None:
     """
     from mos6502 import flags
 
-    address: int = cpu.fetch_zeropage_mode_address(offset_register_name=None)
-    value: int = cpu.read_byte(address=address)
+    address: int = cpu.fetch_zeropage_mode_address(None)
+    value: int = cpu.read_byte(address)
 
     # Bit 7 goes to carry flag
     cpu.flags[flags.C] = 1 if (value & 0x80) else 0
 
     result: int = (value << 1) & 0xFF
-    cpu.write_byte(address=address, data=result)
+    cpu.write_byte(address, result)
 
     # Set N and Z flags
     cpu.flags[flags.Z] = 1 if result == 0 else 0
@@ -72,14 +72,14 @@ def asl_zeropage_x_0x16(cpu: "MOS6502CPU") -> None:
     """
     from mos6502 import flags
 
-    address: int = cpu.fetch_zeropage_mode_address(offset_register_name="X")
-    value: int = cpu.read_byte(address=address)
+    address: int = cpu.fetch_zeropage_mode_address("X")
+    value: int = cpu.read_byte(address)
 
     # Bit 7 goes to carry flag
     cpu.flags[flags.C] = 1 if (value & 0x80) else 0
 
     result: int = (value << 1) & 0xFF
-    cpu.write_byte(address=address, data=result)
+    cpu.write_byte(address, result)
 
     # Set N and Z flags
     cpu.flags[flags.Z] = 1 if result == 0 else 0
@@ -97,8 +97,8 @@ def asl_absolute_0x0e(cpu: "MOS6502CPU") -> None:
     """
     from mos6502 import flags
 
-    address: int = cpu.fetch_absolute_mode_address(offset_register_name=None)
-    value: int = cpu.read_byte(address=address)
+    address: int = cpu.fetch_absolute_mode_address(None)
+    value: int = cpu.read_byte(address)
 
     # Read-Modify-Write operations have an internal processing cycle
     cpu.spend_cpu_cycles(1)
@@ -107,7 +107,7 @@ def asl_absolute_0x0e(cpu: "MOS6502CPU") -> None:
     cpu.flags[flags.C] = 1 if (value & 0x80) else 0
 
     result: int = (value << 1) & 0xFF
-    cpu.write_byte(address=address & 0xFFFF, data=result)
+    cpu.write_byte(address & 0xFFFF, result)
 
     # Set N and Z flags
     cpu.flags[flags.Z] = 1 if result == 0 else 0
@@ -125,12 +125,12 @@ def asl_absolute_x_0x1e(cpu: "MOS6502CPU") -> None:
     """
     from mos6502 import flags
 
-    address: int = cpu.fetch_absolute_mode_address(offset_register_name="X")
+    address: int = cpu.fetch_absolute_mode_address("X")
 
     # Read-Modify-Write with Absolute,X always does a dummy read regardless of page crossing
     cpu.spend_cpu_cycles(1)
 
-    value: int = cpu.read_byte(address=address)
+    value: int = cpu.read_byte(address)
 
     # Internal processing cycle for RMW operation
     cpu.spend_cpu_cycles(1)
@@ -139,7 +139,7 @@ def asl_absolute_x_0x1e(cpu: "MOS6502CPU") -> None:
     cpu.flags[flags.C] = 1 if (value & 0x80) else 0
 
     result: int = (value << 1) & 0xFF
-    cpu.write_byte(address=address & 0xFFFF, data=result)
+    cpu.write_byte(address & 0xFFFF, result)
 
     # Set N and Z flags
     cpu.flags[flags.Z] = 1 if result == 0 else 0

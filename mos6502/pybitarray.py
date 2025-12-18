@@ -30,7 +30,6 @@ class pybitarray:
     def __init__(
         self,
         initializer: Union[int, List[int], "pybitarray"]= 0,
-        *,
         length: Union[int, None]= None,
         endian: Literal["little", "big"] = "little",
     ) -> None:
@@ -76,7 +75,7 @@ class pybitarray:
 
         """
         if isinstance(index, slice):
-            return pybitarray(self._bits[index], endian=self._endian)
+            return pybitarray(self._bits[index], None, self._endian)
         return self._bits[index]
 
     def __setitem__(self, index: int, value: int) -> None:
@@ -86,9 +85,9 @@ class pybitarray:
     def __lshift__(self, count: int) -> "pybitarray":
         """Left shift by count bits, preserving length."""
         if count <= 0:
-            return pybitarray(self._bits[:], endian=self._endian)
+            return pybitarray(self._bits[:], None, self._endian)
         if count >= len(self._bits):
-            return pybitarray([0] * len(self._bits), endian=self._endian)
+            return pybitarray([0] * len(self._bits), None, self._endian)
 
         # For little-endian: shift means moving bits to higher indices
         # New low bits become 0, high bits fall off
@@ -98,14 +97,14 @@ class pybitarray:
             # For big-endian: shift means moving bits to lower indices
             new_bits = self._bits[count:] + [0] * count
 
-        return pybitarray(new_bits, endian=self._endian)
+        return pybitarray(new_bits, None, self._endian)
 
     def __rshift__(self, count: int) -> "pybitarray":
         """Right shift by count bits, preserving length."""
         if count <= 0:
-            return pybitarray(self._bits[:], endian=self._endian)
+            return pybitarray(self._bits[:], None, self._endian)
         if count >= len(self._bits):
-            return pybitarray([0] * len(self._bits), endian=self._endian)
+            return pybitarray([0] * len(self._bits), None, self._endian)
 
         # For little-endian: shift means moving bits to lower indices
         # New high bits become 0, low bits fall off
@@ -115,7 +114,7 @@ class pybitarray:
             # For big-endian: shift means moving bits to higher indices
             new_bits = [0] * count + self._bits[: len(self._bits) - count]
 
-        return pybitarray(new_bits, endian=self._endian)
+        return pybitarray(new_bits, None, self._endian)
 
     def __eq__(self, other: object) -> bool:
         """Equality comparison."""
@@ -232,7 +231,7 @@ def int2ba(
         pybitarray representing the value
 
     """
-    return pybitarray(value, length=length, endian=endian)
+    return pybitarray(value, length, endian)
 
 
 def ba2int(ba: pybitarray) -> int:

@@ -32,7 +32,7 @@ def php_implied_0x08(cpu: "MOS6502CPU") -> None:
 
     # Push processor status with B flag set
     status_with_b: "Byte" = Byte(cpu.flags.value | 0b00110000)
-    cpu.write_byte(address=cpu.S, data=status_with_b)
+    cpu.write_byte(cpu.S, status_with_b)
     cpu.S -= 1
     cpu.log.info("i")
     cpu.spend_cpu_cycles(1)

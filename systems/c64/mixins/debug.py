@@ -9,6 +9,8 @@ from c64.memory import (
     BASIC_ROM_END,
     KERNAL_ROM_START,
     KERNAL_ROM_END,
+    CHAR_ROM_START,
+    CHAR_ROM_END,
 )
 
 log = logging.getLogger("c64")
@@ -313,7 +315,7 @@ class C64DebugMixin:
         print(f"\nDisassembly around PC ${pc:04X}:")
         try:
             start_addr = max(0, pc - 16)
-            self.show_disassembly(start_addr, num_instructions=20)
+            self.show_disassembly(start_addr, 20)
         except Exception as e:
             print(f"  Could not disassemble: {e}")
 

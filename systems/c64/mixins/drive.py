@@ -149,7 +149,7 @@ class C64DriveMixin:
             self.cia2.set_iec_bus(self.iec_bus)
 
             # Create and start drive subprocess
-            self.drive8 = MultiprocessDrive1541(device_number=8)
+            self.drive8 = MultiprocessDrive1541(8)
             self.drive8.start_process(
                 rom_path=rom_path,
                 rom_path_e000=rom_path_e000,
@@ -202,7 +202,7 @@ class C64DriveMixin:
 
                         # Read bus state after drive processed
                         self.iec_bus.atn, self.iec_bus.clk, self.iec_bus.data = \
-                            self._iec_shared_state.get_bus_state(is_drive=False)
+                            self._iec_shared_state.get_bus_state(False)
 
             self.cpu.post_tick_callback = sync_multiprocess
             log.info(f"1541 drive 8 attached in MULTIPROCESS mode (ROM: {rom_path.name})")
@@ -215,7 +215,7 @@ class C64DriveMixin:
             self.cia2.set_iec_bus(self.iec_bus)
 
             # Create threaded drive 8
-            self.drive8 = ThreadedDrive1541(device_number=8)
+            self.drive8 = ThreadedDrive1541(8)
         else:
             # Synchronous mode: Cycle-accurate but slower
             self.iec_bus = IECBus()
@@ -223,11 +223,11 @@ class C64DriveMixin:
             self.cia2.set_iec_bus(self.iec_bus)
 
             # Create standard drive 8
-            self.drive8 = Drive1541(device_number=8)
+            self.drive8 = Drive1541(8)
 
         # Create a separate CPU for the drive (for threaded/synchronous modes)
         # The 1541 uses a full 6502 (not 6510)
-        drive_cpu = CPU(cpu_variant=CPUVariant.NMOS_6502, verbose_cycles=False)
+        drive_cpu = CPU(CPUVariant.NMOS_6502, False)
         self.drive8.cpu = drive_cpu
 
         # Set up drive CPU memory handler

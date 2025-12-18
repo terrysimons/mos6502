@@ -75,25 +75,27 @@ try:
     import logging
 except ImportError:
     # MicroPython stub for logging using print
+    import sys as _sys
+
     class _PrintLogger:
         """Simple logger that uses print() for MicroPython."""
 
         def __init__(self, name=None):
             self._name = name or "root"
 
-        def debug(self, msg, *args, **kwargs):
+        def debug(self, msg, *args):
             print(f"[DEBUG] {self._name}: {msg}")
 
-        def info(self, msg, *args, **kwargs):
+        def info(self, msg, *args):
             print(f"[INFO] {self._name}: {msg}")
 
-        def warning(self, msg, *args, **kwargs):
+        def warning(self, msg, *args):
             print(f"[WARN] {self._name}: {msg}")
 
-        def error(self, msg, *args, **kwargs):
+        def error(self, msg, *args):
             print(f"[ERROR] {self._name}: {msg}")
 
-        def critical(self, msg, *args, **kwargs):
+        def critical(self, msg, *args):
             print(f"[CRIT] {self._name}: {msg}")
 
     class logging:  # noqa: N801
@@ -113,7 +115,7 @@ except ImportError:
             return _PrintLogger(name)
 
         @staticmethod
-        def basicConfig(**kwargs):
+        def basicConfig(level=None):
             """No-op for MicroPython - logging config is ignored."""
             pass
 
@@ -159,6 +161,17 @@ except ImportError:
 # dataclasses compatibility
 try:
     from dataclasses import dataclass, field
+
+    def make_dataclass(frozen, slots):
+        """Create a dataclass decorator with positional args (works on both CPython and MicroPython).
+
+        Usage: @make_dataclass(True, True) instead of @dataclass(frozen=True, slots=True)
+        This syntax avoids kwargs which don't work in MicroPython frozen modules.
+        """
+        def decorator(cls):
+            return dataclass(cls, frozen=frozen, slots=slots)
+        return decorator
+
 except ImportError:
     # MicroPython stub for dataclasses - generates __init__ from __annotations__
 
@@ -176,11 +189,20 @@ except ImportError:
             self.default = default
             self.default_factory = default_factory
 
-    def field(default=MISSING, default_factory=MISSING, **kwargs):  # noqa: N802
+    def field(default=MISSING, default_factory=MISSING):  # noqa: N802
         """Create a field descriptor for dataclasses."""
-        return _Field(default=default, default_factory=default_factory)
+        return _Field(default, default_factory)
 
-    def dataclass(cls=None, frozen=False, slots=False, **kwargs):  # noqa: N802
+    def make_dataclass(frozen, slots):  # noqa: N802
+        """Create a dataclass decorator with positional args (for MicroPython frozen modules).
+
+        Usage: @make_dataclass(True, True) instead of @dataclass(frozen=True, slots=True)
+        """
+        def decorator(cls):
+            return dataclass(cls, frozen, slots)
+        return decorator
+
+    def dataclass(cls=None, frozen=False, slots=False):  # noqa: N802
         """Minimal dataclass decorator for MicroPython.
 
         Generates __init__ from __annotations__. Supports default values.
@@ -216,25 +238,18 @@ except ImportError:
                         # Skip class methods, tuples (like _field_order_), and types
                         defaults[name] = val
 
-            # Build __init__ method
+            # Build __init__ method - positional args only for MicroPython frozen compatibility
             def make_init(field_names, defaults):
-                def __init__(self, *args, **kw):
-                    # Track which fields have been set
-                    num_positional = len(args)
-
+                def __init__(self, *args):
                     # Assign positional args first
                     for i, val in enumerate(args):
                         if i < len(field_names):
                             setattr(self, field_names[i], val)
 
-                    # Then assign keyword args and defaults for remaining fields
-                    for i, name in enumerate(field_names):
-                        if i < num_positional:
-                            # Already set by positional arg
-                            continue
-                        if name in kw:
-                            setattr(self, name, kw[name])
-                        elif name in defaults:
+                    # Fill in defaults for remaining fields
+                    for i in range(len(args), len(field_names)):
+                        name = field_names[i]
+                        if name in defaults:
                             default = defaults[name]
                             if callable(default):
                                 setattr(self, name, default())

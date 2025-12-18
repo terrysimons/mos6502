@@ -24,8 +24,8 @@ def stx_zeropage_0x86(cpu: "MOS6502CPU") -> None:
     ---------
         cpu: The CPU instance to operate on
     """
-    address: int = cpu.fetch_zeropage_mode_address(offset_register_name=None)
-    cpu.write_byte(address=address, data=cpu.X)
+    address: int = cpu.fetch_zeropage_mode_address(None)
+    cpu.write_byte(address, cpu.X)
     cpu.log.info("i")
 
 
@@ -45,8 +45,8 @@ def stx_zeropage_y_0x96(cpu: "MOS6502CPU") -> None:
     ---------
         cpu: The CPU instance to operate on
     """
-    address: int = cpu.fetch_zeropage_mode_address(offset_register_name="Y")
-    cpu.write_byte(address=address, data=cpu.X)
+    address: int = cpu.fetch_zeropage_mode_address("Y")
+    cpu.write_byte(address, cpu.X)
     cpu.log.info("i")
 
 
@@ -66,6 +66,6 @@ def stx_absolute_0x8e(cpu: "MOS6502CPU") -> None:
     ---------
         cpu: The CPU instance to operate on
     """
-    address: int = cpu.fetch_absolute_mode_address(offset_register_name=None)
-    cpu.write_byte(address=address & 0xFFFF, data=cpu.X)
+    address: int = cpu.fetch_absolute_mode_address(None)
+    cpu.write_byte(address & 0xFFFF, cpu.X)
     cpu.log.info("i")

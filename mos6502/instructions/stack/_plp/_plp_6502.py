@@ -27,7 +27,7 @@ def plp_implied_0x28(cpu: "MOS6502CPU") -> None:
     from mos6502.flags import FlagsRegister
 
     cpu.S += 1
-    status_byte: int = cpu.read_byte(address=cpu.S)
+    status_byte: int = cpu.read_byte(cpu.S)
     # Restore all flags from stack - must use FlagsRegister to preserve logging
     cpu._flags = FlagsRegister(status_byte)
     cpu.log.info("i")

@@ -80,10 +80,11 @@ class C64DisplayMixin:
         """
         from collections import deque
         self._speed_sample_count = count
+        # Use positional args for MicroPython compatibility (no kwargs on deque)
         if count > 0:
-            self._speed_samples = deque(maxlen=count)
+            self._speed_samples = deque((), count)
         else:
-            self._speed_samples = deque(maxlen=1)  # Keep at least 1 for the API
+            self._speed_samples = deque((), 1)  # Keep at least 1 for the API
             self._speed_samples.clear()
 
     def _record_speed_sample(self) -> bool:
@@ -222,8 +223,6 @@ class C64DisplayMixin:
         if drive_status:
             _sys.stdout.write(f"\n\033[K" + drive_status)
 
-        _sys.stdout.flush()
-
         # Clear dirty flags after rendering
         self.dirty_tracker.clear()
 
@@ -294,8 +293,6 @@ class C64DisplayMixin:
         drive_status = self._format_drive_status()
         if drive_status:
             _sys.stdout.write(drive_status + "\n")
-
-        _sys.stdout.flush()
 
     def _render_terminal_repl(self) -> None:
         """Render C64 screen to terminal for REPL mode with color support.
@@ -421,8 +418,6 @@ class C64DisplayMixin:
         drive_status = self._format_drive_status()
         if drive_status:
             _sys.stdout.write(f"\n\033[K" + drive_status)
-
-        _sys.stdout.flush()
 
         # Clear dirty flags after rendering
         self.dirty_tracker.clear()

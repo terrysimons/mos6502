@@ -71,7 +71,7 @@ def _should_use_native() -> bool:
     return _NATIVE_AVAILABLE
 
 
-def configure(*, use_native: Union[bool, None]= None) -> None:
+def configure(use_native: Union[bool, None]= None) -> None:
     """Configure which bitarray implementation to use.
 
     Args:
@@ -131,10 +131,10 @@ def is_bitarray(obj: object) -> bool:
 class _LazyBitarray:
     """Lazy loader that selects implementation on first use."""
 
-    def __new__(cls, *args, **kwargs):  # noqa: ANN204, ANN002, ANN003
+    def __new__(cls, initializer=0, length=None, endian="little"):  # noqa: ANN204
         if _should_use_native():
-            return _native_bitarray(*args, **kwargs)
-        return _pybitarray(*args, **kwargs)
+            return _native_bitarray(initializer, length, endian)
+        return _pybitarray(initializer, length, endian)
 
 
 def int2ba(
@@ -156,8 +156,8 @@ def int2ba(
 
     """
     if _should_use_native():
-        return _native_int2ba(value, length=length, endian=endian)
-    return _py_int2ba(value, length=length, endian=endian)
+        return _native_int2ba(value, length, endian)
+    return _py_int2ba(value, length, endian)
 
 
 def ba2int(ba) -> int:  # noqa: ANN001

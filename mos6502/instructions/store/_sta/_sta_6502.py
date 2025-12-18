@@ -24,8 +24,8 @@ def sta_zeropage_0x85(cpu: "MOS6502CPU") -> None:
     ---------
         cpu: The CPU instance to operate on
     """
-    address: int = cpu.fetch_zeropage_mode_address(offset_register_name=None)
-    cpu.write_byte(address=address, data=cpu.A)
+    address: int = cpu.fetch_zeropage_mode_address(None)
+    cpu.write_byte(address, cpu.A)
     cpu.log.info("i")
 
 
@@ -45,8 +45,8 @@ def sta_zeropage_x_0x95(cpu: "MOS6502CPU") -> None:
     ---------
         cpu: The CPU instance to operate on
     """
-    address: int = cpu.fetch_zeropage_mode_address(offset_register_name="X")
-    cpu.write_byte(address=address, data=cpu.A)
+    address: int = cpu.fetch_zeropage_mode_address("X")
+    cpu.write_byte(address, cpu.A)
     cpu.log.info("i")
 
 
@@ -66,8 +66,8 @@ def sta_absolute_0x8d(cpu: "MOS6502CPU") -> None:
     ---------
         cpu: The CPU instance to operate on
     """
-    address: int = cpu.fetch_absolute_mode_address(offset_register_name=None)
-    cpu.write_byte(address=address & 0xFFFF, data=cpu.A)
+    address: int = cpu.fetch_absolute_mode_address(None)
+    cpu.write_byte(address & 0xFFFF, cpu.A)
     cpu.log.info("i")
 
 
@@ -87,13 +87,13 @@ def sta_absolute_x_0x9d(cpu: "MOS6502CPU") -> None:
     ---------
         cpu: The CPU instance to operate on
     """
-    address: int = cpu.fetch_absolute_mode_address(offset_register_name="X")
+    address: int = cpu.fetch_absolute_mode_address("X")
 
     # Store operations always take 5 cycles due to a dummy read that occurs
     # before the write, regardless of page boundary crossing
     cpu.spend_cpu_cycles(1)
 
-    cpu.write_byte(address=address & 0xFFFF, data=cpu.A)
+    cpu.write_byte(address & 0xFFFF, cpu.A)
     cpu.log.info("i")
 
 
@@ -113,13 +113,13 @@ def sta_absolute_y_0x99(cpu: "MOS6502CPU") -> None:
     ---------
         cpu: The CPU instance to operate on
     """
-    address: int = cpu.fetch_absolute_mode_address(offset_register_name="Y")
+    address: int = cpu.fetch_absolute_mode_address("Y")
 
     # Store operations always take 5 cycles due to a dummy read that occurs
     # before the write, regardless of page boundary crossing
     cpu.spend_cpu_cycles(1)
 
-    cpu.write_byte(address=address & 0xFFFF, data=cpu.A)
+    cpu.write_byte(address & 0xFFFF, cpu.A)
     cpu.log.info("i")
 
 
@@ -140,7 +140,7 @@ def sta_indexed_indirect_x_0x81(cpu: "MOS6502CPU") -> None:
         cpu: The CPU instance to operate on
     """
     address: int = cpu.fetch_indexed_indirect_mode_address()
-    cpu.write_byte(address=address & 0xFFFF, data=cpu.A)
+    cpu.write_byte(address & 0xFFFF, cpu.A)
     cpu.log.info("i")
 
 
@@ -161,5 +161,5 @@ def sta_indirect_indexed_y_0x91(cpu: "MOS6502CPU") -> None:
         cpu: The CPU instance to operate on
     """
     address: int = cpu.fetch_indirect_indexed_mode_address()
-    cpu.write_byte(address=address & 0xFFFF, data=cpu.A)
+    cpu.write_byte(address & 0xFFFF, cpu.A)
     cpu.log.info("i")

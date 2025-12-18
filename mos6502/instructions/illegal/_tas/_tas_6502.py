@@ -69,6 +69,6 @@ def tas_absolute_y_0x9b(cpu: "MOS6502CPU") -> None:
     value: int = a_and_x & ((high_byte + 1) & 0xFF)
 
     # Store the value
-    cpu.write_byte(address=effective_address, data=value)
+    cpu.write_byte(effective_address, value)
 
     cpu.log.info("i")

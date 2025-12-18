@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Instruction set for the mos6502 CPU."""
 from mos6502.compat import enum
-from mos6502.compat import dataclass
+from mos6502.compat import make_dataclass
 from mos6502.compat import Literal, NoReturn, List, Dict
 
 from mos6502.errors import IllegalCPUInstructionError
@@ -25,7 +25,8 @@ AddressingMode = Literal[
 ]
 
 
-@dataclass(frozen=True, slots=True)
+# Use make_dataclass(frozen, slots) with positional args - kwargs don't work in MicroPython frozen modules
+@make_dataclass(True, True)
 class CPUInstruction:
     """Metadata for a 6502 CPU instruction opcode.
 

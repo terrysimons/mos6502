@@ -57,7 +57,7 @@ def jmp_indirect_0x6c(cpu: "MOS6502CPU") -> None:
 
     # VARIANT: 65C02 - Bug fixed, always correctly reads across page boundary
     # No special handling needed - just read the word normally
-    jump_address: "Word" = cpu.read_word(address=indirect_address)
+    jump_address: "Word" = cpu.read_word(indirect_address)
 
     cpu.PC = jump_address
     cpu.log.info("i")

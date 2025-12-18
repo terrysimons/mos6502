@@ -25,6 +25,6 @@ def dey_implied_0x88(cpu: "MOS6502CPU") -> None:
         cpu: The CPU instance to operate on
     """
     cpu.Y = (cpu.Y - 1) & 0xFF
-    cpu.set_load_status_flags(register_name="Y")
+    cpu.set_load_status_flags("Y")
     cpu.log.info("i")
     cpu.spend_cpu_cycles(1)

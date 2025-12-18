@@ -65,7 +65,7 @@ class C64KeyboardMixin:
             waited = 0
             while int(self.cpu.ram[self.KEYBOARD_BUFFER_SIZE]) > 0 and waited < max_wait_cycles:
                 try:
-                    self.cpu.execute(cycles=10_000)
+                    self.cpu.execute(10_000)
                 except CPUCycleExhaustionError:
                     pass
                 waited += 10_000
@@ -86,7 +86,7 @@ class C64KeyboardMixin:
             # Run CPU to process this chunk
             if position < len(petscii_text):
                 try:
-                    self.cpu.execute(cycles=cycles_per_chunk)
+                    self.cpu.execute(cycles_per_chunk)
                 except CPUCycleExhaustionError:
                     pass
 
@@ -377,7 +377,7 @@ class C64KeyboardMixin:
 
         # Run CPU for some cycles to let the KERNAL process the keypress
         try:
-            self.cpu.execute(cycles=hold_cycles)
+            self.cpu.execute(hold_cycles)
         except errors.CPUCycleExhaustionError:
             pass
 
@@ -390,7 +390,7 @@ class C64KeyboardMixin:
 
         # Run a bit more to ensure key release is processed
         try:
-            self.cpu.execute(cycles=hold_cycles // 2)
+            self.cpu.execute(hold_cycles // 2)
         except errors.CPUCycleExhaustionError:
             pass
 
@@ -546,7 +546,7 @@ class C64KeyboardMixin:
         for char in text:
             if char in ascii_to_matrix:
                 row, col, needs_shift = ascii_to_matrix[char]
-                self._buffer_pygame_key(row, col, needs_shift, suppress_shift=False)
+                self._buffer_pygame_key(row, col, needs_shift, False)
             else:
                 # Skip unmapped characters
                 log.debug(f"Paste: skipping unmapped character '{char}' (0x{ord(char):02X})")

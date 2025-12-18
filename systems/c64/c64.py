@@ -1,7 +1,6 @@
 """Commodore 64 Emulator - Core class."""
 
 from mos6502.compat import logging
-import sys
 from mos6502.compat import Path
 from mos6502.compat import Optional, Union, List, Dict, Tuple
 
@@ -9,24 +8,46 @@ from mos6502 import CPU, CPUVariant, errors, add_cpu_arguments
 from mos6502.core import INFINITE_CYCLES
 from mos6502.memory import Byte, Word
 
-from c64.cartridges import (
-    Cartridge,
-    CartridgeTestResults,
-    StaticROMCartridge,
-    ErrorCartridge,
-    CARTRIDGE_TYPES,
-    create_cartridge,
-    create_error_cartridge_rom,
-    ROML_START,
-    ROML_END,
-    ROML_SIZE,
-    ROMH_START,
-    ROMH_END,
-    IO1_START,
-    IO1_END,
-    IO2_START,
-    IO2_END,
-)
+# Cartridge support is optional (not available on Pico due to kwargs limitations)
+try:
+    from c64.cartridges import (
+        Cartridge,
+        CartridgeTestResults,
+        StaticROMCartridge,
+        ErrorCartridge,
+        CARTRIDGE_TYPES,
+        create_cartridge,
+        create_error_cartridge_rom,
+        ROML_START,
+        ROML_END,
+        ROML_SIZE,
+        ROMH_START,
+        ROMH_END,
+        IO1_START,
+        IO1_END,
+        IO2_START,
+        IO2_END,
+    )
+    _CARTRIDGES_AVAILABLE = True
+except (ImportError, TypeError):
+    # Stub values for when cartridges module is not available
+    _CARTRIDGES_AVAILABLE = False
+    Cartridge = None
+    CartridgeTestResults = None
+    StaticROMCartridge = None
+    ErrorCartridge = None
+    CARTRIDGE_TYPES = {}
+    create_cartridge = None
+    create_error_cartridge_rom = None
+    ROML_START = 0x8000
+    ROML_END = 0x9FFF
+    ROML_SIZE = 0x2000
+    ROMH_START = 0xA000
+    ROMH_END = 0xBFFF
+    IO1_START = 0xDE00
+    IO1_END = 0xDEFF
+    IO2_START = 0xDF00
+    IO2_END = 0xDFFF
 from c64.cia1 import (
     CIA1,
     PADDLE_1_FIRE,
@@ -52,6 +73,9 @@ from c64.vic import (
     ANSI_RESET,
     PAL,
     NTSC,
+    VIC_6569,
+    VIC_6567R8,
+    VIC_6567R56A,
 )
 from c64.memory import (
     C64Memory,
@@ -89,7 +113,12 @@ from c64.mixins import (
     C64RunnerMixin,
 )
 
-logging.basicConfig(level=logging.CRITICAL)
+# Note: On MicroPython frozen modules, logging.basicConfig() can't be called
+# with kwargs. Since the compat.py stub ignores log levels anyway, we skip it.
+try:
+    logging.basicConfig(level=logging.CRITICAL)
+except TypeError:
+    pass  # MicroPython frozen module - kwargs not supported
 log = logging.getLogger("c64")
 
 # Debug flags - set to True to enable verbose logging
@@ -243,6 +272,7 @@ class C64(
     }
 
 
+    @classmethod
     def args(cls, parser) -> None:
         """Add C64-specific command-line arguments to an argument parser.
 
@@ -513,7 +543,6 @@ class C64(
         )
 
     @classmethod
-
     def from_args(cls, args) -> "C64":
         """Create a C64 instance from parsed command-line arguments.
 
@@ -533,45 +562,40 @@ class C64(
             verbose_cycles=getattr(args, 'verbose_cycles', False),
         )
 
-    def __init__(self, rom_dir: Path = Path("./roms"), display_mode: str = "pygame", scale: int = 2, enable_irq: bool = True, video_chip: str = "6569", cpu_variant: str = "6502", verbose_cycles: bool = False) -> None:
-        """Initialize the C64 emulator.
+    def __init__(self, rom_dir="./roms", display_mode="pygame", scale=2, enable_irq=True, video_chip="6569", cpu_variant="6502", verbose_cycles=False, preallocated_ram=None):
+        """Initialize the C64 emulator."""
+        import sys
+        print("DEBUG C64.__init__: START")
 
-        Arguments:
-            rom_dir: Directory containing ROM files (basic, kernal, char)
-            display_mode: Display mode (pygame [default], terminal, headless)
-                         If pygame fails to initialize, will automatically fall back to terminal
-            scale: Pygame window scaling factor
-            enable_irq: Enable IRQ injection (default: True)
-            video_chip: VIC-II chip variant ("6569" for PAL, "6567R8" for NTSC,
-                       "6567R56A" for old NTSC). PAL/NTSC are aliases.
-            cpu_variant: CPU variant to emulate ("6502", "6502A", "6502C", "65C02").
-                        Default is "6502" (NMOS 6502). Note: The C64 uses a 6510
-                        which is essentially a 6502 with I/O ports.
-            verbose_cycles: Enable per-cycle CPU logging (default: False)
-        """
-        self.rom_dir = Path(rom_dir)
+        log.info("DEBUG: Setting _preallocated_ram")
+        self._preallocated_ram = preallocated_ram
+
+        log.info("DEBUG: Setting rom_dir with Path()")
+        self.rom_dir = Path(rom_dir) if not isinstance(rom_dir, Path) else rom_dir
+
+        log.info("DEBUG: Setting display_mode, scale, enable_irq")
         self.display_mode = display_mode
         self.scale = scale
         self.enable_irq = enable_irq
 
-        # Map video chip selection to VideoTiming
+        log.info("DEBUG: Processing video_chip")
         video_chip_upper = video_chip.upper()
         if video_chip_upper in ("6569", "PAL"):
-            self.video_timing = VideoTiming.VIC_6569
+            self.video_timing = VIC_6569
         elif video_chip_upper in ("6567R8", "NTSC"):
-            self.video_timing = VideoTiming.VIC_6567R8
+            self.video_timing = VIC_6567R8
         elif video_chip_upper == "6567R56A":
-            self.video_timing = VideoTiming.VIC_6567R56A
+            self.video_timing = VIC_6567R56A
         else:
             raise ValueError(f"Unknown video chip: {video_chip}")
 
+        log.info("DEBUG: Setting video_chip attr")
         self.video_chip = self.video_timing.chip_name
 
-        # If pygame mode requested, try to initialize it and fall back to terminal if it fails
+        log.info("DEBUG: Checking pygame mode")
         if self.display_mode == "pygame":
             try:
                 import pygame
-                # Test if pygame can actually initialize (might fail on headless systems)
                 pygame.init()
                 pygame.quit()
             except (ImportError, Exception) as e:
@@ -579,65 +603,79 @@ class C64(
                 log.warning("Falling back to terminal display mode")
                 self.display_mode = "terminal"
 
-        # Initialize CPU (6510 is essentially a 6502 with I/O ports)
-        # Parse the cpu_variant string to get the enum
+        log.info("DEBUG: Creating CPU")
+        log.info(f"DEBUG: cpu_variant type = {type(cpu_variant)}")
+        log.info(f"DEBUG: cpu_variant = {cpu_variant}")
         self._cpu_variant = CPUVariant.from_string(cpu_variant)
-        self.cpu = CPU(cpu_variant=self._cpu_variant, verbose_cycles=verbose_cycles)
-
+        # CPU(cpu_variant, verbose_cycles, preallocated_ram) - use positional args
+        self.cpu = CPU(self._cpu_variant, verbose_cycles, self._preallocated_ram)
         log.info(f"Initialized CPU: {self.cpu.variant_name}")
+        log.info("DEBUG: After CPU init")
 
-        # Storage for ROMs
-        self.basic_rom: Optional[bytes] = None
-        self.kernal_rom: Optional[bytes] = None
-        self.char_rom: Optional[bytes] = None
-        self.vic: Optional[C64VIC] = None
-        self.cia1: Optional[CIA1] = None
-        self.cia2: Optional[CIA2] = None
+        log.info("DEBUG: Setting basic_rom")
+        self.basic_rom = None
+        log.info("DEBUG: Setting kernal_rom")
+        self.kernal_rom = None
+        log.info("DEBUG: Setting char_rom")
+        self.char_rom = None
+        log.info("DEBUG: Setting vic")
+        self.vic = None
+        log.info("DEBUG: Setting cia1")
+        self.cia1 = None
+        log.info("DEBUG: Setting cia2")
+        self.cia2 = None
 
-        # Cartridge support - the Cartridge object handles all banking logic
-        # and provides EXROM/GAME signals. Stored on C64Memory, accessed via self.memory.cartridge
-        # Cartridge type string for display purposes
-        self.cartridge_type: str = "none"  # "none", "8k", "16k", "error"
+        log.info("DEBUG: Setting cartridge_type")
+        self.cartridge_type = "none"
 
-        # 1541 Disk Drive support
-        self.iec_bus: Optional[IECBus] = None
-        self.drive8: Optional[Drive1541] = None
-        self.drive_enabled: bool = False  # Set by attach_drive()
+        log.info("DEBUG: Setting iec_bus")
+        self.iec_bus = None
+        log.info("DEBUG: Setting drive8")
+        self.drive8 = None
+        log.info("DEBUG: Setting drive_enabled")
+        self.drive_enabled = False
 
-        # Pygame display attributes
+        log.info("DEBUG: Setting pygame attrs")
         self.pygame_screen = None
         self.pygame_surface = None
         self.pygame_available = False
 
-        # Screen dirty tracking for optimized rendering
+        log.info("DEBUG: Creating ScreenDirtyTracker")
         self.dirty_tracker = ScreenDirtyTracker()
 
-        # Debug logging control
+        log.info("DEBUG: Setting debug attrs")
         self.basic_logging_enabled = False
         self.last_pc_region = None
 
-        # BASIC ready detection (set by pc_callback when PC enters BASIC ROM range)
+        log.info("DEBUG: Setting BASIC ready attrs")
         self._basic_ready = False
         self._stop_on_basic = False
 
-        # KERNAL keyboard input detection (PC at $E5CF-$E5D6 = waiting for input)
+        log.info("DEBUG: Setting KERNAL input attrs")
         self._kernal_waiting_for_input = False
         self._stop_on_kernal_input = False
 
-        # Execution timing for speedup calculation
-        self._execution_start_time: Optional[float] = None
-        self._execution_end_time: Optional[float] = None
+        log.info("DEBUG: Setting execution_time")
+        self._execution_start_time = None
+        self._execution_end_time = None
 
-        # Rolling average speed tracking (default 10 samples = 10 second window)
+        log.info("DEBUG: Importing deque")
         from collections import deque
-        self._speed_sample_count: int = 10
-        self._speed_samples: deque[float] = deque(maxlen=self._speed_sample_count)
-        self._last_sample_time: float = 0.0
-        self._last_sample_cycles: int = 0
 
-        # Load ROMs during initialization
-        # This sets up the memory handler and all peripherals (VIC, CIAs)
+        log.info("DEBUG: Setting _speed_sample_count")
+        self._speed_sample_count = 10
+
+        log.info("DEBUG: Creating deque")
+        self._speed_samples = deque((), self._speed_sample_count)
+
+        log.info("DEBUG: Setting _last_sample_time")
+        self._last_sample_time = 0.0
+        log.info("DEBUG: Setting _last_sample_cycles")
+        self._last_sample_cycles = 0
+
+        log.info("DEBUG: Calling load_roms()")
         self.load_roms()
+        log.info("DEBUG C64.__init__: END")
 
     def load_rom(self, filename: str, expected_size: int, description: str) -> bytes:
         """Load a ROM file from the rom directory.
@@ -674,46 +712,90 @@ class C64(
         return rom_data
 
     def load_roms(self) -> None:
-        """Load all C64 ROM files into memory."""
-        # Try common ROM filenames
-        basic_names = ["basic", "basic.rom", "basic.901226-01.bin"]
-        kernal_names = ["kernal", "kernal.rom", "kernal.901227-03.bin"]
-        char_names = ["char", "char.rom", "characters.901225-01.bin", "chargen"]
+        """Load all C64 ROM files into memory.
 
-        # Load BASIC ROM
-        for name in basic_names:
-            try:
-                self.basic_rom = self.load_rom(name, BASIC_ROM_SIZE, "BASIC")
-                break
-            except FileNotFoundError:
-                continue
-        else:
-            raise FileNotFoundError(
-                f"BASIC ROM not found. Tried: {', '.join(basic_names)} in {self.rom_dir}"
-            )
+        First tries to use embedded ROMs (baked into firmware by build_firmware.py).
+        Falls back to loading from filesystem if embedded ROMs aren't available.
+        """
+        log.info("Loading ROMs...")
 
-        # Load KERNAL ROM
-        for name in kernal_names:
-            try:
-                self.kernal_rom = self.load_rom(name, KERNAL_ROM_SIZE, "KERNAL")
-                break
-            except FileNotFoundError:
-                continue
-        else:
-            raise FileNotFoundError(
-                f"KERNAL ROM not found. Tried: {', '.join(kernal_names)} in {self.rom_dir}"
-            )
+        # First, try to use embedded ROMs (from frozen roms module)
+        embedded_roms_loaded = False
+        try:
+            from roms import BASIC_ROM, KERNAL_ROM, CHAR_ROM
+            log.info("Found embedded ROMs in firmware")
 
-        # Load CHAR ROM (optional for now)
-        for name in char_names:
-            try:
-                self.char_rom = self.load_rom(name, CHAR_ROM_SIZE, "CHAR")
-                break
-            except FileNotFoundError:
-                continue
+            # Validate sizes
+            if len(BASIC_ROM) == BASIC_ROM_SIZE:
+                self.basic_rom = BASIC_ROM
+                log.info(f"Using embedded BASIC ROM ({len(BASIC_ROM)} bytes)")
+            else:
+                log.warning(f"Embedded BASIC ROM wrong size: {len(BASIC_ROM)}, expected {BASIC_ROM_SIZE}")
 
-        if self.char_rom is None:
-            log.warning(f"CHAR ROM not found (optional). Tried: {', '.join(char_names)}")
+            if len(KERNAL_ROM) == KERNAL_ROM_SIZE:
+                self.kernal_rom = KERNAL_ROM
+                log.info(f"Using embedded KERNAL ROM ({len(KERNAL_ROM)} bytes)")
+            else:
+                log.warning(f"Embedded KERNAL ROM wrong size: {len(KERNAL_ROM)}, expected {KERNAL_ROM_SIZE}")
+
+            if len(CHAR_ROM) == CHAR_ROM_SIZE:
+                self.char_rom = CHAR_ROM
+                log.info(f"Using embedded CHAR ROM ({len(CHAR_ROM)} bytes)")
+            else:
+                log.warning(f"Embedded CHAR ROM wrong size: {len(CHAR_ROM)}, expected {CHAR_ROM_SIZE}")
+
+            # Check if all ROMs loaded successfully
+            if self.basic_rom and self.kernal_rom and self.char_rom:
+                embedded_roms_loaded = True
+                log.info("All embedded ROMs loaded successfully")
+
+        except ImportError:
+            log.info("No embedded ROMs found, loading from filesystem")
+
+        # If embedded ROMs weren't available or incomplete, load from filesystem
+        if not embedded_roms_loaded:
+            # Try common ROM filenames
+            basic_names = ["basic", "basic.rom", "basic.901226-01.bin"]
+            kernal_names = ["kernal", "kernal.rom", "kernal.901227-03.bin"]
+            char_names = ["char", "char.rom", "characters.rom", "characters.901225-01.bin", "chargen"]
+
+            # Load BASIC ROM if not already loaded
+            if self.basic_rom is None:
+                for name in basic_names:
+                    try:
+                        self.basic_rom = self.load_rom(name, BASIC_ROM_SIZE, "BASIC")
+                        break
+                    except FileNotFoundError:
+                        continue
+                else:
+                    raise FileNotFoundError(
+                        f"BASIC ROM not found. Tried: {', '.join(basic_names)} in {self.rom_dir}"
+                    )
+
+            # Load KERNAL ROM if not already loaded
+            if self.kernal_rom is None:
+                for name in kernal_names:
+                    try:
+                        self.kernal_rom = self.load_rom(name, KERNAL_ROM_SIZE, "KERNAL")
+                        break
+                    except FileNotFoundError:
+                        continue
+                else:
+                    raise FileNotFoundError(
+                        f"KERNAL ROM not found. Tried: {', '.join(kernal_names)} in {self.rom_dir}"
+                    )
+
+            # Load CHAR ROM if not already loaded (optional)
+            if self.char_rom is None:
+                for name in char_names:
+                    try:
+                        self.char_rom = self.load_rom(name, CHAR_ROM_SIZE, "CHAR")
+                        break
+                    except FileNotFoundError:
+                        continue
+
+                if self.char_rom is None:
+                    log.warning(f"CHAR ROM not found (optional). Tried: {', '.join(char_names)}")
 
         # DON'T write ROMs to CPU RAM! The C64Memory handler reads from ROM arrays directly.
         # Writing them to RAM would:
@@ -732,27 +814,30 @@ class C64(
 
 
         # Now set up the CIA1, CIA2, SID, and VIC
-        self.cia1 = CIA1(cpu=self.cpu)
-        self.cia2 = CIA2(cpu=self.cpu)
+        # Use positional args - MicroPython frozen modules don't support kwargs
+        self.cia1 = CIA1(self.cpu)
+        self.cia2 = CIA2(self.cpu)
 
         # Link the CIAs for FLAG pin cross-triggering (IEC bus simulation)
         self.cia1.set_other_cia(self.cia2)
         self.cia2.set_other_cia(self.cia1)
 
         self.sid = SID()
-        self.vic = C64VIC(char_rom=self.char_rom, cpu=self.cpu, cia2=self.cia2, video_timing=self.video_timing)
+        # C64VIC(char_rom, cpu, cia2, video_timing)
+        self.vic = C64VIC(self.char_rom, self.cpu, self.cia2, self.video_timing)
 
         # Initialize memory
+        # C64Memory(ram, basic_rom, kernal_rom, char_rom, cia1, cia2, vic, sid, dirty_tracker)
         self.memory = C64Memory(
             self.cpu.ram,
-            basic_rom=self.basic_rom,
-            kernal_rom=self.kernal_rom,
-            char_rom=self.char_rom,
-            cia1=self.cia1,
-            cia2=self.cia2,
-            vic=self.vic,
-            sid=self.sid,
-            dirty_tracker=self.dirty_tracker,
+            self.basic_rom,
+            self.kernal_rom,
+            self.char_rom,
+            self.cia1,
+            self.cia2,
+            self.vic,
+            self.sid,
+            self.dirty_tracker,
         )
         # Hook up the memory handler so CPU RAM accesses go through C64Memory
         self.cpu.ram.memory_handler = self.memory

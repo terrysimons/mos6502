@@ -192,7 +192,7 @@ class FinalCartridgeICartridge(Cartridge):
     def get_cartridge_variants(cls) -> List[CartridgeVariant]:
         """Return all valid configuration variants for Type 13."""
         return [
-            CartridgeVariant("", exrom=0, game=0),  # 16KB mode
+            CartridgeVariant("", 0, 0),  # 16KB mode
         ]
 
     @classmethod
@@ -239,11 +239,8 @@ class FinalCartridgeICartridge(Cartridge):
         romh_data = bytearray(ROMH_SIZE)
         romh_data[0x1FF0:0x1FF8] = b"RH-SIGN!"  # ROMH signature
 
+        # CartridgeImage field order: description, exrom, game, extra, rom_data, hardware_type
         return CartridgeImage(
-            description=variant.description,
-            exrom=variant.exrom,
-            game=variant.game,
-            extra=variant.extra,
-            rom_data={"roml": bytes(roml_data), "romh": bytes(romh_data)},
-            hardware_type=cls.HARDWARE_TYPE,
+            variant.description, variant.exrom, variant.game, variant.extra,
+            {"roml": bytes(roml_data), "romh": bytes(romh_data)}, cls.HARDWARE_TYPE
         )

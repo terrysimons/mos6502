@@ -58,6 +58,6 @@ def shy_absolute_x_0x9c(cpu: "MOS6502CPU") -> None:
     value: int = int(cpu.Y) & ((high_byte + 1) & 0xFF)
 
     # Store the value
-    cpu.write_byte(address=effective_address, data=value)
+    cpu.write_byte(effective_address, value)
 
     cpu.log.info("i")

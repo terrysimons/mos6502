@@ -143,9 +143,9 @@ class C64GSCartridge(Cartridge):
     def get_cartridge_variants(cls) -> List[CartridgeVariant]:
         """Return all valid configuration variants for Type 15."""
         return [
-            CartridgeVariant("64k", exrom=0, game=1, extra={"bank_count": 8}),
-            CartridgeVariant("128k", exrom=0, game=1, extra={"bank_count": 16}),
-            CartridgeVariant("512k", exrom=0, game=1, extra={"bank_count": 64}),
+            CartridgeVariant("64k", 0, 1, {"bank_count": 8}),
+            CartridgeVariant("128k", 0, 1, {"bank_count": 16}),
+            CartridgeVariant("512k", 0, 1, {"bank_count": 64}),
         ]
 
     @classmethod
@@ -197,11 +197,8 @@ class C64GSCartridge(Cartridge):
             bank[0x1FF5] = i  # Bank number as signature
             banks.append(bytes(bank))
 
+        # CartridgeImage field order: description, exrom, game, extra, rom_data, hardware_type
         return CartridgeImage(
-            description=variant.description,
-            exrom=variant.exrom,
-            game=variant.game,
-            extra=variant.extra,
-            rom_data={"banks": banks},
-            hardware_type=cls.HARDWARE_TYPE,
+            variant.description, variant.exrom, variant.game, variant.extra,
+            {"banks": banks}, cls.HARDWARE_TYPE
         )

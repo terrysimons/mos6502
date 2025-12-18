@@ -40,9 +40,9 @@ def jsr_absolute_0x20(cpu: "MOS6502CPU") -> None:
     pc_low = return_addr & 0xFF
 
     # Push high byte first, then low byte
-    cpu.write_byte(address=cpu.S, data=pc_high)
+    cpu.write_byte(cpu.S, pc_high)
     cpu.S -= 1
-    cpu.write_byte(address=cpu.S, data=pc_low)
+    cpu.write_byte(cpu.S, pc_low)
     cpu.S -= 1
     cpu.PC = subroutine_address
     cpu.log.info("i")

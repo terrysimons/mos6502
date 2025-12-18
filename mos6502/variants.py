@@ -45,10 +45,10 @@ class UnstableOpcodeConfig:
 # Default configurations for each CPU variant
 # Users can override these by modifying cpu.unstable_config after creation
 UNSTABLE_OPCODE_DEFAULTS: Dict[str, UnstableOpcodeConfig] = {
-    "6502": UnstableOpcodeConfig(ane_const=0xFF, unstable_stores_enabled=True),
-    "6502A": UnstableOpcodeConfig(ane_const=0xFF, unstable_stores_enabled=True),
-    "6502C": UnstableOpcodeConfig(ane_const=0xEE, unstable_stores_enabled=True),  # Some 6502C chips use 0xEE
-    "65C02": UnstableOpcodeConfig(ane_const=None, unstable_stores_enabled=False),  # CMOS: all illegal opcodes are NOPs
+    "6502": UnstableOpcodeConfig(0xFF, True),
+    "6502A": UnstableOpcodeConfig(0xFF, True),
+    "6502C": UnstableOpcodeConfig(0xEE, True),  # Some 6502C chips use 0xEE
+    "65C02": UnstableOpcodeConfig(None, False),  # CMOS: all illegal opcodes are NOPs
 }
 
 
@@ -76,7 +76,13 @@ class CPUVariant(enum.Enum):
         ------
             ValueError: If variant string is not recognized
         """
-        variant_map = {v.value: v for v in cls}
+        # Explicit mapping for MicroPython compatibility (can't iterate over Enum)
+        variant_map = {
+            "6502": cls.NMOS_6502,
+            "6502A": cls.NMOS_6502A,
+            "6502C": cls.NMOS_6502C,
+            "65C02": cls.CMOS_65C02,
+        }
         if variant not in variant_map:
             valid_variants = ", ".join(variant_map.keys())
             raise ValueError(f"Unknown CPU variant: {variant}. Valid variants: {valid_variants}")

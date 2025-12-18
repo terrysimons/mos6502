@@ -25,4 +25,4 @@ def nop_implied_0xea(cpu: "MOS6502CPU") -> None:
         cpu: The CPU instance to operate on
     """
     cpu.log.info("i")
-    cpu.spend_cpu_cycles(cost=1)
+    cpu.spend_cpu_cycles(1)

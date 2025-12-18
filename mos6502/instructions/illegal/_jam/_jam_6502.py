@@ -46,7 +46,7 @@ def _jam_common(cpu: "MOS6502CPU", opcode: int) -> None:
     cpu.log.warning(f"JAM instruction ${opcode:02X} executed at ${jam_address:04X} - CPU halted")
 
     # Raise the halt exception
-    raise errors.CPUHaltError(opcode=opcode, address=jam_address)
+    raise errors.CPUHaltError(opcode, jam_address)
 
 
 def jam_implied_0x02(cpu: "MOS6502CPU") -> None:

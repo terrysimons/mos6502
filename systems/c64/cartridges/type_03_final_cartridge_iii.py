@@ -234,8 +234,9 @@ class FinalCartridgeIIICartridge(Cartridge):
     @classmethod
     def get_cartridge_variants(cls) -> List[CartridgeVariant]:
         """Return all valid configuration variants for Type 3."""
+        # CartridgeVariant field order: description, exrom, game, extra
         return [
-            CartridgeVariant("", exrom=0, game=0, extra={"bank_count": 4}),
+            CartridgeVariant("", 0, 0, {"bank_count": 4}),
         ]
 
     @classmethod
@@ -292,11 +293,8 @@ class FinalCartridgeIIICartridge(Cartridge):
             romh = bytearray(ROMH_SIZE)
             banks.append(bytes(roml) + bytes(romh))
 
+        # CartridgeImage field order: description, exrom, game, extra, rom_data, hardware_type
         return CartridgeImage(
-            description=variant.description,
-            exrom=variant.exrom,
-            game=variant.game,
-            extra=variant.extra,
-            rom_data={"banks": banks},
-            hardware_type=cls.HARDWARE_TYPE,
+            variant.description, variant.exrom, variant.game, variant.extra,
+            {"banks": banks}, cls.HARDWARE_TYPE
         )

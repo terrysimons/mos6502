@@ -38,13 +38,13 @@ def sax_zeropage_0x87(cpu: "MOS6502CPU") -> None:
         cpu: The CPU instance to operate on
     """
     # Fetch zero page address
-    address: int = cpu.fetch_zeropage_mode_address(offset_register_name=None)
+    address: int = cpu.fetch_zeropage_mode_address(None)
 
     # Calculate A & X
     result: int = int(cpu.A) & int(cpu.X)
 
     # Store to memory
-    cpu.write_byte(address=address, data=result)
+    cpu.write_byte(address, result)
 
     # Internal cycle
     cpu.log.info("i")
@@ -70,13 +70,13 @@ def sax_zeropage_y_0x97(cpu: "MOS6502CPU") -> None:
         cpu: The CPU instance to operate on
     """
     # Fetch zero page,Y address
-    address: int = cpu.fetch_zeropage_mode_address(offset_register_name="Y")
+    address: int = cpu.fetch_zeropage_mode_address("Y")
 
     # Calculate A & X
     result: int = int(cpu.A) & int(cpu.X)
 
     # Store to memory
-    cpu.write_byte(address=address, data=result)
+    cpu.write_byte(address, result)
 
     # Internal cycle
     cpu.log.info("i")
@@ -108,7 +108,7 @@ def sax_indexed_indirect_x_0x83(cpu: "MOS6502CPU") -> None:
     result: int = int(cpu.A) & int(cpu.X)
 
     # Store to memory
-    cpu.write_byte(address=address, data=result)
+    cpu.write_byte(address, result)
 
     # Internal cycle
     cpu.log.info("i")
@@ -134,13 +134,13 @@ def sax_absolute_0x8f(cpu: "MOS6502CPU") -> None:
         cpu: The CPU instance to operate on
     """
     # Fetch absolute address
-    address: int = cpu.fetch_absolute_mode_address(offset_register_name=None)
+    address: int = cpu.fetch_absolute_mode_address(None)
 
     # Calculate A & X
     result: int = int(cpu.A) & int(cpu.X)
 
     # Store to memory
-    cpu.write_byte(address=address & 0xFFFF, data=result)
+    cpu.write_byte(address & 0xFFFF, result)
 
     # Internal cycle
     cpu.log.info("i")
