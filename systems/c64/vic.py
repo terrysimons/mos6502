@@ -10,7 +10,33 @@ This module contains:
 
 
 from mos6502.compat import logging
-import multiprocessing
+# Multiprocessing is optional - only needed for cross-process frame sync
+try:
+    import multiprocessing
+    _multiprocessing_available = True
+except ImportError:
+    _multiprocessing_available = False
+
+# Simple Event class for when multiprocessing is not available
+class _SimpleEvent:
+    """Simple Event replacement when multiprocessing is not available."""
+    def __init__(self):
+        self._flag = False
+    def set(self):
+        self._flag = True
+    def clear(self):
+        self._flag = False
+    def is_set(self):
+        return self._flag
+    def wait(self, timeout=None):
+        return self._flag
+
+def _create_event():
+    """Create an Event - uses multiprocessing if available, otherwise simple."""
+    if _multiprocessing_available:
+        return multiprocessing.Event()
+    return _SimpleEvent()
+
 from mos6502.compat import TYPE_CHECKING, NamedTuple
 
 if TYPE_CHECKING:
@@ -24,33 +50,48 @@ log = logging.getLogger("c64")
 # Video Timing Constants
 # =============================================================================
 
-class VideoTiming(NamedTuple):
-    """Video system timing parameters for VIC-II chip variants.
+# VideoTiming - try to use NamedTuple, fall back to collections.namedtuple for MicroPython
+try:
+    # CPython - use class syntax with NamedTuple
+    class VideoTiming(NamedTuple):
+        """Video system timing parameters for VIC-II chip variants.
 
-    VIC-II Chip Variants:
-        6569 (PAL)       - Europe, Australia (312 lines, 63 cycles/line, ~50Hz)
-        6567R8 (NTSC)    - North America 1984+ (263 lines, 65 cycles/line, ~60Hz)
-        6567R56A (NTSC)  - North America 1982-1984 (262 lines, 64 cycles/line, ~60Hz)
+        VIC-II Chip Variants:
+            6569 (PAL)       - Europe, Australia (312 lines, 63 cycles/line, ~50Hz)
+            6567R8 (NTSC)    - North America 1984+ (263 lines, 65 cycles/line, ~60Hz)
+            6567R56A (NTSC)  - North America 1982-1984 (262 lines, 64 cycles/line, ~60Hz)
 
-    Access standard timing configurations via class attributes:
-        VideoTiming.VIC_6569     - PAL chip
-        VideoTiming.VIC_6567R8   - New NTSC chip (default for NTSC)
-        VideoTiming.VIC_6567R56A - Old NTSC chip
-        VideoTiming.PAL          - Alias for VIC_6569
-        VideoTiming.NTSC         - Alias for VIC_6567R8
-    """
-    chip_name: str          # VIC-II chip identifier (6569, 6567R8, 6567R56A)
-    cpu_freq: int           # CPU frequency in Hz
-    refresh_hz: float       # Screen refresh rate in Hz
-    cycles_per_frame: int   # CPU cycles per video frame
-    cycles_per_line: int    # CPU cycles per raster line
-    raster_lines: int       # Total raster lines per frame
-    render_interval: float  # Seconds between frame renders (1/refresh_hz)
+        Access standard timing configurations via class attributes:
+            VideoTiming.VIC_6569     - PAL chip
+            VideoTiming.VIC_6567R8   - New NTSC chip (default for NTSC)
+            VideoTiming.VIC_6567R56A - Old NTSC chip
+            VideoTiming.PAL          - Alias for VIC_6569
+            VideoTiming.NTSC         - Alias for VIC_6567R8
+        """
+        chip_name: str          # VIC-II chip identifier (6569, 6567R8, 6567R56A)
+        cpu_freq: int           # CPU frequency in Hz
+        refresh_hz: float       # Screen refresh rate in Hz
+        cycles_per_frame: int   # CPU cycles per video frame
+        cycles_per_line: int    # CPU cycles per raster line
+        raster_lines: int       # Total raster lines per frame
+        render_interval: float  # Seconds between frame renders (1/refresh_hz)
+    # Test that it works (will fail on MicroPython)
+    _test = VideoTiming(chip_name="test", cpu_freq=0, refresh_hz=0.0,
+                        cycles_per_frame=0, cycles_per_line=0, raster_lines=0,
+                        render_interval=0.0)
+    del _test
+except (TypeError, AttributeError):
+    # MicroPython - use collections.namedtuple
+    from collections import namedtuple
+    VideoTiming = namedtuple('VideoTiming', [
+        'chip_name', 'cpu_freq', 'refresh_hz', 'cycles_per_frame',
+        'cycles_per_line', 'raster_lines', 'render_interval'
+    ])
 
 
 # VIC-II 6569 (PAL) - Europe, Australia
 # More compatible with demos/games, slightly slower CPU
-VideoTiming.VIC_6569 = VideoTiming(
+VIC_6569 = VideoTiming(
     chip_name="6569",
     cpu_freq=985248,           # ~0.985 MHz
     refresh_hz=50.125,         # ~50 Hz
@@ -62,7 +103,7 @@ VideoTiming.VIC_6569 = VideoTiming(
 
 # VIC-II 6567R8 (NTSC) - North America, Japan (1984 onwards)
 # "New" NTSC chip, most common in later C64s
-VideoTiming.VIC_6567R8 = VideoTiming(
+VIC_6567R8 = VideoTiming(
     chip_name="6567R8",
     cpu_freq=1022727,          # ~1.023 MHz
     refresh_hz=59.826,         # ~60 Hz
@@ -74,7 +115,7 @@ VideoTiming.VIC_6567R8 = VideoTiming(
 
 # VIC-II 6567R56A (NTSC) - North America (1982-1984)
 # "Old" NTSC chip, found in early C64s
-VideoTiming.VIC_6567R56A = VideoTiming(
+VIC_6567R56A = VideoTiming(
     chip_name="6567R56A",
     cpu_freq=1022727,          # ~1.023 MHz
     refresh_hz=59.826,         # ~60 Hz (slightly different in reality)
@@ -84,13 +125,19 @@ VideoTiming.VIC_6567R56A = VideoTiming(
     render_interval=1.0 / 59.826,
 )
 
-# Backwards compatibility aliases
-VideoTiming.PAL = VideoTiming.VIC_6569
-VideoTiming.NTSC = VideoTiming.VIC_6567R8  # Default to new NTSC chip
+# Module-level aliases
+PAL = VIC_6569
+NTSC = VIC_6567R8  # Default to new NTSC chip
 
-# Module-level constants for backwards compatibility
-PAL = VideoTiming.PAL
-NTSC = VideoTiming.NTSC
+# Try to set class attributes for backwards compatibility (may fail on MicroPython)
+try:
+    VideoTiming.VIC_6569 = VIC_6569
+    VideoTiming.VIC_6567R8 = VIC_6567R8
+    VideoTiming.VIC_6567R56A = VIC_6567R56A
+    VideoTiming.PAL = PAL
+    VideoTiming.NTSC = NTSC
+except (TypeError, AttributeError):
+    pass  # MicroPython doesn't allow setting attributes on namedtuple
 
 
 # =============================================================================
@@ -383,8 +430,8 @@ class C64VIC:
         # VIC sets this when a frame completes (raster wraps to 0)
         # Pygame checks it, grabs a snapshot, and clears it
         # No blocking - VIC runs at full speed, pygame renders what it catches
-        # Using multiprocessing.Event for proper cross-process visibility
-        self.frame_complete = multiprocessing.Event()
+        # Using Event for frame sync (multiprocessing.Event if available)
+        self.frame_complete = _create_event()
 
         # RAM snapshots taken at VBlank for consistent rendering
         # Only the 16KB VIC bank is snapshotted (not full 64KB) for performance

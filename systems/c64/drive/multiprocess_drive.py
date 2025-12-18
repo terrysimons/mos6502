@@ -16,7 +16,7 @@ import multiprocessing
 import os
 import sys
 import time
-from pathlib import Path
+from mos6502.compat import Path
 from mos6502.compat import Optional
 
 # Use fork context on POSIX for better performance

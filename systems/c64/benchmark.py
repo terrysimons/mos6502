@@ -4,7 +4,7 @@ import argparse
 from mos6502.compat import logging
 import sys
 import time
-from pathlib import Path
+from mos6502.compat import Path
 from mos6502.compat import Optional, Tuple
 
 from c64 import C64, PAL, NTSC, c64_to_ansi_fg, c64_to_ansi_bg, ANSI_RESET

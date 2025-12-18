@@ -12,7 +12,7 @@ This module provides the foundation for cartridge emulation including:
 from mos6502.compat import logging
 import re
 import struct
-from abc import ABC, abstractmethod
+from mos6502.compat import ABC, abstractmethod
 from mos6502.compat import dataclass, field
 from mos6502.compat import IntEnum
 from mos6502.compat import Protocol, Union, List, Dict, Tuple

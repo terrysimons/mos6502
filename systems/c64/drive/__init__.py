@@ -21,10 +21,27 @@ from .via6522 import VIA6522
 from .d64 import D64Image
 from .drive1541 import Drive1541
 from .iec_bus import IECBus
-from .threaded_iec_bus import ThreadedIECBus
-from .threaded_drive import ThreadedDrive1541
-from .multiprocess_iec_bus import MultiprocessIECBus, SharedIECState
-from .multiprocess_drive import MultiprocessDrive1541
+
+# Threaded/multiprocess drive modules - optional for MicroPython/Pico
+# These require threading/multiprocessing which aren't available on Pico
+_THREADED_AVAILABLE = False
+_MULTIPROCESS_AVAILABLE = False
+try:
+    from .threaded_iec_bus import ThreadedIECBus
+    from .threaded_drive import ThreadedDrive1541
+    _THREADED_AVAILABLE = True
+except ImportError:
+    ThreadedIECBus = None
+    ThreadedDrive1541 = None
+
+try:
+    from .multiprocess_iec_bus import MultiprocessIECBus, SharedIECState
+    from .multiprocess_drive import MultiprocessDrive1541
+    _MULTIPROCESS_AVAILABLE = True
+except ImportError:
+    MultiprocessIECBus = None
+    SharedIECState = None
+    MultiprocessDrive1541 = None
 
 __all__ = [
     "VIA6522",
@@ -36,4 +53,6 @@ __all__ = [
     "MultiprocessIECBus",
     "SharedIECState",
     "MultiprocessDrive1541",
+    "_THREADED_AVAILABLE",
+    "_MULTIPROCESS_AVAILABLE",
 ]

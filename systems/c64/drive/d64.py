@@ -31,7 +31,7 @@ Reference:
 
 
 from mos6502.compat import logging
-from pathlib import Path
+from mos6502.compat import Path
 from mos6502.compat import List, Optional, Tuple, Union
 from mos6502.compat import dataclass
 

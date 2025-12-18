@@ -1,0 +1,1 @@
+- Make sure you copy the packages to dist as-is before you byte compile and remove files.  NEVER remove files in the source repos without explicit permission.

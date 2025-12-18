@@ -8,7 +8,11 @@ Ocean Type 1 cartridges but with a 4-bit bank select (max 16 banks).
 from mos6502.compat import logging
 
 from .base import CartridgeVariant, CartridgeImage, ROML_START, ROML_SIZE
-from .rom_builder import TestROMBuilder
+# Test ROM builder - optional for MicroPython/Pico
+try:
+    from .rom_builder import TestROMBuilder
+except ImportError:
+    TestROMBuilder = None
 from .type_05_ocean import OceanType1Cartridge
 from c64.colors import COLOR_BLUE, COLOR_YELLOW, COLOR_WHITE
 from mos6502.compat import List

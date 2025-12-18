@@ -310,181 +310,189 @@ class InstructionOpcode:
 # Import from individual instruction modules
 from mos6502.instructions._bit import BIT_ZEROPAGE_0x24, BIT_ABSOLUTE_0x2C, register_bit_instructions
 from mos6502.instructions._brk import BRK_IMPLIED_0x00, register_brk_instructions
-# Illegal instructions
-from mos6502.instructions.illegal._lax import (
-    LAX_ZEROPAGE_0xA7,
-    LAX_ZEROPAGE_Y_0xB7,
-    LAX_INDEXED_INDIRECT_X_0xA3,
-    LAX_INDIRECT_INDEXED_Y_0xB3,
-    LAX_ABSOLUTE_0xAF,
-    LAX_ABSOLUTE_Y_0xBF,
-    LAX_IMMEDIATE_0xAB,
-    register_lax_instructions,
-)
-from mos6502.instructions.illegal._sax import (
-    SAX_ZEROPAGE_0x87,
-    SAX_ZEROPAGE_Y_0x97,
-    SAX_INDEXED_INDIRECT_X_0x83,
-    SAX_ABSOLUTE_0x8F,
-    register_sax_instructions,
-)
-from mos6502.instructions.illegal._dcp import (
-    DCP_ZEROPAGE_0xC7,
-    DCP_ZEROPAGE_X_0xD7,
-    DCP_INDEXED_INDIRECT_X_0xC3,
-    DCP_INDIRECT_INDEXED_Y_0xD3,
-    DCP_ABSOLUTE_0xCF,
-    DCP_ABSOLUTE_X_0xDF,
-    DCP_ABSOLUTE_Y_0xDB,
-    register_dcp_instructions,
-)
-from mos6502.instructions.illegal._isc import (
-    ISC_ZEROPAGE_0xE7,
-    ISC_ZEROPAGE_X_0xF7,
-    ISC_INDEXED_INDIRECT_X_0xE3,
-    ISC_INDIRECT_INDEXED_Y_0xF3,
-    ISC_ABSOLUTE_0xEF,
-    ISC_ABSOLUTE_X_0xFF,
-    ISC_ABSOLUTE_Y_0xFB,
-    register_isc_instructions,
-)
-from mos6502.instructions.illegal._slo import (
-    SLO_ZEROPAGE_0x07,
-    SLO_ZEROPAGE_X_0x17,
-    SLO_INDEXED_INDIRECT_X_0x03,
-    SLO_INDIRECT_INDEXED_Y_0x13,
-    SLO_ABSOLUTE_0x0F,
-    SLO_ABSOLUTE_X_0x1F,
-    SLO_ABSOLUTE_Y_0x1B,
-    register_slo_instructions,
-)
-from mos6502.instructions.illegal._rla import (
-    RLA_ZEROPAGE_0x27,
-    RLA_ZEROPAGE_X_0x37,
-    RLA_INDEXED_INDIRECT_X_0x23,
-    RLA_INDIRECT_INDEXED_Y_0x33,
-    RLA_ABSOLUTE_0x2F,
-    RLA_ABSOLUTE_X_0x3F,
-    RLA_ABSOLUTE_Y_0x3B,
-    register_rla_instructions,
-)
-from mos6502.instructions.illegal._sre import (
-    SRE_ZEROPAGE_0x47,
-    SRE_ZEROPAGE_X_0x57,
-    SRE_INDEXED_INDIRECT_X_0x43,
-    SRE_INDIRECT_INDEXED_Y_0x53,
-    SRE_ABSOLUTE_0x4F,
-    SRE_ABSOLUTE_X_0x5F,
-    SRE_ABSOLUTE_Y_0x5B,
-    register_sre_instructions,
-)
-from mos6502.instructions.illegal._rra import (
-    RRA_ZEROPAGE_0x67,
-    RRA_ZEROPAGE_X_0x77,
-    RRA_INDEXED_INDIRECT_X_0x63,
-    RRA_INDIRECT_INDEXED_Y_0x73,
-    RRA_ABSOLUTE_0x6F,
-    RRA_ABSOLUTE_X_0x7F,
-    RRA_ABSOLUTE_Y_0x7B,
-    register_rra_instructions,
-)
-from mos6502.instructions.illegal._anc import (
-    ANC_IMMEDIATE_0x0B,
-    ANC_IMMEDIATE_0x2B,
-    register_anc_instructions,
-)
-from mos6502.instructions.illegal._alr import (
-    ALR_IMMEDIATE_0x4B,
-    register_alr_instructions,
-)
-from mos6502.instructions.illegal._arr import (
-    ARR_IMMEDIATE_0x6B,
-    register_arr_instructions,
-)
-from mos6502.instructions.illegal._sbx import (
-    SBX_IMMEDIATE_0xCB,
-    register_sbx_instructions,
-)
-from mos6502.instructions.illegal._las import (
-    LAS_ABSOLUTE_Y_0xBB,
-    register_las_instructions,
-)
-from mos6502.instructions.illegal._sbc_illegal import (
-    SBC_IMMEDIATE_0xEB,
-    register_sbc_illegal_instructions,
-)
-from mos6502.instructions.illegal._ane import (
-    ANE_IMMEDIATE_0x8B,
-    register_ane_instructions,
-)
-from mos6502.instructions.illegal._sha import (
-    SHA_INDIRECT_INDEXED_Y_0x93,
-    SHA_ABSOLUTE_Y_0x9F,
-    register_sha_instructions,
-)
-from mos6502.instructions.illegal._shx import (
-    SHX_ABSOLUTE_Y_0x9E,
-    register_shx_instructions,
-)
-from mos6502.instructions.illegal._shy import (
-    SHY_ABSOLUTE_X_0x9C,
-    register_shy_instructions,
-)
-from mos6502.instructions.illegal._tas import (
-    TAS_ABSOLUTE_Y_0x9B,
-    register_tas_instructions,
-)
-from mos6502.instructions.illegal._jam import (
-    JAM_IMPLIED_0x02,
-    JAM_IMPLIED_0x12,
-    JAM_IMPLIED_0x22,
-    JAM_IMPLIED_0x32,
-    JAM_IMPLIED_0x42,
-    JAM_IMPLIED_0x52,
-    JAM_IMPLIED_0x62,
-    JAM_IMPLIED_0x72,
-    JAM_IMPLIED_0x92,
-    JAM_IMPLIED_0xB2,
-    JAM_IMPLIED_0xD2,
-    JAM_IMPLIED_0xF2,
-    register_jam_instructions,
-)
-from mos6502.instructions.illegal._nop_illegal import (
-    # 1-byte implied
-    NOP_IMPLIED_0x1A,
-    NOP_IMPLIED_0x3A,
-    NOP_IMPLIED_0x5A,
-    NOP_IMPLIED_0x7A,
-    NOP_IMPLIED_0xDA,
-    NOP_IMPLIED_0xFA,
-    # 2-byte immediate
-    NOP_IMMEDIATE_0x80,
-    NOP_IMMEDIATE_0x82,
-    NOP_IMMEDIATE_0x89,
-    NOP_IMMEDIATE_0xC2,
-    NOP_IMMEDIATE_0xE2,
-    # 2-byte zero page
-    NOP_ZEROPAGE_0x04,
-    NOP_ZEROPAGE_0x44,
-    NOP_ZEROPAGE_0x64,
-    # 2-byte zero page,X
-    NOP_ZEROPAGE_X_0x14,
-    NOP_ZEROPAGE_X_0x34,
-    NOP_ZEROPAGE_X_0x54,
-    NOP_ZEROPAGE_X_0x74,
-    NOP_ZEROPAGE_X_0xD4,
-    NOP_ZEROPAGE_X_0xF4,
-    # 3-byte absolute
-    NOP_ABSOLUTE_0x0C,
-    # 3-byte absolute,X
-    NOP_ABSOLUTE_X_0x1C,
-    NOP_ABSOLUTE_X_0x3C,
-    NOP_ABSOLUTE_X_0x5C,
-    NOP_ABSOLUTE_X_0x7C,
-    NOP_ABSOLUTE_X_0xDC,
-    NOP_ABSOLUTE_X_0xFC,
-    register_nop_illegal_instructions,
-)
+# Illegal instructions - optional for MicroPython/Pico (memory constrained)
+# These imports are wrapped in try/except so they gracefully fail on Pico
+# where the illegal instruction modules are not deployed to save memory.
+_ILLEGAL_INSTRUCTIONS_AVAILABLE = False
+try:
+    from mos6502.instructions.illegal._lax import (
+        LAX_ZEROPAGE_0xA7,
+        LAX_ZEROPAGE_Y_0xB7,
+        LAX_INDEXED_INDIRECT_X_0xA3,
+        LAX_INDIRECT_INDEXED_Y_0xB3,
+        LAX_ABSOLUTE_0xAF,
+        LAX_ABSOLUTE_Y_0xBF,
+        LAX_IMMEDIATE_0xAB,
+        register_lax_instructions,
+    )
+    from mos6502.instructions.illegal._sax import (
+        SAX_ZEROPAGE_0x87,
+        SAX_ZEROPAGE_Y_0x97,
+        SAX_INDEXED_INDIRECT_X_0x83,
+        SAX_ABSOLUTE_0x8F,
+        register_sax_instructions,
+    )
+    from mos6502.instructions.illegal._dcp import (
+        DCP_ZEROPAGE_0xC7,
+        DCP_ZEROPAGE_X_0xD7,
+        DCP_INDEXED_INDIRECT_X_0xC3,
+        DCP_INDIRECT_INDEXED_Y_0xD3,
+        DCP_ABSOLUTE_0xCF,
+        DCP_ABSOLUTE_X_0xDF,
+        DCP_ABSOLUTE_Y_0xDB,
+        register_dcp_instructions,
+    )
+    from mos6502.instructions.illegal._isc import (
+        ISC_ZEROPAGE_0xE7,
+        ISC_ZEROPAGE_X_0xF7,
+        ISC_INDEXED_INDIRECT_X_0xE3,
+        ISC_INDIRECT_INDEXED_Y_0xF3,
+        ISC_ABSOLUTE_0xEF,
+        ISC_ABSOLUTE_X_0xFF,
+        ISC_ABSOLUTE_Y_0xFB,
+        register_isc_instructions,
+    )
+    from mos6502.instructions.illegal._slo import (
+        SLO_ZEROPAGE_0x07,
+        SLO_ZEROPAGE_X_0x17,
+        SLO_INDEXED_INDIRECT_X_0x03,
+        SLO_INDIRECT_INDEXED_Y_0x13,
+        SLO_ABSOLUTE_0x0F,
+        SLO_ABSOLUTE_X_0x1F,
+        SLO_ABSOLUTE_Y_0x1B,
+        register_slo_instructions,
+    )
+    from mos6502.instructions.illegal._rla import (
+        RLA_ZEROPAGE_0x27,
+        RLA_ZEROPAGE_X_0x37,
+        RLA_INDEXED_INDIRECT_X_0x23,
+        RLA_INDIRECT_INDEXED_Y_0x33,
+        RLA_ABSOLUTE_0x2F,
+        RLA_ABSOLUTE_X_0x3F,
+        RLA_ABSOLUTE_Y_0x3B,
+        register_rla_instructions,
+    )
+    from mos6502.instructions.illegal._sre import (
+        SRE_ZEROPAGE_0x47,
+        SRE_ZEROPAGE_X_0x57,
+        SRE_INDEXED_INDIRECT_X_0x43,
+        SRE_INDIRECT_INDEXED_Y_0x53,
+        SRE_ABSOLUTE_0x4F,
+        SRE_ABSOLUTE_X_0x5F,
+        SRE_ABSOLUTE_Y_0x5B,
+        register_sre_instructions,
+    )
+    from mos6502.instructions.illegal._rra import (
+        RRA_ZEROPAGE_0x67,
+        RRA_ZEROPAGE_X_0x77,
+        RRA_INDEXED_INDIRECT_X_0x63,
+        RRA_INDIRECT_INDEXED_Y_0x73,
+        RRA_ABSOLUTE_0x6F,
+        RRA_ABSOLUTE_X_0x7F,
+        RRA_ABSOLUTE_Y_0x7B,
+        register_rra_instructions,
+    )
+    from mos6502.instructions.illegal._anc import (
+        ANC_IMMEDIATE_0x0B,
+        ANC_IMMEDIATE_0x2B,
+        register_anc_instructions,
+    )
+    from mos6502.instructions.illegal._alr import (
+        ALR_IMMEDIATE_0x4B,
+        register_alr_instructions,
+    )
+    from mos6502.instructions.illegal._arr import (
+        ARR_IMMEDIATE_0x6B,
+        register_arr_instructions,
+    )
+    from mos6502.instructions.illegal._sbx import (
+        SBX_IMMEDIATE_0xCB,
+        register_sbx_instructions,
+    )
+    from mos6502.instructions.illegal._las import (
+        LAS_ABSOLUTE_Y_0xBB,
+        register_las_instructions,
+    )
+    from mos6502.instructions.illegal._sbc_illegal import (
+        SBC_IMMEDIATE_0xEB,
+        register_sbc_illegal_instructions,
+    )
+    from mos6502.instructions.illegal._ane import (
+        ANE_IMMEDIATE_0x8B,
+        register_ane_instructions,
+    )
+    from mos6502.instructions.illegal._sha import (
+        SHA_INDIRECT_INDEXED_Y_0x93,
+        SHA_ABSOLUTE_Y_0x9F,
+        register_sha_instructions,
+    )
+    from mos6502.instructions.illegal._shx import (
+        SHX_ABSOLUTE_Y_0x9E,
+        register_shx_instructions,
+    )
+    from mos6502.instructions.illegal._shy import (
+        SHY_ABSOLUTE_X_0x9C,
+        register_shy_instructions,
+    )
+    from mos6502.instructions.illegal._tas import (
+        TAS_ABSOLUTE_Y_0x9B,
+        register_tas_instructions,
+    )
+    from mos6502.instructions.illegal._jam import (
+        JAM_IMPLIED_0x02,
+        JAM_IMPLIED_0x12,
+        JAM_IMPLIED_0x22,
+        JAM_IMPLIED_0x32,
+        JAM_IMPLIED_0x42,
+        JAM_IMPLIED_0x52,
+        JAM_IMPLIED_0x62,
+        JAM_IMPLIED_0x72,
+        JAM_IMPLIED_0x92,
+        JAM_IMPLIED_0xB2,
+        JAM_IMPLIED_0xD2,
+        JAM_IMPLIED_0xF2,
+        register_jam_instructions,
+    )
+    from mos6502.instructions.illegal._nop_illegal import (
+        # 1-byte implied
+        NOP_IMPLIED_0x1A,
+        NOP_IMPLIED_0x3A,
+        NOP_IMPLIED_0x5A,
+        NOP_IMPLIED_0x7A,
+        NOP_IMPLIED_0xDA,
+        NOP_IMPLIED_0xFA,
+        # 2-byte immediate
+        NOP_IMMEDIATE_0x80,
+        NOP_IMMEDIATE_0x82,
+        NOP_IMMEDIATE_0x89,
+        NOP_IMMEDIATE_0xC2,
+        NOP_IMMEDIATE_0xE2,
+        # 2-byte zero page
+        NOP_ZEROPAGE_0x04,
+        NOP_ZEROPAGE_0x44,
+        NOP_ZEROPAGE_0x64,
+        # 2-byte zero page,X
+        NOP_ZEROPAGE_X_0x14,
+        NOP_ZEROPAGE_X_0x34,
+        NOP_ZEROPAGE_X_0x54,
+        NOP_ZEROPAGE_X_0x74,
+        NOP_ZEROPAGE_X_0xD4,
+        NOP_ZEROPAGE_X_0xF4,
+        # 3-byte absolute
+        NOP_ABSOLUTE_0x0C,
+        # 3-byte absolute,X
+        NOP_ABSOLUTE_X_0x1C,
+        NOP_ABSOLUTE_X_0x3C,
+        NOP_ABSOLUTE_X_0x5C,
+        NOP_ABSOLUTE_X_0x7C,
+        NOP_ABSOLUTE_X_0xDC,
+        NOP_ABSOLUTE_X_0xFC,
+        register_nop_illegal_instructions,
+    )
+    _ILLEGAL_INSTRUCTIONS_AVAILABLE = True
+except ImportError:
+    # Illegal instructions not available (MicroPython/Pico deployment)
+    pass
 from mos6502.instructions.load._lda import (
     LDA_IMMEDIATE_0xA9,
     LDA_ZEROPAGE_0xA5,
@@ -1089,28 +1097,29 @@ register_ror_instructions(InstructionSet, InstructionSet.map)
 register_nop_instructions(InstructionSet, InstructionSet.map)
 register_rti_instructions(InstructionSet, InstructionSet.map)
 register_rts_instructions(InstructionSet, InstructionSet.map)
-# Illegal instructions
-register_lax_instructions(InstructionSet, InstructionSet.map)
-register_sax_instructions(InstructionSet, InstructionSet.map)
-register_dcp_instructions(InstructionSet, InstructionSet.map)
-register_isc_instructions(InstructionSet, InstructionSet.map)
-register_slo_instructions(InstructionSet, InstructionSet.map)
-register_rla_instructions(InstructionSet, InstructionSet.map)
-register_sre_instructions(InstructionSet, InstructionSet.map)
-register_rra_instructions(InstructionSet, InstructionSet.map)
-register_anc_instructions(InstructionSet, InstructionSet.map)
-register_alr_instructions(InstructionSet, InstructionSet.map)
-register_arr_instructions(InstructionSet, InstructionSet.map)
-register_sbx_instructions(InstructionSet, InstructionSet.map)
-register_las_instructions(InstructionSet, InstructionSet.map)
-register_nop_illegal_instructions(InstructionSet, InstructionSet.map)
-register_sbc_illegal_instructions(InstructionSet, InstructionSet.map)
-register_ane_instructions(InstructionSet, InstructionSet.map)
-register_sha_instructions(InstructionSet, InstructionSet.map)
-register_shx_instructions(InstructionSet, InstructionSet.map)
-register_shy_instructions(InstructionSet, InstructionSet.map)
-register_tas_instructions(InstructionSet, InstructionSet.map)
-register_jam_instructions(InstructionSet, InstructionSet.map)
+# Illegal instructions - only register if available (not on MicroPython/Pico)
+if _ILLEGAL_INSTRUCTIONS_AVAILABLE:
+    register_lax_instructions(InstructionSet, InstructionSet.map)
+    register_sax_instructions(InstructionSet, InstructionSet.map)
+    register_dcp_instructions(InstructionSet, InstructionSet.map)
+    register_isc_instructions(InstructionSet, InstructionSet.map)
+    register_slo_instructions(InstructionSet, InstructionSet.map)
+    register_rla_instructions(InstructionSet, InstructionSet.map)
+    register_sre_instructions(InstructionSet, InstructionSet.map)
+    register_rra_instructions(InstructionSet, InstructionSet.map)
+    register_anc_instructions(InstructionSet, InstructionSet.map)
+    register_alr_instructions(InstructionSet, InstructionSet.map)
+    register_arr_instructions(InstructionSet, InstructionSet.map)
+    register_sbx_instructions(InstructionSet, InstructionSet.map)
+    register_las_instructions(InstructionSet, InstructionSet.map)
+    register_nop_illegal_instructions(InstructionSet, InstructionSet.map)
+    register_sbc_illegal_instructions(InstructionSet, InstructionSet.map)
+    register_ane_instructions(InstructionSet, InstructionSet.map)
+    register_sha_instructions(InstructionSet, InstructionSet.map)
+    register_shx_instructions(InstructionSet, InstructionSet.map)
+    register_shy_instructions(InstructionSet, InstructionSet.map)
+    register_tas_instructions(InstructionSet, InstructionSet.map)
+    register_jam_instructions(InstructionSet, InstructionSet.map)
 # register_all_arithmetic_instructions(InstructionSet, InstructionSet.map)  # MIGRATED to adc/sbc/inc/dec packages
 register_all_branch_instructions(InstructionSet, InstructionSet.map)  # MIGRATED to individual branch packages
 # register_all_compare_instructions(InstructionSet, InstructionSet.map)  # MIGRATED to cmp/cpx/cpy packages

@@ -12,8 +12,24 @@ Handles:
 
 
 from mos6502.compat import logging
-import threading
 from mos6502.compat import TYPE_CHECKING, Union
+
+# Threading - optional for MicroPython/Pico (single-threaded, no lock needed)
+try:
+    import threading
+except ImportError:
+    # Provide a dummy Lock for single-threaded MicroPython
+    class _DummyLock:
+        def __enter__(self):
+            return self
+        def __exit__(self, *args):
+            pass
+        def acquire(self, blocking=True, timeout=-1):
+            return True
+        def release(self):
+            pass
+    class threading:  # noqa: N801
+        Lock = _DummyLock
 
 if TYPE_CHECKING:
     from mos6502.core import MOS6502CPU

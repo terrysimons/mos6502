@@ -16,7 +16,11 @@ from .base import (
     ROMH_START,
     IO2_START,
 )
-from .rom_builder import TestROMBuilder
+# Test ROM builder - optional for MicroPython/Pico
+try:
+    from .rom_builder import TestROMBuilder
+except ImportError:
+    TestROMBuilder = None
 from c64.colors import COLOR_BLUE, COLOR_YELLOW, COLOR_WHITE
 from mos6502.compat import List
 

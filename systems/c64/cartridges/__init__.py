@@ -65,8 +65,11 @@ from .base import (
     IO2_END,
 )
 
-# Test ROM builder for generating test cartridges
-from .rom_builder import TestROMBuilder
+# Test ROM builder for generating test cartridges - optional for MicroPython/Pico
+try:
+    from .rom_builder import TestROMBuilder
+except ImportError:
+    TestROMBuilder = None
 
 # Implemented cartridge types (registered in CARTRIDGE_TYPES)
 from .type_00_normal import StaticROMCartridge
@@ -82,165 +85,176 @@ from .type_19_magic_desk import MagicDeskCartridge
 from .error import ErrorCartridge
 
 # Unimplemented cartridge types (NOT registered - generate error carts for testing)
-from .type_02_kcs_power import KcsPowerCartridge
-from .type_06_expert import ExpertCartridge
-from .type_07_fun_play import FunPlayPowerPlayCartridge
-from .type_08_super_games import SuperGamesCartridge
-from .type_09_atomic_power import AtomicPowerCartridge
-from .type_11_westermann import WestermannLearningCartridge
-from .type_12_rex_utility import RexUtilityCartridge
-from .type_14_magic_formel import MagicFormelCartridge
-from .type_16_warpspeed import WarpspeedCartridge
-from .type_18_zaxxon import ZaxxonSuperZaxxonCartridge
-from .type_20_super_snapshot_v5 import SuperSnapshotV5Cartridge
-from .type_21_comal80 import Comal80Cartridge
-from .type_22_structured_basic import StructuredBasicCartridge
-from .type_23_ross import RossCartridge
-from .type_24_dela_ep64 import DelaEp64Cartridge
-from .type_25_dela_ep7x8 import DelaEp7X8Cartridge
-from .type_26_dela_ep256 import DelaEp256Cartridge
-from .type_27_rex_ep256 import RexEp256Cartridge
-from .type_28_mikro_assembler import MikroAssemblerCartridge
-from .type_29_final_cartridge_plus import FinalCartridgePlusCartridge
-from .type_30_action_replay_4 import ActionReplay4Cartridge
-from .type_31_stardos import StardosCartridge
-from .type_32_easyflash import EasyflashCartridge
-from .type_33_easyflash_xbank import EasyflashXBankCartridge
-from .type_34_capture import CaptureCartridge
-from .type_35_action_replay_3 import ActionReplay3Cartridge
-from .type_36_retro_replay import RetroReplayCartridge
-from .type_37_mmc64 import Mmc64Cartridge
-from .type_38_mmc_replay import MmcReplayCartridge
-from .type_39_ide64 import Ide64Cartridge
-from .type_40_super_snapshot_v4 import SuperSnapshotV4Cartridge
-from .type_41_ieee488 import Ieee488Cartridge
-from .type_42_game_killer import GameKillerCartridge
-from .type_43_prophet64 import Prophet64Cartridge
-from .type_44_exos import ExosCartridge
-from .type_45_freeze_frame import FreezeFrameCartridge
-from .type_46_freeze_machine import FreezeMachineCartridge
-from .type_47_snapshot64 import Snapshot64Cartridge
-from .type_48_super_explode_v5 import SuperExplodeV5Cartridge
-from .type_49_magic_voice import MagicVoiceCartridge
-from .type_50_action_replay_2 import ActionReplay2Cartridge
-from .type_51_mach5 import Mach5Cartridge
-from .type_52_diashow_maker import DiashowMakerCartridge
-from .type_53_pagefox import PagefoxCartridge
-from .type_54_kingsoft import KingsoftBusinessBasicCartridge
-from .type_55_silver_rock_128 import SilverRock128Cartridge
-from .type_56_formel64 import Formel64Cartridge
-from .type_57_rgcd import RgcdCartridge
-from .type_58_rrnet_mk3 import RrNetMk3Cartridge
-from .type_59_easy_calc import EasyCalcResultCartridge
-from .type_60_gmod2 import Gmod2Cartridge
-from .type_61_max_basic import MaxBasicCartridge
-from .type_62_gmod3 import Gmod3Cartridge
-from .type_63_zippcode48 import ZippCode48Cartridge
-from .type_64_blackbox_v8 import BlackboxV8Cartridge
-from .type_65_blackbox_v3 import BlackboxV3Cartridge
-from .type_66_blackbox_v4 import BlackboxV4Cartridge
-from .type_67_rex_ram_floppy import RexRamFloppyCartridge
-from .type_68_bis_plus import BisPlusCartridge
-from .type_69_sd_box import SdBoxCartridge
-from .type_70_multimax import MultimaxCartridge
-from .type_71_blackbox_v9 import BlackboxV9Cartridge
-from .type_72_lt_kernal import LtKernalCartridge
-from .type_73_cmd_ramlink import CmdRamlinkCartridge
-from .type_74_drean import DreanCartridge
-from .type_75_ieee_flash_64 import IeeeFlash64Cartridge
-from .type_76_turtle_graphics_ii import TurtleGraphicsIiCartridge
-from .type_77_freeze_frame_mk2 import FreezeFrameMk2Cartridge
-from .type_78_partner64 import Partner64Cartridge
-from .type_79_hyper_basic_mk2 import HyperBasicMk2Cartridge
-from .type_80_universal_1 import UniversalCartridge1Cartridge
-from .type_81_universal_15 import UniversalCartridge15Cartridge
-from .type_82_universal_2 import UniversalCartridge2Cartridge
-from .type_83_bmp_turbo_2000 import BmpDataTurbo2000Cartridge
-from .type_84_profi_dos import ProfiDosCartridge
-from .type_85_magic_desk_16 import MagicDesk16Cartridge
+# These are optional for MicroPython/Pico to save memory
+_UNIMPLEMENTED_CARTRIDGES_AVAILABLE = False
+try:
+    from .type_02_kcs_power import KcsPowerCartridge
+    from .type_06_expert import ExpertCartridge
+    from .type_07_fun_play import FunPlayPowerPlayCartridge
+    from .type_08_super_games import SuperGamesCartridge
+    from .type_09_atomic_power import AtomicPowerCartridge
+    from .type_11_westermann import WestermannLearningCartridge
+    from .type_12_rex_utility import RexUtilityCartridge
+    from .type_14_magic_formel import MagicFormelCartridge
+    from .type_16_warpspeed import WarpspeedCartridge
+    from .type_18_zaxxon import ZaxxonSuperZaxxonCartridge
+    from .type_20_super_snapshot_v5 import SuperSnapshotV5Cartridge
+    from .type_21_comal80 import Comal80Cartridge
+    from .type_22_structured_basic import StructuredBasicCartridge
+    from .type_23_ross import RossCartridge
+    from .type_24_dela_ep64 import DelaEp64Cartridge
+    from .type_25_dela_ep7x8 import DelaEp7X8Cartridge
+    from .type_26_dela_ep256 import DelaEp256Cartridge
+    from .type_27_rex_ep256 import RexEp256Cartridge
+    from .type_28_mikro_assembler import MikroAssemblerCartridge
+    from .type_29_final_cartridge_plus import FinalCartridgePlusCartridge
+    from .type_30_action_replay_4 import ActionReplay4Cartridge
+    from .type_31_stardos import StardosCartridge
+    from .type_32_easyflash import EasyflashCartridge
+    from .type_33_easyflash_xbank import EasyflashXBankCartridge
+    from .type_34_capture import CaptureCartridge
+    from .type_35_action_replay_3 import ActionReplay3Cartridge
+    from .type_36_retro_replay import RetroReplayCartridge
+    from .type_37_mmc64 import Mmc64Cartridge
+    from .type_38_mmc_replay import MmcReplayCartridge
+    from .type_39_ide64 import Ide64Cartridge
+    from .type_40_super_snapshot_v4 import SuperSnapshotV4Cartridge
+    from .type_41_ieee488 import Ieee488Cartridge
+    from .type_42_game_killer import GameKillerCartridge
+    from .type_43_prophet64 import Prophet64Cartridge
+    from .type_44_exos import ExosCartridge
+    from .type_45_freeze_frame import FreezeFrameCartridge
+    from .type_46_freeze_machine import FreezeMachineCartridge
+    from .type_47_snapshot64 import Snapshot64Cartridge
+    from .type_48_super_explode_v5 import SuperExplodeV5Cartridge
+    from .type_49_magic_voice import MagicVoiceCartridge
+    from .type_50_action_replay_2 import ActionReplay2Cartridge
+    from .type_51_mach5 import Mach5Cartridge
+    from .type_52_diashow_maker import DiashowMakerCartridge
+    from .type_53_pagefox import PagefoxCartridge
+    from .type_54_kingsoft import KingsoftBusinessBasicCartridge
+    from .type_55_silver_rock_128 import SilverRock128Cartridge
+    from .type_56_formel64 import Formel64Cartridge
+    from .type_57_rgcd import RgcdCartridge
+    from .type_58_rrnet_mk3 import RrNetMk3Cartridge
+    from .type_59_easy_calc import EasyCalcResultCartridge
+    from .type_60_gmod2 import Gmod2Cartridge
+    from .type_61_max_basic import MaxBasicCartridge
+    from .type_62_gmod3 import Gmod3Cartridge
+    from .type_63_zippcode48 import ZippCode48Cartridge
+    from .type_64_blackbox_v8 import BlackboxV8Cartridge
+    from .type_65_blackbox_v3 import BlackboxV3Cartridge
+    from .type_66_blackbox_v4 import BlackboxV4Cartridge
+    from .type_67_rex_ram_floppy import RexRamFloppyCartridge
+    from .type_68_bis_plus import BisPlusCartridge
+    from .type_69_sd_box import SdBoxCartridge
+    from .type_70_multimax import MultimaxCartridge
+    from .type_71_blackbox_v9 import BlackboxV9Cartridge
+    from .type_72_lt_kernal import LtKernalCartridge
+    from .type_73_cmd_ramlink import CmdRamlinkCartridge
+    from .type_74_drean import DreanCartridge
+    from .type_75_ieee_flash_64 import IeeeFlash64Cartridge
+    from .type_76_turtle_graphics_ii import TurtleGraphicsIiCartridge
+    from .type_77_freeze_frame_mk2 import FreezeFrameMk2Cartridge
+    from .type_78_partner64 import Partner64Cartridge
+    from .type_79_hyper_basic_mk2 import HyperBasicMk2Cartridge
+    from .type_80_universal_1 import UniversalCartridge1Cartridge
+    from .type_81_universal_15 import UniversalCartridge15Cartridge
+    from .type_82_universal_2 import UniversalCartridge2Cartridge
+    from .type_83_bmp_turbo_2000 import BmpDataTurbo2000Cartridge
+    from .type_84_profi_dos import ProfiDosCartridge
+    from .type_85_magic_desk_16 import MagicDesk16Cartridge
+    _UNIMPLEMENTED_CARTRIDGES_AVAILABLE = True
+except ImportError:
+    # Unimplemented cartridges not available (MicroPython/Pico deployment)
+    pass
 
 # Registry and factory
 from .registry import CARTRIDGE_TYPES, create_cartridge
 
 # Map of unimplemented cartridge types for test cart generation
-UNIMPLEMENTED_CARTRIDGE_TYPES: Dict[int, type[Cartridge]] = {
-    2: KcsPowerCartridge,
-    6: ExpertCartridge,
-    7: FunPlayPowerPlayCartridge,
-    8: SuperGamesCartridge,
-    9: AtomicPowerCartridge,
-    11: WestermannLearningCartridge,
-    12: RexUtilityCartridge,
-    14: MagicFormelCartridge,
-    16: WarpspeedCartridge,
-    18: ZaxxonSuperZaxxonCartridge,
-    20: SuperSnapshotV5Cartridge,
-    21: Comal80Cartridge,
-    22: StructuredBasicCartridge,
-    23: RossCartridge,
-    24: DelaEp64Cartridge,
-    25: DelaEp7X8Cartridge,
-    26: DelaEp256Cartridge,
-    27: RexEp256Cartridge,
-    28: MikroAssemblerCartridge,
-    29: FinalCartridgePlusCartridge,
-    30: ActionReplay4Cartridge,
-    31: StardosCartridge,
-    32: EasyflashCartridge,
-    33: EasyflashXBankCartridge,
-    34: CaptureCartridge,
-    35: ActionReplay3Cartridge,
-    36: RetroReplayCartridge,
-    37: Mmc64Cartridge,
-    38: MmcReplayCartridge,
-    39: Ide64Cartridge,
-    40: SuperSnapshotV4Cartridge,
-    41: Ieee488Cartridge,
-    42: GameKillerCartridge,
-    43: Prophet64Cartridge,
-    44: ExosCartridge,
-    45: FreezeFrameCartridge,
-    46: FreezeMachineCartridge,
-    47: Snapshot64Cartridge,
-    48: SuperExplodeV5Cartridge,
-    49: MagicVoiceCartridge,
-    50: ActionReplay2Cartridge,
-    51: Mach5Cartridge,
-    52: DiashowMakerCartridge,
-    53: PagefoxCartridge,
-    54: KingsoftBusinessBasicCartridge,
-    55: SilverRock128Cartridge,
-    56: Formel64Cartridge,
-    57: RgcdCartridge,
-    58: RrNetMk3Cartridge,
-    59: EasyCalcResultCartridge,
-    60: Gmod2Cartridge,
-    61: MaxBasicCartridge,
-    62: Gmod3Cartridge,
-    63: ZippCode48Cartridge,
-    64: BlackboxV8Cartridge,
-    65: BlackboxV3Cartridge,
-    66: BlackboxV4Cartridge,
-    67: RexRamFloppyCartridge,
-    68: BisPlusCartridge,
-    69: SdBoxCartridge,
-    70: MultimaxCartridge,
-    71: BlackboxV9Cartridge,
-    72: LtKernalCartridge,
-    73: CmdRamlinkCartridge,
-    74: DreanCartridge,
-    75: IeeeFlash64Cartridge,
-    76: TurtleGraphicsIiCartridge,
-    77: FreezeFrameMk2Cartridge,
-    78: Partner64Cartridge,
-    79: HyperBasicMk2Cartridge,
-    80: UniversalCartridge1Cartridge,
-    81: UniversalCartridge15Cartridge,
-    82: UniversalCartridge2Cartridge,
-    83: BmpDataTurbo2000Cartridge,
-    84: ProfiDosCartridge,
-    85: MagicDesk16Cartridge,
-}
+# Only available when unimplemented cartridges are loaded (not on MicroPython/Pico)
+if _UNIMPLEMENTED_CARTRIDGES_AVAILABLE:
+    UNIMPLEMENTED_CARTRIDGE_TYPES: Dict[int, type[Cartridge]] = {
+        2: KcsPowerCartridge,
+        6: ExpertCartridge,
+        7: FunPlayPowerPlayCartridge,
+        8: SuperGamesCartridge,
+        9: AtomicPowerCartridge,
+        11: WestermannLearningCartridge,
+        12: RexUtilityCartridge,
+        14: MagicFormelCartridge,
+        16: WarpspeedCartridge,
+        18: ZaxxonSuperZaxxonCartridge,
+        20: SuperSnapshotV5Cartridge,
+        21: Comal80Cartridge,
+        22: StructuredBasicCartridge,
+        23: RossCartridge,
+        24: DelaEp64Cartridge,
+        25: DelaEp7X8Cartridge,
+        26: DelaEp256Cartridge,
+        27: RexEp256Cartridge,
+        28: MikroAssemblerCartridge,
+        29: FinalCartridgePlusCartridge,
+        30: ActionReplay4Cartridge,
+        31: StardosCartridge,
+        32: EasyflashCartridge,
+        33: EasyflashXBankCartridge,
+        34: CaptureCartridge,
+        35: ActionReplay3Cartridge,
+        36: RetroReplayCartridge,
+        37: Mmc64Cartridge,
+        38: MmcReplayCartridge,
+        39: Ide64Cartridge,
+        40: SuperSnapshotV4Cartridge,
+        41: Ieee488Cartridge,
+        42: GameKillerCartridge,
+        43: Prophet64Cartridge,
+        44: ExosCartridge,
+        45: FreezeFrameCartridge,
+        46: FreezeMachineCartridge,
+        47: Snapshot64Cartridge,
+        48: SuperExplodeV5Cartridge,
+        49: MagicVoiceCartridge,
+        50: ActionReplay2Cartridge,
+        51: Mach5Cartridge,
+        52: DiashowMakerCartridge,
+        53: PagefoxCartridge,
+        54: KingsoftBusinessBasicCartridge,
+        55: SilverRock128Cartridge,
+        56: Formel64Cartridge,
+        57: RgcdCartridge,
+        58: RrNetMk3Cartridge,
+        59: EasyCalcResultCartridge,
+        60: Gmod2Cartridge,
+        61: MaxBasicCartridge,
+        62: Gmod3Cartridge,
+        63: ZippCode48Cartridge,
+        64: BlackboxV8Cartridge,
+        65: BlackboxV3Cartridge,
+        66: BlackboxV4Cartridge,
+        67: RexRamFloppyCartridge,
+        68: BisPlusCartridge,
+        69: SdBoxCartridge,
+        70: MultimaxCartridge,
+        71: BlackboxV9Cartridge,
+        72: LtKernalCartridge,
+        73: CmdRamlinkCartridge,
+        74: DreanCartridge,
+        75: IeeeFlash64Cartridge,
+        76: TurtleGraphicsIiCartridge,
+        77: FreezeFrameMk2Cartridge,
+        78: Partner64Cartridge,
+        79: HyperBasicMk2Cartridge,
+        80: UniversalCartridge1Cartridge,
+        81: UniversalCartridge15Cartridge,
+        82: UniversalCartridge2Cartridge,
+        83: BmpDataTurbo2000Cartridge,
+        84: ProfiDosCartridge,
+        85: MagicDesk16Cartridge,
+    }
+else:
+    UNIMPLEMENTED_CARTRIDGE_TYPES: Dict[int, type[Cartridge]] = {}
 
 
 __all__ = [

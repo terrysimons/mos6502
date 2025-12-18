@@ -40,7 +40,7 @@ Reference:
 
 
 from mos6502.compat import logging
-from pathlib import Path
+from mos6502.compat import Path
 from mos6502.compat import TYPE_CHECKING, Optional, List
 
 from .via6522 import VIA6522

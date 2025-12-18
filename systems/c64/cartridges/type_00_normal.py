@@ -21,7 +21,11 @@ from .base import (
     ULTIMAX_ROMH_START,
     ULTIMAX_ROMH_SIZE,
 )
-from .rom_builder import TestROMBuilder
+# Test ROM builder - optional for MicroPython/Pico
+try:
+    from .rom_builder import TestROMBuilder
+except ImportError:
+    TestROMBuilder = None
 from c64.colors import COLOR_BLUE, COLOR_YELLOW, COLOR_WHITE
 
 log = logging.getLogger("c64.cartridge")

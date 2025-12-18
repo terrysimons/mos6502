@@ -51,19 +51,17 @@ except ImportError:
     class Protocol:
         pass
 
-    # NamedTuple - use collections.namedtuple as the base
+    # NamedTuple - For MicroPython, create actual namedtuples using collections.namedtuple
+    # The class-based syntax (class Foo(NamedTuple): field: type) doesn't work in MicroPython,
+    # so we provide a simple tuple base class as a fallback
     try:
         from collections import namedtuple as _namedtuple
-
-        def NamedTuple(typename, fields=None):
-            if fields is None:
-                fields = []
-            field_names = [f[0] for f in fields]
-            return _namedtuple(typename, field_names)
+        # MicroPython has namedtuple, but the class inheritance syntax doesn't work
+        # Just use tuple as base - classes will work but lose field names
+        NamedTuple = tuple
     except ImportError:
-        # If even namedtuple isn't available, provide a minimal implementation
-        def NamedTuple(typename, fields=None):
-            return tuple
+        # No namedtuple available - just use tuple
+        NamedTuple = tuple
 
 
 # contextlib compatibility
@@ -101,11 +99,23 @@ except ImportError:
     class logging:  # noqa: N801
         """Stub logging module for MicroPython using print."""
 
+        # Log level constants
+        DEBUG = 10
+        INFO = 20
+        WARNING = 30
+        ERROR = 40
+        CRITICAL = 50
+
         Logger = _PrintLogger
 
         @staticmethod
         def getLogger(name=None):
             return _PrintLogger(name)
+
+        @staticmethod
+        def basicConfig(**kwargs):
+            """No-op for MicroPython - logging config is ignored."""
+            pass
 
 
 # enum compatibility
@@ -283,3 +293,133 @@ def import_module(name, package=None):
     for part in parts[1:]:
         module = getattr(module, part)
     return module
+
+
+# abc compatibility
+try:
+    from abc import ABC, abstractmethod
+except ImportError:
+    # MicroPython stub for abc
+    class ABC:
+        """Abstract Base Class stub for MicroPython."""
+        pass
+
+    def abstractmethod(func):
+        """Abstract method decorator stub - just returns the function."""
+        return func
+
+
+# pathlib compatibility
+try:
+    from pathlib import Path
+except ImportError:
+    # Minimal Path stub for MicroPython
+    import os
+
+    class Path:
+        """Minimal pathlib.Path implementation for MicroPython."""
+
+        __slots__ = ('_path',)
+
+        def __init__(self, path):
+            self._path = str(path)
+
+        def __str__(self):
+            return self._path
+
+        def __repr__(self):
+            return f"Path({self._path!r})"
+
+        def __truediv__(self, other):
+            return Path(self._path + "/" + str(other))
+
+        def __eq__(self, other):
+            if isinstance(other, Path):
+                return self._path == other._path
+            return self._path == str(other)
+
+        def __hash__(self):
+            return hash(self._path)
+
+        def exists(self):
+            try:
+                os.stat(self._path)
+                return True
+            except OSError:
+                return False
+
+        def is_file(self):
+            try:
+                return (os.stat(self._path)[0] & 0x8000) != 0
+            except OSError:
+                return False
+
+        def is_dir(self):
+            try:
+                return (os.stat(self._path)[0] & 0x4000) != 0
+            except OSError:
+                return False
+
+        def read_bytes(self):
+            with open(self._path, "rb") as f:
+                return f.read()
+
+        def read_text(self, encoding="utf-8"):
+            with open(self._path, "r") as f:
+                return f.read()
+
+        def write_bytes(self, data):
+            with open(self._path, "wb") as f:
+                f.write(data)
+
+        def write_text(self, data, encoding="utf-8"):
+            with open(self._path, "w") as f:
+                f.write(data)
+
+        @property
+        def name(self):
+            return self._path.rstrip("/").split("/")[-1]
+
+        @property
+        def stem(self):
+            name = self.name
+            if "." in name:
+                return name.rsplit(".", 1)[0]
+            return name
+
+        @property
+        def suffix(self):
+            name = self.name
+            if "." in name:
+                return "." + name.rsplit(".", 1)[1]
+            return ""
+
+        @property
+        def parent(self):
+            parts = self._path.rstrip("/").split("/")
+            if len(parts) <= 1:
+                return Path(".")
+            return Path("/".join(parts[:-1]))
+
+        def joinpath(self, *args):
+            result = self
+            for arg in args:
+                result = result / arg
+            return result
+
+        def iterdir(self):
+            for name in os.listdir(self._path):
+                yield Path(self._path + "/" + name)
+
+        def glob(self, pattern):
+            # Very basic glob - only supports "*" at the end
+            if pattern.endswith("*"):
+                prefix = pattern[:-1]
+                for item in self.iterdir():
+                    if item.name.startswith(prefix):
+                        yield item
+            else:
+                # Exact match
+                child = self / pattern
+                if child.exists():
+                    yield child
