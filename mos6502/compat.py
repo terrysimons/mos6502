@@ -77,26 +77,43 @@ except ImportError:
     # MicroPython stub for logging using print
     import sys as _sys
 
+    # Global log level - default to WARNING to suppress DEBUG/INFO spam
+    _LOG_LEVEL = 30  # WARNING
+
     class _PrintLogger:
         """Simple logger that uses print() for MicroPython."""
 
         def __init__(self, name=None):
             self._name = name or "root"
+            self._level = None  # Use global level if not set
+
+        def setLevel(self, level):
+            """Set logger-specific level."""
+            self._level = level
+
+        def _get_level(self):
+            """Get effective log level."""
+            return self._level if self._level is not None else _LOG_LEVEL
 
         def debug(self, msg, *args):
-            print(f"[DEBUG] {self._name}: {msg}")
+            if self._get_level() <= 10:
+                print(f"[DEBUG] {self._name}: {msg}")
 
         def info(self, msg, *args):
-            print(f"[INFO] {self._name}: {msg}")
+            if self._get_level() <= 20:
+                print(f"[INFO] {self._name}: {msg}")
 
         def warning(self, msg, *args):
-            print(f"[WARN] {self._name}: {msg}")
+            if self._get_level() <= 30:
+                print(f"[WARN] {self._name}: {msg}")
 
         def error(self, msg, *args):
-            print(f"[ERROR] {self._name}: {msg}")
+            if self._get_level() <= 40:
+                print(f"[ERROR] {self._name}: {msg}")
 
         def critical(self, msg, *args):
-            print(f"[CRIT] {self._name}: {msg}")
+            if self._get_level() <= 50:
+                print(f"[CRIT] {self._name}: {msg}")
 
     class logging:  # noqa: N801
         """Stub logging module for MicroPython using print."""
@@ -116,8 +133,10 @@ except ImportError:
 
         @staticmethod
         def basicConfig(level=None):
-            """No-op for MicroPython - logging config is ignored."""
-            pass
+            """Set global log level for MicroPython."""
+            global _LOG_LEVEL
+            if level is not None:
+                _LOG_LEVEL = level
 
 
 # enum compatibility
