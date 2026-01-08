@@ -1,16 +1,15 @@
 #!/usr/bin/env python3
 """JMP instruction implementation for 65C02 variant."""
 
-from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from mos6502.compat import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from mos6502.core import MOS6502CPU
     from mos6502.memory import Word
 
 
-def jmp_absolute_0x4c(cpu: MOS6502CPU) -> None:
+def jmp_absolute_0x4c(cpu: "MOS6502CPU") -> None:
     """Execute JMP (Jump to New Location) - Absolute addressing mode.
 
     Opcode: 0x4C
@@ -25,13 +24,13 @@ def jmp_absolute_0x4c(cpu: MOS6502CPU) -> None:
     """
     from mos6502.memory import Word
 
-    jump_address: Word = cpu.fetch_word()
+    jump_address: "Word" = cpu.fetch_word()
     cpu.PC = jump_address
     cpu.log.info("i")
     # No additional cycles - fetch_word already spent 2
 
 
-def jmp_indirect_0x6c(cpu: MOS6502CPU) -> None:
+def jmp_indirect_0x6c(cpu: "MOS6502CPU") -> None:
     """Execute JMP (Jump to New Location) - Indirect addressing mode - 65C02 variant.
 
     Opcode: 0x6C
@@ -54,11 +53,11 @@ def jmp_indirect_0x6c(cpu: MOS6502CPU) -> None:
     """
     from mos6502.memory import Word
 
-    indirect_address: Word = cpu.fetch_word()
+    indirect_address: "Word" = cpu.fetch_word()
 
     # VARIANT: 65C02 - Bug fixed, always correctly reads across page boundary
     # No special handling needed - just read the word normally
-    jump_address: Word = cpu.read_word(address=indirect_address)
+    jump_address: "Word" = cpu.read_word(indirect_address)
 
     cpu.PC = jump_address
     cpu.log.info("i")

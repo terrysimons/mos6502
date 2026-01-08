@@ -1,15 +1,14 @@
 #!/usr/bin/env python3
 """CLI instruction implementation for all 6502 variants."""
 
-from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from mos6502.compat import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from mos6502.core import MOS6502CPU
 
 
-def cli_implied_0x58(cpu: MOS6502CPU) -> None:
+def cli_implied_0x58(cpu: "MOS6502CPU") -> None:
     """Execute CLI (Clear Interrupt Disable Bit) - Implied addressing mode.
 
     Opcode: 0x58

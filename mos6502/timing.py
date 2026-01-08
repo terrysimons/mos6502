@@ -24,10 +24,10 @@ Usage:
 """
 
 import ctypes
-import logging
+from mos6502.compat import logging
 import sys
 import time
-from typing import Protocol, Optional
+from mos6502.compat import Protocol, Optional
 
 log = logging.getLogger(__name__)
 
@@ -67,7 +67,11 @@ class FallbackTimer:
 
     @property
     def resolution(self) -> float:
-        return time.get_clock_info('monotonic').resolution
+        # MicroPython doesn't have get_clock_info, use a reasonable default
+        try:
+            return time.get_clock_info('monotonic').resolution
+        except AttributeError:
+            return 0.001  # 1ms default for MicroPython
 
     def now(self) -> float:
         return time.monotonic()

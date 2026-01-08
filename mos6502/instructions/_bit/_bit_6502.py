@@ -1,9 +1,8 @@
 #!/usr/bin/env python3
 """BIT instruction implementation for all 6502 variants."""
 
-from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from mos6502.compat import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from mos6502.core import MOS6502CPU
@@ -14,7 +13,7 @@ BYTE_BIT_7_MASK = 0b10000000
 BYTE_BIT_6_MASK = 0b01000000
 
 
-def bit_zeropage_0x24(cpu: MOS6502CPU) -> None:
+def bit_zeropage_0x24(cpu: "MOS6502CPU") -> None:
     """Execute BIT (Test Bits in Memory with Accumulator) - Zeropage addressing mode.
 
     Opcode: 0x24
@@ -33,8 +32,8 @@ def bit_zeropage_0x24(cpu: MOS6502CPU) -> None:
     from mos6502 import flags
 
     # Bit Test - AND A with memory, set flags but don't store result
-    address: int = cpu.fetch_zeropage_mode_address(offset_register_name=None)
-    value: int = cpu.read_byte(address=address)
+    address: int = cpu.fetch_zeropage_mode_address(None)
+    value: int = cpu.read_byte(address)
 
     # Z flag set based on A AND memory
     result: int = cpu.A & value
@@ -49,7 +48,7 @@ def bit_zeropage_0x24(cpu: MOS6502CPU) -> None:
     cpu.log.info("i")
 
 
-def bit_absolute_0x2c(cpu: MOS6502CPU) -> None:
+def bit_absolute_0x2c(cpu: "MOS6502CPU") -> None:
     """Execute BIT (Test Bits in Memory with Accumulator) - Absolute addressing mode.
 
     Opcode: 0x2C
@@ -68,8 +67,8 @@ def bit_absolute_0x2c(cpu: MOS6502CPU) -> None:
     from mos6502 import flags
 
     # Bit Test - AND A with memory, set flags but don't store result
-    address: int = cpu.fetch_absolute_mode_address(offset_register_name=None)
-    value: int = cpu.read_byte(address=address)
+    address: int = cpu.fetch_absolute_mode_address(None)
+    value: int = cpu.read_byte(address)
 
     # Z flag set based on A AND memory
     result: int = cpu.A & value

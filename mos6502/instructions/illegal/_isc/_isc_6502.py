@@ -12,15 +12,14 @@ References:
   - http://www.oxyron.de/html/opcodes02.html
 """
 
-from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from mos6502.compat import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from mos6502.core import MOS6502CPU
 
 
-def isc_zeropage_0xe7(cpu: MOS6502CPU) -> None:
+def isc_zeropage_0xe7(cpu: "MOS6502CPU") -> None:
     """Execute ISC (Increment and Subtract with Carry) - Zero Page addressing mode.
 
     Opcode: 0xE7
@@ -42,16 +41,16 @@ def isc_zeropage_0xe7(cpu: MOS6502CPU) -> None:
     from mos6502 import flags
 
     # Fetch zero page address
-    address: int = cpu.fetch_zeropage_mode_address(offset_register_name=None)
+    address: int = cpu.fetch_zeropage_mode_address(None)
 
     # Read value from memory
-    value: int = cpu.read_byte(address=address)
+    value: int = cpu.read_byte(address)
 
     # Increment value
     incremented: int = (value + 1) & 0xFF
 
     # Write incremented value back to memory
-    cpu.write_byte(address=address, data=incremented)
+    cpu.write_byte(address, incremented)
 
     # Subtract incremented value from A with carry (like SBC)
     if cpu.flags[flags.D]:
@@ -72,7 +71,7 @@ def isc_zeropage_0xe7(cpu: MOS6502CPU) -> None:
     cpu.log.info("i")
 
 
-def isc_zeropage_x_0xf7(cpu: MOS6502CPU) -> None:
+def isc_zeropage_x_0xf7(cpu: "MOS6502CPU") -> None:
     """Execute ISC (Increment and Subtract with Carry) - Zero Page,X addressing mode.
 
     Opcode: 0xF7
@@ -94,16 +93,16 @@ def isc_zeropage_x_0xf7(cpu: MOS6502CPU) -> None:
     from mos6502 import flags
 
     # Fetch zero page,X address
-    address: int = cpu.fetch_zeropage_mode_address(offset_register_name="X")
+    address: int = cpu.fetch_zeropage_mode_address("X")
 
     # Read value from memory
-    value: int = cpu.read_byte(address=address)
+    value: int = cpu.read_byte(address)
 
     # Increment value
     incremented: int = (value + 1) & 0xFF
 
     # Write incremented value back to memory
-    cpu.write_byte(address=address, data=incremented)
+    cpu.write_byte(address, incremented)
 
     # Subtract incremented value from A with carry
     if cpu.flags[flags.D]:
@@ -124,7 +123,7 @@ def isc_zeropage_x_0xf7(cpu: MOS6502CPU) -> None:
     cpu.log.info("i")
 
 
-def isc_indexed_indirect_x_0xe3(cpu: MOS6502CPU) -> None:
+def isc_indexed_indirect_x_0xe3(cpu: "MOS6502CPU") -> None:
     """Execute ISC (Increment and Subtract with Carry) - (Indirect,X) addressing mode.
 
     Opcode: 0xE3
@@ -149,13 +148,13 @@ def isc_indexed_indirect_x_0xe3(cpu: MOS6502CPU) -> None:
     address: int = cpu.fetch_indexed_indirect_mode_address()
 
     # Read value from memory
-    value: int = cpu.read_byte(address=address)
+    value: int = cpu.read_byte(address)
 
     # Increment value
     incremented: int = (value + 1) & 0xFF
 
     # Write incremented value back to memory
-    cpu.write_byte(address=address & 0xFFFF, data=incremented)
+    cpu.write_byte(address & 0xFFFF, incremented)
 
     # Subtract incremented value from A with carry
     if cpu.flags[flags.D]:
@@ -176,7 +175,7 @@ def isc_indexed_indirect_x_0xe3(cpu: MOS6502CPU) -> None:
     cpu.log.info("i")
 
 
-def isc_indirect_indexed_y_0xf3(cpu: MOS6502CPU) -> None:
+def isc_indirect_indexed_y_0xf3(cpu: "MOS6502CPU") -> None:
     """Execute ISC (Increment and Subtract with Carry) - (Indirect),Y addressing mode.
 
     Opcode: 0xF3
@@ -201,13 +200,13 @@ def isc_indirect_indexed_y_0xf3(cpu: MOS6502CPU) -> None:
     address: int = cpu.fetch_indirect_indexed_mode_address()
 
     # Read value from memory
-    value: int = cpu.read_byte(address=address)
+    value: int = cpu.read_byte(address)
 
     # Increment value
     incremented: int = (value + 1) & 0xFF
 
     # Write incremented value back to memory
-    cpu.write_byte(address=address & 0xFFFF, data=incremented)
+    cpu.write_byte(address & 0xFFFF, incremented)
 
     # Subtract incremented value from A with carry
     if cpu.flags[flags.D]:
@@ -228,7 +227,7 @@ def isc_indirect_indexed_y_0xf3(cpu: MOS6502CPU) -> None:
     cpu.log.info("i")
 
 
-def isc_absolute_0xef(cpu: MOS6502CPU) -> None:
+def isc_absolute_0xef(cpu: "MOS6502CPU") -> None:
     """Execute ISC (Increment and Subtract with Carry) - Absolute addressing mode.
 
     Opcode: 0xEF
@@ -250,16 +249,16 @@ def isc_absolute_0xef(cpu: MOS6502CPU) -> None:
     from mos6502 import flags
 
     # Fetch absolute address
-    address: int = cpu.fetch_absolute_mode_address(offset_register_name=None)
+    address: int = cpu.fetch_absolute_mode_address(None)
 
     # Read value from memory
-    value: int = cpu.read_byte(address=address)
+    value: int = cpu.read_byte(address)
 
     # Increment value
     incremented: int = (value + 1) & 0xFF
 
     # Write incremented value back to memory
-    cpu.write_byte(address=address & 0xFFFF, data=incremented)
+    cpu.write_byte(address & 0xFFFF, incremented)
 
     # Subtract incremented value from A with carry
     if cpu.flags[flags.D]:
@@ -280,7 +279,7 @@ def isc_absolute_0xef(cpu: MOS6502CPU) -> None:
     cpu.log.info("i")
 
 
-def isc_absolute_x_0xff(cpu: MOS6502CPU) -> None:
+def isc_absolute_x_0xff(cpu: "MOS6502CPU") -> None:
     """Execute ISC (Increment and Subtract with Carry) - Absolute,X addressing mode.
 
     Opcode: 0xFF
@@ -302,13 +301,13 @@ def isc_absolute_x_0xff(cpu: MOS6502CPU) -> None:
     from mos6502 import flags
 
     # Use existing helper for absolute X addressing
-    address: int = cpu.fetch_absolute_mode_address(offset_register_name="X")
+    address: int = cpu.fetch_absolute_mode_address("X")
 
     # Read-Modify-Write with Absolute,X always does a dummy read regardless of page crossing
     cpu.spend_cpu_cycles(1)
 
     # Read value from memory
-    value: int = cpu.read_byte(address=address)
+    value: int = cpu.read_byte(address)
 
     # Internal processing cycle for RMW operation
     cpu.spend_cpu_cycles(1)
@@ -317,7 +316,7 @@ def isc_absolute_x_0xff(cpu: MOS6502CPU) -> None:
     incremented: int = (value + 1) & 0xFF
 
     # Write incremented value back to memory
-    cpu.write_byte(address=address & 0xFFFF, data=incremented)
+    cpu.write_byte(address & 0xFFFF, incremented)
 
     # Subtract incremented value from A with carry
     if cpu.flags[flags.D]:
@@ -337,7 +336,7 @@ def isc_absolute_x_0xff(cpu: MOS6502CPU) -> None:
     cpu.log.info("ax")
 
 
-def isc_absolute_y_0xfb(cpu: MOS6502CPU) -> None:
+def isc_absolute_y_0xfb(cpu: "MOS6502CPU") -> None:
     """Execute ISC (Increment and Subtract with Carry) - Absolute,Y addressing mode.
 
     Opcode: 0xFB
@@ -359,13 +358,13 @@ def isc_absolute_y_0xfb(cpu: MOS6502CPU) -> None:
     from mos6502 import flags
 
     # Use existing helper for absolute Y addressing
-    address: int = cpu.fetch_absolute_mode_address(offset_register_name="Y")
+    address: int = cpu.fetch_absolute_mode_address("Y")
 
     # Read-Modify-Write with Absolute,Y always does a dummy read regardless of page crossing
     cpu.spend_cpu_cycles(1)
 
     # Read value from memory
-    value: int = cpu.read_byte(address=address & 0xFFFF)
+    value: int = cpu.read_byte(address & 0xFFFF)
 
     # Internal processing cycle for RMW operation
     cpu.spend_cpu_cycles(1)
@@ -374,7 +373,7 @@ def isc_absolute_y_0xfb(cpu: MOS6502CPU) -> None:
     incremented: int = (value + 1) & 0xFF
 
     # Write incremented value back to memory
-    cpu.write_byte(address=address & 0xFFFF, data=incremented)
+    cpu.write_byte(address & 0xFFFF, incremented)
 
     # Subtract incremented value from A with carry
     if cpu.flags[flags.D]:

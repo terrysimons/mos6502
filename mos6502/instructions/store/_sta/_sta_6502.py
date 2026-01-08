@@ -1,15 +1,14 @@
 #!/usr/bin/env python3
 """STA instruction implementation for all 6502 variants."""
 
-from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from mos6502.compat import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from mos6502.core import MOS6502CPU
 
 
-def sta_zeropage_0x85(cpu: MOS6502CPU) -> None:
+def sta_zeropage_0x85(cpu: "MOS6502CPU") -> None:
     """Execute STA (Store Accumulator in Memory) - Zeropage addressing mode.
 
     Opcode: 0x85
@@ -25,12 +24,12 @@ def sta_zeropage_0x85(cpu: MOS6502CPU) -> None:
     ---------
         cpu: The CPU instance to operate on
     """
-    address: int = cpu.fetch_zeropage_mode_address(offset_register_name=None)
-    cpu.write_byte(address=address, data=cpu.A)
+    address: int = cpu.fetch_zeropage_mode_address(None)
+    cpu.write_byte(address, cpu.A)
     cpu.log.info("i")
 
 
-def sta_zeropage_x_0x95(cpu: MOS6502CPU) -> None:
+def sta_zeropage_x_0x95(cpu: "MOS6502CPU") -> None:
     """Execute STA (Store Accumulator in Memory) - Zeropage,X addressing mode.
 
     Opcode: 0x95
@@ -46,12 +45,12 @@ def sta_zeropage_x_0x95(cpu: MOS6502CPU) -> None:
     ---------
         cpu: The CPU instance to operate on
     """
-    address: int = cpu.fetch_zeropage_mode_address(offset_register_name="X")
-    cpu.write_byte(address=address, data=cpu.A)
+    address: int = cpu.fetch_zeropage_mode_address("X")
+    cpu.write_byte(address, cpu.A)
     cpu.log.info("i")
 
 
-def sta_absolute_0x8d(cpu: MOS6502CPU) -> None:
+def sta_absolute_0x8d(cpu: "MOS6502CPU") -> None:
     """Execute STA (Store Accumulator in Memory) - Absolute addressing mode.
 
     Opcode: 0x8D
@@ -67,12 +66,12 @@ def sta_absolute_0x8d(cpu: MOS6502CPU) -> None:
     ---------
         cpu: The CPU instance to operate on
     """
-    address: int = cpu.fetch_absolute_mode_address(offset_register_name=None)
-    cpu.write_byte(address=address & 0xFFFF, data=cpu.A)
+    address: int = cpu.fetch_absolute_mode_address(None)
+    cpu.write_byte(address & 0xFFFF, cpu.A)
     cpu.log.info("i")
 
 
-def sta_absolute_x_0x9d(cpu: MOS6502CPU) -> None:
+def sta_absolute_x_0x9d(cpu: "MOS6502CPU") -> None:
     """Execute STA (Store Accumulator in Memory) - Absolute,X addressing mode.
 
     Opcode: 0x9D
@@ -88,17 +87,17 @@ def sta_absolute_x_0x9d(cpu: MOS6502CPU) -> None:
     ---------
         cpu: The CPU instance to operate on
     """
-    address: int = cpu.fetch_absolute_mode_address(offset_register_name="X")
+    address: int = cpu.fetch_absolute_mode_address("X")
 
     # Store operations always take 5 cycles due to a dummy read that occurs
     # before the write, regardless of page boundary crossing
     cpu.spend_cpu_cycles(1)
 
-    cpu.write_byte(address=address & 0xFFFF, data=cpu.A)
+    cpu.write_byte(address & 0xFFFF, cpu.A)
     cpu.log.info("i")
 
 
-def sta_absolute_y_0x99(cpu: MOS6502CPU) -> None:
+def sta_absolute_y_0x99(cpu: "MOS6502CPU") -> None:
     """Execute STA (Store Accumulator in Memory) - Absolute,Y addressing mode.
 
     Opcode: 0x99
@@ -114,17 +113,17 @@ def sta_absolute_y_0x99(cpu: MOS6502CPU) -> None:
     ---------
         cpu: The CPU instance to operate on
     """
-    address: int = cpu.fetch_absolute_mode_address(offset_register_name="Y")
+    address: int = cpu.fetch_absolute_mode_address("Y")
 
     # Store operations always take 5 cycles due to a dummy read that occurs
     # before the write, regardless of page boundary crossing
     cpu.spend_cpu_cycles(1)
 
-    cpu.write_byte(address=address & 0xFFFF, data=cpu.A)
+    cpu.write_byte(address & 0xFFFF, cpu.A)
     cpu.log.info("i")
 
 
-def sta_indexed_indirect_x_0x81(cpu: MOS6502CPU) -> None:
+def sta_indexed_indirect_x_0x81(cpu: "MOS6502CPU") -> None:
     """Execute STA (Store Accumulator in Memory) - (Indirect,X) addressing mode.
 
     Opcode: 0x81
@@ -141,11 +140,11 @@ def sta_indexed_indirect_x_0x81(cpu: MOS6502CPU) -> None:
         cpu: The CPU instance to operate on
     """
     address: int = cpu.fetch_indexed_indirect_mode_address()
-    cpu.write_byte(address=address & 0xFFFF, data=cpu.A)
+    cpu.write_byte(address & 0xFFFF, cpu.A)
     cpu.log.info("i")
 
 
-def sta_indirect_indexed_y_0x91(cpu: MOS6502CPU) -> None:
+def sta_indirect_indexed_y_0x91(cpu: "MOS6502CPU") -> None:
     """Execute STA (Store Accumulator in Memory) - (Indirect),Y addressing mode.
 
     Opcode: 0x91
@@ -162,5 +161,5 @@ def sta_indirect_indexed_y_0x91(cpu: MOS6502CPU) -> None:
         cpu: The CPU instance to operate on
     """
     address: int = cpu.fetch_indirect_indexed_mode_address()
-    cpu.write_byte(address=address & 0xFFFF, data=cpu.A)
+    cpu.write_byte(address & 0xFFFF, cpu.A)
     cpu.log.info("i")

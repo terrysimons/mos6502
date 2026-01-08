@@ -1,15 +1,14 @@
 #!/usr/bin/env python3
 """LSR instruction implementation for all 6502 variants."""
 
-from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from mos6502.compat import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from mos6502.core import MOS6502CPU
 
 
-def lsr_accumulator_0x4a(cpu: MOS6502CPU) -> None:
+def lsr_accumulator_0x4a(cpu: "MOS6502CPU") -> None:
     """Execute LSR (Logical Shift Right) - Accumulator addressing mode.
 
     Opcode: 0x4A
@@ -39,7 +38,7 @@ def lsr_accumulator_0x4a(cpu: MOS6502CPU) -> None:
     cpu.log.info("i")
 
 
-def lsr_zeropage_0x46(cpu: MOS6502CPU) -> None:
+def lsr_zeropage_0x46(cpu: "MOS6502CPU") -> None:
     """Execute LSR (Logical Shift Right) - Zero Page addressing mode.
 
     Opcode: 0x46
@@ -48,14 +47,14 @@ def lsr_zeropage_0x46(cpu: MOS6502CPU) -> None:
     """
     from mos6502 import flags
 
-    address: int = cpu.fetch_zeropage_mode_address(offset_register_name=None)
-    value: int = cpu.read_byte(address=address)
+    address: int = cpu.fetch_zeropage_mode_address(None)
+    value: int = cpu.read_byte(address)
 
     # Bit 0 goes to carry flag
     cpu.flags[flags.C] = 1 if (value & 0x01) else 0
 
     result: int = (value >> 1) & 0xFF
-    cpu.write_byte(address=address, data=result)
+    cpu.write_byte(address, result)
 
     # Set N and Z flags (N is always 0 for LSR since bit 7 becomes 0)
     cpu.flags[flags.Z] = 1 if result == 0 else 0
@@ -64,7 +63,7 @@ def lsr_zeropage_0x46(cpu: MOS6502CPU) -> None:
     cpu.log.info("z")
 
 
-def lsr_zeropage_x_0x56(cpu: MOS6502CPU) -> None:
+def lsr_zeropage_x_0x56(cpu: "MOS6502CPU") -> None:
     """Execute LSR (Logical Shift Right) - Zero Page,X addressing mode.
 
     Opcode: 0x56
@@ -73,14 +72,14 @@ def lsr_zeropage_x_0x56(cpu: MOS6502CPU) -> None:
     """
     from mos6502 import flags
 
-    address: int = cpu.fetch_zeropage_mode_address(offset_register_name="X")
-    value: int = cpu.read_byte(address=address)
+    address: int = cpu.fetch_zeropage_mode_address("X")
+    value: int = cpu.read_byte(address)
 
     # Bit 0 goes to carry flag
     cpu.flags[flags.C] = 1 if (value & 0x01) else 0
 
     result: int = (value >> 1) & 0xFF
-    cpu.write_byte(address=address, data=result)
+    cpu.write_byte(address, result)
 
     # Set N and Z flags (N is always 0 for LSR since bit 7 becomes 0)
     cpu.flags[flags.Z] = 1 if result == 0 else 0
@@ -89,7 +88,7 @@ def lsr_zeropage_x_0x56(cpu: MOS6502CPU) -> None:
     cpu.log.info("zx")
 
 
-def lsr_absolute_0x4e(cpu: MOS6502CPU) -> None:
+def lsr_absolute_0x4e(cpu: "MOS6502CPU") -> None:
     """Execute LSR (Logical Shift Right) - Absolute addressing mode.
 
     Opcode: 0x4E
@@ -98,8 +97,8 @@ def lsr_absolute_0x4e(cpu: MOS6502CPU) -> None:
     """
     from mos6502 import flags
 
-    address: int = cpu.fetch_absolute_mode_address(offset_register_name=None)
-    value: int = cpu.read_byte(address=address)
+    address: int = cpu.fetch_absolute_mode_address(None)
+    value: int = cpu.read_byte(address)
 
     # Read-Modify-Write operations have an internal processing cycle
     cpu.spend_cpu_cycles(1)
@@ -108,7 +107,7 @@ def lsr_absolute_0x4e(cpu: MOS6502CPU) -> None:
     cpu.flags[flags.C] = 1 if (value & 0x01) else 0
 
     result: int = (value >> 1) & 0xFF
-    cpu.write_byte(address=address & 0xFFFF, data=result)
+    cpu.write_byte(address & 0xFFFF, result)
 
     # Set N and Z flags (N is always 0 for LSR since bit 7 becomes 0)
     cpu.flags[flags.Z] = 1 if result == 0 else 0
@@ -117,7 +116,7 @@ def lsr_absolute_0x4e(cpu: MOS6502CPU) -> None:
     cpu.log.info("a")
 
 
-def lsr_absolute_x_0x5e(cpu: MOS6502CPU) -> None:
+def lsr_absolute_x_0x5e(cpu: "MOS6502CPU") -> None:
     """Execute LSR (Logical Shift Right) - Absolute,X addressing mode.
 
     Opcode: 0x5E
@@ -126,12 +125,12 @@ def lsr_absolute_x_0x5e(cpu: MOS6502CPU) -> None:
     """
     from mos6502 import flags
 
-    address: int = cpu.fetch_absolute_mode_address(offset_register_name="X")
+    address: int = cpu.fetch_absolute_mode_address("X")
 
     # Read-Modify-Write with Absolute,X always does a dummy read regardless of page crossing
     cpu.spend_cpu_cycles(1)
 
-    value: int = cpu.read_byte(address=address)
+    value: int = cpu.read_byte(address)
 
     # Internal processing cycle for RMW operation
     cpu.spend_cpu_cycles(1)
@@ -140,7 +139,7 @@ def lsr_absolute_x_0x5e(cpu: MOS6502CPU) -> None:
     cpu.flags[flags.C] = 1 if (value & 0x01) else 0
 
     result: int = (value >> 1) & 0xFF
-    cpu.write_byte(address=address & 0xFFFF, data=result)
+    cpu.write_byte(address & 0xFFFF, result)
 
     # Set N and Z flags (N is always 0 for LSR since bit 7 becomes 0)
     cpu.flags[flags.Z] = 1 if result == 0 else 0

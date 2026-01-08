@@ -11,15 +11,14 @@ References:
   - http://www.oxyron.de/html/opcodes02.html
 """
 
-from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from mos6502.compat import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from mos6502.core import MOS6502CPU
 
 
-def arr_immediate_0x6b(cpu: MOS6502CPU) -> None:
+def arr_immediate_0x6b(cpu: "MOS6502CPU") -> None:
     """Execute ARR (AND then Rotate Right) - Immediate addressing mode.
 
     Opcode: 0x6B

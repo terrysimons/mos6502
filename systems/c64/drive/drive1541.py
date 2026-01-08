@@ -38,11 +38,10 @@ Reference:
 - https://sta.c64.org/cbm1541mem.html
 """
 
-from __future__ import annotations
 
-import logging
-from pathlib import Path
-from typing import TYPE_CHECKING, Optional
+from mos6502.compat import logging
+from mos6502.compat import Path
+from mos6502.compat import TYPE_CHECKING, Optional, List
 
 from .via6522 import VIA6522
 from .d64 import D64Image, SECTORS_PER_TRACK, TRACK_SPEED_ZONE
@@ -206,7 +205,7 @@ class Drive1541:
         self.device_number = device_number
 
         # CPU will be set by the C64 when the drive is attached
-        self.cpu: Optional[MOS6502CPU] = None
+        self.cpu: Optional["MOS6502CPU"] = None
 
         # Memory subsystem
         self.memory = Drive1541Memory(self)
@@ -284,7 +283,7 @@ class Drive1541:
         #   CB2 LOW (bits 7-5 = 110) = Write mode
         #   CB2 HIGH (bits 7-5 = 111) = Read mode
         self._write_mode = False
-        self._gcr_write_buffer: list[int] = []
+        self._gcr_write_buffer: List[int] = []
         self._write_track = 0  # Track being written to
         self._d64_path: Optional[Path] = None  # Path for persistence
 

@@ -10,7 +10,6 @@ The TestROMBuilder class is used by cartridge classes to implement
 their create_test_cartridge() methods.
 """
 
-from __future__ import annotations
 
 from .base import ROML_START, ROML_SIZE
 
@@ -66,6 +65,7 @@ from mos6502.instructions import (
     # Logic
     ORA_IMMEDIATE_0x09,
 )
+from mos6502.compat import List
 
 
 __all__ = [
@@ -101,7 +101,7 @@ PERIPHERAL_TEST_ZP_JOY2 = 0x06    # Joystick 2 state (CIA Port A bits 0-4)
 RAM_ROUTINE_ADDR = 0xC000
 
 
-def text_to_screen_codes(text: str) -> list[int]:
+def text_to_screen_codes(text: str) -> List[int]:
     """Convert ASCII text to C64 screen codes."""
     screen_codes = []
     for ch in text:
@@ -414,7 +414,7 @@ class TestROMBuilder:
         self.branches_to_fix.append((len(self.code), fail_label))
         self.code.append(0x00)  # Placeholder
 
-    def emit_bytes(self, bytes_list: list[int]) -> None:
+    def emit_bytes(self, bytes_list: List[int]) -> None:
         """Emit raw bytes directly into the code stream.
 
         Args:

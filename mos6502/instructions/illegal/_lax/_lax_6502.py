@@ -12,15 +12,14 @@ References:
   - http://www.oxyron.de/html/opcodes02.html
 """
 
-from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from mos6502.compat import TYPE_CHECKING, Union
 
 if TYPE_CHECKING:
     from mos6502.core import MOS6502CPU
 
 
-def lax_zeropage_0xa7(cpu: MOS6502CPU) -> None:
+def lax_zeropage_0xa7(cpu: "MOS6502CPU") -> None:
     """Execute LAX (Load A and X) - Zero Page addressing mode.
 
     Opcode: 0xA7
@@ -40,8 +39,8 @@ def lax_zeropage_0xa7(cpu: MOS6502CPU) -> None:
         cpu: The CPU instance to operate on
     """
     # Fetch zero page address and read value
-    address: int = cpu.fetch_zeropage_mode_address(offset_register_name=None)
-    value: int = cpu.read_byte(address=address)
+    address: int = cpu.fetch_zeropage_mode_address(None)
+    value: int = cpu.read_byte(address)
 
     # Load into both A and X
     cpu.A = value
@@ -55,7 +54,7 @@ def lax_zeropage_0xa7(cpu: MOS6502CPU) -> None:
     cpu.log.info("i")
 
 
-def lax_zeropage_y_0xb7(cpu: MOS6502CPU) -> None:
+def lax_zeropage_y_0xb7(cpu: "MOS6502CPU") -> None:
     """Execute LAX (Load A and X) - Zero Page,Y addressing mode.
 
     Opcode: 0xB7
@@ -75,8 +74,8 @@ def lax_zeropage_y_0xb7(cpu: MOS6502CPU) -> None:
         cpu: The CPU instance to operate on
     """
     # Fetch zero page,Y address and read value
-    address: int = cpu.fetch_zeropage_mode_address(offset_register_name="Y")
-    value: int = cpu.read_byte(address=address)
+    address: int = cpu.fetch_zeropage_mode_address("Y")
+    value: int = cpu.read_byte(address)
 
     # Load into both A and X
     cpu.A = value
@@ -90,7 +89,7 @@ def lax_zeropage_y_0xb7(cpu: MOS6502CPU) -> None:
     cpu.log.info("i")
 
 
-def lax_indexed_indirect_x_0xa3(cpu: MOS6502CPU) -> None:
+def lax_indexed_indirect_x_0xa3(cpu: "MOS6502CPU") -> None:
     """Execute LAX (Load A and X) - (Indirect,X) addressing mode.
 
     Opcode: 0xA3
@@ -111,7 +110,7 @@ def lax_indexed_indirect_x_0xa3(cpu: MOS6502CPU) -> None:
     """
     # Use existing helper for indexed indirect addressing
     address: int = cpu.fetch_indexed_indirect_mode_address()
-    value: int = cpu.read_byte(address=address)
+    value: int = cpu.read_byte(address)
 
     # Load into both A and X
     cpu.A = value
@@ -125,7 +124,7 @@ def lax_indexed_indirect_x_0xa3(cpu: MOS6502CPU) -> None:
     cpu.log.info("i")
 
 
-def lax_indirect_indexed_y_0xb3(cpu: MOS6502CPU) -> None:
+def lax_indirect_indexed_y_0xb3(cpu: "MOS6502CPU") -> None:
     """Execute LAX (Load A and X) - (Indirect),Y addressing mode.
 
     Opcode: 0xB3
@@ -146,7 +145,7 @@ def lax_indirect_indexed_y_0xb3(cpu: MOS6502CPU) -> None:
     """
     # Use existing helper for indirect indexed addressing
     address: int = cpu.fetch_indirect_indexed_mode_address()
-    value: int = cpu.read_byte(address=address)
+    value: int = cpu.read_byte(address)
 
     # Load into both A and X
     cpu.A = value
@@ -160,7 +159,7 @@ def lax_indirect_indexed_y_0xb3(cpu: MOS6502CPU) -> None:
     cpu.log.info("i")
 
 
-def lax_absolute_0xaf(cpu: MOS6502CPU) -> None:
+def lax_absolute_0xaf(cpu: "MOS6502CPU") -> None:
     """Execute LAX (Load A and X) - Absolute addressing mode.
 
     Opcode: 0xAF
@@ -180,8 +179,8 @@ def lax_absolute_0xaf(cpu: MOS6502CPU) -> None:
         cpu: The CPU instance to operate on
     """
     # Fetch absolute address and read value
-    address: int = cpu.fetch_absolute_mode_address(offset_register_name=None)
-    value: int = cpu.read_byte(address=address)
+    address: int = cpu.fetch_absolute_mode_address(None)
+    value: int = cpu.read_byte(address)
 
     # Load into both A and X
     cpu.A = value
@@ -195,7 +194,7 @@ def lax_absolute_0xaf(cpu: MOS6502CPU) -> None:
     cpu.log.info("i")
 
 
-def lax_absolute_y_0xbf(cpu: MOS6502CPU) -> None:
+def lax_absolute_y_0xbf(cpu: "MOS6502CPU") -> None:
     """Execute LAX (Load A and X) - Absolute,Y addressing mode.
 
     Opcode: 0xBF
@@ -215,8 +214,8 @@ def lax_absolute_y_0xbf(cpu: MOS6502CPU) -> None:
         cpu: The CPU instance to operate on
     """
     # Use existing helper for absolute Y addressing
-    address: int = cpu.fetch_absolute_mode_address(offset_register_name="Y")
-    value: int = cpu.read_byte(address=address)
+    address: int = cpu.fetch_absolute_mode_address("Y")
+    value: int = cpu.read_byte(address)
 
     # Load into both A and X
     cpu.A = value
@@ -230,7 +229,7 @@ def lax_absolute_y_0xbf(cpu: MOS6502CPU) -> None:
     cpu.log.info("i")
 
 
-def lax_immediate_0xab(cpu: MOS6502CPU) -> None:
+def lax_immediate_0xab(cpu: "MOS6502CPU") -> None:
     """Execute LAX (Load A and X) - Immediate addressing mode.
 
     Opcode: 0xAB
@@ -242,7 +241,7 @@ def lax_immediate_0xab(cpu: MOS6502CPU) -> None:
     This opcode is extremely unstable and may produce different results
     on different chip revisions, temperatures, and manufacturing runs.
 
-    The actual operation is: (A | CONST) & immediate → A → X
+    The actual operation is: Union[(A, CONST]) & immediate → A → X
     where CONST is an undefined magic constant that varies by chip.
 
     VARIANT: 6502 - UNSTABLE - behavior varies

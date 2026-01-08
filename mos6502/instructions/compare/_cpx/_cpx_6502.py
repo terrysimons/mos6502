@@ -1,15 +1,14 @@
 #!/usr/bin/env python3
 """CPX instruction implementation for all 6502 variants."""
 
-from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from mos6502.compat import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from mos6502.core import MOS6502CPU
 
 
-def cpx_immediate_0xe0(cpu: MOS6502CPU) -> None:
+def cpx_immediate_0xe0(cpu: "MOS6502CPU") -> None:
     """Execute CPX (Compare X Register with Memory) - Immediate addressing mode.
 
     Opcode: 0xE0
@@ -37,7 +36,7 @@ def cpx_immediate_0xe0(cpu: MOS6502CPU) -> None:
     cpu.log.info("i")
 
 
-def cpx_zeropage_0xe4(cpu: MOS6502CPU) -> None:
+def cpx_zeropage_0xe4(cpu: "MOS6502CPU") -> None:
     """Execute CPX (Compare X Register with Memory) - Zeropage addressing mode.
 
     Opcode: 0xE4
@@ -53,8 +52,8 @@ def cpx_zeropage_0xe4(cpu: MOS6502CPU) -> None:
     ---------
         cpu: The CPU instance to operate on
     """
-    address: int = cpu.fetch_zeropage_mode_address(offset_register_name=None)
-    value: int = cpu.read_byte(address=address)
+    address: int = cpu.fetch_zeropage_mode_address(None)
+    value: int = cpu.read_byte(address)
     result: int = (cpu.X - value) & 0xFF
 
     from mos6502 import flags
@@ -65,7 +64,7 @@ def cpx_zeropage_0xe4(cpu: MOS6502CPU) -> None:
     cpu.log.info("i")
 
 
-def cpx_absolute_0xec(cpu: MOS6502CPU) -> None:
+def cpx_absolute_0xec(cpu: "MOS6502CPU") -> None:
     """Execute CPX (Compare X Register with Memory) - Absolute addressing mode.
 
     Opcode: 0xEC
@@ -81,8 +80,8 @@ def cpx_absolute_0xec(cpu: MOS6502CPU) -> None:
     ---------
         cpu: The CPU instance to operate on
     """
-    address: int = cpu.fetch_absolute_mode_address(offset_register_name=None)
-    value: int = cpu.read_byte(address=address)
+    address: int = cpu.fetch_absolute_mode_address(None)
+    value: int = cpu.read_byte(address)
     result: int = (cpu.X - value) & 0xFF
 
     from mos6502 import flags

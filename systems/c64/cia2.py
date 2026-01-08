@@ -11,10 +11,9 @@ Handles:
 - NMI generation (directly to CPU)
 """
 
-from __future__ import annotations
 
-import logging
-from typing import TYPE_CHECKING
+from mos6502.compat import logging
+from mos6502.compat import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from mos6502.core import MOS6502CPU
@@ -35,7 +34,7 @@ class CIA2:
     - NMI generation (directly to CPU)
     """
 
-    def __init__(self, cpu: MOS6502CPU) -> None:
+    def __init__(self, cpu: "MOS6502CPU") -> None:
         # 16 registers, mirrored through $DD00–$DD0F
         self.regs = [0x00] * 16
 

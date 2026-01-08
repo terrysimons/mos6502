@@ -15,15 +15,14 @@ References:
   - https://www.nesdev.org/wiki/CPU_unofficial_opcodes
 """
 
-from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from mos6502.compat import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from mos6502.core import MOS6502CPU
 
 
-def shx_absolute_y_0x9e(cpu: MOS6502CPU) -> None:
+def shx_absolute_y_0x9e(cpu: "MOS6502CPU") -> None:
     """Execute SHX (SXA) - Absolute Y addressing mode.
 
     Opcode: 0x9E
@@ -59,6 +58,6 @@ def shx_absolute_y_0x9e(cpu: MOS6502CPU) -> None:
     value: int = int(cpu.X) & ((high_byte + 1) & 0xFF)
 
     # Store the value
-    cpu.write_byte(address=effective_address, data=value)
+    cpu.write_byte(effective_address, value)
 
     cpu.log.info("i")

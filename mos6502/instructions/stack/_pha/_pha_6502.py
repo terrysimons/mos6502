@@ -1,15 +1,14 @@
 #!/usr/bin/env python3
 """PHA instruction implementation for all 6502 variants."""
 
-from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from mos6502.compat import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from mos6502.core import MOS6502CPU
 
 
-def pha_implied_0x48(cpu: MOS6502CPU) -> None:
+def pha_implied_0x48(cpu: "MOS6502CPU") -> None:
     """Execute PHA (Push Accumulator on Stack) - Implied addressing mode.
 
     Opcode: 0x48
@@ -25,7 +24,7 @@ def pha_implied_0x48(cpu: MOS6502CPU) -> None:
     ---------
         cpu: The CPU instance to operate on
     """
-    cpu.write_byte(address=cpu.S, data=cpu.A)
+    cpu.write_byte(cpu.S, cpu.A)
     cpu.S -= 1
     cpu.log.info("i")
     cpu.spend_cpu_cycles(1)

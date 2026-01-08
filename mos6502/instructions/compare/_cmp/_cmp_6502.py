@@ -1,16 +1,15 @@
 #!/usr/bin/env python3
 """CMP instruction implementation for all 6502 variants."""
 
-from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from mos6502.compat import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from mos6502.core import MOS6502CPU
     from mos6502 import flags
 
 
-def cmp_immediate_0xc9(cpu: MOS6502CPU) -> None:
+def cmp_immediate_0xc9(cpu: "MOS6502CPU") -> None:
     """Execute CMP (Compare Accumulator with Memory) - Immediate addressing mode.
 
     Opcode: 0xC9
@@ -38,7 +37,7 @@ def cmp_immediate_0xc9(cpu: MOS6502CPU) -> None:
     cpu.log.info("i")
 
 
-def cmp_zeropage_0xc5(cpu: MOS6502CPU) -> None:
+def cmp_zeropage_0xc5(cpu: "MOS6502CPU") -> None:
     """Execute CMP (Compare Accumulator with Memory) - Zeropage addressing mode.
 
     Opcode: 0xC5
@@ -54,8 +53,8 @@ def cmp_zeropage_0xc5(cpu: MOS6502CPU) -> None:
     ---------
         cpu: The CPU instance to operate on
     """
-    address: int = cpu.fetch_zeropage_mode_address(offset_register_name=None)
-    value: int = cpu.read_byte(address=address)
+    address: int = cpu.fetch_zeropage_mode_address(None)
+    value: int = cpu.read_byte(address)
     result: int = (cpu.A - value) & 0xFF
 
     from mos6502 import flags
@@ -66,7 +65,7 @@ def cmp_zeropage_0xc5(cpu: MOS6502CPU) -> None:
     cpu.log.info("i")
 
 
-def cmp_zeropage_x_0xd5(cpu: MOS6502CPU) -> None:
+def cmp_zeropage_x_0xd5(cpu: "MOS6502CPU") -> None:
     """Execute CMP (Compare Accumulator with Memory) - Zeropage,X addressing mode.
 
     Opcode: 0xD5
@@ -82,8 +81,8 @@ def cmp_zeropage_x_0xd5(cpu: MOS6502CPU) -> None:
     ---------
         cpu: The CPU instance to operate on
     """
-    address: int = cpu.fetch_zeropage_mode_address(offset_register_name="X")
-    value: int = cpu.read_byte(address=address)
+    address: int = cpu.fetch_zeropage_mode_address("X")
+    value: int = cpu.read_byte(address)
     result: int = (cpu.A - value) & 0xFF
 
     from mos6502 import flags
@@ -94,7 +93,7 @@ def cmp_zeropage_x_0xd5(cpu: MOS6502CPU) -> None:
     cpu.log.info("i")
 
 
-def cmp_absolute_0xcd(cpu: MOS6502CPU) -> None:
+def cmp_absolute_0xcd(cpu: "MOS6502CPU") -> None:
     """Execute CMP (Compare Accumulator with Memory) - Absolute addressing mode.
 
     Opcode: 0xCD
@@ -110,8 +109,8 @@ def cmp_absolute_0xcd(cpu: MOS6502CPU) -> None:
     ---------
         cpu: The CPU instance to operate on
     """
-    address: int = cpu.fetch_absolute_mode_address(offset_register_name=None)
-    value: int = cpu.read_byte(address=address)
+    address: int = cpu.fetch_absolute_mode_address(None)
+    value: int = cpu.read_byte(address)
     result: int = (cpu.A - value) & 0xFF
 
     from mos6502 import flags
@@ -122,7 +121,7 @@ def cmp_absolute_0xcd(cpu: MOS6502CPU) -> None:
     cpu.log.info("i")
 
 
-def cmp_absolute_x_0xdd(cpu: MOS6502CPU) -> None:
+def cmp_absolute_x_0xdd(cpu: "MOS6502CPU") -> None:
     """Execute CMP (Compare Accumulator with Memory) - Absolute,X addressing mode.
 
     Opcode: 0xDD
@@ -138,8 +137,8 @@ def cmp_absolute_x_0xdd(cpu: MOS6502CPU) -> None:
     ---------
         cpu: The CPU instance to operate on
     """
-    address: int = cpu.fetch_absolute_mode_address(offset_register_name="X")
-    value: int = cpu.read_byte(address=address)
+    address: int = cpu.fetch_absolute_mode_address("X")
+    value: int = cpu.read_byte(address)
     result: int = (cpu.A - value) & 0xFF
 
     from mos6502 import flags
@@ -150,7 +149,7 @@ def cmp_absolute_x_0xdd(cpu: MOS6502CPU) -> None:
     cpu.log.info("i")
 
 
-def cmp_absolute_y_0xd9(cpu: MOS6502CPU) -> None:
+def cmp_absolute_y_0xd9(cpu: "MOS6502CPU") -> None:
     """Execute CMP (Compare Accumulator with Memory) - Absolute,Y addressing mode.
 
     Opcode: 0xD9
@@ -166,8 +165,8 @@ def cmp_absolute_y_0xd9(cpu: MOS6502CPU) -> None:
     ---------
         cpu: The CPU instance to operate on
     """
-    address: int = cpu.fetch_absolute_mode_address(offset_register_name="Y")
-    value: int = cpu.read_byte(address=address)
+    address: int = cpu.fetch_absolute_mode_address("Y")
+    value: int = cpu.read_byte(address)
     result: int = (cpu.A - value) & 0xFF
 
     from mos6502 import flags
@@ -178,7 +177,7 @@ def cmp_absolute_y_0xd9(cpu: MOS6502CPU) -> None:
     cpu.log.info("i")
 
 
-def cmp_indexed_indirect_x_0xc1(cpu: MOS6502CPU) -> None:
+def cmp_indexed_indirect_x_0xc1(cpu: "MOS6502CPU") -> None:
     """Execute CMP (Compare Accumulator with Memory) - (Indirect,X) addressing mode.
 
     Opcode: 0xC1
@@ -195,7 +194,7 @@ def cmp_indexed_indirect_x_0xc1(cpu: MOS6502CPU) -> None:
         cpu: The CPU instance to operate on
     """
     address: int = cpu.fetch_indexed_indirect_mode_address()
-    value: int = cpu.read_byte(address=address)
+    value: int = cpu.read_byte(address)
     result: int = (cpu.A - value) & 0xFF
 
     from mos6502 import flags
@@ -206,7 +205,7 @@ def cmp_indexed_indirect_x_0xc1(cpu: MOS6502CPU) -> None:
     cpu.log.info("i")
 
 
-def cmp_indirect_indexed_y_0xd1(cpu: MOS6502CPU) -> None:
+def cmp_indirect_indexed_y_0xd1(cpu: "MOS6502CPU") -> None:
     """Execute CMP (Compare Accumulator with Memory) - (Indirect),Y addressing mode.
 
     Opcode: 0xD1
@@ -223,7 +222,7 @@ def cmp_indirect_indexed_y_0xd1(cpu: MOS6502CPU) -> None:
         cpu: The CPU instance to operate on
     """
     address: int = cpu.fetch_indirect_indexed_mode_address()
-    value: int = cpu.read_byte(address=address)
+    value: int = cpu.read_byte(address)
     result: int = (cpu.A - value) & 0xFF
 
     from mos6502 import flags

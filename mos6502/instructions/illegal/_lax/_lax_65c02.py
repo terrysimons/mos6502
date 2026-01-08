@@ -12,15 +12,14 @@ References:
   - https://wilsonminesco.com/NMOS-CMOSdif/
 """
 
-from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from mos6502.compat import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from mos6502.core import MOS6502CPU
 
 
-def lax_zeropage_0xa7(cpu: MOS6502CPU) -> None:
+def lax_zeropage_0xa7(cpu: "MOS6502CPU") -> None:
     """Execute LAX - Zero Page (acts as NOP on 65C02).
 
     Opcode: 0xA7
@@ -47,7 +46,7 @@ def lax_zeropage_0xa7(cpu: MOS6502CPU) -> None:
     # No registers, flags, or memory modified
 
 
-def lax_zeropage_y_0xb7(cpu: MOS6502CPU) -> None:
+def lax_zeropage_y_0xb7(cpu: "MOS6502CPU") -> None:
     """Execute LAX - Zero Page,Y (acts as NOP on 65C02).
 
     Opcode: 0xB7
@@ -75,7 +74,7 @@ def lax_zeropage_y_0xb7(cpu: MOS6502CPU) -> None:
     # No registers, flags, or memory modified
 
 
-def lax_indexed_indirect_x_0xa3(cpu: MOS6502CPU) -> None:
+def lax_indexed_indirect_x_0xa3(cpu: "MOS6502CPU") -> None:
     """Execute LAX - (Indirect,X) (acts as NOP on 65C02).
 
     Opcode: 0xA3
@@ -102,7 +101,7 @@ def lax_indexed_indirect_x_0xa3(cpu: MOS6502CPU) -> None:
     # No registers, flags, or memory modified
 
 
-def lax_indirect_indexed_y_0xb3(cpu: MOS6502CPU) -> None:
+def lax_indirect_indexed_y_0xb3(cpu: "MOS6502CPU") -> None:
     """Execute LAX - (Indirect),Y (acts as NOP on 65C02).
 
     Opcode: 0xB3
@@ -129,7 +128,7 @@ def lax_indirect_indexed_y_0xb3(cpu: MOS6502CPU) -> None:
     # No registers, flags, or memory modified
 
 
-def lax_absolute_0xaf(cpu: MOS6502CPU) -> None:
+def lax_absolute_0xaf(cpu: "MOS6502CPU") -> None:
     """Execute LAX - Absolute (acts as NOP on 65C02).
 
     Opcode: 0xAF
@@ -156,7 +155,7 @@ def lax_absolute_0xaf(cpu: MOS6502CPU) -> None:
     # No registers, flags, or memory modified
 
 
-def lax_absolute_y_0xbf(cpu: MOS6502CPU) -> None:
+def lax_absolute_y_0xbf(cpu: "MOS6502CPU") -> None:
     """Execute LAX - Absolute,Y (acts as NOP on 65C02).
 
     Opcode: 0xBF
@@ -183,7 +182,7 @@ def lax_absolute_y_0xbf(cpu: MOS6502CPU) -> None:
     # No registers, flags, or memory modified
 
 
-def lax_immediate_0xab(cpu: MOS6502CPU) -> None:
+def lax_immediate_0xab(cpu: "MOS6502CPU") -> None:
     """Execute LAX - Immediate (acts as NOP on 65C02).
 
     Opcode: 0xAB

@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """Instruction set for the mos6502 CPU."""
-import enum
-from dataclasses import dataclass
-from typing import Literal, NoReturn, Self
+from mos6502.compat import enum
+from mos6502.compat import make_dataclass
+from mos6502.compat import Literal, NoReturn, List, Dict
 
 from mos6502.errors import IllegalCPUInstructionError
 
@@ -25,7 +25,8 @@ AddressingMode = Literal[
 ]
 
 
-@dataclass(frozen=True, slots=True)
+# Use make_dataclass(frozen, slots) with positional args - kwargs don't work in MicroPython frozen modules
+@make_dataclass(True, True)
 class CPUInstruction:
     """Metadata for a 6502 CPU instruction opcode.
 
@@ -47,6 +48,12 @@ class CPUInstruction:
 
     """
 
+    # Explicit field order for MicroPython compatibility (annotations may not work)
+    _field_order_ = ('opcode', 'mnemonic', 'addressing', 'assembler', 'bytes',
+                     'base_cycles', 'affected_flags', 'package', 'function',
+                     'page_boundary_penalty')
+    _field_defaults_ = {'page_boundary_penalty': False}
+
     opcode: int
     mnemonic: str
     addressing: AddressingMode
@@ -58,7 +65,7 @@ class CPUInstruction:
     function: str
     page_boundary_penalty: bool = False
 
-    def __post_init__(self: Self) -> None:
+    def __post_init__(self) -> None:
         """Validate instruction metadata after initialization."""
         if not 0x00 <= self.opcode <= 0xFF:
             msg = f"Opcode must be 0x00-0xFF, got: 0x{self.opcode:02X}"
@@ -79,7 +86,7 @@ class CPUInstruction:
             raise ValueError(msg)
 
     @property
-    def name(self: Self) -> str:
+    def name(self) -> str:
         """Generate canonical name like LDA_IMMEDIATE_0xA9."""
         addr_map = {
             "implied": "IMPLIED",
@@ -100,43 +107,43 @@ class CPUInstruction:
         return f"{self.mnemonic}_{addr_name}_0x{self.opcode:02X}"
 
     @property
-    def cycles_display(self: Self) -> str:
+    def cycles_display(self) -> str:
         """Return cycles as display string (e.g., '4' or '4*' for page penalty)."""
         if self.page_boundary_penalty:
             return f"{self.base_cycles}*"
         return str(self.base_cycles)
 
     @property
-    def affects_n(self: Self) -> bool:
+    def affects_n(self) -> bool:
         """True if instruction affects Negative flag."""
         return "N" in self.affected_flags
 
     @property
-    def affects_v(self: Self) -> bool:
+    def affects_v(self) -> bool:
         """True if instruction affects Overflow flag."""
         return "V" in self.affected_flags
 
     @property
-    def affects_z(self: Self) -> bool:
+    def affects_z(self) -> bool:
         """True if instruction affects Zero flag."""
         return "Z" in self.affected_flags
 
     @property
-    def affects_c(self: Self) -> bool:
+    def affects_c(self) -> bool:
         """True if instruction affects Carry flag."""
         return "C" in self.affected_flags
 
     @property
-    def affects_i(self: Self) -> bool:
+    def affects_i(self) -> bool:
         """True if instruction affects Interrupt Disable flag."""
         return "I" in self.affected_flags
 
     @property
-    def affects_d(self: Self) -> bool:
+    def affects_d(self) -> bool:
         """True if instruction affects Decimal flag."""
         return "D" in self.affected_flags
 
-    def to_legacy_dict(self: Self) -> dict:
+    def to_legacy_dict(self) -> dict:
         """Convert to legacy instruction_map dictionary format."""
         from mos6502 import flags as flag_bits
         from mos6502.memory import Byte
@@ -164,34 +171,62 @@ class CPUInstruction:
             "flags": flags_byte,
         }
 
-    def __int__(self: Self) -> int:
+    def __int__(self) -> int:
         """Allow using CPUInstruction where an int opcode is expected."""
         return self.opcode
 
-    def __hash__(self: Self) -> int:
+    def __hash__(self) -> int:
         """Hash by opcode for use in sets and as dict keys."""
         return hash(self.opcode)
 
 
-class PseudoEnumMember(int):
-    """Allows dynamic addition of members to IntEnum classes."""
+class PseudoEnumMember:
+    """Allows dynamic addition of members to IntEnum classes.
 
-    def __new__(cls, value: int, name: str) -> "PseudoEnumMember":
+    Note: Does not inherit from int for MicroPython compatibility.
+    Implements __int__, __eq__, __hash__, and __index__ to behave like an int.
+    """
+
+    __slots__ = ('_value_', '_name')
+
+    def __init__(self, value: int, name: str) -> None:
         """Create a pseudo-enum member with the given value and name."""
-        obj = int.__new__(cls, value)
-        obj._name = name
-        obj._value_ = value
-        return obj
+        self._value_ = value
+        self._name = name
 
     @property
-    def name(self: Self) -> str:
+    def name(self) -> str:
         """Return the member name."""
         return self._name
 
     @property
-    def value(self: Self) -> int:
+    def value(self) -> int:
         """Return the member value."""
         return self._value_
+
+    def __int__(self) -> int:
+        """Return the integer value."""
+        return self._value_
+
+    def __eq__(self, other: object) -> bool:
+        """Compare equality with int or another PseudoEnumMember."""
+        if isinstance(other, int):
+            return self._value_ == other
+        if isinstance(other, PseudoEnumMember):
+            return self._value_ == other._value_
+        return NotImplemented
+
+    def __hash__(self) -> int:
+        """Hash by value for use in sets and as dict keys."""
+        return hash(self._value_)
+
+    def __index__(self) -> int:
+        """Allow use in slices and hex()."""
+        return self._value_
+
+    def __repr__(self) -> str:
+        """Return string representation."""
+        return f"<{self._name}: {self._value_}>"
 
 
 def register_instruction(
@@ -207,7 +242,7 @@ def register_instruction(
 
 
 def register_instructions(
-    instructions: list[CPUInstruction],
+    instructions: List[CPUInstruction],
     instruction_set_class: type,
     instruction_map: dict,
 ) -> None:
@@ -216,11 +251,14 @@ def register_instructions(
         register_instruction(instruction, instruction_set_class, instruction_map)
 
 
-class InstructionOpcode(int):
+class InstructionOpcode:
     """Instruction opcode that carries its variant metadata.
 
-    This class extends int to carry package and function names for variant dispatch,
-    while remaining fully compatible with existing code that expects plain integers.
+    This class stores the opcode value and carries package and function names
+    for variant dispatch, while remaining compatible with code that expects integers.
+
+    Note: Does not inherit from int for MicroPython compatibility.
+    Implements __int__, __eq__, __hash__, and __index__ to behave like an int.
 
     Example:
     -------
@@ -231,7 +269,9 @@ class InstructionOpcode(int):
         )
     """
 
-    def __new__(cls, value: int, package: str, function: str) -> "InstructionSet":
+    __slots__ = ('_value', 'package', 'function')
+
+    def __init__(self, value: int, package: str, function: str) -> None:
         """Create instruction opcode with metadata.
 
         Arguments:
@@ -240,189 +280,220 @@ class InstructionOpcode(int):
             package: Package name (e.g., "mos6502.instructions.nop")
             function: Function name (e.g., "nop_implied_0xea")
         """
-        obj = int.__new__(cls, value)
-        obj.package = package  # type: ignore
-        obj.function = function  # type: ignore
-        return obj
+        self._value = value
+        self.package = package
+        self.function = function
+
+    def __int__(self) -> int:
+        """Return the integer opcode value."""
+        return self._value
+
+    def __eq__(self, other: object) -> bool:
+        """Compare equality with int or another InstructionOpcode."""
+        if isinstance(other, int):
+            return self._value == other
+        if isinstance(other, InstructionOpcode):
+            return self._value == other._value
+        return NotImplemented
+
+    def __hash__(self) -> int:
+        """Hash by opcode value for use in sets and as dict keys."""
+        return hash(self._value)
+
+    def __index__(self) -> int:
+        """Allow use in slices and hex()."""
+        return self._value
+
+    def __repr__(self) -> str:
+        """Return string representation."""
+        return f"InstructionOpcode(0x{self._value:02X}, {self.package!r}, {self.function!r})"
 
 # Import from individual instruction modules
 from mos6502.instructions._bit import BIT_ZEROPAGE_0x24, BIT_ABSOLUTE_0x2C, register_bit_instructions
 from mos6502.instructions._brk import BRK_IMPLIED_0x00, register_brk_instructions
-# Illegal instructions
-from mos6502.instructions.illegal._lax import (
-    LAX_ZEROPAGE_0xA7,
-    LAX_ZEROPAGE_Y_0xB7,
-    LAX_INDEXED_INDIRECT_X_0xA3,
-    LAX_INDIRECT_INDEXED_Y_0xB3,
-    LAX_ABSOLUTE_0xAF,
-    LAX_ABSOLUTE_Y_0xBF,
-    LAX_IMMEDIATE_0xAB,
-    register_lax_instructions,
-)
-from mos6502.instructions.illegal._sax import (
-    SAX_ZEROPAGE_0x87,
-    SAX_ZEROPAGE_Y_0x97,
-    SAX_INDEXED_INDIRECT_X_0x83,
-    SAX_ABSOLUTE_0x8F,
-    register_sax_instructions,
-)
-from mos6502.instructions.illegal._dcp import (
-    DCP_ZEROPAGE_0xC7,
-    DCP_ZEROPAGE_X_0xD7,
-    DCP_INDEXED_INDIRECT_X_0xC3,
-    DCP_INDIRECT_INDEXED_Y_0xD3,
-    DCP_ABSOLUTE_0xCF,
-    DCP_ABSOLUTE_X_0xDF,
-    DCP_ABSOLUTE_Y_0xDB,
-    register_dcp_instructions,
-)
-from mos6502.instructions.illegal._isc import (
-    ISC_ZEROPAGE_0xE7,
-    ISC_ZEROPAGE_X_0xF7,
-    ISC_INDEXED_INDIRECT_X_0xE3,
-    ISC_INDIRECT_INDEXED_Y_0xF3,
-    ISC_ABSOLUTE_0xEF,
-    ISC_ABSOLUTE_X_0xFF,
-    ISC_ABSOLUTE_Y_0xFB,
-    register_isc_instructions,
-)
-from mos6502.instructions.illegal._slo import (
-    SLO_ZEROPAGE_0x07,
-    SLO_ZEROPAGE_X_0x17,
-    SLO_INDEXED_INDIRECT_X_0x03,
-    SLO_INDIRECT_INDEXED_Y_0x13,
-    SLO_ABSOLUTE_0x0F,
-    SLO_ABSOLUTE_X_0x1F,
-    SLO_ABSOLUTE_Y_0x1B,
-    register_slo_instructions,
-)
-from mos6502.instructions.illegal._rla import (
-    RLA_ZEROPAGE_0x27,
-    RLA_ZEROPAGE_X_0x37,
-    RLA_INDEXED_INDIRECT_X_0x23,
-    RLA_INDIRECT_INDEXED_Y_0x33,
-    RLA_ABSOLUTE_0x2F,
-    RLA_ABSOLUTE_X_0x3F,
-    RLA_ABSOLUTE_Y_0x3B,
-    register_rla_instructions,
-)
-from mos6502.instructions.illegal._sre import (
-    SRE_ZEROPAGE_0x47,
-    SRE_ZEROPAGE_X_0x57,
-    SRE_INDEXED_INDIRECT_X_0x43,
-    SRE_INDIRECT_INDEXED_Y_0x53,
-    SRE_ABSOLUTE_0x4F,
-    SRE_ABSOLUTE_X_0x5F,
-    SRE_ABSOLUTE_Y_0x5B,
-    register_sre_instructions,
-)
-from mos6502.instructions.illegal._rra import (
-    RRA_ZEROPAGE_0x67,
-    RRA_ZEROPAGE_X_0x77,
-    RRA_INDEXED_INDIRECT_X_0x63,
-    RRA_INDIRECT_INDEXED_Y_0x73,
-    RRA_ABSOLUTE_0x6F,
-    RRA_ABSOLUTE_X_0x7F,
-    RRA_ABSOLUTE_Y_0x7B,
-    register_rra_instructions,
-)
-from mos6502.instructions.illegal._anc import (
-    ANC_IMMEDIATE_0x0B,
-    ANC_IMMEDIATE_0x2B,
-    register_anc_instructions,
-)
-from mos6502.instructions.illegal._alr import (
-    ALR_IMMEDIATE_0x4B,
-    register_alr_instructions,
-)
-from mos6502.instructions.illegal._arr import (
-    ARR_IMMEDIATE_0x6B,
-    register_arr_instructions,
-)
-from mos6502.instructions.illegal._sbx import (
-    SBX_IMMEDIATE_0xCB,
-    register_sbx_instructions,
-)
-from mos6502.instructions.illegal._las import (
-    LAS_ABSOLUTE_Y_0xBB,
-    register_las_instructions,
-)
-from mos6502.instructions.illegal._sbc_illegal import (
-    SBC_IMMEDIATE_0xEB,
-    register_sbc_illegal_instructions,
-)
-from mos6502.instructions.illegal._ane import (
-    ANE_IMMEDIATE_0x8B,
-    register_ane_instructions,
-)
-from mos6502.instructions.illegal._sha import (
-    SHA_INDIRECT_INDEXED_Y_0x93,
-    SHA_ABSOLUTE_Y_0x9F,
-    register_sha_instructions,
-)
-from mos6502.instructions.illegal._shx import (
-    SHX_ABSOLUTE_Y_0x9E,
-    register_shx_instructions,
-)
-from mos6502.instructions.illegal._shy import (
-    SHY_ABSOLUTE_X_0x9C,
-    register_shy_instructions,
-)
-from mos6502.instructions.illegal._tas import (
-    TAS_ABSOLUTE_Y_0x9B,
-    register_tas_instructions,
-)
-from mos6502.instructions.illegal._jam import (
-    JAM_IMPLIED_0x02,
-    JAM_IMPLIED_0x12,
-    JAM_IMPLIED_0x22,
-    JAM_IMPLIED_0x32,
-    JAM_IMPLIED_0x42,
-    JAM_IMPLIED_0x52,
-    JAM_IMPLIED_0x62,
-    JAM_IMPLIED_0x72,
-    JAM_IMPLIED_0x92,
-    JAM_IMPLIED_0xB2,
-    JAM_IMPLIED_0xD2,
-    JAM_IMPLIED_0xF2,
-    register_jam_instructions,
-)
-from mos6502.instructions.illegal._nop_illegal import (
-    # 1-byte implied
-    NOP_IMPLIED_0x1A,
-    NOP_IMPLIED_0x3A,
-    NOP_IMPLIED_0x5A,
-    NOP_IMPLIED_0x7A,
-    NOP_IMPLIED_0xDA,
-    NOP_IMPLIED_0xFA,
-    # 2-byte immediate
-    NOP_IMMEDIATE_0x80,
-    NOP_IMMEDIATE_0x82,
-    NOP_IMMEDIATE_0x89,
-    NOP_IMMEDIATE_0xC2,
-    NOP_IMMEDIATE_0xE2,
-    # 2-byte zero page
-    NOP_ZEROPAGE_0x04,
-    NOP_ZEROPAGE_0x44,
-    NOP_ZEROPAGE_0x64,
-    # 2-byte zero page,X
-    NOP_ZEROPAGE_X_0x14,
-    NOP_ZEROPAGE_X_0x34,
-    NOP_ZEROPAGE_X_0x54,
-    NOP_ZEROPAGE_X_0x74,
-    NOP_ZEROPAGE_X_0xD4,
-    NOP_ZEROPAGE_X_0xF4,
-    # 3-byte absolute
-    NOP_ABSOLUTE_0x0C,
-    # 3-byte absolute,X
-    NOP_ABSOLUTE_X_0x1C,
-    NOP_ABSOLUTE_X_0x3C,
-    NOP_ABSOLUTE_X_0x5C,
-    NOP_ABSOLUTE_X_0x7C,
-    NOP_ABSOLUTE_X_0xDC,
-    NOP_ABSOLUTE_X_0xFC,
-    register_nop_illegal_instructions,
-)
+# Illegal instructions - optional for MicroPython/Pico (memory constrained)
+# These imports are wrapped in try/except so they gracefully fail on Pico
+# where the illegal instruction modules are not deployed to save memory.
+_ILLEGAL_INSTRUCTIONS_AVAILABLE = False
+try:
+    from mos6502.instructions.illegal._lax import (
+        LAX_ZEROPAGE_0xA7,
+        LAX_ZEROPAGE_Y_0xB7,
+        LAX_INDEXED_INDIRECT_X_0xA3,
+        LAX_INDIRECT_INDEXED_Y_0xB3,
+        LAX_ABSOLUTE_0xAF,
+        LAX_ABSOLUTE_Y_0xBF,
+        LAX_IMMEDIATE_0xAB,
+        register_lax_instructions,
+    )
+    from mos6502.instructions.illegal._sax import (
+        SAX_ZEROPAGE_0x87,
+        SAX_ZEROPAGE_Y_0x97,
+        SAX_INDEXED_INDIRECT_X_0x83,
+        SAX_ABSOLUTE_0x8F,
+        register_sax_instructions,
+    )
+    from mos6502.instructions.illegal._dcp import (
+        DCP_ZEROPAGE_0xC7,
+        DCP_ZEROPAGE_X_0xD7,
+        DCP_INDEXED_INDIRECT_X_0xC3,
+        DCP_INDIRECT_INDEXED_Y_0xD3,
+        DCP_ABSOLUTE_0xCF,
+        DCP_ABSOLUTE_X_0xDF,
+        DCP_ABSOLUTE_Y_0xDB,
+        register_dcp_instructions,
+    )
+    from mos6502.instructions.illegal._isc import (
+        ISC_ZEROPAGE_0xE7,
+        ISC_ZEROPAGE_X_0xF7,
+        ISC_INDEXED_INDIRECT_X_0xE3,
+        ISC_INDIRECT_INDEXED_Y_0xF3,
+        ISC_ABSOLUTE_0xEF,
+        ISC_ABSOLUTE_X_0xFF,
+        ISC_ABSOLUTE_Y_0xFB,
+        register_isc_instructions,
+    )
+    from mos6502.instructions.illegal._slo import (
+        SLO_ZEROPAGE_0x07,
+        SLO_ZEROPAGE_X_0x17,
+        SLO_INDEXED_INDIRECT_X_0x03,
+        SLO_INDIRECT_INDEXED_Y_0x13,
+        SLO_ABSOLUTE_0x0F,
+        SLO_ABSOLUTE_X_0x1F,
+        SLO_ABSOLUTE_Y_0x1B,
+        register_slo_instructions,
+    )
+    from mos6502.instructions.illegal._rla import (
+        RLA_ZEROPAGE_0x27,
+        RLA_ZEROPAGE_X_0x37,
+        RLA_INDEXED_INDIRECT_X_0x23,
+        RLA_INDIRECT_INDEXED_Y_0x33,
+        RLA_ABSOLUTE_0x2F,
+        RLA_ABSOLUTE_X_0x3F,
+        RLA_ABSOLUTE_Y_0x3B,
+        register_rla_instructions,
+    )
+    from mos6502.instructions.illegal._sre import (
+        SRE_ZEROPAGE_0x47,
+        SRE_ZEROPAGE_X_0x57,
+        SRE_INDEXED_INDIRECT_X_0x43,
+        SRE_INDIRECT_INDEXED_Y_0x53,
+        SRE_ABSOLUTE_0x4F,
+        SRE_ABSOLUTE_X_0x5F,
+        SRE_ABSOLUTE_Y_0x5B,
+        register_sre_instructions,
+    )
+    from mos6502.instructions.illegal._rra import (
+        RRA_ZEROPAGE_0x67,
+        RRA_ZEROPAGE_X_0x77,
+        RRA_INDEXED_INDIRECT_X_0x63,
+        RRA_INDIRECT_INDEXED_Y_0x73,
+        RRA_ABSOLUTE_0x6F,
+        RRA_ABSOLUTE_X_0x7F,
+        RRA_ABSOLUTE_Y_0x7B,
+        register_rra_instructions,
+    )
+    from mos6502.instructions.illegal._anc import (
+        ANC_IMMEDIATE_0x0B,
+        ANC_IMMEDIATE_0x2B,
+        register_anc_instructions,
+    )
+    from mos6502.instructions.illegal._alr import (
+        ALR_IMMEDIATE_0x4B,
+        register_alr_instructions,
+    )
+    from mos6502.instructions.illegal._arr import (
+        ARR_IMMEDIATE_0x6B,
+        register_arr_instructions,
+    )
+    from mos6502.instructions.illegal._sbx import (
+        SBX_IMMEDIATE_0xCB,
+        register_sbx_instructions,
+    )
+    from mos6502.instructions.illegal._las import (
+        LAS_ABSOLUTE_Y_0xBB,
+        register_las_instructions,
+    )
+    from mos6502.instructions.illegal._sbc_illegal import (
+        SBC_IMMEDIATE_0xEB,
+        register_sbc_illegal_instructions,
+    )
+    from mos6502.instructions.illegal._ane import (
+        ANE_IMMEDIATE_0x8B,
+        register_ane_instructions,
+    )
+    from mos6502.instructions.illegal._sha import (
+        SHA_INDIRECT_INDEXED_Y_0x93,
+        SHA_ABSOLUTE_Y_0x9F,
+        register_sha_instructions,
+    )
+    from mos6502.instructions.illegal._shx import (
+        SHX_ABSOLUTE_Y_0x9E,
+        register_shx_instructions,
+    )
+    from mos6502.instructions.illegal._shy import (
+        SHY_ABSOLUTE_X_0x9C,
+        register_shy_instructions,
+    )
+    from mos6502.instructions.illegal._tas import (
+        TAS_ABSOLUTE_Y_0x9B,
+        register_tas_instructions,
+    )
+    from mos6502.instructions.illegal._jam import (
+        JAM_IMPLIED_0x02,
+        JAM_IMPLIED_0x12,
+        JAM_IMPLIED_0x22,
+        JAM_IMPLIED_0x32,
+        JAM_IMPLIED_0x42,
+        JAM_IMPLIED_0x52,
+        JAM_IMPLIED_0x62,
+        JAM_IMPLIED_0x72,
+        JAM_IMPLIED_0x92,
+        JAM_IMPLIED_0xB2,
+        JAM_IMPLIED_0xD2,
+        JAM_IMPLIED_0xF2,
+        register_jam_instructions,
+    )
+    from mos6502.instructions.illegal._nop_illegal import (
+        # 1-byte implied
+        NOP_IMPLIED_0x1A,
+        NOP_IMPLIED_0x3A,
+        NOP_IMPLIED_0x5A,
+        NOP_IMPLIED_0x7A,
+        NOP_IMPLIED_0xDA,
+        NOP_IMPLIED_0xFA,
+        # 2-byte immediate
+        NOP_IMMEDIATE_0x80,
+        NOP_IMMEDIATE_0x82,
+        NOP_IMMEDIATE_0x89,
+        NOP_IMMEDIATE_0xC2,
+        NOP_IMMEDIATE_0xE2,
+        # 2-byte zero page
+        NOP_ZEROPAGE_0x04,
+        NOP_ZEROPAGE_0x44,
+        NOP_ZEROPAGE_0x64,
+        # 2-byte zero page,X
+        NOP_ZEROPAGE_X_0x14,
+        NOP_ZEROPAGE_X_0x34,
+        NOP_ZEROPAGE_X_0x54,
+        NOP_ZEROPAGE_X_0x74,
+        NOP_ZEROPAGE_X_0xD4,
+        NOP_ZEROPAGE_X_0xF4,
+        # 3-byte absolute
+        NOP_ABSOLUTE_0x0C,
+        # 3-byte absolute,X
+        NOP_ABSOLUTE_X_0x1C,
+        NOP_ABSOLUTE_X_0x3C,
+        NOP_ABSOLUTE_X_0x5C,
+        NOP_ABSOLUTE_X_0x7C,
+        NOP_ABSOLUTE_X_0xDC,
+        NOP_ABSOLUTE_X_0xFC,
+        register_nop_illegal_instructions,
+    )
+    _ILLEGAL_INSTRUCTIONS_AVAILABLE = True
+except ImportError:
+    # Illegal instructions not available (MicroPython/Pico deployment)
+    pass
 from mos6502.instructions.load._lda import (
     LDA_IMMEDIATE_0xA9,
     LDA_ZEROPAGE_0xA5,
@@ -993,8 +1064,9 @@ class InstructionSet(enum.IntEnum):
         raise IllegalCPUInstructionError(f"{value} ({value:02X}) is not a valid {cls}.")
 
 
-# Initialize instruction map
+# Initialize instruction map and _value2member_map_ (needed for MicroPython compatibility)
 InstructionSet.map = {}
+InstructionSet._value2member_map_ = {}
 
 # Register instruction modules
 register_bit_instructions(InstructionSet, InstructionSet.map)
@@ -1026,28 +1098,29 @@ register_ror_instructions(InstructionSet, InstructionSet.map)
 register_nop_instructions(InstructionSet, InstructionSet.map)
 register_rti_instructions(InstructionSet, InstructionSet.map)
 register_rts_instructions(InstructionSet, InstructionSet.map)
-# Illegal instructions
-register_lax_instructions(InstructionSet, InstructionSet.map)
-register_sax_instructions(InstructionSet, InstructionSet.map)
-register_dcp_instructions(InstructionSet, InstructionSet.map)
-register_isc_instructions(InstructionSet, InstructionSet.map)
-register_slo_instructions(InstructionSet, InstructionSet.map)
-register_rla_instructions(InstructionSet, InstructionSet.map)
-register_sre_instructions(InstructionSet, InstructionSet.map)
-register_rra_instructions(InstructionSet, InstructionSet.map)
-register_anc_instructions(InstructionSet, InstructionSet.map)
-register_alr_instructions(InstructionSet, InstructionSet.map)
-register_arr_instructions(InstructionSet, InstructionSet.map)
-register_sbx_instructions(InstructionSet, InstructionSet.map)
-register_las_instructions(InstructionSet, InstructionSet.map)
-register_nop_illegal_instructions(InstructionSet, InstructionSet.map)
-register_sbc_illegal_instructions(InstructionSet, InstructionSet.map)
-register_ane_instructions(InstructionSet, InstructionSet.map)
-register_sha_instructions(InstructionSet, InstructionSet.map)
-register_shx_instructions(InstructionSet, InstructionSet.map)
-register_shy_instructions(InstructionSet, InstructionSet.map)
-register_tas_instructions(InstructionSet, InstructionSet.map)
-register_jam_instructions(InstructionSet, InstructionSet.map)
+# Illegal instructions - only register if available (not on MicroPython/Pico)
+if _ILLEGAL_INSTRUCTIONS_AVAILABLE:
+    register_lax_instructions(InstructionSet, InstructionSet.map)
+    register_sax_instructions(InstructionSet, InstructionSet.map)
+    register_dcp_instructions(InstructionSet, InstructionSet.map)
+    register_isc_instructions(InstructionSet, InstructionSet.map)
+    register_slo_instructions(InstructionSet, InstructionSet.map)
+    register_rla_instructions(InstructionSet, InstructionSet.map)
+    register_sre_instructions(InstructionSet, InstructionSet.map)
+    register_rra_instructions(InstructionSet, InstructionSet.map)
+    register_anc_instructions(InstructionSet, InstructionSet.map)
+    register_alr_instructions(InstructionSet, InstructionSet.map)
+    register_arr_instructions(InstructionSet, InstructionSet.map)
+    register_sbx_instructions(InstructionSet, InstructionSet.map)
+    register_las_instructions(InstructionSet, InstructionSet.map)
+    register_nop_illegal_instructions(InstructionSet, InstructionSet.map)
+    register_sbc_illegal_instructions(InstructionSet, InstructionSet.map)
+    register_ane_instructions(InstructionSet, InstructionSet.map)
+    register_sha_instructions(InstructionSet, InstructionSet.map)
+    register_shx_instructions(InstructionSet, InstructionSet.map)
+    register_shy_instructions(InstructionSet, InstructionSet.map)
+    register_tas_instructions(InstructionSet, InstructionSet.map)
+    register_jam_instructions(InstructionSet, InstructionSet.map)
 # register_all_arithmetic_instructions(InstructionSet, InstructionSet.map)  # MIGRATED to adc/sbc/inc/dec packages
 register_all_branch_instructions(InstructionSet, InstructionSet.map)  # MIGRATED to individual branch packages
 # register_all_compare_instructions(InstructionSet, InstructionSet.map)  # MIGRATED to cmp/cpx/cpy packages
@@ -1061,7 +1134,7 @@ register_all_transfer_instructions(InstructionSet, InstructionSet.map)  # MIGRAT
 
 # Build opcode lookup map for variant dispatch
 # This maps int opcode values to InstructionOpcode objects with metadata
-def _build_opcode_lookup() -> dict[int, InstructionOpcode]:
+def _build_opcode_lookup() -> Dict[int, InstructionOpcode]:
     """Build lookup map from opcode values to InstructionOpcode objects.
 
     This allows converting fetched instruction bytes to InstructionOpcode objects

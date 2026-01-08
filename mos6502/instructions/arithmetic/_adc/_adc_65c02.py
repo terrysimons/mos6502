@@ -1,15 +1,14 @@
 #!/usr/bin/env python3
 """ADC instruction implementation for CMOS 65C02 variant."""
 
-from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from mos6502.compat import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from mos6502.core import MOS6502CPU
 
 
-def adc_immediate_0x69(cpu: MOS6502CPU) -> None:
+def adc_immediate_0x69(cpu: "MOS6502CPU") -> None:
     """Execute ADC (Add with Carry) - Immediate addressing mode - 65C02 variant.
 
     Opcode: 0x69
@@ -58,7 +57,7 @@ def adc_immediate_0x69(cpu: MOS6502CPU) -> None:
     cpu.log.info("i")
 
 
-def adc_zeropage_0x65(cpu: MOS6502CPU) -> None:
+def adc_zeropage_0x65(cpu: "MOS6502CPU") -> None:
     """Execute ADC (Add with Carry) - Zero Page addressing mode - 65C02 variant.
 
     Opcode: 0x65
@@ -70,8 +69,8 @@ def adc_zeropage_0x65(cpu: MOS6502CPU) -> None:
     """
     from mos6502 import flags
 
-    address: int = cpu.fetch_zeropage_mode_address(offset_register_name=None)
-    value: int = cpu.read_byte(address=address)
+    address: int = cpu.fetch_zeropage_mode_address(None)
+    value: int = cpu.read_byte(address)
 
     if cpu.flags[flags.D]:
         result, carry_out, overflow, binary_result = cpu._adc_bcd(cpu.A, value, cpu.flags[flags.C])
@@ -91,7 +90,7 @@ def adc_zeropage_0x65(cpu: MOS6502CPU) -> None:
     cpu.log.info("z")
 
 
-def adc_zeropage_x_0x75(cpu: MOS6502CPU) -> None:
+def adc_zeropage_x_0x75(cpu: "MOS6502CPU") -> None:
     """Execute ADC (Add with Carry) - Zero Page,X addressing mode - 65C02 variant.
 
     Opcode: 0x75
@@ -103,8 +102,8 @@ def adc_zeropage_x_0x75(cpu: MOS6502CPU) -> None:
     """
     from mos6502 import flags
 
-    address: int = cpu.fetch_zeropage_mode_address(offset_register_name="X")
-    value: int = cpu.read_byte(address=address)
+    address: int = cpu.fetch_zeropage_mode_address("X")
+    value: int = cpu.read_byte(address)
 
     if cpu.flags[flags.D]:
         result, carry_out, overflow, binary_result = cpu._adc_bcd(cpu.A, value, cpu.flags[flags.C])
@@ -124,7 +123,7 @@ def adc_zeropage_x_0x75(cpu: MOS6502CPU) -> None:
     cpu.log.info("zx")
 
 
-def adc_absolute_0x6d(cpu: MOS6502CPU) -> None:
+def adc_absolute_0x6d(cpu: "MOS6502CPU") -> None:
     """Execute ADC (Add with Carry) - Absolute addressing mode - 65C02 variant.
 
     Opcode: 0x6D
@@ -136,8 +135,8 @@ def adc_absolute_0x6d(cpu: MOS6502CPU) -> None:
     """
     from mos6502 import flags
 
-    address: int = cpu.fetch_absolute_mode_address(offset_register_name=None)
-    value: int = cpu.read_byte(address=address)
+    address: int = cpu.fetch_absolute_mode_address(None)
+    value: int = cpu.read_byte(address)
 
     if cpu.flags[flags.D]:
         result, carry_out, overflow, binary_result = cpu._adc_bcd(cpu.A, value, cpu.flags[flags.C])
@@ -157,7 +156,7 @@ def adc_absolute_0x6d(cpu: MOS6502CPU) -> None:
     cpu.log.info("a")
 
 
-def adc_absolute_x_0x7d(cpu: MOS6502CPU) -> None:
+def adc_absolute_x_0x7d(cpu: "MOS6502CPU") -> None:
     """Execute ADC (Add with Carry) - Absolute,X addressing mode - 65C02 variant.
 
     Opcode: 0x7D
@@ -169,8 +168,8 @@ def adc_absolute_x_0x7d(cpu: MOS6502CPU) -> None:
     """
     from mos6502 import flags
 
-    address: int = cpu.fetch_absolute_mode_address(offset_register_name="X")
-    value: int = cpu.read_byte(address=address)
+    address: int = cpu.fetch_absolute_mode_address("X")
+    value: int = cpu.read_byte(address)
 
     if cpu.flags[flags.D]:
         result, carry_out, overflow, binary_result = cpu._adc_bcd(cpu.A, value, cpu.flags[flags.C])
@@ -190,7 +189,7 @@ def adc_absolute_x_0x7d(cpu: MOS6502CPU) -> None:
     cpu.log.info("ax")
 
 
-def adc_absolute_y_0x79(cpu: MOS6502CPU) -> None:
+def adc_absolute_y_0x79(cpu: "MOS6502CPU") -> None:
     """Execute ADC (Add with Carry) - Absolute,Y addressing mode - 65C02 variant.
 
     Opcode: 0x79
@@ -202,8 +201,8 @@ def adc_absolute_y_0x79(cpu: MOS6502CPU) -> None:
     """
     from mos6502 import flags
 
-    address: int = cpu.fetch_absolute_mode_address(offset_register_name="Y")
-    value: int = cpu.read_byte(address=address)
+    address: int = cpu.fetch_absolute_mode_address("Y")
+    value: int = cpu.read_byte(address)
 
     if cpu.flags[flags.D]:
         result, carry_out, overflow, binary_result = cpu._adc_bcd(cpu.A, value, cpu.flags[flags.C])
@@ -223,7 +222,7 @@ def adc_absolute_y_0x79(cpu: MOS6502CPU) -> None:
     cpu.log.info("ay")
 
 
-def adc_indexed_indirect_x_0x61(cpu: MOS6502CPU) -> None:
+def adc_indexed_indirect_x_0x61(cpu: "MOS6502CPU") -> None:
     """Execute ADC (Add with Carry) - Indexed Indirect (X) addressing mode - 65C02 variant.
 
     Opcode: 0x61
@@ -236,7 +235,7 @@ def adc_indexed_indirect_x_0x61(cpu: MOS6502CPU) -> None:
     from mos6502 import flags
 
     address: int = cpu.fetch_indexed_indirect_mode_address()
-    value: int = cpu.read_byte(address=address)
+    value: int = cpu.read_byte(address)
 
     if cpu.flags[flags.D]:
         result, carry_out, overflow, binary_result = cpu._adc_bcd(cpu.A, value, cpu.flags[flags.C])
@@ -256,7 +255,7 @@ def adc_indexed_indirect_x_0x61(cpu: MOS6502CPU) -> None:
     cpu.log.info("ix")
 
 
-def adc_indirect_indexed_y_0x71(cpu: MOS6502CPU) -> None:
+def adc_indirect_indexed_y_0x71(cpu: "MOS6502CPU") -> None:
     """Execute ADC (Add with Carry) - Indirect Indexed (Y) addressing mode - 65C02 variant.
 
     Opcode: 0x71
@@ -269,7 +268,7 @@ def adc_indirect_indexed_y_0x71(cpu: MOS6502CPU) -> None:
     from mos6502 import flags
 
     address: int = cpu.fetch_indirect_indexed_mode_address()
-    value: int = cpu.read_byte(address=address)
+    value: int = cpu.read_byte(address)
 
     if cpu.flags[flags.D]:
         result, carry_out, overflow, binary_result = cpu._adc_bcd(cpu.A, value, cpu.flags[flags.C])

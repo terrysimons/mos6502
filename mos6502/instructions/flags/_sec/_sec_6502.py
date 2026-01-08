@@ -1,15 +1,14 @@
 #!/usr/bin/env python3
 """SEC instruction implementation for all 6502 variants."""
 
-from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from mos6502.compat import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from mos6502.core import MOS6502CPU
 
 
-def sec_implied_0x38(cpu: MOS6502CPU) -> None:
+def sec_implied_0x38(cpu: "MOS6502CPU") -> None:
     """Execute SEC (Set Carry Flag) - Implied addressing mode.
 
     Opcode: 0x38

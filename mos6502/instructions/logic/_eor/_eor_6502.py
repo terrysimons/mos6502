@@ -1,15 +1,14 @@
 #!/usr/bin/env python3
 """EOR instruction implementation for all 6502 variants."""
 
-from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from mos6502.compat import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from mos6502.core import MOS6502CPU
 
 
-def eor_immediate_0x49(cpu: MOS6502CPU) -> None:
+def eor_immediate_0x49(cpu: "MOS6502CPU") -> None:
     """Execute EOR (Exclusive OR with Accumulator) - Immediate addressing mode.
 
     Opcode: 0x49
@@ -27,11 +26,11 @@ def eor_immediate_0x49(cpu: MOS6502CPU) -> None:
     """
     value: int = cpu.fetch_byte()
     cpu.A = cpu.A ^ value
-    cpu.set_load_status_flags(register_name="A")
+    cpu.set_load_status_flags("A")
     cpu.log.info("i")
 
 
-def eor_zeropage_0x45(cpu: MOS6502CPU) -> None:
+def eor_zeropage_0x45(cpu: "MOS6502CPU") -> None:
     """Execute EOR (Exclusive OR with Accumulator) - Zeropage addressing mode.
 
     Opcode: 0x45
@@ -47,14 +46,14 @@ def eor_zeropage_0x45(cpu: MOS6502CPU) -> None:
     ---------
         cpu: The CPU instance to operate on
     """
-    address: int = cpu.fetch_zeropage_mode_address(offset_register_name=None)
-    value: int = cpu.read_byte(address=address)
+    address: int = cpu.fetch_zeropage_mode_address(None)
+    value: int = cpu.read_byte(address)
     cpu.A = cpu.A ^ value
-    cpu.set_load_status_flags(register_name="A")
+    cpu.set_load_status_flags("A")
     cpu.log.info("i")
 
 
-def eor_zeropage_x_0x55(cpu: MOS6502CPU) -> None:
+def eor_zeropage_x_0x55(cpu: "MOS6502CPU") -> None:
     """Execute EOR (Exclusive OR with Accumulator) - Zeropage,X addressing mode.
 
     Opcode: 0x55
@@ -70,14 +69,14 @@ def eor_zeropage_x_0x55(cpu: MOS6502CPU) -> None:
     ---------
         cpu: The CPU instance to operate on
     """
-    address: int = cpu.fetch_zeropage_mode_address(offset_register_name="X")
-    value: int = cpu.read_byte(address=address)
+    address: int = cpu.fetch_zeropage_mode_address("X")
+    value: int = cpu.read_byte(address)
     cpu.A = cpu.A ^ value
-    cpu.set_load_status_flags(register_name="A")
+    cpu.set_load_status_flags("A")
     cpu.log.info("i")
 
 
-def eor_absolute_0x4d(cpu: MOS6502CPU) -> None:
+def eor_absolute_0x4d(cpu: "MOS6502CPU") -> None:
     """Execute EOR (Exclusive OR with Accumulator) - Absolute addressing mode.
 
     Opcode: 0x4D
@@ -93,14 +92,14 @@ def eor_absolute_0x4d(cpu: MOS6502CPU) -> None:
     ---------
         cpu: The CPU instance to operate on
     """
-    address: int = cpu.fetch_absolute_mode_address(offset_register_name=None)
-    value: int = cpu.read_byte(address=address)
+    address: int = cpu.fetch_absolute_mode_address(None)
+    value: int = cpu.read_byte(address)
     cpu.A = cpu.A ^ value
-    cpu.set_load_status_flags(register_name="A")
+    cpu.set_load_status_flags("A")
     cpu.log.info("i")
 
 
-def eor_absolute_x_0x5d(cpu: MOS6502CPU) -> None:
+def eor_absolute_x_0x5d(cpu: "MOS6502CPU") -> None:
     """Execute EOR (Exclusive OR with Accumulator) - Absolute,X addressing mode.
 
     Opcode: 0x5D
@@ -116,14 +115,14 @@ def eor_absolute_x_0x5d(cpu: MOS6502CPU) -> None:
     ---------
         cpu: The CPU instance to operate on
     """
-    address: int = cpu.fetch_absolute_mode_address(offset_register_name="X")
-    value: int = cpu.read_byte(address=address)
+    address: int = cpu.fetch_absolute_mode_address("X")
+    value: int = cpu.read_byte(address)
     cpu.A = cpu.A ^ value
-    cpu.set_load_status_flags(register_name="A")
+    cpu.set_load_status_flags("A")
     cpu.log.info("i")
 
 
-def eor_absolute_y_0x59(cpu: MOS6502CPU) -> None:
+def eor_absolute_y_0x59(cpu: "MOS6502CPU") -> None:
     """Execute EOR (Exclusive OR with Accumulator) - Absolute,Y addressing mode.
 
     Opcode: 0x59
@@ -139,14 +138,14 @@ def eor_absolute_y_0x59(cpu: MOS6502CPU) -> None:
     ---------
         cpu: The CPU instance to operate on
     """
-    address: int = cpu.fetch_absolute_mode_address(offset_register_name="Y")
-    value: int = cpu.read_byte(address=address)
+    address: int = cpu.fetch_absolute_mode_address("Y")
+    value: int = cpu.read_byte(address)
     cpu.A = cpu.A ^ value
-    cpu.set_load_status_flags(register_name="A")
+    cpu.set_load_status_flags("A")
     cpu.log.info("i")
 
 
-def eor_indexed_indirect_x_0x41(cpu: MOS6502CPU) -> None:
+def eor_indexed_indirect_x_0x41(cpu: "MOS6502CPU") -> None:
     """Execute EOR (Exclusive OR with Accumulator) - (Indirect,X) addressing mode.
 
     Opcode: 0x41
@@ -163,13 +162,13 @@ def eor_indexed_indirect_x_0x41(cpu: MOS6502CPU) -> None:
         cpu: The CPU instance to operate on
     """
     address: int = cpu.fetch_indexed_indirect_mode_address()
-    value: int = cpu.read_byte(address=address)
+    value: int = cpu.read_byte(address)
     cpu.A = cpu.A ^ value
-    cpu.set_load_status_flags(register_name="A")
+    cpu.set_load_status_flags("A")
     cpu.log.info("i")
 
 
-def eor_indirect_indexed_y_0x51(cpu: MOS6502CPU) -> None:
+def eor_indirect_indexed_y_0x51(cpu: "MOS6502CPU") -> None:
     """Execute EOR (Exclusive OR with Accumulator) - (Indirect),Y addressing mode.
 
     Opcode: 0x51
@@ -186,7 +185,7 @@ def eor_indirect_indexed_y_0x51(cpu: MOS6502CPU) -> None:
         cpu: The CPU instance to operate on
     """
     address: int = cpu.fetch_indirect_indexed_mode_address()
-    value: int = cpu.read_byte(address=address)
+    value: int = cpu.read_byte(address)
     cpu.A = cpu.A ^ value
-    cpu.set_load_status_flags(register_name="A")
+    cpu.set_load_status_flags("A")
     cpu.log.info("i")

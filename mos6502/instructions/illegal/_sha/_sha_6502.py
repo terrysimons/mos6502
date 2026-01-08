@@ -18,15 +18,14 @@ References:
   - https://www.nesdev.org/wiki/CPU_unofficial_opcodes
 """
 
-from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from mos6502.compat import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from mos6502.core import MOS6502CPU
 
 
-def sha_indirect_indexed_y_0x93(cpu: MOS6502CPU) -> None:
+def sha_indirect_indexed_y_0x93(cpu: "MOS6502CPU") -> None:
     """Execute SHA (AHX) - Indirect Indexed Y addressing mode.
 
     Opcode: 0x93
@@ -65,12 +64,12 @@ def sha_indirect_indexed_y_0x93(cpu: MOS6502CPU) -> None:
     value: int = int(cpu.A) & int(cpu.X) & ((high_byte + 1) & 0xFF)
 
     # Store the value
-    cpu.write_byte(address=effective_address, data=value)
+    cpu.write_byte(effective_address, value)
 
     cpu.log.info("i")
 
 
-def sha_absolute_y_0x9f(cpu: MOS6502CPU) -> None:
+def sha_absolute_y_0x9f(cpu: "MOS6502CPU") -> None:
     """Execute SHA (AHX) - Absolute Y addressing mode.
 
     Opcode: 0x9F
@@ -106,6 +105,6 @@ def sha_absolute_y_0x9f(cpu: MOS6502CPU) -> None:
     value: int = int(cpu.A) & int(cpu.X) & ((high_byte + 1) & 0xFF)
 
     # Store the value
-    cpu.write_byte(address=effective_address, data=value)
+    cpu.write_byte(effective_address, value)
 
     cpu.log.info("i")

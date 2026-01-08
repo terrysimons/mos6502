@@ -22,7 +22,7 @@ performance (PyPy's JIT works better with pure Python code).
 
 import os
 import sys
-from typing import Literal
+from mos6502.compat import Literal, Union
 
 # Auto-detect PyPy and force pure-Python mode
 # PyPy's JIT compiler works much better with pure Python than with C extensions
@@ -30,7 +30,7 @@ if sys.implementation.name == "pypy":
     os.environ.setdefault("MOS6502_PURE_PYTHON", "1")
 
 # Configuration - can be overridden before first use
-_USE_NATIVE: bool | None = None  # None means auto-detect
+_USE_NATIVE: Union[bool, None]= None  # None means auto-detect
 _NATIVE_AVAILABLE: bool = False
 
 # Try to import native bitarray
@@ -71,7 +71,7 @@ def _should_use_native() -> bool:
     return _NATIVE_AVAILABLE
 
 
-def configure(*, use_native: bool | None = None) -> None:
+def configure(use_native: Union[bool, None]= None) -> None:
     """Configure which bitarray implementation to use.
 
     Args:
@@ -131,10 +131,10 @@ def is_bitarray(obj: object) -> bool:
 class _LazyBitarray:
     """Lazy loader that selects implementation on first use."""
 
-    def __new__(cls, *args, **kwargs):  # noqa: ANN204, ANN002, ANN003
+    def __new__(cls, initializer=0, length=None, endian="little"):  # noqa: ANN204
         if _should_use_native():
-            return _native_bitarray(*args, **kwargs)
-        return _pybitarray(*args, **kwargs)
+            return _native_bitarray(initializer, length, endian)
+        return _pybitarray(initializer, length, endian)
 
 
 def int2ba(
@@ -156,8 +156,8 @@ def int2ba(
 
     """
     if _should_use_native():
-        return _native_int2ba(value, length=length, endian=endian)
-    return _py_int2ba(value, length=length, endian=endian)
+        return _native_int2ba(value, length, endian)
+    return _py_int2ba(value, length, endian)
 
 
 def ba2int(ba) -> int:  # noqa: ANN001

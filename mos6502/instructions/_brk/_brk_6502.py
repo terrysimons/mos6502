@@ -1,15 +1,14 @@
 #!/usr/bin/env python3
 """BRK instruction implementation for all 6502 variants."""
 
-from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from mos6502.compat import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from mos6502.core import MOS6502CPU
 
 
-def brk_implied_0x00(cpu: MOS6502CPU) -> None:
+def brk_implied_0x00(cpu: "MOS6502CPU") -> None:
     """Execute BRK (Force Break) - Implied addressing mode.
 
     Opcode: 0x00
@@ -43,17 +42,17 @@ def brk_implied_0x00(cpu: MOS6502CPU) -> None:
     pc_low = return_addr & 0xFF
 
     # Push PC high byte first (6502 pushes high byte before low byte)
-    cpu.write_byte(address=cpu.S, data=pc_high)
+    cpu.write_byte(cpu.S, pc_high)
     cpu.S -= 1
 
     # Push PC low byte
-    cpu.write_byte(address=cpu.S, data=pc_low)
+    cpu.write_byte(cpu.S, pc_low)
     cpu.S -= 1
 
     # Push status register with B flag set
     # Create a copy of flags with B flag set
     status_with_break: Byte = Byte(cpu._flags.value | (1 << flags.B))
-    cpu.write_byte(address=cpu.S, data=status_with_break)
+    cpu.write_byte(cpu.S, status_with_break)
     cpu.S -= 1
 
     # Set interrupt disable flag
@@ -62,10 +61,10 @@ def brk_implied_0x00(cpu: MOS6502CPU) -> None:
     # Load PC from IRQ vector at 0xFFFE/0xFFFF
     # Read the IRQ vector (2 cycles)
     irq_vector = cpu.peek_word(0xFFFE)
-    cpu.spend_cpu_cycles(cost=2)
+    cpu.spend_cpu_cycles(2)
 
     # Jump to IRQ handler (1 cycle)
     cpu.PC = irq_vector
-    cpu.spend_cpu_cycles(cost=1)
+    cpu.spend_cpu_cycles(1)
 
     cpu.log.info("i")

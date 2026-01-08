@@ -1,15 +1,14 @@
 #!/usr/bin/env python3
 """DEC instruction implementation for all 6502 variants."""
 
-from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from mos6502.compat import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from mos6502.core import MOS6502CPU
 
 
-def dec_zeropage_0xc6(cpu: MOS6502CPU) -> None:
+def dec_zeropage_0xc6(cpu: "MOS6502CPU") -> None:
     """Execute DEC (Decrement Memory) - Zero Page addressing mode.
 
     Opcode: 0xC6
@@ -22,11 +21,11 @@ def dec_zeropage_0xc6(cpu: MOS6502CPU) -> None:
     """
     from mos6502 import flags
 
-    address: int = cpu.fetch_zeropage_mode_address(offset_register_name=None)
-    value: int = cpu.read_byte(address=address)
+    address: int = cpu.fetch_zeropage_mode_address(None)
+    value: int = cpu.read_byte(address)
 
     result: int = (value - 1) & 0xFF
-    cpu.write_byte(address=address, data=result)
+    cpu.write_byte(address, result)
 
     # Set N and Z flags
     cpu.flags[flags.Z] = 1 if result == 0 else 0
@@ -35,7 +34,7 @@ def dec_zeropage_0xc6(cpu: MOS6502CPU) -> None:
     cpu.log.info("z")
 
 
-def dec_zeropage_x_0xd6(cpu: MOS6502CPU) -> None:
+def dec_zeropage_x_0xd6(cpu: "MOS6502CPU") -> None:
     """Execute DEC (Decrement Memory) - Zero Page,X addressing mode.
 
     Opcode: 0xD6
@@ -44,11 +43,11 @@ def dec_zeropage_x_0xd6(cpu: MOS6502CPU) -> None:
     """
     from mos6502 import flags
 
-    address: int = cpu.fetch_zeropage_mode_address(offset_register_name="X")
-    value: int = cpu.read_byte(address=address)
+    address: int = cpu.fetch_zeropage_mode_address("X")
+    value: int = cpu.read_byte(address)
 
     result: int = (value - 1) & 0xFF
-    cpu.write_byte(address=address, data=result)
+    cpu.write_byte(address, result)
 
     # Set N and Z flags
     cpu.flags[flags.Z] = 1 if result == 0 else 0
@@ -57,7 +56,7 @@ def dec_zeropage_x_0xd6(cpu: MOS6502CPU) -> None:
     cpu.log.info("zx")
 
 
-def dec_absolute_0xce(cpu: MOS6502CPU) -> None:
+def dec_absolute_0xce(cpu: "MOS6502CPU") -> None:
     """Execute DEC (Decrement Memory) - Absolute addressing mode.
 
     Opcode: 0xCE
@@ -66,14 +65,14 @@ def dec_absolute_0xce(cpu: MOS6502CPU) -> None:
     """
     from mos6502 import flags
 
-    address: int = cpu.fetch_absolute_mode_address(offset_register_name=None)
-    value: int = cpu.read_byte(address=address)
+    address: int = cpu.fetch_absolute_mode_address(None)
+    value: int = cpu.read_byte(address)
 
     # Read-Modify-Write operations have an internal processing cycle
     cpu.spend_cpu_cycles(1)
 
     result: int = (value - 1) & 0xFF
-    cpu.write_byte(address=address & 0xFFFF, data=result)
+    cpu.write_byte(address & 0xFFFF, result)
 
     # Set N and Z flags
     cpu.flags[flags.Z] = 1 if result == 0 else 0
@@ -82,7 +81,7 @@ def dec_absolute_0xce(cpu: MOS6502CPU) -> None:
     cpu.log.info("a")
 
 
-def dec_absolute_x_0xde(cpu: MOS6502CPU) -> None:
+def dec_absolute_x_0xde(cpu: "MOS6502CPU") -> None:
     """Execute DEC (Decrement Memory) - Absolute,X addressing mode.
 
     Opcode: 0xDE
@@ -91,18 +90,18 @@ def dec_absolute_x_0xde(cpu: MOS6502CPU) -> None:
     """
     from mos6502 import flags
 
-    address: int = cpu.fetch_absolute_mode_address(offset_register_name="X")
+    address: int = cpu.fetch_absolute_mode_address("X")
 
     # Read-Modify-Write with Absolute,X always does a dummy read regardless of page crossing
     cpu.spend_cpu_cycles(1)
 
-    value: int = cpu.read_byte(address=address)
+    value: int = cpu.read_byte(address)
 
     # Internal processing cycle for RMW operation
     cpu.spend_cpu_cycles(1)
 
     result: int = (value - 1) & 0xFF
-    cpu.write_byte(address=address & 0xFFFF, data=result)
+    cpu.write_byte(address & 0xFFFF, result)
 
     # Set N and Z flags
     cpu.flags[flags.Z] = 1 if result == 0 else 0

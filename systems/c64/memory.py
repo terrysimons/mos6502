@@ -6,22 +6,36 @@ This module contains:
 - C64Memory class that implements the C64's memory banking and I/O mapping
 """
 
-from __future__ import annotations
 
-import logging
-from typing import TYPE_CHECKING, Optional
+from mos6502.compat import logging
+from mos6502.compat import TYPE_CHECKING, Optional
 
-from c64.cartridges import (
-    Cartridge,
-    ROML_START,
-    ROML_END,
-    ROMH_START,
-    ROMH_END,
-    IO1_START,
-    IO1_END,
-    IO2_START,
-    IO2_END,
-)
+# Cartridge support is optional (not available on Pico due to kwargs limitations)
+try:
+    from c64.cartridges import (
+        Cartridge,
+        ROML_START,
+        ROML_END,
+        ROMH_START,
+        ROMH_END,
+        IO1_START,
+        IO1_END,
+        IO2_START,
+        IO2_END,
+    )
+    _CARTRIDGES_AVAILABLE = True
+except (ImportError, TypeError):
+    # Stub values for when cartridges module is not available
+    _CARTRIDGES_AVAILABLE = False
+    Cartridge = None
+    ROML_START = 0x8000
+    ROML_END = 0x9FFF
+    ROMH_START = 0xA000
+    ROMH_END = 0xBFFF
+    IO1_START = 0xDE00
+    IO1_END = 0xDEFF
+    IO2_START = 0xDF00
+    IO2_END = 0xDFFF
 
 if TYPE_CHECKING:
     from c64.cia1 import CIA1
@@ -81,7 +95,7 @@ class C64Memory:
     - Cartridge ROM support (ROML, ROMH, Ultimax mode)
     """
 
-    def __init__(self, ram, *, basic_rom, kernal_rom, char_rom, cia1, cia2, vic, sid, dirty_tracker=None) -> None:
+    def __init__(self, ram, basic_rom, kernal_rom, char_rom, cia1, cia2, vic, sid, dirty_tracker=None) -> None:
         # Store reference to flat RAM array for direct access (avoids delegation loop)
         # This eliminates branching on every RAM access
         self._ram = ram.data  # Direct reference to flat bytearray

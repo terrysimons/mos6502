@@ -4,14 +4,18 @@ CRT hardware type 17. Dinamic cartridges are functionally similar to
 Ocean Type 1 cartridges but with a 4-bit bank select (max 16 banks).
 """
 
-from __future__ import annotations
 
-import logging
+from mos6502.compat import logging
 
 from .base import CartridgeVariant, CartridgeImage, ROML_START, ROML_SIZE
-from .rom_builder import TestROMBuilder
+# Test ROM builder - optional for MicroPython/Pico
+try:
+    from .rom_builder import TestROMBuilder
+except ImportError:
+    TestROMBuilder = None
 from .type_05_ocean import OceanType1Cartridge
 from c64.colors import COLOR_BLUE, COLOR_YELLOW, COLOR_WHITE
+from mos6502.compat import List
 
 log = logging.getLogger("c64.cartridge")
 
@@ -65,10 +69,10 @@ class DinamicCartridge(OceanType1Cartridge):
     SIGNATURE_ADDR = 0x9FF5  # Each bank has its bank number here
 
     @classmethod
-    def get_cartridge_variants(cls) -> list[CartridgeVariant]:
+    def get_cartridge_variants(cls) -> List[CartridgeVariant]:
         """Return all valid configuration variants for Type 17."""
         return [
-            CartridgeVariant("128k", exrom=0, game=1, extra={"bank_count": 16}),
+            CartridgeVariant("128k", 0, 1, {"bank_count": 16}),
         ]
 
     @classmethod
@@ -120,11 +124,8 @@ class DinamicCartridge(OceanType1Cartridge):
             bank[0x1FF5] = i  # Bank number as signature
             banks.append(bytes(bank))
 
+        # CartridgeImage field order: description, exrom, game, extra, rom_data, hardware_type
         return CartridgeImage(
-            description=variant.description,
-            exrom=variant.exrom,
-            game=variant.game,
-            extra=variant.extra,
-            rom_data={"banks": banks},
-            hardware_type=cls.HARDWARE_TYPE,
+            variant.description, variant.exrom, variant.game, variant.extra,
+            {"banks": banks}, cls.HARDWARE_TYPE
         )

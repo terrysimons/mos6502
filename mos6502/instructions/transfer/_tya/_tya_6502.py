@@ -1,15 +1,14 @@
 #!/usr/bin/env python3
 """TYA instruction implementation for all 6502 variants."""
 
-from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from mos6502.compat import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from mos6502.core import MOS6502CPU
 
 
-def tya_implied_0x98(cpu: MOS6502CPU) -> None:
+def tya_implied_0x98(cpu: "MOS6502CPU") -> None:
     """Execute TYA (Transfer Index Y to Accumulator) - Implied addressing mode.
 
     Opcode: 0x98
@@ -26,6 +25,6 @@ def tya_implied_0x98(cpu: MOS6502CPU) -> None:
         cpu: The CPU instance to operate on
     """
     cpu.A = cpu.Y
-    cpu.set_load_status_flags(register_name="A")
+    cpu.set_load_status_flags("A")
     cpu.log.info("i")
     cpu.spend_cpu_cycles(1)

@@ -11,15 +11,14 @@ References:
   - http://www.oxyron.de/html/opcodes02.html
 """
 
-from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from mos6502.compat import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from mos6502.core import MOS6502CPU
 
 
-def las_absolute_y_0xbb(cpu: MOS6502CPU) -> None:
+def las_absolute_y_0xbb(cpu: "MOS6502CPU") -> None:
     """Execute LAS (Load A, X, and S) - Absolute,Y addressing mode.
 
     Opcode: 0xBB
@@ -42,8 +41,8 @@ def las_absolute_y_0xbb(cpu: MOS6502CPU) -> None:
     """
     from mos6502 import flags
 
-    address: int = cpu.fetch_absolute_mode_address(offset_register_name="Y")
-    value: int = cpu.read_byte(address=address)
+    address: int = cpu.fetch_absolute_mode_address("Y")
+    value: int = cpu.read_byte(address)
 
     # Perform M & S
     result: int = value & int(cpu.S)

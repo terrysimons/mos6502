@@ -5,10 +5,9 @@ The simplest cartridge type where ROM is directly mapped to fixed
 addresses with no banking hardware.
 """
 
-from __future__ import annotations
 
-import logging
-from typing import Optional
+from mos6502.compat import logging
+from mos6502.compat import Optional, List
 
 from .base import (
     Cartridge,
@@ -22,7 +21,11 @@ from .base import (
     ULTIMAX_ROMH_START,
     ULTIMAX_ROMH_SIZE,
 )
-from .rom_builder import TestROMBuilder
+# Test ROM builder - optional for MicroPython/Pico
+try:
+    from .rom_builder import TestROMBuilder
+except ImportError:
+    TestROMBuilder = None
 from c64.colors import COLOR_BLUE, COLOR_YELLOW, COLOR_WHITE
 
 log = logging.getLogger("c64.cartridge")
@@ -135,14 +138,15 @@ class StaticROMCartridge(Cartridge):
     # --- Test cartridge generation ---
 
     @classmethod
-    def get_cartridge_variants(cls) -> list[CartridgeVariant]:
+    def get_cartridge_variants(cls) -> List[CartridgeVariant]:
         """Return all valid configuration variants for Type 0."""
+        # CartridgeVariant field order: description, exrom, game, extra
         return [
-            CartridgeVariant("8k", exrom=0, game=1),
-            CartridgeVariant("16k", exrom=0, game=0),
-            CartridgeVariant("16k_single_chip", exrom=0, game=0, extra={"single_chip": True}),
-            CartridgeVariant("ultimax", exrom=1, game=0),
-            CartridgeVariant("ultimax_with_roml", exrom=1, game=0, extra={"include_roml": True}),
+            CartridgeVariant("8k", 0, 1),
+            CartridgeVariant("16k", 0, 0),
+            CartridgeVariant("16k_single_chip", 0, 0, {"single_chip": True}),
+            CartridgeVariant("ultimax", 1, 0),
+            CartridgeVariant("ultimax_with_roml", 1, 0, {"include_roml": True}),
         ]
 
     @classmethod
@@ -202,13 +206,10 @@ class StaticROMCartridge(Cartridge):
         signature = b"ROML-OK!"
         roml[0x1FF0:0x1FF0 + len(signature)] = signature
 
+        # CartridgeImage field order: description, exrom, game, extra, rom_data, hardware_type
         return CartridgeImage(
-            description=variant.description,
-            exrom=variant.exrom,
-            game=variant.game,
-            extra=variant.extra,
-            rom_data={"roml": bytes(roml)},
-            hardware_type=cls.HARDWARE_TYPE,
+            variant.description, variant.exrom, variant.game, variant.extra,
+            {"roml": bytes(roml)}, cls.HARDWARE_TYPE
         )
 
     @classmethod
@@ -264,13 +265,10 @@ class StaticROMCartridge(Cartridge):
         romh[0x0000:0x0008] = b"RH-START"  # At $A000
         romh[0x1FF0:0x1FF8] = b"RH-END!!"  # At $BFF0
 
+        # CartridgeImage field order: description, exrom, game, extra, rom_data, hardware_type
         return CartridgeImage(
-            description=variant.description,
-            exrom=variant.exrom,
-            game=variant.game,
-            extra=variant.extra,
-            rom_data={"roml": bytes(roml), "romh": bytes(romh)},
-            hardware_type=cls.HARDWARE_TYPE,
+            variant.description, variant.exrom, variant.game, variant.extra,
+            {"roml": bytes(roml), "romh": bytes(romh)}, cls.HARDWARE_TYPE
         )
 
     @classmethod
@@ -332,11 +330,8 @@ class StaticROMCartridge(Cartridge):
             roml[0x1FF0:0x1FF8] = b"ROML-OK!"
             rom_data["roml"] = bytes(roml)
 
+        # CartridgeImage field order: description, exrom, game, extra, rom_data, hardware_type
         return CartridgeImage(
-            description=variant.description,
-            exrom=variant.exrom,
-            game=variant.game,
-            extra=variant.extra,
-            rom_data=rom_data,
-            hardware_type=cls.HARDWARE_TYPE,
+            variant.description, variant.exrom, variant.game, variant.extra,
+            rom_data, cls.HARDWARE_TYPE
         )

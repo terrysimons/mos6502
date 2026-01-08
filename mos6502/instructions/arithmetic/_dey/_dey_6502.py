@@ -1,15 +1,14 @@
 #!/usr/bin/env python3
 """DEY instruction implementation for all 6502 variants."""
 
-from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from mos6502.compat import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from mos6502.core import MOS6502CPU
 
 
-def dey_implied_0x88(cpu: MOS6502CPU) -> None:
+def dey_implied_0x88(cpu: "MOS6502CPU") -> None:
     """Execute DEY (Decrement Index Y by One) - Implied addressing mode.
 
     Opcode: 0x88
@@ -26,6 +25,6 @@ def dey_implied_0x88(cpu: MOS6502CPU) -> None:
         cpu: The CPU instance to operate on
     """
     cpu.Y = (cpu.Y - 1) & 0xFF
-    cpu.set_load_status_flags(register_name="Y")
+    cpu.set_load_status_flags("Y")
     cpu.log.info("i")
     cpu.spend_cpu_cycles(1)

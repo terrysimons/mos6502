@@ -8,15 +8,14 @@ This module provides the foundation for cartridge emulation including:
 - Error cartridge ROM generation utilities
 """
 
-from __future__ import annotations
 
-import logging
+from mos6502.compat import logging
 import re
 import struct
-from abc import ABC, abstractmethod
-from dataclasses import dataclass, field
-from enum import IntEnum
-from typing import Protocol
+from mos6502.compat import ABC, abstractmethod
+from mos6502.compat import dataclass, field
+from mos6502.compat import IntEnum
+from mos6502.compat import Protocol, Union, List, Dict, Tuple
 
 log = logging.getLogger("c64.cartridge")
 
@@ -236,7 +235,7 @@ class CartridgeImage(CartridgeVariant):
     Inherits variant configuration and adds ROM data and serialization.
     This is the result of calling create_test_cartridge().
     """
-    rom_data: dict = None  # {"roml": bytes, "romh": bytes} or {"banks": list[bytes]}
+    rom_data: dict = None  # {"roml": bytes, "romh": bytes} or {"banks": List[bytes]}
     hardware_type: int = 0
 
     def __post_init__(self):
@@ -330,172 +329,120 @@ class CartridgeImage(CartridgeVariant):
         """Build all CHIP packets based on rom_data structure."""
         chips = b""
 
+        # _build_chip_packet args: bank, load_addr, data
         if "roml" in self.rom_data:
             if self.extra.get("single_chip") and "romh" in self.rom_data:
                 # Combined ROML+ROMH as single 16KB chip
                 combined = self.rom_data["roml"] + self.rom_data["romh"]
-                chips += self._build_chip_packet(
-                    bank=0, load_addr=ROML_START, data=combined
-                )
+                chips += self._build_chip_packet(0, ROML_START, combined)
             else:
                 # ROML as separate chip
-                chips += self._build_chip_packet(
-                    bank=0, load_addr=ROML_START, data=self.rom_data["roml"]
-                )
+                chips += self._build_chip_packet(0, ROML_START, self.rom_data["roml"])
                 if "romh" in self.rom_data:
                     # ROMH as separate chip (16KB mode at $A000)
-                    chips += self._build_chip_packet(
-                        bank=0, load_addr=ROMH_START, data=self.rom_data["romh"]
-                    )
+                    chips += self._build_chip_packet(0, ROMH_START, self.rom_data["romh"])
                 if "ultimax_romh" in self.rom_data:
                     # Ultimax ROMH as separate chip at $E000 (with ROML present)
-                    chips += self._build_chip_packet(
-                        bank=0, load_addr=ULTIMAX_ROMH_START, data=self.rom_data["ultimax_romh"]
-                    )
+                    chips += self._build_chip_packet(0, ULTIMAX_ROMH_START, self.rom_data["ultimax_romh"])
         elif "romh" in self.rom_data:
             # ROMH alone (Ultimax mode - loads at $E000)
             # Use extra["ultimax_romh_addr"] if specified, else ULTIMAX_ROMH_START
             romh_addr = self.extra.get("ultimax_romh_addr", ULTIMAX_ROMH_START)
-            chips += self._build_chip_packet(
-                bank=0, load_addr=romh_addr, data=self.rom_data["romh"]
-            )
+            chips += self._build_chip_packet(0, romh_addr, self.rom_data["romh"])
         elif "ultimax_romh" in self.rom_data:
             # Ultimax ROMH alone at $E000
-            chips += self._build_chip_packet(
-                bank=0, load_addr=ULTIMAX_ROMH_START, data=self.rom_data["ultimax_romh"]
-            )
+            chips += self._build_chip_packet(0, ULTIMAX_ROMH_START, self.rom_data["ultimax_romh"])
 
         if "banks" in self.rom_data:
             for i, bank_data in enumerate(self.rom_data["banks"]):
-                chips += self._build_chip_packet(
-                    bank=i, load_addr=ROML_START, data=bank_data
-                )
+                chips += self._build_chip_packet(i, ROML_START, bank_data)
 
         return chips
 
 
 # Mapper requirements for each hardware type
 # This defines what each mapper type needs to function
-MAPPER_REQUIREMENTS: dict[int | CartridgeType, MapperRequirements] = {
+# MapperRequirements field order (for positional args - kwargs don't work in MicroPython frozen):
+#   uses_roml, uses_romh, uses_ultimax_romh, num_banks, bank_size,
+#   uses_io1, uses_io2, control_registers, has_ram, ram_size
+MAPPER_REQUIREMENTS: Union[Dict[int, CartridgeType], MapperRequirements] = {
     # Type 0: Static ROM - simplest type, no banking
-    CartridgeType.NORMAL: MapperRequirements(
-        uses_roml=True,
-        uses_romh=True,  # 16KB mode
-        uses_ultimax_romh=True,  # Ultimax mode
-        num_banks=1,
-    ),
+    # (uses_roml=True, uses_romh=True, uses_ultimax_romh=True, num_banks=1)
+    CartridgeType.NORMAL: MapperRequirements(True, True, True, 1),
     # Type 1: Action Replay - freezer with bank switching
+    # (uses_roml=True, uses_romh=True, uses_ultimax_romh=False, num_banks=4, bank_size=0x2000,
+    #  uses_io1=True, uses_io2=True, control_registers=[...], has_ram=True, ram_size=0x2000)
     CartridgeType.ACTION_REPLAY: MapperRequirements(
-        uses_roml=True,
-        uses_romh=True,
-        num_banks=4,
-        uses_io1=True,
-        uses_io2=True,
-        has_ram=True,
-        ram_size=0x2000,  # 8KB RAM
-        control_registers=[
-            ("$DE00", "Control Reg"),
-        ],
+        True, True, False, 4, 0x2000, True, True,
+        [("$DE00", "Control Reg")], True, 0x2000
     ),
     # Type 2: KCS Power Cartridge
+    # (uses_roml=True, uses_romh=True, uses_ultimax_romh=False, num_banks=1, bank_size=0x2000,
+    #  uses_io1=True, uses_io2=True, control_registers=[...])
     CartridgeType.KCS_POWER: MapperRequirements(
-        uses_roml=True,
-        uses_romh=True,
-        num_banks=1,
-        uses_io1=True,
-        uses_io2=True,
-        control_registers=[
-            ("$DE00", "Config"),
-            ("$DF00", "Freeze"),
-        ],
+        True, True, False, 1, 0x2000, True, True,
+        [("$DE00", "Config"), ("$DF00", "Freeze")]
     ),
     # Type 3: Final Cartridge III
+    # (uses_roml=True, uses_romh=True, uses_ultimax_romh=False, num_banks=4, bank_size=0x2000,
+    #  uses_io1=True, uses_io2=True, control_registers=[...])
     CartridgeType.FINAL_CARTRIDGE_III: MapperRequirements(
-        uses_roml=True,
-        uses_romh=True,
-        num_banks=4,
-        uses_io1=True,
-        uses_io2=True,
-        control_registers=[
-            ("$DFFF", "Control"),
-        ],
+        True, True, False, 4, 0x2000, True, True,
+        [("$DFFF", "Control")]
     ),
     # Type 4: Simons' BASIC
+    # (uses_roml=True, uses_romh=True, uses_ultimax_romh=False, num_banks=1, bank_size=0x2000,
+    #  uses_io1=True, uses_io2=True, control_registers=[...])
     CartridgeType.SIMONS_BASIC: MapperRequirements(
-        uses_roml=True,
-        uses_romh=True,
-        num_banks=1,
-        uses_io1=True,
-        uses_io2=True,
-        control_registers=[
-            ("$DE00", "Enable ROMH"),
-            ("$DF00", "Disable ROMH"),
-        ],
+        True, True, False, 1, 0x2000, True, True,
+        [("$DE00", "Enable ROMH"), ("$DF00", "Disable ROMH")]
     ),
     # Type 5: Ocean type 1
+    # (uses_roml=True, uses_romh=True, uses_ultimax_romh=False, num_banks=64, bank_size=0x2000,
+    #  uses_io1=True, uses_io2=False, control_registers=[...])
     CartridgeType.OCEAN_TYPE_1: MapperRequirements(
-        uses_roml=True,
-        uses_romh=True,
-        num_banks=64,  # Up to 512KB
-        uses_io1=True,
-        control_registers=[
-            ("$DE00", "Bank Select"),
-        ],
+        True, True, False, 64, 0x2000, True, False,
+        [("$DE00", "Bank Select")]
     ),
     # Type 10: Epyx FastLoad
+    # (uses_roml=True, uses_romh=False, uses_ultimax_romh=False, num_banks=1, bank_size=0x2000,
+    #  uses_io1=True, uses_io2=True, control_registers=[...])
     CartridgeType.EPYX_FASTLOAD: MapperRequirements(
-        uses_roml=True,
-        num_banks=1,
-        uses_io1=True,  # Reading IO1 enables cartridge
-        uses_io2=True,  # IO2 shows last 256 bytes of ROM (always visible)
-        control_registers=[
-            ("$DE00", "Enable (read)"),
-            ("$DF00", "ROM stub"),
-        ],
+        True, False, False, 1, 0x2000, True, True,
+        [("$DE00", "Enable (read)"), ("$DF00", "ROM stub")]
     ),
     # Type 13: Final Cartridge I
+    # (uses_roml=True, uses_romh=True, uses_ultimax_romh=False, num_banks=1, bank_size=0x2000,
+    #  uses_io1=True, uses_io2=True, control_registers=[...])
     CartridgeType.FINAL_CARTRIDGE_I: MapperRequirements(
-        uses_roml=True,
-        uses_romh=True,
-        num_banks=1,
-        uses_io1=True,  # Any IO1 access disables cartridge
-        uses_io2=True,  # Any IO2 access enables cartridge
-        control_registers=[
-            ("$DE00", "Disable (any access)"),
-            ("$DF00", "Enable (any access)"),
-        ],
+        True, True, False, 1, 0x2000, True, True,
+        [("$DE00", "Disable (any access)"), ("$DF00", "Enable (any access)")]
     ),
     # Type 15: C64 Game System / System 3
+    # (uses_roml=True, uses_romh=False, uses_ultimax_romh=False, num_banks=64, bank_size=0x2000,
+    #  uses_io1=True, uses_io2=False, control_registers=[...])
     CartridgeType.C64_GAME_SYSTEM: MapperRequirements(
-        uses_roml=True,
-        num_banks=64,  # Up to 512KB (64 x 8KB banks)
-        uses_io1=True,
-        control_registers=[
-            ("$DE00", "Bank Select (read disables)"),
-        ],
+        True, False, False, 64, 0x2000, True, False,
+        [("$DE00", "Bank Select (read disables)")]
     ),
     # Type 17: Dinamic
+    # (uses_roml=True, uses_romh=False, uses_ultimax_romh=False, num_banks=16, bank_size=0x2000,
+    #  uses_io1=True, uses_io2=False, control_registers=[...])
     CartridgeType.DINAMIC: MapperRequirements(
-        uses_roml=True,
-        num_banks=16,  # 128KB typical
-        uses_io1=True,
-        control_registers=[
-            ("$DE00", "Bank Select"),
-        ],
+        True, False, False, 16, 0x2000, True, False,
+        [("$DE00", "Bank Select")]
     ),
     # Type 19: Magic Desk / Domark / HES Australia
+    # (uses_roml=True, uses_romh=False, uses_ultimax_romh=False, num_banks=64, bank_size=0x2000,
+    #  uses_io1=True, uses_io2=False, control_registers=[...])
     CartridgeType.MAGIC_DESK: MapperRequirements(
-        uses_roml=True,
-        num_banks=64,  # Up to 512KB (64 x 8KB banks)
-        uses_io1=True,
-        control_registers=[
-            ("$DE00", "Bank/Disable"),
-        ],
+        True, False, False, 64, 0x2000, True, False,
+        [("$DE00", "Bank/Disable")]
     ),
 }
 
 
-def generate_mapper_tests(hw_type: int) -> list[MapperTest]:
+def generate_mapper_tests(hw_type: int) -> List[MapperTest]:
     """Generate the list of tests for a mapper type.
 
     This is the single source of truth for both:
@@ -516,37 +463,35 @@ def generate_mapper_tests(hw_type: int) -> list[MapperTest]:
     bank_size = reqs.bank_size
 
     # Generate bank tests
+    # MapperTest field order: name, test_id, passed (default False)
     if reqs.num_banks > 1:
         for bank_num in range(reqs.num_banks):
             bank_offset = bank_num * bank_size
-            tests.append(MapperTest(
-                name=f"Bank {bank_num} ${bank_offset:04X}",
-                test_id=f"bank_{bank_num}",
-            ))
+            tests.append(MapperTest(f"Bank {bank_num} ${bank_offset:04X}", f"bank_{bank_num}"))
     else:
         # Single bank - just test ROML/ROMH presence
         if reqs.uses_roml:
-            tests.append(MapperTest(name="ROML $8000", test_id="roml"))
+            tests.append(MapperTest("ROML $8000", "roml"))
         if reqs.uses_romh:
-            tests.append(MapperTest(name="ROMH $A000", test_id="romh"))
+            tests.append(MapperTest("ROMH $A000", "romh"))
         if reqs.uses_ultimax_romh:
-            tests.append(MapperTest(name="ROMH $E000", test_id="ultimax_romh"))
+            tests.append(MapperTest("ROMH $E000", "ultimax_romh"))
 
     # Generate I/O and control register tests
     ctrl_addr_set = {a for a, _ in reqs.control_registers}
 
     if reqs.uses_io1 and "$DE00" not in ctrl_addr_set:
-        tests.append(MapperTest(name="IO1 $DE00-$DEFF", test_id="io1"))
+        tests.append(MapperTest("IO1 $DE00-$DEFF", "io1"))
     if reqs.uses_io2 and "$DF00" not in ctrl_addr_set:
         if reqs.has_ram:
-            tests.append(MapperTest(name="IO2 $DF00 RAM", test_id="io2_ram"))
+            tests.append(MapperTest("IO2 $DF00 RAM", "io2_ram"))
         else:
-            tests.append(MapperTest(name="IO2 $DF00-$DFFF", test_id="io2"))
+            tests.append(MapperTest("IO2 $DF00-$DFFF", "io2"))
 
     # Control registers
     for reg_addr, name in reqs.control_registers:
         safe_id = reg_addr.replace("$", "").lower()
-        tests.append(MapperTest(name=f"{reg_addr} {name}", test_id=f"reg_{safe_id}"))
+        tests.append(MapperTest(f"{reg_addr} {name}", f"reg_{safe_id}"))
 
     return tests
 
@@ -599,7 +544,7 @@ class CartridgeTestResults:
         if self.mapper_addresses is None:
             self.mapper_addresses = {}
 
-    def to_display_lines(self) -> list[str]:
+    def to_display_lines(self) -> List[str]:
         """Convert results to display lines for error cartridge.
 
         Uses generate_mapper_tests() as the single source of truth for
@@ -712,7 +657,7 @@ class CartridgeTestResults:
         return lines
 
 
-def parse_color_markup(text: str) -> list[tuple[str, int]]:
+def parse_color_markup(text: str) -> List[Tuple[str, int]]:
     """Parse color markup in text and return list of (char, color) tuples.
 
     Color markup codes:
@@ -763,7 +708,7 @@ def parse_color_markup(text: str) -> list[tuple[str, int]]:
     return result
 
 
-def create_error_cartridge_rom(error_lines: list[str], border_color: int = 0x02) -> bytes:
+def create_error_cartridge_rom(error_lines: List[str], border_color: int = 0x02) -> bytes:
     """Create an 8KB cartridge ROM that displays an error/info message.
 
     This is the single source of truth for error cartridge generation,
@@ -1052,7 +997,7 @@ class Cartridge(ABC):
     # --- Test cartridge generation ---
 
     @classmethod
-    def get_cartridge_variants(cls) -> list[CartridgeVariant]:
+    def get_cartridge_variants(cls) -> List[CartridgeVariant]:
         """Return all valid configuration variants for this cartridge type.
 
         Each variant represents a different mode or configuration that should
@@ -1107,12 +1052,9 @@ class Cartridge(ABC):
             CartridgeImage for a Type 0 8KB error display cart
         """
         lines = results.to_display_lines()
-        rom_bytes = create_error_cartridge_rom(lines, border_color=0x02)  # Red border
+        # create_error_cartridge_rom args: error_lines, border_color (default 0x02 = red)
+        rom_bytes = create_error_cartridge_rom(lines, 0x02)
+        # CartridgeImage field order: description, exrom, game, extra, rom_data, hardware_type
         return CartridgeImage(
-            description=variant.description,
-            exrom=0,
-            game=1,
-            extra=variant.extra,
-            rom_data={"roml": rom_bytes},
-            hardware_type=0,  # Type 0 for simplest compatibility
+            variant.description, 0, 1, variant.extra, {"roml": rom_bytes}, 0
         )

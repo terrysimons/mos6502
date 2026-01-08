@@ -4,13 +4,17 @@ CRT hardware type 19. Magic Desk cartridges support up to 512KB ROM
 organized as up to 64 x 8KB banks.
 """
 
-from __future__ import annotations
 
-import logging
+from mos6502.compat import logging
 
 from .base import Cartridge, CartridgeVariant, CartridgeImage, ROML_START, ROML_SIZE
-from .rom_builder import TestROMBuilder
+# Test ROM builder - optional for MicroPython/Pico
+try:
+    from .rom_builder import TestROMBuilder
+except ImportError:
+    TestROMBuilder = None
 from c64.colors import COLOR_BLUE, COLOR_YELLOW, COLOR_WHITE
+from mos6502.compat import List
 
 log = logging.getLogger("c64.cartridge")
 
@@ -56,7 +60,7 @@ class MagicDeskCartridge(Cartridge):
     HARDWARE_TYPE = 19
     BANK_SIZE = ROML_SIZE  # 8KB banks
 
-    def __init__(self, banks: list[bytes], name: str = ""):
+    def __init__(self, banks: List[bytes], name: str = ""):
         """Initialize Magic Desk cartridge.
 
         Args:
@@ -141,14 +145,14 @@ class MagicDeskCartridge(Cartridge):
     SIGNATURE_ADDR = 0x9FF5  # Each bank has its bank number here
 
     @classmethod
-    def get_cartridge_variants(cls) -> list[CartridgeVariant]:
+    def get_cartridge_variants(cls) -> List[CartridgeVariant]:
         """Return all valid configuration variants for Type 19."""
         return [
-            CartridgeVariant("32k", exrom=0, game=1, extra={"bank_count": 4}),
-            CartridgeVariant("64k", exrom=0, game=1, extra={"bank_count": 8}),
-            CartridgeVariant("128k", exrom=0, game=1, extra={"bank_count": 16}),
-            CartridgeVariant("256k", exrom=0, game=1, extra={"bank_count": 32}),
-            CartridgeVariant("512k", exrom=0, game=1, extra={"bank_count": 64}),
+            CartridgeVariant("32k", 0, 1, {"bank_count": 4}),
+            CartridgeVariant("64k", 0, 1, {"bank_count": 8}),
+            CartridgeVariant("128k", 0, 1, {"bank_count": 16}),
+            CartridgeVariant("256k", 0, 1, {"bank_count": 32}),
+            CartridgeVariant("512k", 0, 1, {"bank_count": 64}),
         ]
 
     @classmethod
@@ -200,11 +204,8 @@ class MagicDeskCartridge(Cartridge):
             bank[0x1FF5] = i  # Bank number as signature
             banks.append(bytes(bank))
 
+        # CartridgeImage field order: description, exrom, game, extra, rom_data, hardware_type
         return CartridgeImage(
-            description=variant.description,
-            exrom=variant.exrom,
-            game=variant.game,
-            extra=variant.extra,
-            rom_data={"banks": banks},
-            hardware_type=cls.HARDWARE_TYPE,
+            variant.description, variant.exrom, variant.game, variant.extra,
+            {"banks": banks}, cls.HARDWARE_TYPE
         )

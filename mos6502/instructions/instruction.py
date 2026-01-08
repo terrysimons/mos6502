@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Pydantic model for 6502 instruction metadata."""
 
-from typing import Literal, Self
+from mos6502.compat import Literal, List
 
 from pydantic import BaseModel, Field, computed_field, model_validator
 
@@ -82,7 +82,7 @@ class Instruction(BaseModel):
     }
 
     @model_validator(mode="after")
-    def validate_assembler_format(self: Self) -> Self:
+    def validate_assembler_format(self) -> "Instruction":
         """Validate assembler format string matches addressing mode."""
         # Implied and accumulator modes shouldn't have {oper}
         if self.addressing in ("implied", "accumulator"):
@@ -98,7 +98,7 @@ class Instruction(BaseModel):
 
     @computed_field
     @property
-    def name(self: Self) -> str:
+    def name(self) -> str:
         """Generate canonical name like LDA_IMMEDIATE_0xA9."""
         # Convert addressing mode to name format
         addr_map = {
@@ -121,7 +121,7 @@ class Instruction(BaseModel):
 
     @computed_field
     @property
-    def cycles_display(self: Self) -> str:
+    def cycles_display(self) -> str:
         """Return cycles as display string (e.g., '4' or '4*' for page penalty)."""
         if self.page_boundary_penalty:
             return f"{self.base_cycles}*"
@@ -129,41 +129,41 @@ class Instruction(BaseModel):
 
     @computed_field
     @property
-    def affects_n(self: Self) -> bool:
+    def affects_n(self) -> bool:
         """True if instruction affects Negative flag."""
         return "N" in self.affected_flags
 
     @computed_field
     @property
-    def affects_v(self: Self) -> bool:
+    def affects_v(self) -> bool:
         """True if instruction affects Overflow flag."""
         return "V" in self.affected_flags
 
     @computed_field
     @property
-    def affects_z(self: Self) -> bool:
+    def affects_z(self) -> bool:
         """True if instruction affects Zero flag."""
         return "Z" in self.affected_flags
 
     @computed_field
     @property
-    def affects_c(self: Self) -> bool:
+    def affects_c(self) -> bool:
         """True if instruction affects Carry flag."""
         return "C" in self.affected_flags
 
     @computed_field
     @property
-    def affects_i(self: Self) -> bool:
+    def affects_i(self) -> bool:
         """True if instruction affects Interrupt Disable flag."""
         return "I" in self.affected_flags
 
     @computed_field
     @property
-    def affects_d(self: Self) -> bool:
+    def affects_d(self) -> bool:
         """True if instruction affects Decimal flag."""
         return "D" in self.affected_flags
 
-    def to_legacy_dict(self: Self) -> dict:
+    def to_legacy_dict(self) -> dict:
         """Convert to legacy instruction_map dictionary format.
 
         This allows gradual migration by supporting the old dict-based API.
@@ -195,38 +195,54 @@ class Instruction(BaseModel):
             "flags": flags_byte,
         }
 
-    def __hash__(self: Self) -> int:
+    def __hash__(self) -> int:
         """Hash by opcode for use in sets and as dict keys."""
         return hash(self.opcode)
 
-    def __int__(self: Self) -> int:
+    def __int__(self) -> int:
         """Allow using Instruction where an int opcode is expected."""
         return self.opcode
 
 
-class PseudoEnumMember(int):
+class PseudoEnumMember:
     """Allows dynamic addition of members to IntEnum classes.
 
     This class is used to add instruction opcodes to the InstructionSet enum
     at runtime, since Python's IntEnum doesn't support dynamic member addition.
+
+    Note: Does not inherit from int for MicroPython compatibility.
     """
 
-    def __new__(cls, value: int, name: str) -> "PseudoEnumMember":
+    __slots__ = ('_value_', '_name')
+
+    def __init__(self, value: int, name: str) -> None:
         """Create a pseudo-enum member with the given value and name."""
-        obj = int.__new__(cls, value)
-        obj._name = name
-        obj._value_ = value
-        return obj
+        self._value_ = value
+        self._name = name
 
     @property
-    def name(self: Self) -> str:
+    def name(self) -> str:
         """Return the member name."""
         return self._name
 
     @property
-    def value(self: Self) -> int:
+    def value(self) -> int:
         """Return the member value."""
         return self._value_
+
+    def __int__(self) -> int:
+        """Return the integer value."""
+        return self._value_
+
+    def __eq__(self, other: object) -> bool:
+        """Compare equality with int or another PseudoEnumMember."""
+        if isinstance(other, int):
+            return self._value_ == other
+        return NotImplemented
+
+    def __hash__(self) -> int:
+        """Hash by value."""
+        return hash(self._value_)
 
 
 def register_instruction(
@@ -253,7 +269,7 @@ def register_instruction(
 
 
 def register_instructions(
-    instructions: list[Instruction],
+    instructions: List[Instruction],
     instruction_set_class: type,
     instruction_map: dict,
 ) -> None:

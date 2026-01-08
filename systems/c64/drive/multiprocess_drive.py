@@ -10,15 +10,14 @@ Process Model:
     - Commands (disk insert/eject) via multiprocessing.Queue
 """
 
-from __future__ import annotations
 
-import logging
+from mos6502.compat import logging
 import multiprocessing
 import os
 import sys
 import time
-from pathlib import Path
-from typing import Optional
+from mos6502.compat import Path
+from mos6502.compat import Optional
 
 # Use fork context on POSIX for better performance
 # (spawn has overhead of reimporting modules)
@@ -82,10 +81,10 @@ def drive_process_main(
         shared_state = SharedIECState(name=shared_mem_name, create=False)
 
         # Create drive instance
-        drive = Drive1541(device_number=device_number)
+        drive = Drive1541(device_number)
 
         # Create CPU for the drive (1541 uses standard 6502)
-        drive_cpu = CPU(cpu_variant=CPUVariant.NMOS_6502, verbose_cycles=False)
+        drive_cpu = CPU(CPUVariant.NMOS_6502, False)
         drive.cpu = drive_cpu
         drive_cpu.ram.memory_handler = drive.memory
 

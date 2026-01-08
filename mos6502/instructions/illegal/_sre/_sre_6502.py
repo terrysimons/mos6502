@@ -12,15 +12,14 @@ References:
   - http://www.oxyron.de/html/opcodes02.html
 """
 
-from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from mos6502.compat import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from mos6502.core import MOS6502CPU
 
 
-def sre_zeropage_0x47(cpu: MOS6502CPU) -> None:
+def sre_zeropage_0x47(cpu: "MOS6502CPU") -> None:
     """Execute SRE (Shift Right and EOR) - Zero Page addressing mode.
 
     Opcode: 0x47
@@ -41,15 +40,15 @@ def sre_zeropage_0x47(cpu: MOS6502CPU) -> None:
     """
     from mos6502 import flags
 
-    address: int = cpu.fetch_zeropage_mode_address(offset_register_name=None)
-    value: int = cpu.read_byte(address=address)
+    address: int = cpu.fetch_zeropage_mode_address(None)
+    value: int = cpu.read_byte(address)
 
     # Shift right (bit 0 goes to carry)
     cpu.flags[flags.C] = 1 if (value & 0x01) else 0
     shifted: int = (value >> 1) & 0xFF
 
     # Write shifted value back to memory
-    cpu.write_byte(address=address, data=shifted)
+    cpu.write_byte(address, shifted)
 
     # EOR with accumulator
     cpu.A = int(cpu.A) ^ shifted
@@ -61,7 +60,7 @@ def sre_zeropage_0x47(cpu: MOS6502CPU) -> None:
     cpu.log.info("i")
 
 
-def sre_zeropage_x_0x57(cpu: MOS6502CPU) -> None:
+def sre_zeropage_x_0x57(cpu: "MOS6502CPU") -> None:
     """Execute SRE (Shift Right and EOR) - Zero Page,X addressing mode.
 
     Opcode: 0x57
@@ -82,13 +81,13 @@ def sre_zeropage_x_0x57(cpu: MOS6502CPU) -> None:
     """
     from mos6502 import flags
 
-    address: int = cpu.fetch_zeropage_mode_address(offset_register_name="X")
-    value: int = cpu.read_byte(address=address)
+    address: int = cpu.fetch_zeropage_mode_address("X")
+    value: int = cpu.read_byte(address)
 
     cpu.flags[flags.C] = 1 if (value & 0x01) else 0
     shifted: int = (value >> 1) & 0xFF
 
-    cpu.write_byte(address=address, data=shifted)
+    cpu.write_byte(address, shifted)
 
     cpu.A = int(cpu.A) ^ shifted
 
@@ -98,7 +97,7 @@ def sre_zeropage_x_0x57(cpu: MOS6502CPU) -> None:
     cpu.log.info("i")
 
 
-def sre_indexed_indirect_x_0x43(cpu: MOS6502CPU) -> None:
+def sre_indexed_indirect_x_0x43(cpu: "MOS6502CPU") -> None:
     """Execute SRE (Shift Right and EOR) - (Indirect,X) addressing mode.
 
     Opcode: 0x43
@@ -120,12 +119,12 @@ def sre_indexed_indirect_x_0x43(cpu: MOS6502CPU) -> None:
     from mos6502 import flags
 
     address: int = cpu.fetch_indexed_indirect_mode_address()
-    value: int = cpu.read_byte(address=address)
+    value: int = cpu.read_byte(address)
 
     cpu.flags[flags.C] = 1 if (value & 0x01) else 0
     shifted: int = (value >> 1) & 0xFF
 
-    cpu.write_byte(address=address & 0xFFFF, data=shifted)
+    cpu.write_byte(address & 0xFFFF, shifted)
 
     cpu.A = int(cpu.A) ^ shifted
 
@@ -135,7 +134,7 @@ def sre_indexed_indirect_x_0x43(cpu: MOS6502CPU) -> None:
     cpu.log.info("i")
 
 
-def sre_indirect_indexed_y_0x53(cpu: MOS6502CPU) -> None:
+def sre_indirect_indexed_y_0x53(cpu: "MOS6502CPU") -> None:
     """Execute SRE (Shift Right and EOR) - (Indirect),Y addressing mode.
 
     Opcode: 0x53
@@ -157,12 +156,12 @@ def sre_indirect_indexed_y_0x53(cpu: MOS6502CPU) -> None:
     from mos6502 import flags
 
     address: int = cpu.fetch_indirect_indexed_mode_address()
-    value: int = cpu.read_byte(address=address)
+    value: int = cpu.read_byte(address)
 
     cpu.flags[flags.C] = 1 if (value & 0x01) else 0
     shifted: int = (value >> 1) & 0xFF
 
-    cpu.write_byte(address=address & 0xFFFF, data=shifted)
+    cpu.write_byte(address & 0xFFFF, shifted)
 
     cpu.A = int(cpu.A) ^ shifted
 
@@ -172,7 +171,7 @@ def sre_indirect_indexed_y_0x53(cpu: MOS6502CPU) -> None:
     cpu.log.info("i")
 
 
-def sre_absolute_0x4f(cpu: MOS6502CPU) -> None:
+def sre_absolute_0x4f(cpu: "MOS6502CPU") -> None:
     """Execute SRE (Shift Right and EOR) - Absolute addressing mode.
 
     Opcode: 0x4F
@@ -193,13 +192,13 @@ def sre_absolute_0x4f(cpu: MOS6502CPU) -> None:
     """
     from mos6502 import flags
 
-    address: int = cpu.fetch_absolute_mode_address(offset_register_name=None)
-    value: int = cpu.read_byte(address=address)
+    address: int = cpu.fetch_absolute_mode_address(None)
+    value: int = cpu.read_byte(address)
 
     cpu.flags[flags.C] = 1 if (value & 0x01) else 0
     shifted: int = (value >> 1) & 0xFF
 
-    cpu.write_byte(address=address & 0xFFFF, data=shifted)
+    cpu.write_byte(address & 0xFFFF, shifted)
 
     cpu.A = int(cpu.A) ^ shifted
 
@@ -209,7 +208,7 @@ def sre_absolute_0x4f(cpu: MOS6502CPU) -> None:
     cpu.log.info("i")
 
 
-def sre_absolute_x_0x5f(cpu: MOS6502CPU) -> None:
+def sre_absolute_x_0x5f(cpu: "MOS6502CPU") -> None:
     """Execute SRE (Shift Right and EOR) - Absolute,X addressing mode.
 
     Opcode: 0x5F
@@ -230,12 +229,12 @@ def sre_absolute_x_0x5f(cpu: MOS6502CPU) -> None:
     """
     from mos6502 import flags
 
-    address: int = cpu.fetch_absolute_mode_address(offset_register_name="X")
+    address: int = cpu.fetch_absolute_mode_address("X")
 
     # Read-Modify-Write with Absolute,X always does a dummy read regardless of page crossing
     cpu.spend_cpu_cycles(1)
 
-    value: int = cpu.read_byte(address=address)
+    value: int = cpu.read_byte(address)
 
     # Internal processing cycle for RMW operation
     cpu.spend_cpu_cycles(1)
@@ -243,7 +242,7 @@ def sre_absolute_x_0x5f(cpu: MOS6502CPU) -> None:
     cpu.flags[flags.C] = 1 if (value & 0x01) else 0
     shifted: int = (value >> 1) & 0xFF
 
-    cpu.write_byte(address=address & 0xFFFF, data=shifted)
+    cpu.write_byte(address & 0xFFFF, shifted)
 
     cpu.A = int(cpu.A) ^ shifted
 
@@ -253,7 +252,7 @@ def sre_absolute_x_0x5f(cpu: MOS6502CPU) -> None:
     cpu.log.info("ax")
 
 
-def sre_absolute_y_0x5b(cpu: MOS6502CPU) -> None:
+def sre_absolute_y_0x5b(cpu: "MOS6502CPU") -> None:
     """Execute SRE (Shift Right and EOR) - Absolute,Y addressing mode.
 
     Opcode: 0x5B
@@ -274,12 +273,12 @@ def sre_absolute_y_0x5b(cpu: MOS6502CPU) -> None:
     """
     from mos6502 import flags
 
-    address: int = cpu.fetch_absolute_mode_address(offset_register_name="Y")
+    address: int = cpu.fetch_absolute_mode_address("Y")
 
     # Read-Modify-Write with Absolute,Y always does a dummy read regardless of page crossing
     cpu.spend_cpu_cycles(1)
 
-    value: int = cpu.read_byte(address=address & 0xFFFF)
+    value: int = cpu.read_byte(address & 0xFFFF)
 
     # Internal processing cycle for RMW operation
     cpu.spend_cpu_cycles(1)
@@ -287,7 +286,7 @@ def sre_absolute_y_0x5b(cpu: MOS6502CPU) -> None:
     cpu.flags[flags.C] = 1 if (value & 0x01) else 0
     shifted: int = (value >> 1) & 0xFF
 
-    cpu.write_byte(address=address & 0xFFFF, data=shifted)
+    cpu.write_byte(address & 0xFFFF, shifted)
 
     cpu.A = int(cpu.A) ^ shifted
 

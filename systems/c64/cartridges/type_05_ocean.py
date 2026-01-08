@@ -4,13 +4,17 @@ CRT hardware type 5. Ocean Type 1 cartridges support up to 512KB ROM
 organized as up to 64 x 8KB banks.
 """
 
-from __future__ import annotations
 
-import logging
+from mos6502.compat import logging
 
 from .base import Cartridge, CartridgeVariant, CartridgeImage, ROML_START, ROML_SIZE, ROMH_START
-from .rom_builder import TestROMBuilder
+# Test ROM builder - optional for MicroPython/Pico
+try:
+    from .rom_builder import TestROMBuilder
+except ImportError:
+    TestROMBuilder = None
 from c64.colors import COLOR_BLUE, COLOR_YELLOW, COLOR_WHITE
+from mos6502.compat import List
 
 log = logging.getLogger("c64.cartridge")
 
@@ -49,7 +53,7 @@ class OceanType1Cartridge(Cartridge):
     HARDWARE_TYPE = 5
     BANK_SIZE = ROML_SIZE  # 8KB banks
 
-    def __init__(self, banks: list[bytes], name: str = "", use_16kb_mode: bool = False):
+    def __init__(self, banks: List[bytes], name: str = "", use_16kb_mode: bool = False):
         """Initialize Ocean Type 1 cartridge.
 
         Args:
@@ -125,12 +129,13 @@ class OceanType1Cartridge(Cartridge):
     # --- Test cartridge generation ---
 
     @classmethod
-    def get_cartridge_variants(cls) -> list[CartridgeVariant]:
+    def get_cartridge_variants(cls) -> List[CartridgeVariant]:
         """Return all valid configuration variants for Type 5."""
+        # CartridgeVariant field order: description, exrom, game, extra
         return [
-            CartridgeVariant("128k", exrom=0, game=1, extra={"bank_count": 16}),
-            CartridgeVariant("256k", exrom=0, game=1, extra={"bank_count": 32}),
-            CartridgeVariant("512k", exrom=0, game=1, extra={"bank_count": 64}),
+            CartridgeVariant("128k", 0, 1, {"bank_count": 16}),
+            CartridgeVariant("256k", 0, 1, {"bank_count": 32}),
+            CartridgeVariant("512k", 0, 1, {"bank_count": 64}),
         ]
 
     # Bank select register and signature location
@@ -188,11 +193,8 @@ class OceanType1Cartridge(Cartridge):
             bank[0x1FF5] = i  # Bank number as signature
             banks.append(bytes(bank))
 
+        # CartridgeImage field order: description, exrom, game, extra, rom_data, hardware_type
         return CartridgeImage(
-            description=variant.description,
-            exrom=variant.exrom,
-            game=variant.game,
-            extra=variant.extra,
-            rom_data={"banks": banks},
-            hardware_type=cls.HARDWARE_TYPE,
+            variant.description, variant.exrom, variant.game, variant.extra,
+            {"banks": banks}, cls.HARDWARE_TYPE
         )

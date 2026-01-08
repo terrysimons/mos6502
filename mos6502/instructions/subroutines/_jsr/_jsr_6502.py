@@ -1,15 +1,14 @@
 #!/usr/bin/env python3
 """JSR instruction implementation for all 6502 variants."""
 
-from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from mos6502.compat import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from mos6502.core import MOS6502CPU
 
 
-def jsr_absolute_0x20(cpu: MOS6502CPU) -> None:
+def jsr_absolute_0x20(cpu: "MOS6502CPU") -> None:
     """Execute JSR (Jump to New Location Saving Return Address) - Absolute addressing mode.
 
     Opcode: 0x20
@@ -41,9 +40,9 @@ def jsr_absolute_0x20(cpu: MOS6502CPU) -> None:
     pc_low = return_addr & 0xFF
 
     # Push high byte first, then low byte
-    cpu.write_byte(address=cpu.S, data=pc_high)
+    cpu.write_byte(cpu.S, pc_high)
     cpu.S -= 1
-    cpu.write_byte(address=cpu.S, data=pc_low)
+    cpu.write_byte(cpu.S, pc_low)
     cpu.S -= 1
     cpu.PC = subroutine_address
     cpu.log.info("i")

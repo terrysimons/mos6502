@@ -14,9 +14,8 @@ References:
   - https://www.nesdev.org/wiki/CPU_unofficial_opcodes
 """
 
-from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from mos6502.compat import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from mos6502.core import MOS6502CPU
@@ -26,7 +25,7 @@ if TYPE_CHECKING:
 # 1-byte NOPs (implied mode, 2 cycles)
 # =============================================================================
 
-def nop_implied_0x1a(cpu: MOS6502CPU) -> None:
+def nop_implied_0x1a(cpu: "MOS6502CPU") -> None:
     """Execute illegal NOP - Implied addressing mode.
 
     Opcode: 0x1A
@@ -35,10 +34,10 @@ def nop_implied_0x1a(cpu: MOS6502CPU) -> None:
     Flags: None affected
     """
     cpu.log.info("i")
-    cpu.spend_cpu_cycles(cost=1)
+    cpu.spend_cpu_cycles(1)
 
 
-def nop_implied_0x3a(cpu: MOS6502CPU) -> None:
+def nop_implied_0x3a(cpu: "MOS6502CPU") -> None:
     """Execute illegal NOP - Implied addressing mode.
 
     Opcode: 0x3A
@@ -47,10 +46,10 @@ def nop_implied_0x3a(cpu: MOS6502CPU) -> None:
     Flags: None affected
     """
     cpu.log.info("i")
-    cpu.spend_cpu_cycles(cost=1)
+    cpu.spend_cpu_cycles(1)
 
 
-def nop_implied_0x5a(cpu: MOS6502CPU) -> None:
+def nop_implied_0x5a(cpu: "MOS6502CPU") -> None:
     """Execute illegal NOP - Implied addressing mode.
 
     Opcode: 0x5A
@@ -59,10 +58,10 @@ def nop_implied_0x5a(cpu: MOS6502CPU) -> None:
     Flags: None affected
     """
     cpu.log.info("i")
-    cpu.spend_cpu_cycles(cost=1)
+    cpu.spend_cpu_cycles(1)
 
 
-def nop_implied_0x7a(cpu: MOS6502CPU) -> None:
+def nop_implied_0x7a(cpu: "MOS6502CPU") -> None:
     """Execute illegal NOP - Implied addressing mode.
 
     Opcode: 0x7A
@@ -71,10 +70,10 @@ def nop_implied_0x7a(cpu: MOS6502CPU) -> None:
     Flags: None affected
     """
     cpu.log.info("i")
-    cpu.spend_cpu_cycles(cost=1)
+    cpu.spend_cpu_cycles(1)
 
 
-def nop_implied_0xda(cpu: MOS6502CPU) -> None:
+def nop_implied_0xda(cpu: "MOS6502CPU") -> None:
     """Execute illegal NOP - Implied addressing mode.
 
     Opcode: 0xDA
@@ -83,10 +82,10 @@ def nop_implied_0xda(cpu: MOS6502CPU) -> None:
     Flags: None affected
     """
     cpu.log.info("i")
-    cpu.spend_cpu_cycles(cost=1)
+    cpu.spend_cpu_cycles(1)
 
 
-def nop_implied_0xfa(cpu: MOS6502CPU) -> None:
+def nop_implied_0xfa(cpu: "MOS6502CPU") -> None:
     """Execute illegal NOP - Implied addressing mode.
 
     Opcode: 0xFA
@@ -95,14 +94,14 @@ def nop_implied_0xfa(cpu: MOS6502CPU) -> None:
     Flags: None affected
     """
     cpu.log.info("i")
-    cpu.spend_cpu_cycles(cost=1)
+    cpu.spend_cpu_cycles(1)
 
 
 # =============================================================================
 # 2-byte NOPs (immediate mode, 2 cycles)
 # =============================================================================
 
-def nop_immediate_0x80(cpu: MOS6502CPU) -> None:
+def nop_immediate_0x80(cpu: "MOS6502CPU") -> None:
     """Execute illegal NOP - Immediate addressing mode.
 
     Opcode: 0x80
@@ -114,7 +113,7 @@ def nop_immediate_0x80(cpu: MOS6502CPU) -> None:
     cpu.log.info("i")
 
 
-def nop_immediate_0x82(cpu: MOS6502CPU) -> None:
+def nop_immediate_0x82(cpu: "MOS6502CPU") -> None:
     """Execute illegal NOP - Immediate addressing mode.
 
     Opcode: 0x82
@@ -126,7 +125,7 @@ def nop_immediate_0x82(cpu: MOS6502CPU) -> None:
     cpu.log.info("i")
 
 
-def nop_immediate_0x89(cpu: MOS6502CPU) -> None:
+def nop_immediate_0x89(cpu: "MOS6502CPU") -> None:
     """Execute illegal NOP - Immediate addressing mode.
 
     Opcode: 0x89
@@ -138,7 +137,7 @@ def nop_immediate_0x89(cpu: MOS6502CPU) -> None:
     cpu.log.info("i")
 
 
-def nop_immediate_0xc2(cpu: MOS6502CPU) -> None:
+def nop_immediate_0xc2(cpu: "MOS6502CPU") -> None:
     """Execute illegal NOP - Immediate addressing mode.
 
     Opcode: 0xC2
@@ -150,7 +149,7 @@ def nop_immediate_0xc2(cpu: MOS6502CPU) -> None:
     cpu.log.info("i")
 
 
-def nop_immediate_0xe2(cpu: MOS6502CPU) -> None:
+def nop_immediate_0xe2(cpu: "MOS6502CPU") -> None:
     """Execute illegal NOP - Immediate addressing mode.
 
     Opcode: 0xE2
@@ -166,7 +165,7 @@ def nop_immediate_0xe2(cpu: MOS6502CPU) -> None:
 # 2-byte NOPs (zero page mode, 3 cycles)
 # =============================================================================
 
-def nop_zeropage_0x04(cpu: MOS6502CPU) -> None:
+def nop_zeropage_0x04(cpu: "MOS6502CPU") -> None:
     """Execute illegal NOP - Zero Page addressing mode.
 
     Opcode: 0x04
@@ -174,12 +173,12 @@ def nop_zeropage_0x04(cpu: MOS6502CPU) -> None:
     Bytes: 2
     Flags: None affected
     """
-    address: int = cpu.fetch_zeropage_mode_address(offset_register_name=None)
+    address: int = cpu.fetch_zeropage_mode_address(None)
     cpu.read_byte(address)  # Dummy read
     cpu.log.info("i")
 
 
-def nop_zeropage_0x44(cpu: MOS6502CPU) -> None:
+def nop_zeropage_0x44(cpu: "MOS6502CPU") -> None:
     """Execute illegal NOP - Zero Page addressing mode.
 
     Opcode: 0x44
@@ -187,12 +186,12 @@ def nop_zeropage_0x44(cpu: MOS6502CPU) -> None:
     Bytes: 2
     Flags: None affected
     """
-    address: int = cpu.fetch_zeropage_mode_address(offset_register_name=None)
+    address: int = cpu.fetch_zeropage_mode_address(None)
     cpu.read_byte(address)  # Dummy read
     cpu.log.info("i")
 
 
-def nop_zeropage_0x64(cpu: MOS6502CPU) -> None:
+def nop_zeropage_0x64(cpu: "MOS6502CPU") -> None:
     """Execute illegal NOP - Zero Page addressing mode.
 
     Opcode: 0x64
@@ -200,7 +199,7 @@ def nop_zeropage_0x64(cpu: MOS6502CPU) -> None:
     Bytes: 2
     Flags: None affected
     """
-    address: int = cpu.fetch_zeropage_mode_address(offset_register_name=None)
+    address: int = cpu.fetch_zeropage_mode_address(None)
     cpu.read_byte(address)  # Dummy read
     cpu.log.info("i")
 
@@ -209,7 +208,7 @@ def nop_zeropage_0x64(cpu: MOS6502CPU) -> None:
 # 2-byte NOPs (zero page,X mode, 4 cycles)
 # =============================================================================
 
-def nop_zeropage_x_0x14(cpu: MOS6502CPU) -> None:
+def nop_zeropage_x_0x14(cpu: "MOS6502CPU") -> None:
     """Execute illegal NOP - Zero Page,X addressing mode.
 
     Opcode: 0x14
@@ -217,12 +216,12 @@ def nop_zeropage_x_0x14(cpu: MOS6502CPU) -> None:
     Bytes: 2
     Flags: None affected
     """
-    address: int = cpu.fetch_zeropage_mode_address(offset_register_name="X")
+    address: int = cpu.fetch_zeropage_mode_address("X")
     cpu.read_byte(address)  # Dummy read
     cpu.log.info("i")
 
 
-def nop_zeropage_x_0x34(cpu: MOS6502CPU) -> None:
+def nop_zeropage_x_0x34(cpu: "MOS6502CPU") -> None:
     """Execute illegal NOP - Zero Page,X addressing mode.
 
     Opcode: 0x34
@@ -230,12 +229,12 @@ def nop_zeropage_x_0x34(cpu: MOS6502CPU) -> None:
     Bytes: 2
     Flags: None affected
     """
-    address: int = cpu.fetch_zeropage_mode_address(offset_register_name="X")
+    address: int = cpu.fetch_zeropage_mode_address("X")
     cpu.read_byte(address)  # Dummy read
     cpu.log.info("i")
 
 
-def nop_zeropage_x_0x54(cpu: MOS6502CPU) -> None:
+def nop_zeropage_x_0x54(cpu: "MOS6502CPU") -> None:
     """Execute illegal NOP - Zero Page,X addressing mode.
 
     Opcode: 0x54
@@ -243,12 +242,12 @@ def nop_zeropage_x_0x54(cpu: MOS6502CPU) -> None:
     Bytes: 2
     Flags: None affected
     """
-    address: int = cpu.fetch_zeropage_mode_address(offset_register_name="X")
+    address: int = cpu.fetch_zeropage_mode_address("X")
     cpu.read_byte(address)  # Dummy read
     cpu.log.info("i")
 
 
-def nop_zeropage_x_0x74(cpu: MOS6502CPU) -> None:
+def nop_zeropage_x_0x74(cpu: "MOS6502CPU") -> None:
     """Execute illegal NOP - Zero Page,X addressing mode.
 
     Opcode: 0x74
@@ -256,12 +255,12 @@ def nop_zeropage_x_0x74(cpu: MOS6502CPU) -> None:
     Bytes: 2
     Flags: None affected
     """
-    address: int = cpu.fetch_zeropage_mode_address(offset_register_name="X")
+    address: int = cpu.fetch_zeropage_mode_address("X")
     cpu.read_byte(address)  # Dummy read
     cpu.log.info("i")
 
 
-def nop_zeropage_x_0xd4(cpu: MOS6502CPU) -> None:
+def nop_zeropage_x_0xd4(cpu: "MOS6502CPU") -> None:
     """Execute illegal NOP - Zero Page,X addressing mode.
 
     Opcode: 0xD4
@@ -269,12 +268,12 @@ def nop_zeropage_x_0xd4(cpu: MOS6502CPU) -> None:
     Bytes: 2
     Flags: None affected
     """
-    address: int = cpu.fetch_zeropage_mode_address(offset_register_name="X")
+    address: int = cpu.fetch_zeropage_mode_address("X")
     cpu.read_byte(address)  # Dummy read
     cpu.log.info("i")
 
 
-def nop_zeropage_x_0xf4(cpu: MOS6502CPU) -> None:
+def nop_zeropage_x_0xf4(cpu: "MOS6502CPU") -> None:
     """Execute illegal NOP - Zero Page,X addressing mode.
 
     Opcode: 0xF4
@@ -282,7 +281,7 @@ def nop_zeropage_x_0xf4(cpu: MOS6502CPU) -> None:
     Bytes: 2
     Flags: None affected
     """
-    address: int = cpu.fetch_zeropage_mode_address(offset_register_name="X")
+    address: int = cpu.fetch_zeropage_mode_address("X")
     cpu.read_byte(address)  # Dummy read
     cpu.log.info("i")
 
@@ -291,7 +290,7 @@ def nop_zeropage_x_0xf4(cpu: MOS6502CPU) -> None:
 # 3-byte NOPs (absolute mode, 4 cycles)
 # =============================================================================
 
-def nop_absolute_0x0c(cpu: MOS6502CPU) -> None:
+def nop_absolute_0x0c(cpu: "MOS6502CPU") -> None:
     """Execute illegal NOP - Absolute addressing mode.
 
     Opcode: 0x0C
@@ -299,7 +298,7 @@ def nop_absolute_0x0c(cpu: MOS6502CPU) -> None:
     Bytes: 3
     Flags: None affected
     """
-    address: int = cpu.fetch_absolute_mode_address(offset_register_name=None)
+    address: int = cpu.fetch_absolute_mode_address(None)
     cpu.read_byte(address)  # Dummy read
     cpu.log.info("i")
 
@@ -309,7 +308,7 @@ def nop_absolute_0x0c(cpu: MOS6502CPU) -> None:
 # Extra cycle on page boundary crossing
 # =============================================================================
 
-def nop_absolute_x_0x1c(cpu: MOS6502CPU) -> None:
+def nop_absolute_x_0x1c(cpu: "MOS6502CPU") -> None:
     """Execute illegal NOP - Absolute,X addressing mode.
 
     Opcode: 0x1C
@@ -317,12 +316,12 @@ def nop_absolute_x_0x1c(cpu: MOS6502CPU) -> None:
     Bytes: 3
     Flags: None affected
     """
-    address: int = cpu.fetch_absolute_mode_address(offset_register_name="X")
+    address: int = cpu.fetch_absolute_mode_address("X")
     cpu.read_byte(address)  # Dummy read
     cpu.log.info("i")
 
 
-def nop_absolute_x_0x3c(cpu: MOS6502CPU) -> None:
+def nop_absolute_x_0x3c(cpu: "MOS6502CPU") -> None:
     """Execute illegal NOP - Absolute,X addressing mode.
 
     Opcode: 0x3C
@@ -330,12 +329,12 @@ def nop_absolute_x_0x3c(cpu: MOS6502CPU) -> None:
     Bytes: 3
     Flags: None affected
     """
-    address: int = cpu.fetch_absolute_mode_address(offset_register_name="X")
+    address: int = cpu.fetch_absolute_mode_address("X")
     cpu.read_byte(address)  # Dummy read
     cpu.log.info("i")
 
 
-def nop_absolute_x_0x5c(cpu: MOS6502CPU) -> None:
+def nop_absolute_x_0x5c(cpu: "MOS6502CPU") -> None:
     """Execute illegal NOP - Absolute,X addressing mode.
 
     Opcode: 0x5C
@@ -343,12 +342,12 @@ def nop_absolute_x_0x5c(cpu: MOS6502CPU) -> None:
     Bytes: 3
     Flags: None affected
     """
-    address: int = cpu.fetch_absolute_mode_address(offset_register_name="X")
+    address: int = cpu.fetch_absolute_mode_address("X")
     cpu.read_byte(address)  # Dummy read
     cpu.log.info("i")
 
 
-def nop_absolute_x_0x7c(cpu: MOS6502CPU) -> None:
+def nop_absolute_x_0x7c(cpu: "MOS6502CPU") -> None:
     """Execute illegal NOP - Absolute,X addressing mode.
 
     Opcode: 0x7C
@@ -356,12 +355,12 @@ def nop_absolute_x_0x7c(cpu: MOS6502CPU) -> None:
     Bytes: 3
     Flags: None affected
     """
-    address: int = cpu.fetch_absolute_mode_address(offset_register_name="X")
+    address: int = cpu.fetch_absolute_mode_address("X")
     cpu.read_byte(address)  # Dummy read
     cpu.log.info("i")
 
 
-def nop_absolute_x_0xdc(cpu: MOS6502CPU) -> None:
+def nop_absolute_x_0xdc(cpu: "MOS6502CPU") -> None:
     """Execute illegal NOP - Absolute,X addressing mode.
 
     Opcode: 0xDC
@@ -369,12 +368,12 @@ def nop_absolute_x_0xdc(cpu: MOS6502CPU) -> None:
     Bytes: 3
     Flags: None affected
     """
-    address: int = cpu.fetch_absolute_mode_address(offset_register_name="X")
+    address: int = cpu.fetch_absolute_mode_address("X")
     cpu.read_byte(address)  # Dummy read
     cpu.log.info("i")
 
 
-def nop_absolute_x_0xfc(cpu: MOS6502CPU) -> None:
+def nop_absolute_x_0xfc(cpu: "MOS6502CPU") -> None:
     """Execute illegal NOP - Absolute,X addressing mode.
 
     Opcode: 0xFC
@@ -382,6 +381,6 @@ def nop_absolute_x_0xfc(cpu: MOS6502CPU) -> None:
     Bytes: 3
     Flags: None affected
     """
-    address: int = cpu.fetch_absolute_mode_address(offset_register_name="X")
+    address: int = cpu.fetch_absolute_mode_address("X")
     cpu.read_byte(address)  # Dummy read
     cpu.log.info("i")

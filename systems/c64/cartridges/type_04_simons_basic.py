@@ -4,13 +4,17 @@ CRT hardware type 4. A simple 16KB cartridge that extends Commodore BASIC
 with additional commands.
 """
 
-from __future__ import annotations
 
-import logging
+from mos6502.compat import logging
 
 from .base import Cartridge, CartridgeVariant, CartridgeImage, ROML_START, ROML_SIZE, ROMH_START, ROMH_SIZE
-from .rom_builder import TestROMBuilder
+# Test ROM builder - optional for MicroPython/Pico
+try:
+    from .rom_builder import TestROMBuilder
+except ImportError:
+    TestROMBuilder = None
 from c64.colors import COLOR_BLUE, COLOR_YELLOW, COLOR_WHITE
+from mos6502.compat import List
 
 log = logging.getLogger("c64.cartridge")
 
@@ -114,10 +118,11 @@ class SimonsBasicCartridge(Cartridge):
     # --- Test cartridge generation ---
 
     @classmethod
-    def get_cartridge_variants(cls) -> list[CartridgeVariant]:
+    def get_cartridge_variants(cls) -> List[CartridgeVariant]:
         """Return all valid configuration variants for Type 4."""
+        # CartridgeVariant field order: description, exrom, game, extra
         return [
-            CartridgeVariant("", exrom=0, game=1),  # 8KB mode initially
+            CartridgeVariant("", 0, 1),  # 8KB mode initially
         ]
 
     @classmethod
@@ -169,11 +174,8 @@ class SimonsBasicCartridge(Cartridge):
         romh_data = bytearray(ROMH_SIZE)
         romh_data[0x1FF0:0x1FF8] = b"RH-SIGN!"  # ROMH signature
 
+        # CartridgeImage field order: description, exrom, game, extra, rom_data, hardware_type
         return CartridgeImage(
-            description=variant.description,
-            exrom=variant.exrom,
-            game=variant.game,
-            extra=variant.extra,
-            rom_data={"roml": bytes(roml_data), "romh": bytes(romh_data)},
-            hardware_type=cls.HARDWARE_TYPE,
+            variant.description, variant.exrom, variant.game, variant.extra,
+            {"roml": bytes(roml_data), "romh": bytes(romh_data)}, cls.HARDWARE_TYPE
         )
